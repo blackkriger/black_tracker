@@ -141,7 +141,7 @@ async function copyToken(): Promise<void> {
                 <span class="av av--xl" :style="buddyAvatarStyle(me?.login ?? '')"></span>
                 <div class="who__lines">
                   <span class="who__login">{{ me?.login }}</span>
-                  <span class="stamp">SINCE {{ since }}<template v-if="me?.isAdmin">, ADMIN</template></span>
+                  <span class="stamp">SINCE {{ since }}</span>
                 </div>
               </div>
               <div class="field">
