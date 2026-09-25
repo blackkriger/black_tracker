@@ -146,7 +146,18 @@ async function copyToken(): Promise<void> {
               </div>
               <div class="field">
                 <label class="label" for="fullname">Display name</label>
-                <input id="fullname" v-model="fullName" class="input" maxlength="120" />
+                <!-- Empty is fine: the placeholder shows the login, which is what stands in for a missing name everywhere. -->
+                <input
+                  id="fullname"
+                  v-model="fullName"
+                  class="input"
+                  maxlength="120"
+                  :placeholder="me?.login"
+                />
+              </div>
+              <div class="field">
+                <label class="label" for="login">Login</label>
+                <input id="login" class="input" :value="me?.login" readonly />
               </div>
               <div v-if="nameError" class="err">{{ nameError }}</div>
               <div class="row-end">
