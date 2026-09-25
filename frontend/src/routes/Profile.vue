@@ -223,8 +223,8 @@ async function copyToken(): Promise<void> {
               <span class="label">Token</span>
               <code class="input token__value">trk_••••••••••••{{ me.token.hint }}</code>
               <span class="stamp">
-                CREATED {{ tokenCreated }}<template v-if="tokenUsed"> · LAST USED {{ tokenUsed }}</template>
-                <template v-else> · NEVER USED</template>
+                CREATED {{ tokenCreated }}<template v-if="tokenUsed">, LAST USED {{ tokenUsed }}</template>
+                <template v-else>, NEVER USED</template>
               </span>
             </div>
 
@@ -244,9 +244,6 @@ async function copyToken(): Promise<void> {
             <div v-if="tokenError" class="err">{{ tokenError }}</div>
 
             <div class="token__foot">
-              <p v-if="me?.token" class="hint token__note">
-                Regenerating breaks every script using the old token at once.
-              </p>
               <div class="sp"></div>
               <button v-if="me?.token" class="btn btn--danger" type="button" :disabled="tokenBusy" @click="revoke">
                 Revoke
@@ -390,8 +387,5 @@ async function copyToken(): Promise<void> {
   gap: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
-}
-.token__note {
-  margin: 0;
 }
 </style>

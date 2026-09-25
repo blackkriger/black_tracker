@@ -6,6 +6,9 @@ import multipart from '@fastify/multipart';
 import { env } from './env.js';
 import { pruneSessions, registerAuthRoutes } from './auth.js';
 import { registerProjectRoutes } from './project-routes.js';
+import { registerBoardRoutes } from './board-routes.js';
+import { registerTagRoutes } from './tag-routes.js';
+import { registerUserRoutes } from './user-routes.js';
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
@@ -21,6 +24,9 @@ app.get('/health', async () => ({ data: { ok: true } }));
 
 registerAuthRoutes(app);
 registerProjectRoutes(app);
+registerBoardRoutes(app);
+registerTagRoutes(app);
+registerUserRoutes(app);
 
 // Every route answers the same two shapes: `{ data }` when it worked, `{ error }` when it did not.
 app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found.' }));
