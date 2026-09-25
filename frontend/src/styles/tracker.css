@@ -317,7 +317,7 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .shot-a { background: linear-gradient(180deg, #1a1450 0%, #2c2170 52%, #4a3418 52%, #2a1c0c 100%); }
 .shot-a::after { content: ""; position: absolute; left: 38%; bottom: 44%; width: 10%; height: 18%; background: #e8c267; box-shadow: 30px 6px 0 -2px #ff5066; }
 .shot-b { background: linear-gradient(180deg, #0f2a3a 0%, #1d4d4a 58%, #1c3a1c 58%, #0f220f 100%); }
-.shot-b::after { content: ""; position: absolute; left: 20%; bottom: 36%; width: 60%; height: 3px; background: var(--focus); box-shadow: 0 -10px 0 var(--focus), 0 10px 0 rgba(108, 220, 255, .4); }
+.shot-b::after { content: ""; position: absolute; left: 20%; bottom: 36%; width: 60%; height: 3px; background: var(--focus); box-shadow: 0 -10px 0 var(--focus), 0 10px 0 color-mix(in srgb, var(--focus) 40%, transparent); }
 .shot-d { background: repeating-linear-gradient(90deg, #2a1f6a 0 12px, #231a5c 12px 24px); }
 
 /* comments */
