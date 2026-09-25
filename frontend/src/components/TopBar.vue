@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // The bar every screen but sign-in carries: which project you are in, how you are looking at it, and who you are.
 import { useRouter } from 'vue-router';
-import { buddyAvatarStyle } from '../lib/avatar';
 import { useSession } from '../lib/session';
 
 const props = defineProps<{
@@ -31,9 +30,6 @@ async function signOut(): Promise<void> {
     <div class="sp"></div>
 
     <RouterLink class="toplink" to="/profile">{{ session.me.value?.login }}</RouterLink>
-    <RouterLink class="user" to="/profile" :aria-label="`Profile: ${session.me.value?.login}`">
-      <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
-    </RouterLink>
     <button class="btn btn--ghost btn--sm" type="button" @click="signOut">Sign out</button>
   </header>
 </template>

@@ -133,7 +133,7 @@ async function copyToken(): Promise<void> {
 
     <div class="page__body">
       <div class="grid">
-        <div class="col">
+        <div class="stack">
           <section class="panel">
             <header class="panel__h">Profile</header>
             <form class="panel__b form" @submit.prevent="saveName">
@@ -277,11 +277,11 @@ async function copyToken(): Promise<void> {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.col {
+/* Named apart from the board's `.col`, which carries a surface background — reusing that name painted the gap between the panels. */
+.stack {
   display: flex;
   flex-direction: column;
-  /* Wider than the column gap: at 24px the two panels read as one tall block, since the panel border barely shows against the page. */
-  gap: var(--space-6);
+  gap: var(--space-5);
   min-width: 0;
 }
 .form {

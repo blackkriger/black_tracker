@@ -58,13 +58,19 @@ watch(
       <p v-if="loading" class="hint">Loading…</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
       <div v-else-if="project" class="cols">
-        <section v-for="s in project.states" :key="s.id" class="col">
-          <header class="col__h">
-            <b class="col__dot" :style="{ background: s.color }"></b>
-            <span class="col__name">{{ s.name }}</span>
+        <section
+          v-for="s in project.states"
+          :key="s.id"
+          class="col"
+          :style="{ '--c': s.color }"
+          :aria-label="`${s.name}, 0 issues`"
+        >
+          <header class="col__head">
+            <span class="col__sw"></span>
+            <h2 class="col__name">{{ s.name }}</h2>
             <span class="col__count">0</span>
           </header>
-          <div class="col__b">
+          <div class="col__body">
             <div class="empty empty--sm"><span class="empty__g">◇</span>Nothing here yet.</div>
           </div>
         </section>
@@ -84,38 +90,13 @@ watch(
   padding: var(--space-5);
   overflow-x: auto;
 }
+/* The column itself, its header and its body are styled globally — this only lays the columns out in a row. */
 .cols {
   display: flex;
   gap: var(--space-4);
   align-items: flex-start;
 }
-.col {
-  width: var(--col-w);
-  flex: none;
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-.col__h {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  height: 40px;
-  padding: 0 var(--space-3);
-  border-bottom: 1px solid var(--line);
-  font-weight: 600;
-}
-.col__dot {
-  width: 8px;
-  height: 8px;
-  flex: none;
-}
-.col__count {
-  margin-left: auto;
-  font-family: var(--font-num);
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-.col__b {
-  padding: var(--space-2);
+.col__name {
+  margin: 0;
 }
 </style>
