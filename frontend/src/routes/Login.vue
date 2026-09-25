@@ -18,8 +18,11 @@ async function onSubmit(): Promise<void> {
   error.value = null;
   try {
     await session.signIn(login.value.trim(), password.value);
+    // Back to where they were headed, or to the root, which decides which board to open.
     const next = route.query.next;
-    await router.replace(typeof next === 'string' && next.startsWith('/') ? next : '/board');
+    const target =
+      typeof next === 'string' && next.startsWith('/') && !next.startsWith('/login') ? next : '/';
+    await router.replace(target);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not sign in.';
   } finally {
