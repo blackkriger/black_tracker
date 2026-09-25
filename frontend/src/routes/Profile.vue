@@ -313,6 +313,10 @@ async function copyToken(): Promise<void> {
   justify-content: flex-end;
   gap: var(--space-3);
 }
+/* The confirmation belongs at the start of the row, not crowding the button it reports on. */
+.row-end .hint {
+  margin-right: auto;
+}
 .token__lede {
   margin: 0;
   font-size: 13px;
