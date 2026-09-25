@@ -182,7 +182,7 @@ async function copyToken(): Promise<void> {
               </div>
               <div v-if="passwordError" class="err">{{ passwordError }}</div>
               <div class="row-end">
-                <span v-if="passwordDone" class="hint">Password changed — other sessions were signed out.</span>
+                <span v-if="passwordDone" class="hint">Password changed.</span>
                 <button class="btn btn--primary" type="submit" :disabled="!canChangePassword">
                   Change password
                 </button>
