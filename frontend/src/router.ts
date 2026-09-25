@@ -26,6 +26,11 @@ router.beforeEach(async (to) => {
   if (to.meta.public) {
     return session.me.value && to.name === 'login' ? { name: 'home' } : true;
   }
-  if (!session.me.value) return { name: 'login', query: { next: to.fullPath } };
+  // `next` rides along only when it says something the root does not already decide.
+  if (!session.me.value) {
+    return to.fullPath === '/'
+      ? { name: 'login' }
+      : { name: 'login', query: { next: to.fullPath } };
+  }
   return true;
 });
