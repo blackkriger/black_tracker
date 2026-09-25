@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The bar every screen but sign-in carries: which project you are in, how you are looking at it, and who you are.
-import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { buddyAvatarStyle } from '../lib/avatar';
 import { useSession } from '../lib/session';
 
 const props = defineProps<{
@@ -11,21 +11,6 @@ const props = defineProps<{
 
 const session = useSession();
 const router = useRouter();
-
-// The avatar is the same initials-on-colour plate another project uses, hashed off the login so a person keeps their colour.
-const initials = computed(() => {
-  const source = session.me.value?.fullName || session.me.value?.login || '';
-  const parts = source.trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : source.slice(0, 2);
-  return letters.toUpperCase();
-});
-
-const avatarColor = computed(() => {
-  const login = session.me.value?.login ?? '';
-  let hash = 0;
-  for (const ch of login) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return `var(--mono-c${hash % 8})`;
-});
 
 async function signOut(): Promise<void> {
   await session.signOut();
@@ -47,7 +32,7 @@ async function signOut(): Promise<void> {
 
     <RouterLink class="toplink" to="/profile">{{ session.me.value?.login }}</RouterLink>
     <RouterLink class="user" to="/profile" :aria-label="`Profile: ${session.me.value?.login}`">
-      <span class="av" :style="{ '--c': avatarColor }">{{ initials }}</span>
+      <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
     </RouterLink>
     <button class="btn btn--ghost btn--sm" type="button" @click="signOut">Sign out</button>
   </header>

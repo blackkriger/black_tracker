@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import TopBar from '../components/TopBar.vue';
 import { api } from '../lib/api';
+import { buddyAvatarStyle } from '../lib/avatar';
 import { useSession, type Me } from '../lib/session';
 
 const session = useSession();
@@ -137,7 +138,7 @@ async function copyToken(): Promise<void> {
             <header class="panel__h">Profile</header>
             <form class="panel__b form" @submit.prevent="saveName">
               <div class="who">
-                <span class="av av--xl">{{ (me?.fullName || me?.login || '').slice(0, 2).toUpperCase() }}</span>
+                <span class="av av--xl" :style="buddyAvatarStyle(me?.login ?? '')"></span>
                 <div class="who__lines">
                   <span class="who__login">{{ me?.login }}</span>
                   <span class="stamp">{{ me?.role.toUpperCase() }} · SINCE {{ since }}</span>
@@ -279,7 +280,8 @@ async function copyToken(): Promise<void> {
 .col {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  /* Wider than the column gap: at 24px the two panels read as one tall block, since the panel border barely shows against the page. */
+  gap: var(--space-6);
   min-width: 0;
 }
 .form {
