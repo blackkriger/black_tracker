@@ -206,9 +206,8 @@ async function copyToken(): Promise<void> {
           <header class="panel__h">API token</header>
           <div class="panel__b form">
             <p class="token__lede">
-              Personal token for scripts and AI agents. Whatever it does is recorded as
-              <strong>{{ me?.login }}</strong
-              >, marked <span class="api">API</span> in history.
+              Personal token for scripts and API use. Whatever it does is recorded as
+              <strong>your</strong> action, marked <span class="api">API</span> in history.
             </p>
 
             <div v-if="freshToken" class="field">
