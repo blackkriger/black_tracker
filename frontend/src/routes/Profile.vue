@@ -234,7 +234,7 @@ async function copyToken(): Promise<void> {
             </div>
 
             <div class="token__can">
-              <span class="label token__can-h">What the token can do</span>
+              <span class="label token__can-h">What the token can do:</span>
               <ul class="token__list">
                 <li><span class="token__yes">✓</span>Create issues, change status, priority, assignee, tags</li>
                 <li><span class="token__no">✕</span>Post or edit comments</li>
