@@ -244,9 +244,10 @@ async function copyToken(): Promise<void> {
             <div v-if="tokenError" class="err">{{ tokenError }}</div>
 
             <div class="token__foot">
-              <p class="hint token__note">
-                {{ me?.token ? 'Regenerating breaks every script using the old token at once.' : 'Issue one when a script or an agent needs it.' }}
+              <p v-if="me?.token" class="hint token__note">
+                Regenerating breaks every script using the old token at once.
               </p>
+              <div class="sp"></div>
               <button v-if="me?.token" class="btn btn--danger" type="button" :disabled="tokenBusy" @click="revoke">
                 Revoke
               </button>
@@ -391,7 +392,6 @@ async function copyToken(): Promise<void> {
   border-top: 1px solid var(--line);
 }
 .token__note {
-  flex: 1 1 auto;
   margin: 0;
 }
 </style>
