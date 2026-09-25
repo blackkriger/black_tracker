@@ -9,7 +9,6 @@ import TopBar from '../components/TopBar.vue';
       <div class="empty">
         <span class="empty__g">404</span>
         No such page.
-        <RouterLink class="btn btn--sm" to="/">Back to the board</RouterLink>
       </div>
     </div>
   </div>
