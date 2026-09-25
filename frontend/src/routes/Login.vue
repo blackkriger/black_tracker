@@ -31,7 +31,7 @@ async function onSubmit(): Promise<void> {
 <template>
   <div class="signin">
     <div class="signin__mark">
-      <span class="signin__brand">TRACKER_</span>
+      <span class="signin__brand">TRACKER<span class="signin__cursor">_</span></span>
       <span class="num signin__kind">TRACKER</span>
     </div>
 
@@ -59,7 +59,6 @@ async function onSubmit(): Promise<void> {
       </form>
     </section>
 
-    <p class="hint signin__note">Private instance. Accounts are created by the admin.</p>
   </div>
 </template>
 
@@ -82,6 +81,21 @@ async function onSubmit(): Promise<void> {
   font: 700 34px/1 var(--font-display);
   letter-spacing: 0.06em;
   color: var(--accent);
+}
+/* The same cursor another project's header blinks: steps(2, end) so it snaps on and off rather than fading. */
+.signin__cursor {
+  color: var(--text);
+  animation: cursor-blink 1.2s steps(2, end) infinite;
+}
+@keyframes cursor-blink {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  61%,
+  100% {
+    opacity: 0;
+  }
 }
 .signin__kind {
   font-size: 21px;
@@ -108,8 +122,5 @@ async function onSubmit(): Promise<void> {
 .signin__submit {
   height: 38px;
   margin-top: var(--space-1);
-}
-.signin__note {
-  margin: 0;
 }
 </style>
