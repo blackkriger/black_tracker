@@ -52,7 +52,10 @@ interface UserRow {
   full_name: string;
   role: 'admin' | 'member';
   active: boolean;
-  api_token: string | null;
+  api_token_hash: string | null;
+  api_token_hint: string | null;
+  api_token_created_at: Date | null;
+  api_token_last_used_at: Date | null;
   created_at: Date;
   last_seen_at: Date | null;
 }
@@ -64,9 +67,16 @@ export function publicUser(row: UserRow) {
     fullName: row.full_name,
     role: row.role,
     active: row.active,
-    hasToken: row.api_token != null,
     createdAt: row.created_at.toISOString(),
     lastSeenAt: row.last_seen_at?.toISOString() ?? null,
+    // The raw token is gone the moment it is handed over, so the profile shows the tail and the dates instead.
+    token: row.api_token_hash
+      ? {
+          hint: row.api_token_hint,
+          createdAt: row.api_token_created_at?.toISOString() ?? null,
+          lastUsedAt: row.api_token_last_used_at?.toISOString() ?? null,
+        }
+      : null,
   };
 }
 
@@ -80,6 +90,17 @@ function touchLastSeen(userId: string): void {
     .catch((err) => console.error('[auth] last-seen write failed', err));
 }
 
+// Same throttle as the visit stamp: an agent can fire a burst of calls, and one write a quarter hour is enough to answer "is this token still in use".
+const tokenUseWrites = new Map<string, number>();
+function touchTokenUse(userId: string): void {
+  const now = Date.now();
+  if (now - (tokenUseWrites.get(userId) ?? 0) < LAST_SEEN_THROTTLE_MS) return;
+  tokenUseWrites.set(userId, now);
+  pool
+    .query('update users set api_token_last_used_at = now() where id = $1', [userId])
+    .catch((err) => console.error('[auth] token-use write failed', err));
+}
+
 // Resolves whoever is calling, or null. Never sends a reply — the requireX helpers below do that, so one place decides the status code.
 async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
   const header = req.headers.authorization;
@@ -87,12 +108,13 @@ async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
     const raw = header.slice(7).trim();
     if (!raw) return null;
     const res = await pool.query<{ id: string; login: string; role: 'admin' | 'member' }>(
-      `select id, login, role from users where api_token = $1 and active`,
-      [raw]
+      `select id, login, role from users where api_token_hash = $1 and active`,
+      [hashToken(raw)]
     );
     const row = res.rows[0];
     if (!row) return null;
     touchLastSeen(row.id);
+    touchTokenUse(row.id);
     return { userId: row.id, login: row.login, role: row.role, kind: 'token' };
   }
 
@@ -205,20 +227,47 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ...publicUser(row), authKind: auth.kind } });
   });
 
-  // The raw token is shown once, right here: only its value is stored, and the profile screen says so.
+  // The raw token is handed over exactly here and never again: the database keeps its hash, its last four characters and the dates. A lost token is replaced, not recovered.
   app.post('/me/regenerate-token', async (req, reply) => {
     const auth = await requireSession(req, reply);
     if (!auth) return;
-    const token = newRawToken();
-    await pool.query('update users set api_token = $1 where id = $2', [token, auth.userId]);
+    const token = `trk_${newRawToken()}`;
+    await pool.query(
+      `update users
+          set api_token_hash = $1, api_token_hint = $2,
+              api_token_created_at = now(), api_token_last_used_at = null
+        where id = $3`,
+      [hashToken(token), token.slice(-4), auth.userId]
+    );
     return reply.send({ data: { token } });
   });
 
   app.delete('/me/token', async (req, reply) => {
     const auth = await requireSession(req, reply);
     if (!auth) return;
-    await pool.query('update users set api_token = null where id = $1', [auth.userId]);
+    await pool.query(
+      `update users
+          set api_token_hash = null, api_token_hint = null,
+              api_token_created_at = null, api_token_last_used_at = null
+        where id = $1`,
+      [auth.userId]
+    );
     return reply.send({ data: { ok: true } });
+  });
+
+  // The display name is the only thing a person changes about themselves; the login and the role belong to an admin.
+  app.patch('/me', async (req, reply) => {
+    const auth = await requireSession(req, reply);
+    if (!auth) return;
+    const parsed = z
+      .object({ fullName: z.string().trim().max(120) })
+      .safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Name is too long.' });
+    const res = await pool.query<UserRow>(
+      'update users set full_name = $1 where id = $2 returning *',
+      [parsed.data.fullName, auth.userId]
+    );
+    return reply.send({ data: publicUser(res.rows[0]) });
   });
 
   app.post('/me/password', async (req, reply) => {

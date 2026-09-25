@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+// The board itself is still a shell: columns come from the project's states, the cards land in the next pass.
+import { onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import TopBar from '../components/TopBar.vue';
 import { api } from '../lib/api';
-import { useSession } from '../lib/session';
+import { lastProject } from '../lib/lastProject';
 
 interface State {
   id: string;
@@ -16,54 +19,54 @@ interface Project {
   shortName: string;
   name: string;
   archived: boolean;
+  states: State[];
 }
 
-const session = useSession();
-const projects = ref<Project[]>([]);
-const states = ref<State[]>([]);
-const error = ref<string | null>(null);
+const route = useRoute();
+const project = ref<Project | null>(null);
 const loading = ref(true);
+const error = ref<string | null>(null);
 
-onMounted(async () => {
+async function load(short: string): Promise<void> {
+  loading.value = true;
+  error.value = null;
   try {
-    projects.value = await api<Project[]>('/projects');
-    const first = projects.value.find((p) => !p.archived);
-    if (first) {
-      states.value = await api<State[]>(`/projects/${first.shortName}/states`);
-    }
+    project.value = await api<Project>(`/projects/${encodeURIComponent(short)}`);
+    lastProject.set(project.value.shortName);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not load the board.';
+    project.value = null;
+    error.value = err instanceof Error ? err.message : 'Could not load the project.';
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(() => load(String(route.params.short)));
+watch(
+  () => route.params.short,
+  (short) => {
+    if (short) void load(String(short));
+  }
+);
 </script>
 
 <template>
-  <div class="app">
-    <header class="top">
-      <button class="proj" type="button">
-        <span class="proj__k">{{ projects[0]?.shortName ?? '—' }}</span>
-        <span class="proj__name">{{ projects[0]?.name ?? 'No projects yet' }}</span>
-      </button>
-      <div class="sp"></div>
-      <span class="hint">{{ session.me.value?.login }}</span>
-      <button class="btn btn--ghost btn--sm" type="button" @click="session.signOut().then(() => $router.push('/login'))">
-        Sign out
-      </button>
-    </header>
+  <div class="page">
+    <TopBar :project="project" />
 
-    <div class="board">
+    <div class="page__body">
       <p v-if="loading" class="hint">Loading…</p>
-      <p v-else-if="error" class="hint">{{ error }}</p>
-      <p v-else-if="!projects.length" class="hint">No projects yet. An admin creates the first one.</p>
-      <div v-else class="cols">
-        <section v-for="s in states" :key="s.id" class="col">
+      <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
+      <div v-else-if="project" class="cols">
+        <section v-for="s in project.states" :key="s.id" class="col">
           <header class="col__h">
             <b class="col__dot" :style="{ background: s.color }"></b>
             <span class="col__name">{{ s.name }}</span>
             <span class="col__count">0</span>
           </header>
+          <div class="col__b">
+            <div class="empty empty--sm"><span class="empty__g">◇</span>Nothing here yet.</div>
+          </div>
         </section>
       </div>
     </div>
@@ -71,14 +74,15 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.app {
+.page {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
 }
-.board {
+.page__body {
+  flex: 1 1 auto;
   padding: var(--space-5);
+  overflow-x: auto;
 }
 .cols {
   display: flex;
@@ -87,6 +91,7 @@ onMounted(async () => {
 }
 .col {
   width: var(--col-w);
+  flex: none;
   background: var(--surface);
   border: 1px solid var(--line);
 }
@@ -109,5 +114,8 @@ onMounted(async () => {
   font-family: var(--font-num);
   font-size: 12.5px;
   color: var(--text-muted);
+}
+.col__b {
+  padding: var(--space-2);
 }
 </style>

@@ -7,10 +7,11 @@ export interface Me {
   fullName: string;
   role: 'admin' | 'member';
   active: boolean;
-  hasToken: boolean;
   createdAt: string;
   lastSeenAt: string | null;
   authKind: 'session' | 'token';
+  /** Null until a token is minted; the raw value is never part of this — only its tail and dates. */
+  token: { hint: string | null; createdAt: string | null; lastUsedAt: string | null } | null;
 }
 
 const me = ref<Me | null>(null);
