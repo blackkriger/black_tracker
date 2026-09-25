@@ -32,7 +32,6 @@ async function onSubmit(): Promise<void> {
   <div class="signin">
     <div class="signin__mark">
       <span class="signin__brand">TRACKER<span class="signin__cursor">_</span></span>
-      <span class="num signin__kind">TRACKER</span>
     </div>
 
     <section class="panel signin__panel" aria-labelledby="signin-title">
@@ -96,12 +95,6 @@ async function onSubmit(): Promise<void> {
   100% {
     opacity: 0;
   }
-}
-.signin__kind {
-  font-size: 21px;
-  line-height: 1;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
 }
 .signin__panel {
   width: 360px;
