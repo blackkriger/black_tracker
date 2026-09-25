@@ -45,6 +45,10 @@
 }
 
 /* ---------- base ---------- */
+/* The artboards carried the background on `.app` because each one was a fixed-size box; a real page needs it on the document, or a short screen like sign-in shows white below the fold. */
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font-ui); }
+*, *::before, *::after { box-sizing: border-box; }
+#app { min-height: 100vh; }
 .app, .app * { box-sizing: border-box; }
 .app { position: relative; overflow: hidden; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font-ui); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
