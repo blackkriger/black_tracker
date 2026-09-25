@@ -5,7 +5,7 @@ export interface Me {
   id: string;
   login: string;
   fullName: string;
-  role: 'admin' | 'member';
+  isAdmin: boolean;
   active: boolean;
   createdAt: string;
   lastSeenAt: string | null;
@@ -21,7 +21,7 @@ export function useSession() {
   return {
     me,
     ready,
-    isAdmin: computed(() => me.value?.role === 'admin'),
+    isAdmin: computed(() => me.value?.isAdmin === true),
     async refresh(): Promise<void> {
       try {
         me.value = await api<Me>('/me');

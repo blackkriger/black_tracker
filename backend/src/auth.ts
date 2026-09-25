@@ -15,7 +15,8 @@ const LAST_SEEN_THROTTLE_MS = 15 * 60 * 1000;
 export interface Auth {
   userId: string;
   login: string;
-  role: 'admin' | 'member';
+  /** May change how the tracker is set up: projects, statuses, tags, accounts. Proper roles come later as rows people create. */
+  isAdmin: boolean;
   /** How the caller proved who they are. Comment routes accept 'session' only. */
   kind: 'session' | 'token';
 }
@@ -50,7 +51,7 @@ interface UserRow {
   id: string;
   login: string;
   full_name: string;
-  role: 'admin' | 'member';
+  is_admin: boolean;
   active: boolean;
   api_token_hash: string | null;
   api_token_hint: string | null;
@@ -65,7 +66,7 @@ export function publicUser(row: UserRow) {
     id: row.id,
     login: row.login,
     fullName: row.full_name,
-    role: row.role,
+    isAdmin: row.is_admin,
     active: row.active,
     createdAt: row.created_at.toISOString(),
     lastSeenAt: row.last_seen_at?.toISOString() ?? null,
@@ -107,21 +108,21 @@ async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
   if (header?.startsWith('Bearer ')) {
     const raw = header.slice(7).trim();
     if (!raw) return null;
-    const res = await pool.query<{ id: string; login: string; role: 'admin' | 'member' }>(
-      `select id, login, role from users where api_token_hash = $1 and active`,
+    const res = await pool.query<{ id: string; login: string; is_admin: boolean }>(
+      `select id, login, is_admin from users where api_token_hash = $1 and active`,
       [hashToken(raw)]
     );
     const row = res.rows[0];
     if (!row) return null;
     touchLastSeen(row.id);
     touchTokenUse(row.id);
-    return { userId: row.id, login: row.login, role: row.role, kind: 'token' };
+    return { userId: row.id, login: row.login, isAdmin: row.is_admin, kind: 'token' };
   }
 
   const cookie = req.cookies?.[SESSION_COOKIE];
   if (!cookie) return null;
-  const res = await pool.query<{ id: string; login: string; role: 'admin' | 'member' }>(
-    `select u.id, u.login, u.role
+  const res = await pool.query<{ id: string; login: string; is_admin: boolean }>(
+    `select u.id, u.login, u.is_admin
        from sessions s
        join users u on u.id = s.user_id and u.active
       where s.token = $1 and s.expires_at > now()`,
@@ -130,7 +131,7 @@ async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
   const row = res.rows[0];
   if (!row) return null;
   touchLastSeen(row.id);
-  return { userId: row.id, login: row.login, role: row.role, kind: 'session' };
+  return { userId: row.id, login: row.login, isAdmin: row.is_admin, kind: 'session' };
 }
 
 export async function requireAuth(
@@ -166,7 +167,7 @@ export async function requireAdmin(
 ): Promise<Auth | null> {
   const auth = await requireAuth(req, reply);
   if (!auth) return null;
-  if (auth.role !== 'admin') {
+  if (!auth.isAdmin) {
     reply.code(403).send({ error: 'Admins only.' });
     return null;
   }
