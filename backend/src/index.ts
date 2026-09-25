@@ -1,0 +1,37 @@
+import { mkdir } from 'node:fs/promises';
+import Fastify from 'fastify';
+import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
+import { env } from './env.js';
+import { pruneSessions, registerAuthRoutes } from './auth.js';
+import { registerProjectRoutes } from './project-routes.js';
+
+const app = Fastify({
+  logger: { level: process.env.LOG_LEVEL ?? 'info' },
+  // Screenshots and gifs are the point of attachments; nginx carries the same ceiling.
+  bodyLimit: 30 * 1024 * 1024,
+});
+
+await app.register(cookie);
+await app.register(cors, { origin: env.corsOrigins, credentials: true });
+await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 10 } });
+
+app.get('/health', async () => ({ data: { ok: true } }));
+
+registerAuthRoutes(app);
+registerProjectRoutes(app);
+
+// Every route answers the same two shapes: `{ data }` when it worked, `{ error }` when it did not.
+app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found.' }));
+app.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
+  app.log.error(err);
+  const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+  reply.code(status).send({ error: status === 500 ? 'Something went wrong.' : err.message });
+});
+
+await mkdir(env.uploadDir, { recursive: true });
+await pruneSessions();
+setInterval(pruneSessions, 24 * 60 * 60 * 1000).unref();
+
+await app.listen({ port: env.port, host: '127.0.0.1' });
