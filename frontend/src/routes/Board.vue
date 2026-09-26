@@ -69,6 +69,17 @@ const people = ref<{ id: string; login: string; fullName: string }[]>([]);
 // Tags narrow the board too: pick several and a card has to wear all of them.
 const byTags = ref<string[]>([]);
 
+const filtering = computed(
+  () => !!byAssignee.value || !!byAuthor.value || !!byPriority.value || byTags.value.length > 0
+);
+
+function clearFilters(): void {
+  byAssignee.value = '';
+  byAuthor.value = '';
+  byPriority.value = '';
+  byTags.value = [];
+}
+
 function toggleTag(id: string): void {
   byTags.value = byTags.value.includes(id)
     ? byTags.value.filter((t) => t !== id)
@@ -316,6 +327,13 @@ watch(
         :style="{ '--c': t.color }"
         @click="toggleTag(t.id)"
       >{{ t.name }}</button>
+
+      <template v-if="filtering">
+        <div class="sp"></div>
+        <button class="btn btn--sm btn--ghost" type="button" @click="clearFilters">
+          Clear filters
+        </button>
+      </template>
     </div>
 
     <div
