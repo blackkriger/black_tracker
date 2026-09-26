@@ -7,6 +7,8 @@ import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
 import { dueLabel, priorityClass, type Issue } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
+import { useLive } from '../lib/live';
+import { useSession } from '../lib/session';
 
 interface State {
   id: string;
@@ -38,6 +40,7 @@ interface Project {
 
 const route = useRoute();
 const router = useRouter();
+const session = useSession();
 const project = ref<Project | null>(null);
 const issues = ref<Issue[]>([]);
 const issuesLoading = ref(true);
@@ -48,6 +51,33 @@ const dropAt = ref<{ stateId: string; beforeId: string | null } | null>(null);
 
 // The column a new issue is being written into, if any.
 const creatingIn = ref<string | null>(null);
+
+// Cards that changed under us a moment ago, lit until the animation is done.
+const fresh = ref<Set<string>>(new Set());
+
+function flash(issueId: string): void {
+  fresh.value = new Set(fresh.value).add(issueId);
+  setTimeout(() => {
+    const next = new Set(fresh.value);
+    next.delete(issueId);
+    fresh.value = next;
+  }, 2000);
+}
+
+// Someone else's work on this board, arriving as it happens. Our own changes are already on screen.
+useLive((ev) => {
+  const board = current.value;
+  if (!board || ev.boardId !== board.id) return;
+  if (ev.by && ev.by === session.me.value?.login) return;
+  if (!ev.type.startsWith('issue.')) return;
+  if (ev.type === 'issue.deleted') {
+    issues.value = issues.value.filter((i) => i.id !== ev.issueId);
+    return;
+  }
+  void loadIssues(board.id).then(() => {
+    if (ev.issueId) flash(ev.issueId);
+  });
+});
 // What this project can tag an issue with: its own tags and the global ones, in the server's order.
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
@@ -240,7 +270,7 @@ watch(
               v-for="i in issuesOf(s.id)"
               :key="i.id"
               class="card"
-              :class="{ 'card--ghost': dragId === i.id }"
+              :class="{ 'card--ghost': dragId === i.id, 'is-fresh': fresh.has(i.id) }"
               draggable="true"
               tabindex="0"
               @dragstart="dragId = i.id"

@@ -295,6 +295,13 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .side a[aria-current] { color: var(--text); background: var(--surface); }
 .side a .num { font-size: 16px; color: var(--text-muted); }
 
+/* Something changed under you: the field or the card holds a tint for two seconds and lets go. */
+@keyframes fresh {
+  from { background-color: color-mix(in srgb, var(--focus) 30%, transparent); }
+  to { background-color: transparent; }
+}
+.is-fresh { animation: fresh 2s ease-out; }
+
 /* ---------- skeleton / empty ---------- */
 .sk { background: linear-gradient(90deg, rgba(255, 255, 255, .04) 0%, rgba(255, 255, 255, .09) 50%, rgba(255, 255, 255, .04) 100%); background-size: 200% 100%; animation: sk 1.4s linear infinite; }
 @keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }

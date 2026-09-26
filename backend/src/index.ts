@@ -12,6 +12,7 @@ import { registerUserRoutes } from './user-routes.js';
 import { registerInviteRoutes } from './invite-routes.js';
 import { registerRoleRoutes } from './role-routes.js';
 import { registerIssueRoutes } from './issue-routes.js';
+import { registerEventRoutes } from './events.js';
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
@@ -33,6 +34,7 @@ registerUserRoutes(app);
 registerInviteRoutes(app);
 registerRoleRoutes(app);
 registerIssueRoutes(app);
+registerEventRoutes(app);
 
 // Every route answers the same two shapes: `{ data }` when it worked, `{ error }` when it did not.
 app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found.' }));

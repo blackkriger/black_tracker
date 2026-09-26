@@ -3,6 +3,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
+import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
 import {
   PRIORITIES,
@@ -72,6 +73,33 @@ const posting = ref(false);
 const editingComment = ref<string | null>(null);
 const commentEdit = ref('');
 
+// Fields somebody else changed a moment ago, lit for as long as the animation runs.
+const fresh = ref<Set<string>>(new Set());
+
+// The names the server sends for what changed, in the names this screen knows them by.
+const FIELD_OF: Record<string, string> = {
+  summary: 'summary',
+  description: 'description',
+  stateId: 'status',
+  status: 'status',
+  priority: 'priority',
+  assigneeId: 'assignee',
+  dueDate: 'due',
+  tagIds: 'tags',
+};
+
+function flash(names: string[]): void {
+  if (!names.length) return;
+  const next = new Set(fresh.value);
+  for (const n of names) next.add(n);
+  fresh.value = next;
+  setTimeout(() => {
+    const after = new Set(fresh.value);
+    for (const n of names) after.delete(n);
+    fresh.value = after;
+  }, 2000);
+}
+
 const uploading = ref(false);
 const dragOver = ref(false);
 const deleting = ref(false);
@@ -115,6 +143,28 @@ onMounted(() => {
 onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 watch(() => props.issueKey, load, { immediate: true });
+
+// The issue is being read by more than one person: what they do to it lands here as it happens.
+useLive((ev) => {
+  const current = issue.value;
+  if (!current || ev.issueId !== current.id) return;
+  if (ev.by && ev.by === session.me.value?.login) return;
+  void reload().then(() => {
+    if (ev.type.startsWith('comment.')) flash(['comments']);
+    else if (ev.type.startsWith('attachment.')) flash(['files']);
+    else flash((ev.fields ?? []).map((f) => FIELD_OF[f] ?? f));
+  });
+});
+
+// A second read of the same issue, without the skeleton: the window is already on screen.
+async function reload(): Promise<void> {
+  if (!props.issueKey) return;
+  try {
+    issue.value = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
+  } catch {
+    /* the next event, or closing and opening it again, will do */
+  }
+}
 
 async function load(): Promise<void> {
   if (!props.issueKey) {
@@ -407,15 +457,23 @@ async function removeIssue(): Promise<void> {
               autofocus
               @keydown.enter.prevent="creating ? create() : saveText()"
             />
-            <h1 v-else class="iv__title iv__title--ro">{{ issue?.summary }}</h1>
+            <h1
+              v-else
+              class="iv__title iv__title--ro"
+              :class="{ 'is-fresh': fresh.has('summary') }"
+            >{{ issue?.summary }}</h1>
 
             <div>
               <div class="sec-h">Description</div>
               <textarea v-if="editing" v-model="bodyDraft" class="input iv__body-edit"></textarea>
-              <div v-else class="md iv__body">{{ issue?.description || 'Nothing written yet.' }}</div>
+              <div
+                v-else
+                class="md iv__body"
+                :class="{ 'is-fresh': fresh.has('description') }"
+              >{{ issue?.description || 'Nothing written yet.' }}</div>
             </div>
 
-            <div v-if="issue">
+            <div v-if="issue" :class="{ 'is-fresh': fresh.has('files') }">
               <div class="sec-h">Files<span class="n">{{ issue.attachments.length }}</span></div>
               <div v-if="images.length" class="atts">
                 <figure v-for="a in images" :key="a.id" class="att">
@@ -479,7 +537,11 @@ async function removeIssue(): Promise<void> {
               </button>
             </nav>
 
-            <div v-if="issue && tab === 'comments'" class="iv__list">
+            <div
+              v-if="issue && tab === 'comments'"
+              class="iv__list"
+              :class="{ 'is-fresh': fresh.has('comments') }"
+            >
               <article v-for="c in issue.comments" :key="c.id" class="cm">
                 <span class="av av--lg" :style="buddyAvatarStyle(c.author.login)"></span>
                 <div>
@@ -558,7 +620,7 @@ async function removeIssue(): Promise<void> {
           </div>
 
           <aside class="props">
-            <div class="prop">
+            <div class="prop" :class="{ 'is-fresh': fresh.has('status') }">
               <span class="prop__k">Status</span>
               <select
                 class="input input--sm"
@@ -568,7 +630,7 @@ async function removeIssue(): Promise<void> {
                 <option v-for="s in board.states" :key="s.id" :value="s.id">{{ s.name }}</option>
               </select>
             </div>
-            <div class="prop">
+            <div class="prop" :class="{ 'is-fresh': fresh.has('priority') }">
               <span class="prop__k">Priority</span>
               <select
                 class="input input--sm"
@@ -578,7 +640,7 @@ async function removeIssue(): Promise<void> {
                 <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
               </select>
             </div>
-            <div class="prop">
+            <div class="prop" :class="{ 'is-fresh': fresh.has('assignee') }">
               <span class="prop__k">Assignee</span>
               <select
                 class="input input--sm"
@@ -591,7 +653,7 @@ async function removeIssue(): Promise<void> {
                 </option>
               </select>
             </div>
-            <div class="prop">
+            <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
               <span class="prop__k">Due</span>
               <!-- A date that has gone by says so by being red; there is no word for it anywhere else. -->
               <input
@@ -605,7 +667,7 @@ async function removeIssue(): Promise<void> {
 
             <div class="hr"></div>
 
-            <div class="prop prop--tall">
+            <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('tags') }">
               <span class="prop__k">Tags</span>
               <div class="prop__tags">
                 <span

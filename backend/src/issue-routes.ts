@@ -11,6 +11,7 @@ import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { deniedFor } from './board-service.js';
+import { publish } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
 
@@ -250,6 +251,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
 
     const row = await issueById(created);
     const tags = await tagsFor([created]);
+    void publish({
+      type: 'issue.created',
+      boardId: id,
+      projectId,
+      issueId: created,
+      issueKey: row?.readable_id,
+      by: auth.login,
+    });
     return reply.code(201).send({ data: publicIssue(row as IssueRow, tags.get(created) ?? []) });
   });
 
@@ -310,6 +319,15 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       }
     });
 
+    void publish({
+      type: 'issue.moved',
+      boardId: id,
+      projectId: moved.project_id,
+      issueId,
+      issueKey: moved.readable_id,
+      fields: moved.state_id === stateId ? [] : ['status'],
+      by: auth.login,
+    });
     return reply.send({ data: { ok: true } });
   });
 
@@ -516,6 +534,15 @@ export function registerIssueRoutes(app: FastifyInstance): void {
 
     const row = await issueById(id);
     const tags = await tagsFor([id]);
+    void publish({
+      type: 'issue.updated',
+      boardId: issue.board_id,
+      projectId: issue.project_id,
+      issueId: id,
+      issueKey: issue.readable_id,
+      fields: Object.keys(p),
+      by: auth.login,
+    });
     return reply.send({ data: publicIssue(row as IssueRow, tags.get(id) ?? []) });
   });
 
@@ -535,6 +562,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     );
     await pool.query('delete from issues where id = $1', [id]);
     await Promise.all(files.rows.map((f) => unlink(f.storage_path).catch(() => {})));
+    void publish({
+      type: 'issue.deleted',
+      boardId: issue.board_id,
+      projectId: issue.project_id,
+      issueId: id,
+      issueKey: issue.readable_id,
+      by: auth.login,
+    });
     return reply.send({ data: { ok: true } });
   });
 
@@ -554,6 +589,15 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id, session.userId, parsed.data.text]
     );
     const row = res.rows[0];
+    void publish({
+      type: 'comment.added',
+      boardId: found.issue.board_id,
+      projectId: found.issue.project_id,
+      issueId: id,
+      issueKey: found.issue.readable_id,
+      commentId: row.id,
+      by: session.login,
+    });
     return reply.code(201).send({
       data: {
         id: row.id,
@@ -571,8 +615,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const { id } = req.params as { id: string };
     const parsed = z.object({ text: z.string().trim().min(1).max(20000) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'A comment needs some text.' });
-    const owner = await pool.query<{ author_id: string }>(
-      'select author_id from issue_comments where id = $1',
+    const owner = await pool.query<{ author_id: string; issue_id: string }>(
+      'select author_id, issue_id from issue_comments where id = $1',
       [id]
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
@@ -584,6 +628,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       'update issue_comments set text = $2, edited_at = now() where id = $1 returning edited_at',
       [id, parsed.data.text]
     );
+    const host = await issueById(owner.rows[0].issue_id);
+    void publish({
+      type: 'comment.edited',
+      boardId: host?.board_id,
+      projectId: host?.project_id,
+      issueId: owner.rows[0].issue_id,
+      issueKey: host?.readable_id,
+      commentId: id,
+      by: session.login,
+    });
     return reply.send({
       data: { id, text: parsed.data.text, editedAt: res.rows[0].edited_at.toISOString() },
     });
@@ -593,8 +647,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { id } = req.params as { id: string };
-    const owner = await pool.query<{ author_id: string }>(
-      'select author_id from issue_comments where id = $1',
+    const owner = await pool.query<{ author_id: string; issue_id: string }>(
+      'select author_id, issue_id from issue_comments where id = $1',
       [id]
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
@@ -606,6 +660,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     );
     await pool.query('delete from issue_comments where id = $1', [id]);
     await Promise.all(files.rows.map((f) => unlink(f.storage_path).catch(() => {})));
+    const host = await issueById(owner.rows[0].issue_id);
+    void publish({
+      type: 'comment.deleted',
+      boardId: host?.board_id,
+      projectId: host?.project_id,
+      issueId: owner.rows[0].issue_id,
+      issueKey: host?.readable_id,
+      commentId: id,
+      by: auth.login,
+    });
     return reply.send({ data: { ok: true } });
   });
 
@@ -636,6 +700,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
        returning id, created_at`,
       [id, null, filename, file.mimetype, size, stored, found.auth.userId]
     );
+    void publish({
+      type: 'attachment.added',
+      boardId: found.issue.board_id,
+      projectId: found.issue.project_id,
+      issueId: id,
+      issueKey: found.issue.readable_id,
+      by: found.auth.login,
+    });
     return reply.code(201).send({
       data: {
         id: res.rows[0].id,
@@ -675,16 +747,26 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { id } = req.params as { id: string };
-    const res = await pool.query<{ storage_path: string; uploaded_by: string | null }>(
-      'select storage_path, uploaded_by from issue_attachments where id = $1',
-      [id]
-    );
+    const res = await pool.query<{
+      storage_path: string;
+      uploaded_by: string | null;
+      issue_id: string;
+    }>('select storage_path, uploaded_by, issue_id from issue_attachments where id = $1', [id]);
     const row = res.rows[0];
     if (!row) return reply.code(404).send({ error: 'No such file.' });
     const mine = row.uploaded_by === auth.userId;
     if (!mine && !(await requireDeleter(req, reply))) return;
     await pool.query('delete from issue_attachments where id = $1', [id]);
     await unlink(row.storage_path).catch(() => {});
+    const host = await issueById(row.issue_id);
+    void publish({
+      type: 'attachment.deleted',
+      boardId: host?.board_id,
+      projectId: host?.project_id,
+      issueId: row.issue_id,
+      issueKey: host?.readable_id,
+      by: auth.login,
+    });
     return reply.send({ data: { ok: true } });
   });
 }
