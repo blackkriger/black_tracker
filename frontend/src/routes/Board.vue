@@ -134,13 +134,6 @@ watch(
   display: flex;
   flex-direction: column;
 }
-.tagbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 10px var(--space-5);
-}
 .page__body {
   flex: 1 1 auto;
   padding: var(--space-5);

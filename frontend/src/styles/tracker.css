@@ -79,7 +79,7 @@ button { font-family: var(--font-ui); }
 .user:hover, .user[aria-current] { border-color: var(--line-2); }
 
 /* ---------- tag bar: tags in a row under the top bar ---------- */
-.tagbar { position: relative; z-index: 2; flex: none; display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.tagbar { position: relative; z-index: 2; flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 44px; padding: 8px 20px; }
 .tf { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid transparent; background: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer; white-space: nowrap; }
 .tf b { width: 7px; height: 7px; background: var(--c); flex: none; }
 .tf:hover, .tf.is-hover { color: var(--text); background: var(--surface); }
