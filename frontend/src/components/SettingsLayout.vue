@@ -2,6 +2,7 @@
 // The frame every admin screen sits in: the top bar, the section list on the left, and whatever the screen puts in the slot.
 import { computed, onMounted } from 'vue';
 import TopBar from './TopBar.vue';
+import { ExternalLink } from 'lucide-vue-next';
 import { useLive } from '../lib/live';
 import { useProjects } from '../lib/projects';
 
@@ -36,6 +37,11 @@ useLive((ev) => {
         <div class="side__h">Workspace</div>
         <RouterLink to="/settings/tags">Tags</RouterLink>
         <RouterLink to="/settings/users">Users &amp; access</RouterLink>
+        <!-- pgweb on the same host, behind its own basic auth: the tracker's session does not open it. -->
+        <a href="/db/" target="_blank" rel="noopener noreferrer">
+          DB
+          <ExternalLink class="ic ic--sm" />
+        </a>
       </nav>
 
       <div class="sheet">
