@@ -592,7 +592,21 @@ async function removeIssue(): Promise<void> {
                     <span class="cm__who">{{ c.author.login }}</span>
                     <time class="stamp">{{ stamp(c.createdAt) }}</time>
                     <span v-if="c.editedAt" class="cm__edited">edited</span>
-                    <span v-if="c.pinnedAt" class="cm__pin">Pinned</span>
+                    <svg
+                      v-if="c.pinnedAt"
+                      class="cm__pin"
+                      viewBox="0 0 16 16"
+                      width="12"
+                      height="12"
+                      role="img"
+                      :aria-label="c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned'"
+                    >
+                      <title>{{ c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned' }}</title>
+                      <path
+                        fill="currentColor"
+                        d="M9.5 1.5 14.5 6.5 12.9 8.1 12 7.9 9.2 10.7 9.6 13.2 8.6 14.2 5.3 10.9 1.9 14.3 1.7 14.1 5.1 10.7 1.8 7.4 2.8 6.4 5.3 6.8 8.1 4 7.9 3.1z"
+                      />
+                    </svg>
                     <span class="cm__acts">
                       <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
                         {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
@@ -841,8 +855,9 @@ async function removeIssue(): Promise<void> {
 .cm__body :deep(p:last-child) {
   margin-bottom: 0;
 }
+/* A pushpin drawn rather than written: the theme speaks in glyphs, and a word in the middle of a name line reads as part of the name. */
 .cm__pin {
-  font-size: 12px;
+  flex: none;
   color: var(--accent);
 }
 .att__pic {
