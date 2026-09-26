@@ -57,6 +57,7 @@ const copied = ref(false);
 
 const newRole = ref('');
 const accessFor = ref<Role | null>(null);
+const accessCanDelete = ref(false);
 // Two kinds of denial: a whole project, or single boards inside one the role does have.
 const deniedProjects = ref<string[]>([]);
 const deniedBoards = ref<string[]>([]);
@@ -113,21 +114,17 @@ async function addRole(): Promise<void> {
   }
 }
 
-async function patchRole(role: Role, body: Record<string, unknown>): Promise<void> {
-  clear('roles');
-  try {
-    const updated = await api<Role>(`/roles/${role.id}`, { method: 'PATCH', body });
-    roles.value = roles.value.map((r) => (r.id === role.id ? updated : r));
-    // Whoever wears it is holding the old name on this screen until it is read again.
-    users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: updated } : u));
-  } catch (err) {
-    fail('roles', err);
-  }
+async function patchRole(role: Role, body: Record<string, unknown>, panel = 'roles'): Promise<void> {
+  clear(panel);
+  const updated = await api<Role>(`/roles/${role.id}`, { method: 'PATCH', body });
+  roles.value = roles.value.map((r) => (r.id === role.id ? updated : r));
+  // Whoever wears it is holding the old name on this screen until it is read again.
+  users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: updated } : u));
 }
 
 function renameRole(role: Role, name: string): void {
   if (!name.trim() || name === role.name) return;
-  void patchRole(role, { name });
+  patchRole(role, { name }).catch((err) => fail('roles', err));
 }
 
 async function removeRole(): Promise<void> {
@@ -188,6 +185,7 @@ async function revokeInvite(i: Invite): Promise<void> {
 
 async function openAccess(role: Role): Promise<void> {
   accessFor.value = role;
+  accessCanDelete.value = role.canDelete;
   deniedProjects.value = [];
   deniedBoards.value = [];
   clear('access');
@@ -221,6 +219,9 @@ async function saveAccess(): Promise<void> {
   accessBusy.value = true;
   clear('access');
   try {
+    if (accessCanDelete.value !== role.canDelete) {
+      await patchRole(role, { canDelete: accessCanDelete.value }, 'access');
+    }
     await api(`/roles/${role.id}/access`, {
       method: 'PUT',
       body: { deniedProjects: deniedProjects.value, deniedBoards: deniedBoards.value },
@@ -299,8 +300,7 @@ async function saveAccess(): Promise<void> {
           <thead>
             <tr>
               <th>Role</th>
-              <th class="c-flag">May delete</th>
-              <th class="c-act2">Boards</th>
+              <th class="c-act2">Access</th>
               <th class="c-del"><span class="sr">Delete</span></th>
             </tr>
           </thead>
@@ -314,15 +314,6 @@ async function saveAccess(): Promise<void> {
                   maxlength="40"
                   @change="renameRole(r, ($event.target as HTMLInputElement).value)"
                 />
-              </td>
-              <td class="c-flag">
-                <label class="check">
-                  <input
-                    type="checkbox"
-                    :checked="r.canDelete"
-                    @change="patchRole(r, { canDelete: ($event.target as HTMLInputElement).checked })"
-                  />
-                </label>
               </td>
               <td class="c-act2">
                 <button class="btn btn--sm" type="button" @click="openAccess(r)">Access…</button>
@@ -433,9 +424,15 @@ async function saveAccess(): Promise<void> {
     <Dialog
       v-if="accessFor"
       :title="`Access — ${accessFor.name}`"
-      :width="420"
+      :width="560"
       @close="accessFor = null"
     >
+      <label class="check access__right">
+        <input v-model="accessCanDelete" type="checkbox" />
+        May delete projects, boards, statuses and tags
+      </label>
+      <div class="access__sep"></div>
+
       <div v-for="p in accessProjects" :key="p.id" class="access__group">
         <label class="check access__proj">
           <input
@@ -540,6 +537,13 @@ async function saveAccess(): Promise<void> {
 }
 .access__group + .access__group {
   margin-top: var(--space-4);
+}
+.access__right {
+  font-size: 13px;
+}
+.access__sep {
+  margin: var(--space-4) 0;
+  border-top: 1px solid var(--line);
 }
 .access__proj {
   font-weight: 500;
