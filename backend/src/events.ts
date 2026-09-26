@@ -60,6 +60,11 @@ export async function publish(event: LiveEvent): Promise<void> {
   if (!clients.size) return;
   const line = `data: ${JSON.stringify({ ...event, at: new Date().toISOString() })}\n\n`;
   for (const [id, client] of clients) {
+    // A socket can die without the close handler running — a write to it would be swallowed and the client would sit in the map for good.
+    if (client.reply.raw.destroyed || client.reply.raw.writableEnded) {
+      clients.delete(id);
+      continue;
+    }
     try {
       if (!mayHear(await denialsFresh(client), event)) continue;
       client.reply.raw.write(line);
@@ -120,6 +125,11 @@ export function registerEventRoutes(app: FastifyInstance): void {
     });
 
     const beat = setInterval(() => {
+      if (reply.raw.destroyed || reply.raw.writableEnded) {
+        clearInterval(beat);
+        clients.delete(id);
+        return;
+      }
       try {
         reply.raw.write(': ping\n\n');
       } catch {
