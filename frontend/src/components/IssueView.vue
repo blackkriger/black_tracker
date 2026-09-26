@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // One issue, opened over the board it lives on: the text on the left, what it is on the right, and underneath it everything that has been said and done about it. Every edit is its own small write — there is no Save for the issue as a whole.
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import RichText from './RichText.vue';
 import { api } from '../lib/api';
+import { asHtml, isBlank } from '../lib/richtext';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
@@ -275,9 +277,9 @@ function toggleTag(tagId: string, on: boolean): void {
 }
 
 async function postComment(): Promise<void> {
-  const text = commentDraft.value.trim();
+  const text = commentDraft.value;
   const current = issue.value;
-  if (!text || !current || posting.value) return;
+  if (isBlank(text) || !current || posting.value) return;
   posting.value = true;
   error.value = null;
   try {
@@ -295,10 +297,10 @@ async function postComment(): Promise<void> {
 }
 
 async function saveComment(c: Comment): Promise<void> {
-  const text = commentEdit.value.trim();
+  const text = commentEdit.value;
   editingComment.value = null;
   const current = issue.value;
-  if (!current || !text || text === c.text) return;
+  if (!current || isBlank(text) || text === c.text) return;
   try {
     const updated = await api<{ editedAt: string }>(`/comments/${c.id}`, {
       method: 'PATCH',
@@ -465,12 +467,14 @@ async function removeIssue(): Promise<void> {
 
             <div>
               <div class="sec-h">Description</div>
-              <textarea v-if="editing" v-model="bodyDraft" class="input iv__body-edit"></textarea>
+              <RichText v-if="editing" v-model="bodyDraft" placeholder="What is this about?" />
               <div
-                v-else
+                v-else-if="issue?.description && !isBlank(issue.description)"
                 class="md iv__body"
                 :class="{ 'is-fresh': fresh.has('description') }"
-              >{{ issue?.description || 'Nothing written yet.' }}</div>
+                v-html="asHtml(issue.description)"
+              ></div>
+              <div v-else class="md iv__body hint">Nothing written yet.</div>
             </div>
 
             <div v-if="issue" :class="{ 'is-fresh': fresh.has('files') }">
@@ -565,31 +569,27 @@ async function removeIssue(): Promise<void> {
                     </span>
                   </div>
                   <template v-if="editingComment === c.id">
-                    <textarea v-model="commentEdit" class="input iv__body-edit"></textarea>
+                    <RichText v-model="commentEdit" min-height="90px" />
                     <div class="composer__row">
                       <div class="sp"></div>
                       <button class="btn btn--sm" type="button" @click="editingComment = null">Cancel</button>
                       <button class="btn btn--sm btn--primary" type="button" @click="saveComment(c)">Save</button>
                     </div>
                   </template>
-                  <div v-else class="md cm__body">{{ c.text }}</div>
+                  <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
                 </div>
               </article>
 
               <form class="cm cm--new" @submit.prevent="postComment">
                 <span class="av av--lg" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
                 <div>
-                  <textarea
-                    v-model="commentDraft"
-                    class="input iv__body-edit"
-                    placeholder="Write a comment…"
-                  ></textarea>
+                  <RichText v-model="commentDraft" min-height="90px" placeholder="Write a comment…" />
                   <div class="composer__row">
                     <div class="sp"></div>
                     <button
                       class="btn btn--sm btn--primary"
                       type="submit"
-                      :disabled="!commentDraft.trim() || posting"
+                      :disabled="isBlank(commentDraft) || posting"
                     >
                       Post
                     </button>
@@ -779,8 +779,8 @@ async function removeIssue(): Promise<void> {
   border-color: transparent;
   background: none;
 }
-.iv__body {
-  white-space: pre-wrap;
+.iv__body :deep(p:last-child) {
+  margin-bottom: 0;
 }
 .iv__body-edit {
   width: 100%;
@@ -802,8 +802,8 @@ async function removeIssue(): Promise<void> {
   flex-direction: column;
   gap: 20px;
 }
-.cm__body {
-  white-space: pre-wrap;
+.cm__body :deep(p:last-child) {
+  margin-bottom: 0;
 }
 .att__pic {
   width: 100%;

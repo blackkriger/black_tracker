@@ -12,6 +12,8 @@
     "@fontsource/cinzel": "^5.2.5",
     "@fontsource/ibm-plex-mono": "^5.2.5",
     "@fontsource/ibm-plex-sans": "^5.2.5",
+    "dompurify": "^3.4.16",
+    "quill": "^2.0.3",
     "vue": "^3.5.22",
     "vue-router": "^4.5.1"
   },
