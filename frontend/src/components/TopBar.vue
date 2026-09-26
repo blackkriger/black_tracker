@@ -95,33 +95,34 @@ async function signOut(): Promise<void> {
           <span class="topitem__name">{{ p.name }}</span>
         </RouterLink>
 
-        <button
-          v-if="p.boards.length > 1"
-          class="topitem topitem--caret"
-          type="button"
-          :aria-expanded="openShort === p.shortName"
-          :aria-label="`Boards of ${p.name}`"
-          @click="openShort = openShort === p.shortName ? null : p.shortName"
-        >
-          <span class="topitem__board">{{ shownBoard(p)?.name }}</span>
-          <span class="topitem__caret">▾</span>
-        </button>
+        <span v-if="p.boards.length > 1" class="boardpick">
+          <button
+            class="topitem topitem--caret"
+            type="button"
+            :aria-expanded="openShort === p.shortName"
+            :aria-label="`Boards of ${p.name}`"
+            @click="openShort = openShort === p.shortName ? null : p.shortName"
+          >
+            <span class="topitem__board">{{ shownBoard(p)?.name }}</span>
+            <span class="topitem__caret">▾</span>
+          </button>
+
+          <div v-if="openShort === p.shortName" class="menu boardmenu" role="menu">
+            <button
+              v-for="b in p.boards"
+              :key="b.id"
+              class="menu__i"
+              :class="{ 'is-cur': b.slug === shownBoard(p)?.slug }"
+              type="button"
+              role="menuitem"
+              @click="pickBoard(p.shortName, b.slug)"
+            >{{ b.name }}</button>
+          </div>
+        </span>
         <span
           v-else-if="p.boards.length === 1"
           class="topitem topitem--caret topitem__board"
         >{{ p.boards[0].name }}</span>
-
-        <div v-if="openShort === p.shortName" class="menu boardmenu" role="menu">
-          <button
-            v-for="b in p.boards"
-            :key="b.id"
-            class="menu__i"
-            :class="{ 'is-cur': b.slug === shownBoard(p)?.slug }"
-            type="button"
-            role="menuitem"
-            @click="pickBoard(p.shortName, b.slug)"
-          >{{ b.name }}</button>
-        </div>
       </span>
     </nav>
 
@@ -185,11 +186,32 @@ async function signOut(): Promise<void> {
 .topitem__caret {
   font-size: 10px;
 }
+.boardpick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
 .boardmenu {
   position: absolute;
-  top: calc(100% + 2px);
+  top: calc(100% + 7px);
   left: 0;
   z-index: 20;
+}
+/* The pointer above the menu, drawn twice: the border's triangle, then the surface's one pixel lower to cover the line under it. */
+.boardmenu::before,
+.boardmenu::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 11px;
+  border: 6px solid transparent;
+}
+.boardmenu::before {
+  border-bottom-color: var(--line-2);
+}
+.boardmenu::after {
+  margin-bottom: -1px;
+  border-bottom-color: var(--card);
 }
 .topitem--danger:hover {
   color: var(--danger-text);

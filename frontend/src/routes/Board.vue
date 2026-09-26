@@ -21,6 +21,11 @@ interface Board {
   position: number;
   states: State[];
 }
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
 interface Project {
   id: string;
   shortName: string;
@@ -31,6 +36,8 @@ interface Project {
 
 const route = useRoute();
 const project = ref<Project | null>(null);
+// What this project can tag an issue with: its own tags and the global ones, in the server's order.
+const tags = ref<Tag[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
@@ -57,10 +64,16 @@ async function load(short: string): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    project.value = await api<Project>(`/projects/${encodeURIComponent(short)}`);
-    lastProject.set(project.value.shortName);
+    const [loaded, tagRows] = await Promise.all([
+      api<Project>(`/projects/${encodeURIComponent(short)}`),
+      api<Tag[]>(`/tags?project=${encodeURIComponent(short)}`),
+    ]);
+    project.value = loaded;
+    tags.value = tagRows;
+    lastProject.set(loaded.shortName);
   } catch (err) {
     project.value = null;
+    tags.value = [];
     error.value = err instanceof Error ? err.message : 'Could not load the project.';
   } finally {
     loading.value = false;
@@ -79,6 +92,15 @@ watch(
 <template>
   <div class="page">
     <TopBar :project="project" :board="current" />
+
+    <div v-if="tags.length" class="tagbar">
+      <span
+        v-for="t in tags"
+        :key="t.id"
+        class="taglabel taglabel--plain"
+        :style="{ '--c': t.color }"
+      >{{ t.name }}</span>
+    </div>
 
     <div class="page__body">
       <p v-if="loading" class="hint">Loading…</p>
@@ -111,6 +133,14 @@ watch(
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+.tagbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px var(--space-5);
+  border-bottom: 1px solid var(--line);
 }
 .page__body {
   flex: 1 1 auto;
