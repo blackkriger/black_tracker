@@ -484,6 +484,19 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       );
 
       if (p.tagIds) {
+        // Which tag came and which went, by name: "tags" on its own says nothing a month later.
+        const before = await client.query<{ tag_id: string; name: string }>(
+          `select it.tag_id, t.name from issue_tags it join tags t on t.id = it.tag_id
+            where it.issue_id = $1`,
+          [id]
+        );
+        const after = await client.query<{ id: string; name: string }>(
+          'select id, name from tags where id = any($1::uuid[])',
+          [p.tagIds]
+        );
+        const had = new Set(before.rows.map((r) => r.tag_id));
+        const has = new Set(p.tagIds);
+
         await client.query('delete from issue_tags where issue_id = $1', [id]);
         if (p.tagIds.length) {
           await client.query(
@@ -492,7 +505,12 @@ export function registerIssueRoutes(app: FastifyInstance): void {
             [id, p.tagIds]
           );
         }
-        await writeHistory(client, id, auth.userId, 'tags', null, null);
+        for (const row of after.rows.filter((r) => !had.has(r.id))) {
+          await writeHistory(client, id, auth.userId, 'tag added', null, row.name);
+        }
+        for (const row of before.rows.filter((r) => !has.has(r.tag_id))) {
+          await writeHistory(client, id, auth.userId, 'tag removed', null, row.name);
+        }
       }
     });
 

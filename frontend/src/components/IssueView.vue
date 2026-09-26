@@ -439,11 +439,13 @@ async function removeIssue(): Promise<void> {
                 <span class="hi__who">{{ h.by }}</span>
                 <span class="hi__what">
                   <span class="hi__f">{{ h.field }}</span>
-                  <template v-if="h.from || h.to">
-                    <span class="hi__f">{{ h.from ?? '—' }}</span>
+                  <!-- Nothing before it means there is nothing to point away from: the value stands alone. -->
+                  <template v-if="h.from">
+                    <span class="hi__f">{{ h.from }}</span>
                     <span class="hi__arrow">→</span>
                     <span class="hi__t">{{ h.to ?? '—' }}</span>
                   </template>
+                  <span v-else-if="h.to" class="hi__t">{{ h.to }}</span>
                 </span>
               </div>
               <div v-if="!issue.history.length" class="empty empty--sm">
