@@ -67,10 +67,30 @@ async function remove(tag: TagItem): Promise<void> {
 
 <template>
   <SettingsLayout>
-    <p v-if="loading" class="hint sheet__wide">Loading…</p>
     <div v-if="error" class="err sheet__wide">{{ error }}</div>
 
-    <section class="panel sheet__wide">
+    <!-- While the tags load the page keeps its shape: the global container, then one project container under it, both filled with label-shaped placeholders. -->
+    <template v-if="loading">
+      <section class="panel sheet__wide">
+        <header class="panel__h">Global tags<span class="panel__end">Usable on every project</span></header>
+        <div class="panel__b">
+          <div class="taglabels">
+            <span v-for="w in [64, 92, 48, 76]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel sheet__wide">
+        <header class="panel__h"><span class="sk head-sk"></span></header>
+        <div class="panel__b">
+          <div class="taglabels">
+            <span v-for="w in [80, 56, 68]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <section v-if="!loading" class="panel sheet__wide">
       <header class="panel__h">Global tags<span class="panel__end">Usable on every project</span></header>
       <div class="panel__b">
         <div v-if="!globalTags.length" class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
@@ -78,7 +98,7 @@ async function remove(tag: TagItem): Promise<void> {
       </div>
     </section>
 
-    <section v-for="p in projects" :key="p.id" class="panel sheet__wide">
+    <section v-for="p in !loading ? projects : []" :key="p.id" class="panel sheet__wide">
       <header class="panel__h">
         {{ p.name }}<span class="panel__end">{{ p.shortName }} only</span>
       </header>
@@ -94,3 +114,15 @@ async function remove(tag: TagItem): Promise<void> {
     </section>
   </SettingsLayout>
 </template>
+
+<style scoped>
+.tag-sk {
+  display: block;
+  height: 24px;
+}
+.head-sk {
+  display: block;
+  width: 140px;
+  height: 14px;
+}
+</style>
