@@ -655,6 +655,36 @@ export function registerIssueRoutes(app: FastifyInstance): void {
   });
 
   // ── links ────────────────────────────────────────────────────────
+  // Finding the issue to link to: by the start of its key, or by anything in its title. The answer is shaped like a link row, because that is what it is about to become.
+  app.get('/issues/search', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const { q, exclude } = req.query as { q?: string; exclude?: string };
+    const term = (q ?? '').trim();
+    if (!term) return reply.send({ data: [] });
+    const res = await pool.query<LinkRow>(
+      `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
+              s.name as state_name, s.color as state_color, p.short_name, b.slug
+         from issues i
+         join states s on s.id = i.state_id
+         join projects p on p.id = i.project_id
+         join boards b on b.id = i.board_id
+        where ($2::uuid is null or i.id <> $2)
+          and (i.readable_id ilike $1 || '%' or i.summary ilike '%' || $1 || '%')
+        order by (i.readable_id ilike $1 || '%') desc, i.updated_at desc
+        limit 20`,
+      [term, exclude ?? null]
+    );
+    if (auth.isAdmin) return reply.send({ data: res.rows.map(publicLink) });
+    const denied = await deniedFor(auth.roleId);
+    if (denied.everything) return reply.send({ data: [] });
+    return reply.send({
+      data: res.rows
+        .filter((r) => !denied.boards.has(r.board_id) && !denied.projects.has(r.project_id))
+        .map(publicLink),
+    });
+  });
+
   app.post('/issues/:id/links', async (req, reply) => {
     const { id } = req.params as { id: string };
     const found = await loadIssueFor(req, reply, id);

@@ -74,9 +74,43 @@ const saving = ref(false);
 const titleDraft = ref('');
 const bodyDraft = ref('');
 
-// A link is made by naming the other issue's key; nothing else about it is stored.
-const linkKey = ref('');
+// Linking: the chain opens a small window that searches by key or by title, and the pair is all that is stored.
+const picking = ref(false);
+const linkQuery = ref('');
+const linkResults = ref<IssueLink[]>([]);
+const searching = ref(false);
 const linking = ref(false);
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(linkQuery, (term) => {
+  if (searchTimer) clearTimeout(searchTimer);
+  const q = term.trim();
+  if (!q) {
+    linkResults.value = [];
+    return;
+  }
+  // A keystroke is not a query: the search waits for the typing to stop.
+  searchTimer = setTimeout(async () => {
+    searching.value = true;
+    try {
+      const rows = await api<IssueLink[]>(
+        `/issues/search?q=${encodeURIComponent(q)}&exclude=${issue.value?.id ?? ''}`
+      );
+      const already = new Set((issue.value?.links ?? []).map((l) => l.id));
+      linkResults.value = rows.filter((r) => !already.has(r.id));
+    } catch {
+      linkResults.value = [];
+    } finally {
+      searching.value = false;
+    }
+  }, 200);
+});
+
+function openPicker(): void {
+  picking.value = true;
+  linkQuery.value = '';
+  linkResults.value = [];
+}
 
 const commentDraft = ref('');
 const posting = ref(false);
@@ -360,8 +394,7 @@ async function saveComment(c: Comment): Promise<void> {
   }
 }
 
-async function addLink(): Promise<void> {
-  const key = linkKey.value.trim().toUpperCase();
+async function addLink(key: string): Promise<void> {
   const current = issue.value;
   if (!key || !current || linking.value) return;
   linking.value = true;
@@ -373,7 +406,7 @@ async function addLink(): Promise<void> {
     });
     const now = issue.value ?? current;
     issue.value = { ...now, links: [...now.links, made] };
-    linkKey.value = '';
+    picking.value = false;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not link them.';
   } finally {
@@ -615,35 +648,34 @@ async function removeIssue(): Promise<void> {
               <div v-else class="iv__body hint">Nothing written yet.</div>
             </div>
 
-            <div v-if="issue" :class="{ 'is-fresh': fresh.has('links') }">
-              <div class="sec-h">Linked<span class="n">{{ issue.links.length }}</span></div>
+            <div v-if="issue" class="links" :class="{ 'is-fresh': fresh.has('links') }">
+              <button class="links__add" type="button" title="Link an issue" @click="openPicker">
+                <svg viewBox="0 0 16 16" width="14" height="14" role="img" aria-label="Link an issue">
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    d="M6.4 9.6 9.6 6.4M6.9 4.7 8.5 3.1a2.9 2.9 0 0 1 4.1 4.1L11 8.8M9.1 11.3l-1.6 1.6a2.9 2.9 0 0 1-4.1-4.1L5 7.2"
+                  />
+                </svg>
+              </button>
+
               <RouterLink
                 v-for="l in issue.links"
                 :key="l.id"
                 class="lk"
                 :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
+                :title="`${l.summary} — ${l.stateName}`"
               >
-                <span class="key">{{ l.key }}</span>
-                <span class="lk__sum">{{ l.summary }}</span>
-                <span class="lk__state" :style="{ color: l.stateColor }">{{ l.stateName }}</span>
+                <span class="key lk__key" :style="{ color: l.stateColor }">{{ l.key }}</span>
                 <button
-                  class="btn btn--sm btn--icon btn--ghost"
+                  class="lk__x"
                   type="button"
                   :aria-label="`Unlink ${l.key}`"
                   @click.prevent="removeLink(l)"
                 >✕</button>
               </RouterLink>
-
-              <form class="addrow" @submit.prevent="addLink">
-                <input
-                  v-model="linkKey"
-                  class="input"
-                  placeholder="Link an issue by its key…"
-                  maxlength="30"
-                  @input="linkKey = linkKey.toUpperCase()"
-                />
-                <button class="btn" type="submit" :disabled="!linkKey.trim() || linking">Link</button>
-              </form>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('files') }">
@@ -975,6 +1007,32 @@ async function removeIssue(): Promise<void> {
         <div v-if="error" class="err iv__err">{{ error }}</div>
       </section>
 
+      <Dialog v-if="picking" title="Link an issue" :width="460" @close="picking = false">
+        <input
+          v-model="linkQuery"
+          class="input"
+          placeholder="Key or title…"
+          autofocus
+          @keydown.enter.prevent="linkResults[0] && addLink(linkResults[0].key)"
+        />
+        <div class="pick">
+          <button
+            v-for="r in linkResults"
+            :key="r.id"
+            class="pick__row"
+            type="button"
+            :disabled="linking"
+            @click="addLink(r.key)"
+          >
+            <span class="key">{{ r.key }}</span>
+            <span class="pick__sum">{{ r.summary }}</span>
+            <span class="pick__state" :style="{ color: r.stateColor }">{{ r.stateName }}</span>
+          </button>
+          <p v-if="searching" class="hint">Searching…</p>
+          <p v-else-if="linkQuery.trim() && !linkResults.length" class="hint">Nothing found.</p>
+        </div>
+      </Dialog>
+
       <ImageViewer v-model:index="shown" :images="gallery" />
 
       <Dialog v-if="deleting" :title="`Delete ${issueKey}`" @close="deleting = false">
@@ -1091,30 +1149,91 @@ async function removeIssue(): Promise<void> {
 .att__row--wait {
   border-style: dashed;
 }
-/* A linked issue reads as one line: its key, what it says, and where it stands. */
+/* The chain and what hangs off it stand on one line: the keys are enough, and the title rides in the tooltip. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.links__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.links__add:hover {
+  color: var(--text);
+}
 .lk {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 2px 0 8px;
+  border: 1px solid var(--line-2);
+  text-decoration: none;
+}
+.lk:hover {
+  background: var(--card-hover);
+}
+.lk__key {
+  font-size: 11.5px;
+}
+.lk__x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.lk__x:hover {
+  color: var(--danger-text);
+}
+/* The search answers in rows that look like what they will become. */
+.pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.pick__row {
   display: flex;
   align-items: center;
   gap: 10px;
   height: 32px;
-  padding: 0 4px 0 8px;
-  border: 1px solid var(--line);
-  margin-bottom: 6px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  background: none;
   color: var(--text);
-  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
 }
-.lk:hover {
+.pick__row:hover {
   border-color: var(--line-2);
   background: var(--card-hover);
 }
-.lk__sum {
+.pick__sum {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
 }
-.lk__state {
+.pick__state {
   font-size: 12px;
 }
 .cm__files {
