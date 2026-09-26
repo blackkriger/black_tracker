@@ -74,7 +74,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
 
-    const { rows, statesByBoard } = await boardsOfProject(project.id);
+    const { rows, statesByBoard, issuesByBoard } = await boardsOfProject(project.id);
     const denials = await denialsFor(rows.map((r) => r.id));
     // An admin manages access, so they see every board and who is shut out; anyone else is simply not handed the boards they cannot open.
     const visible = auth.isAdmin
@@ -82,7 +82,12 @@ export function registerBoardRoutes(app: FastifyInstance): void {
       : rows.filter((r) => !(denials.get(r.id) ?? []).includes(auth.userId));
     return reply.send({
       data: visible.map((r) =>
-        publicBoard(r, statesByBoard.get(r.id) ?? [], auth.isAdmin ? denials.get(r.id) ?? [] : [])
+        publicBoard(
+          r,
+          statesByBoard.get(r.id) ?? [],
+          auth.isAdmin ? denials.get(r.id) ?? [] : [],
+          issuesByBoard.get(r.id) ?? 0
+        )
       ),
     });
   });
@@ -162,8 +167,12 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         where b.id = o.id and b.project_id = $1`,
       [project.id, parsed.data.ids]
     );
-    const { rows, statesByBoard } = await boardsOfProject(project.id);
-    return reply.send({ data: rows.map((r) => publicBoard(r, statesByBoard.get(r.id) ?? [])) });
+    const { rows, statesByBoard, issuesByBoard } = await boardsOfProject(project.id);
+    return reply.send({
+      data: rows.map((r) =>
+        publicBoard(r, statesByBoard.get(r.id) ?? [], [], issuesByBoard.get(r.id) ?? 0)
+      ),
+    });
   });
 
   // The last board of a project cannot go: its issues would have nowhere to live.
@@ -179,17 +188,13 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     if (siblings.rows[0].n <= 1) {
       return reply.code(409).send({ error: 'A project keeps at least one board.' });
     }
+    // The board's statuses and issues go with it, which is what the confirmation on the screen spells out.
     const used = await pool.query<{ n: number }>(
       'select count(*)::int as n from issues where board_id = $1',
       [id]
     );
-    if (used.rows[0].n > 0) {
-      return reply.code(409).send({
-        error: `Move the ${used.rows[0].n} issue(s) off this board first.`,
-      });
-    }
     await pool.query('delete from boards where id = $1', [id]);
-    return reply.send({ data: { ok: true } });
+    return reply.send({ data: { ok: true, issues: used.rows[0].n } });
   });
 
   // ── the board's columns ────────────────────────────────────────

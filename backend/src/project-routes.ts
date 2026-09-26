@@ -57,9 +57,9 @@ export async function projectByShort(shortName: string): Promise<ProjectRow | nu
   return res.rows[0] ?? null;
 }
 
-// One project's boards with their columns, in two queries rather than one per board.
+// One project's boards with their columns and issue counts, in three queries rather than three per board.
 export async function boardsOfProject(projectId: string) {
-  const [boards, states] = await Promise.all([
+  const [boards, states, counts] = await Promise.all([
     pool.query<BoardRow>(
       `select id, project_id, name, default_state_id, position
          from boards where project_id = $1 order by position, name`,
@@ -72,6 +72,12 @@ export async function boardsOfProject(projectId: string) {
         order by s.position, s.name`,
       [projectId]
     ),
+    pool.query<{ board_id: string; n: number }>(
+      `select board_id, count(*)::int as n from issues
+        where project_id = $1 and board_id is not null
+        group by board_id`,
+      [projectId]
+    ),
   ]);
   const byBoard = new Map<string, StateRow[]>();
   for (const s of states.rows) {
@@ -79,7 +85,8 @@ export async function boardsOfProject(projectId: string) {
     list.push(s);
     byBoard.set(s.board_id, list);
   }
-  return { rows: boards.rows, statesByBoard: byBoard };
+  const issuesByBoard = new Map(counts.rows.map((r) => [r.board_id, r.n]));
+  return { rows: boards.rows, statesByBoard: byBoard, issuesByBoard };
 }
 
 export function registerProjectRoutes(app: FastifyInstance): void {
@@ -94,11 +101,13 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const { short } = req.params as { short: string };
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
-    const { rows, statesByBoard } = await boardsOfProject(project.id);
+    const { rows, statesByBoard, issuesByBoard } = await boardsOfProject(project.id);
     return reply.send({
       data: {
         ...publicProject(project),
-        boards: rows.map((b) => publicBoard(b, statesByBoard.get(b.id) ?? [])),
+        boards: rows.map((b) =>
+          publicBoard(b, statesByBoard.get(b.id) ?? [], [], issuesByBoard.get(b.id) ?? 0)
+        ),
       },
     });
   });

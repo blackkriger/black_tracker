@@ -21,6 +21,8 @@ interface Board {
   name: string;
   defaultStateId: string | null;
   position: number;
+  /** How many issues live on it, so a delete can say what it takes with it. */
+  issues: number;
   states: State[];
 }
 interface Project {
@@ -43,6 +45,8 @@ const newBoard = ref('');
 // Deleting a project is the one action here nothing can undo, so the key has to be typed before the button appears.
 const deleting = ref(false);
 const confirmKey = ref('');
+// A board takes its statuses and its issues with it, so that one is asked about too — by name, not by typing.
+const deletingBoard = ref<Board | null>(null);
 const newStatus = ref<Record<string, string>>({});
 
 async function load(): Promise<void> {
@@ -125,12 +129,16 @@ async function patchBoard(b: Board, body: Record<string, unknown>): Promise<void
   }
 }
 
-async function deleteBoard(b: Board): Promise<void> {
+async function deleteBoard(): Promise<void> {
+  const b = deletingBoard.value;
+  if (!b) return;
   try {
     await api(`/boards/${b.id}`, { method: 'DELETE' });
     boards.value = boards.value.filter((row) => row.id !== b.id);
+    deletingBoard.value = null;
   } catch (err) {
     report(err);
+    deletingBoard.value = null;
   }
 }
 
@@ -242,7 +250,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
             >
               <option v-for="s in b.states" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
-            <button class="btn btn--sm btn--danger" type="button" @click="deleteBoard(b)">Delete board</button>
+            <button class="btn btn--sm btn--danger" type="button" @click="deletingBoard = b">Delete board</button>
           </span>
         </header>
 
@@ -327,6 +335,24 @@ async function onDrop(b: Board, target: State): Promise<void> {
         </div>
       </section>
     </template>
+
+    <Dialog
+      v-if="deletingBoard"
+      :title="`Delete ${deletingBoard.name}`"
+      @close="deletingBoard = null"
+    >
+      <p class="dialog__lede">
+        This takes the board's statuses
+        <template v-if="deletingBoard.issues">
+          and its {{ deletingBoard.issues }} issue{{ deletingBoard.issues === 1 ? '' : 's' }}
+        </template>
+        with it. This cannot be undone.
+      </p>
+      <template #footer>
+        <button class="btn" type="button" @click="deletingBoard = null">Cancel</button>
+        <button class="btn btn--danger" type="button" @click="deleteBoard">Delete board</button>
+      </template>
+    </Dialog>
 
     <Dialog
       v-if="deleting && project"
