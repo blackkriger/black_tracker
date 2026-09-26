@@ -1555,18 +1555,15 @@ async function removeIssue(): Promise<void> {
   margin-top: 8px;
 }
 /* Waiting, not yet uploaded: one block per file — the picture itself at its own size, and under it the whole name, the size and the way to take it back. The dashed edge is what says it has not gone up yet. */
-/* Blocks stand side by side when they fit: a small picture takes only the width it needs, a large one takes the row. */
+/* Columns rather than rows: pictures are of every shape, and a row of them leaves holes under the short ones. Each block drops into the shortest column and nothing is left empty between them. */
 .waits {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px;
+  columns: 240px;
+  column-gap: 8px;
   margin-top: 8px;
 }
 .wait {
-  flex: 0 1 auto;
-  min-width: 200px;
-  max-width: 100%;
+  break-inside: avoid;
+  margin: 0 0 8px;
   border: 1px dashed var(--line-2);
   background: var(--bg);
 }
