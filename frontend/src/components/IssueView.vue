@@ -45,9 +45,10 @@ const people = ref<{ id: string; login: string; fullName: string }[]>([]);
 
 const tab = ref<'comments' | 'history'>('comments');
 
-const editingTitle = ref(false);
+// The title and the description are the issue's text: they are edited together, deliberately, and saved in one write.
+const editing = ref(false);
+const saving = ref(false);
 const titleDraft = ref('');
-const editingBody = ref(false);
 const bodyDraft = ref('');
 
 const commentDraft = ref('');
@@ -72,7 +73,9 @@ const files = computed(() =>
 );
 
 function onKeydown(ev: KeyboardEvent): void {
-  if (ev.key === 'Escape' && !editingTitle.value && !editingBody.value) emit('close');
+  if (ev.key !== 'Escape') return;
+  if (editing.value) editing.value = false;
+  else emit('close');
 }
 
 onMounted(() => {
@@ -112,26 +115,26 @@ async function patch(body: Record<string, unknown>): Promise<void> {
   }
 }
 
-function startTitle(): void {
+function startEditing(): void {
   titleDraft.value = issue.value?.summary ?? '';
-  editingTitle.value = true;
-}
-
-async function saveTitle(): Promise<void> {
-  const value = titleDraft.value.trim();
-  editingTitle.value = false;
-  if (value && value !== issue.value?.summary) await patch({ summary: value });
-}
-
-function startBody(): void {
   bodyDraft.value = issue.value?.description ?? '';
-  editingBody.value = true;
+  editing.value = true;
 }
 
-async function saveBody(): Promise<void> {
-  const value = bodyDraft.value;
-  editingBody.value = false;
-  if (value !== issue.value?.description) await patch({ description: value });
+async function saveText(): Promise<void> {
+  const current = issue.value;
+  if (!current || saving.value) return;
+  const summary = titleDraft.value.trim();
+  const body: Record<string, unknown> = {};
+  if (summary && summary !== current.summary) body.summary = summary;
+  if (bodyDraft.value !== current.description) body.description = bodyDraft.value;
+  saving.value = true;
+  try {
+    if (Object.keys(body).length) await patch(body);
+    editing.value = false;
+  } finally {
+    saving.value = false;
+  }
 }
 
 function toggleTag(tagId: string, on: boolean): void {
@@ -259,14 +262,31 @@ async function removeIssue(): Promise<void> {
           <span class="key iv__key">{{ issueKey }}</span>
           <span v-if="state" class="iv__state" :style="{ color: state.color }">{{ state.name }}</span>
           <div class="sp"></div>
-          <button
-            class="btn btn--sm btn--danger"
-            type="button"
-            :disabled="!session.canDelete.value"
-            @click="deleting = true"
-          >
-            Delete
-          </button>
+          <template v-if="editing">
+            <button class="btn btn--sm" type="button" @click="editing = false">Cancel</button>
+            <button class="btn btn--sm btn--primary" type="button" :disabled="saving" @click="saveText">
+              Save
+            </button>
+          </template>
+          <template v-else>
+            <button
+              class="btn btn--sm btn--icon btn--ghost"
+              type="button"
+              aria-label="Edit"
+              :disabled="!issue"
+              @click="startEditing"
+            >
+              ✎
+            </button>
+            <button
+              class="btn btn--sm btn--danger"
+              type="button"
+              :disabled="!session.canDelete.value"
+              @click="deleting = true"
+            >
+              Delete
+            </button>
+          </template>
           <button
             class="btn btn--sm btn--icon btn--ghost"
             type="button"
@@ -286,30 +306,19 @@ async function removeIssue(): Promise<void> {
         <div v-else class="iv">
           <div class="iv__main">
             <input
-              v-if="editingTitle"
+              v-if="editing"
               v-model="titleDraft"
               class="input iv__title-edit"
               maxlength="300"
               autofocus
-              @keydown.enter.prevent="saveTitle"
-              @keydown.esc="editingTitle = false"
-              @blur="saveTitle"
+              @keydown.enter.prevent="saveText"
             />
-            <h1 v-else class="iv__title" @click="startTitle">{{ issue.summary }}</h1>
+            <h1 v-else class="iv__title iv__title--ro">{{ issue.summary }}</h1>
 
             <div>
               <div class="sec-h">Description</div>
-              <template v-if="editingBody">
-                <textarea v-model="bodyDraft" class="input iv__body-edit" autofocus></textarea>
-                <div class="composer__row">
-                  <div class="sp"></div>
-                  <button class="btn btn--sm" type="button" @click="editingBody = false">Cancel</button>
-                  <button class="btn btn--sm btn--primary" type="button" @click="saveBody">Save</button>
-                </div>
-              </template>
-              <div v-else class="md iv__body" @click="startBody">
-                {{ issue.description || 'Nothing written yet.' }}
-              </div>
+              <textarea v-if="editing" v-model="bodyDraft" class="input iv__body-edit"></textarea>
+              <div v-else class="md iv__body">{{ issue.description || 'Nothing written yet.' }}</div>
             </div>
 
             <div>
@@ -607,9 +616,13 @@ async function removeIssue(): Promise<void> {
   height: 38px;
   font: 600 20px var(--font-ui);
 }
+/* Out of edit mode the text is text: nothing here invites a click that would change it. */
+.iv__title--ro:hover {
+  border-color: transparent;
+  background: none;
+}
 .iv__body {
   white-space: pre-wrap;
-  cursor: text;
 }
 .iv__body-edit {
   width: 100%;
@@ -617,6 +630,10 @@ async function removeIssue(): Promise<void> {
   padding: 10px;
   line-height: 1.55;
   resize: vertical;
+}
+/* The buttons belong to the field above them, not stuck to its edge. */
+.iv__body-edit + .composer__row {
+  margin-top: 8px;
 }
 /* The day and the clock ride together in the first column, so it is wider than the theme's default. */
 .hi {
