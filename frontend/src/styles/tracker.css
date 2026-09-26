@@ -109,7 +109,7 @@ button { font-family: var(--font-ui); }
 }
 
 /* A row that adds something to the list above it: the field takes the width, the button sits beside it at the same height. */
-.addrow { display: flex; gap: 6px; align-items: stretch; }
+.addrow { display: flex; gap: 6px; align-items: stretch; margin-top: 12px; }
 .addrow .input { flex: 1 1 auto; height: 34px; }
 .addrow .btn { height: 34px; }
 

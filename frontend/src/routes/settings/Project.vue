@@ -535,7 +535,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
   gap: var(--space-2);
 }
 .addrow {
-  padding: 8px 4px 0;
+  padding: 0 4px;
 }
 .grip {
   color: var(--text-dim);

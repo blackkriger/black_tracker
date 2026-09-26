@@ -80,7 +80,4 @@ function add(): void {
   font: inherit;
   cursor: text;
 }
-.addrow {
-  margin-top: var(--space-3);
-}
 </style>

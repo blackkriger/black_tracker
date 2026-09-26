@@ -183,9 +183,6 @@ async function remove(scope: string, tag: TagItem): Promise<void> {
   height: 14px;
 }
 /* The add row keeps its place too, or the panel grows the moment the tags land. */
-.addrow {
-  margin-top: var(--space-3);
-}
 .field-sk {
   display: block;
   flex: 1 1 auto;
