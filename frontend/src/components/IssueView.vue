@@ -25,7 +25,10 @@ interface State {
 }
 
 const props = defineProps<{
-  issueKey: string;
+  /** The issue being read. Absent means this window is writing a new one. */
+  issueKey?: string;
+  /** The column a new issue starts in. */
+  createIn?: string | null;
   board: { id: string; name: string; states: State[] };
   tags: IssueTag[];
 }>();
@@ -33,10 +36,23 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'changed', issue: Issue): void;
+  (e: 'created', issue: Issue): void;
   (e: 'deleted', id: string): void;
 }>();
 
 const session = useSession();
+
+const creating = computed(() => !props.issueKey);
+// What a new issue is so far. An existing one is written a field at a time; this one is written all at once, when it is saved.
+const draft = ref({
+  summary: '',
+  description: '',
+  stateId: '',
+  priority: 'Normal' as Priority,
+  assigneeId: null as string | null,
+  dueDate: null as string | null,
+  tagIds: [] as string[],
+});
 
 const issue = ref<IssueFull | null>(null);
 const loading = ref(true);
@@ -60,8 +76,20 @@ const uploading = ref(false);
 const dragOver = ref(false);
 const deleting = ref(false);
 
-const state = computed(() => props.board.states.find((s) => s.id === issue.value?.stateId) ?? null);
-const wornTags = computed(() => issue.value?.tags ?? []);
+const shownStateId = computed(() => (creating.value ? draft.value.stateId : issue.value?.stateId));
+const shownPriority = computed(() =>
+  creating.value ? draft.value.priority : (issue.value?.priority ?? 'Normal')
+);
+const shownAssignee = computed(() =>
+  creating.value ? draft.value.assigneeId : (issue.value?.assignee?.id ?? null)
+);
+const shownDue = computed(() => (creating.value ? draft.value.dueDate : (issue.value?.dueDate ?? null)));
+const state = computed(() => props.board.states.find((s) => s.id === shownStateId.value) ?? null);
+const wornTags = computed(() =>
+  creating.value
+    ? props.tags.filter((t) => draft.value.tagIds.includes(t.id))
+    : (issue.value?.tags ?? [])
+);
 const freeTags = computed(() =>
   props.tags.filter((t) => !wornTags.value.some((w) => w.id === t.id))
 );
@@ -89,6 +117,23 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 watch(() => props.issueKey, load, { immediate: true });
 
 async function load(): Promise<void> {
+  if (!props.issueKey) {
+    // A window opened on nothing starts in edit mode, in the column it was opened from.
+    draft.value = {
+      summary: '',
+      description: '',
+      stateId: props.createIn ?? props.board.states[0]?.id ?? '',
+      priority: 'Normal',
+      assigneeId: null,
+      dueDate: null,
+      tagIds: [],
+    };
+    titleDraft.value = '';
+    bodyDraft.value = '';
+    editing.value = true;
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   error.value = null;
   try {
@@ -112,6 +157,41 @@ async function patch(body: Record<string, unknown>): Promise<void> {
     emit('changed', updated);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not save the change.';
+  }
+}
+
+// Each property either goes straight to the server or into the draft, depending on which kind of window this is.
+function setProp(body: Record<string, unknown>): void {
+  if (!creating.value) {
+    void patch(body);
+    return;
+  }
+  draft.value = { ...draft.value, ...body };
+}
+
+async function create(): Promise<void> {
+  const summary = titleDraft.value.trim();
+  if (!summary || saving.value) return;
+  saving.value = true;
+  error.value = null;
+  try {
+    const made = await api<Issue>(`/boards/${props.board.id}/issues`, {
+      method: 'POST',
+      body: {
+        summary,
+        description: bodyDraft.value,
+        stateId: draft.value.stateId,
+        priority: draft.value.priority,
+        assigneeId: draft.value.assigneeId,
+        dueDate: draft.value.dueDate,
+        tagIds: draft.value.tagIds,
+      },
+    });
+    emit('created', made);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Could not create the issue.';
+  } finally {
+    saving.value = false;
   }
 }
 
@@ -141,7 +221,7 @@ function toggleTag(tagId: string, on: boolean): void {
   const next = on
     ? [...wornTags.value.map((t) => t.id), tagId]
     : wornTags.value.map((t) => t.id).filter((id) => id !== tagId);
-  void patch({ tagIds: next });
+  setProp({ tagIds: next });
 }
 
 async function postComment(): Promise<void> {
@@ -259,10 +339,21 @@ async function removeIssue(): Promise<void> {
     <div class="iv__scrim" @click.self="emit('close')">
       <section class="dlg iv__win" role="dialog" aria-modal="true">
         <header class="dlg__h">
-          <span class="key iv__key">{{ issueKey }}</span>
+          <span class="key iv__key">{{ issueKey ?? 'New issue' }}</span>
           <span v-if="state" class="iv__state" :style="{ color: state.color }">{{ state.name }}</span>
           <div class="sp"></div>
-          <template v-if="editing">
+          <template v-if="creating">
+            <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
+            <button
+              class="btn btn--sm btn--primary"
+              type="button"
+              :disabled="saving || !titleDraft.trim()"
+              @click="create"
+            >
+              Create
+            </button>
+          </template>
+          <template v-else-if="editing">
             <button class="btn btn--sm" type="button" @click="editing = false">Cancel</button>
             <button class="btn btn--sm btn--primary" type="button" :disabled="saving" @click="saveText">
               Save
@@ -297,11 +388,13 @@ async function removeIssue(): Promise<void> {
           </button>
         </header>
 
-        <div v-if="loading" class="iv__loading">
+        <div v-if="loading && !creating" class="iv__loading">
           <span class="sk sk--line" style="width: 320px; height: 24px"></span>
           <span class="sk sk--line" style="width: 100%; height: 64px"></span>
         </div>
-        <div v-else-if="!issue" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
+        <div v-else-if="!issue && !creating" class="empty">
+          <span class="empty__g">✕</span>{{ error }}
+        </div>
 
         <div v-else class="iv">
           <div class="iv__main">
@@ -310,18 +403,19 @@ async function removeIssue(): Promise<void> {
               v-model="titleDraft"
               class="input iv__title-edit"
               maxlength="300"
+              placeholder="What needs doing?"
               autofocus
-              @keydown.enter.prevent="saveText"
+              @keydown.enter.prevent="creating ? create() : saveText()"
             />
-            <h1 v-else class="iv__title iv__title--ro">{{ issue.summary }}</h1>
+            <h1 v-else class="iv__title iv__title--ro">{{ issue?.summary }}</h1>
 
             <div>
               <div class="sec-h">Description</div>
               <textarea v-if="editing" v-model="bodyDraft" class="input iv__body-edit"></textarea>
-              <div v-else class="md iv__body">{{ issue.description || 'Nothing written yet.' }}</div>
+              <div v-else class="md iv__body">{{ issue?.description || 'Nothing written yet.' }}</div>
             </div>
 
-            <div>
+            <div v-if="issue">
               <div class="sec-h">Files<span class="n">{{ issue.attachments.length }}</span></div>
               <div v-if="images.length" class="atts">
                 <figure v-for="a in images" :key="a.id" class="att">
@@ -366,7 +460,7 @@ async function removeIssue(): Promise<void> {
               </label>
             </div>
 
-            <nav class="itabs" aria-label="Issue detail">
+            <nav v-if="issue" class="itabs" aria-label="Issue detail">
               <button
                 class="itab"
                 type="button"
@@ -385,7 +479,7 @@ async function removeIssue(): Promise<void> {
               </button>
             </nav>
 
-            <div v-if="tab === 'comments'" class="iv__list">
+            <div v-if="issue && tab === 'comments'" class="iv__list">
               <article v-for="c in issue.comments" :key="c.id" class="cm">
                 <span class="av av--lg" :style="buddyAvatarStyle(c.author.login)"></span>
                 <div>
@@ -442,7 +536,7 @@ async function removeIssue(): Promise<void> {
               </form>
             </div>
 
-            <div v-else class="hist">
+            <div v-else-if="issue" class="hist">
               <div v-for="h in issue.history" :key="h.id" class="hi">
                 <time>{{ stampAt(h.at) }}</time>
                 <span class="hi__who">{{ h.by }}</span>
@@ -468,8 +562,8 @@ async function removeIssue(): Promise<void> {
               <span class="prop__k">Status</span>
               <select
                 class="input input--sm"
-                :value="issue.stateId"
-                @change="patch({ stateId: ($event.target as HTMLSelectElement).value })"
+                :value="shownStateId"
+                @change="setProp({ stateId: ($event.target as HTMLSelectElement).value })"
               >
                 <option v-for="s in board.states" :key="s.id" :value="s.id">{{ s.name }}</option>
               </select>
@@ -478,8 +572,8 @@ async function removeIssue(): Promise<void> {
               <span class="prop__k">Priority</span>
               <select
                 class="input input--sm"
-                :value="issue.priority"
-                @change="patch({ priority: ($event.target as HTMLSelectElement).value as Priority })"
+                :value="shownPriority"
+                @change="setProp({ priority: ($event.target as HTMLSelectElement).value as Priority })"
               >
                 <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
               </select>
@@ -488,8 +582,8 @@ async function removeIssue(): Promise<void> {
               <span class="prop__k">Assignee</span>
               <select
                 class="input input--sm"
-                :value="issue.assignee?.id ?? ''"
-                @change="patch({ assigneeId: ($event.target as HTMLSelectElement).value || null })"
+                :value="shownAssignee ?? ''"
+                @change="setProp({ assigneeId: ($event.target as HTMLSelectElement).value || null })"
               >
                 <option value="">—</option>
                 <option v-for="p in people" :key="p.id" :value="p.id">
@@ -502,10 +596,10 @@ async function removeIssue(): Promise<void> {
               <!-- A date that has gone by says so by being red; there is no word for it anywhere else. -->
               <input
                 class="input input--sm"
-                :class="{ 'is-late': dueLabel(issue.dueDate)?.late }"
+                :class="{ 'is-late': dueLabel(shownDue)?.late }"
                 type="date"
-                :value="issue.dueDate ?? ''"
-                @change="patch({ dueDate: ($event.target as HTMLInputElement).value || null })"
+                :value="shownDue ?? ''"
+                @change="setProp({ dueDate: ($event.target as HTMLInputElement).value || null })"
               />
             </div>
 
@@ -540,16 +634,18 @@ async function removeIssue(): Promise<void> {
               </div>
             </div>
 
-            <div class="hr"></div>
+            <template v-if="issue">
+              <div class="hr"></div>
 
-            <div class="prop">
-              <span class="prop__k">Author</span>
-              <span class="pv pv--ro">{{ issue.author?.login ?? '—' }}</span>
-            </div>
-            <div class="prop">
-              <span class="prop__k">Created</span>
-              <span class="pv pv--ro stamp">{{ stamp(issue.createdAt) }}</span>
-            </div>
+              <div class="prop">
+                <span class="prop__k">Author</span>
+                <span class="pv pv--ro">{{ issue.author?.login ?? '—' }}</span>
+              </div>
+              <div class="prop">
+                <span class="prop__k">Created</span>
+                <span class="pv pv--ro stamp">{{ stamp(issue.createdAt) }}</span>
+              </div>
+            </template>
           </aside>
         </div>
 

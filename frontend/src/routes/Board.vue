@@ -46,10 +46,8 @@ const issuesLoading = ref(true);
 const dragId = ref<string | null>(null);
 const dropAt = ref<{ stateId: string; beforeId: string | null } | null>(null);
 
-// Which column has its composer open, and what is being typed into it.
-const composing = ref<string | null>(null);
-const draft = ref('');
-const adding = ref(false);
+// The column a new issue is being written into, if any.
+const creatingIn = ref<string | null>(null);
 // What this project can tag an issue with: its own tags and the global ones, in the server's order.
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
@@ -126,32 +124,11 @@ async function onDrop(): Promise<void> {
   }
 }
 
-// ── adding one ───────────────────────────────────────────────────
-function startComposing(stateId: string): void {
-  composing.value = stateId;
-  draft.value = '';
-}
-
-async function addIssue(stateId: string): Promise<void> {
-  const summary = draft.value.trim();
-  const board = current.value;
-  if (!summary || !board || adding.value) return;
-  adding.value = true;
-  try {
-    const created = await api<Issue>(`/boards/${board.id}/issues`, {
-      method: 'POST',
-      body: { summary, stateId },
-    });
-    issues.value = [...issues.value, created];
-    draft.value = '';
-    composing.value = null;
-    // The card exists the moment it has a title; everything else about it is filled in where it is read.
-    openIssue(created);
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not create the issue.';
-  } finally {
-    adding.value = false;
-  }
+// A new issue is written in the same window it will be read in, and the card appears once it exists.
+function issueCreated(created: Issue): void {
+  issues.value = [...issues.value, created];
+  creatingIn.value = null;
+  openIssue(created);
 }
 
 function openIssue(issue: Issue): void {
@@ -161,9 +138,10 @@ function openIssue(issue: Issue): void {
 }
 
 function closeIssue(): void {
+  creatingIn.value = null;
   const short = project.value?.shortName;
   const slug = current.value?.slug;
-  if (short && slug) void router.push(`/${short}/${slug}`);
+  if (openKey.value && short && slug) void router.push(`/${short}/${slug}`);
 }
 
 // What changed in the view is what the card shows, without reading the whole board again.
@@ -298,36 +276,27 @@ watch(
               </div>
             </article>
 
-            <form v-if="composing === s.id" class="composer" @submit.prevent="addIssue(s.id)">
-              <textarea
-                v-model="draft"
-                class="input"
-                maxlength="300"
-                autofocus
-                @keydown.enter.prevent="addIssue(s.id)"
-                @keydown.esc="composing = null"
-              ></textarea>
-              <div class="composer__row">
-                <div class="sp"></div>
-                <button class="btn btn--sm" type="button" @click="composing = null">Cancel</button>
-                <button class="btn btn--sm btn--primary" type="submit" :disabled="!draft.trim() || adding">
-                  Add
-                </button>
-              </div>
-            </form>
-            <button v-else class="add" type="button" @click="startComposing(s.id)">Add issue…</button>
+            <button
+              class="add add--plus"
+              type="button"
+              :aria-label="`Add an issue to ${s.name}`"
+              @click="creatingIn = s.id"
+            >+</button>
           </template>
         </div>
       </section>
     </div>
 
     <IssueView
-      v-if="openKey && current"
-      :issue-key="openKey"
+      v-if="current && (openKey || creatingIn)"
+      :key="openKey || 'new'"
+      :issue-key="openKey || undefined"
+      :create-in="creatingIn"
       :board="current"
       :tags="tags"
       @close="closeIssue"
       @changed="issueChanged"
+      @created="issueCreated"
       @deleted="issueGone"
     />
   </div>
@@ -360,5 +329,17 @@ watch(
 .card__who {
   font-size: 12.5px;
   color: var(--text-dim);
+}
+/* The plus is the only thing that lights up, the way the top bar's links do: no plate behind it. */
+.add--plus {
+  width: auto;
+  padding: 0 8px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.add--plus:hover {
+  background: none;
+  color: var(--text);
 }
 </style>
