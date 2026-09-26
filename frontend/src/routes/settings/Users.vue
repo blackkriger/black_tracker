@@ -54,12 +54,16 @@ const copied = ref(false);
 
 const newRole = ref('');
 const accessFor = ref<Role | null>(null);
-const denied = ref<string[]>([]);
+// Two kinds of denial: a whole project, or single boards inside one the role does have.
+const deniedProjects = ref<string[]>([]);
+const deniedBoards = ref<string[]>([]);
 const accessBusy = ref(false);
 
-const boardsByProject = computed(() =>
-  projects.value.filter((p) => p.boards.length).map((p) => ({ ...p, boards: p.boards }))
-);
+// Every project, boards or not: a project with nothing on it yet can still be closed to a role.
+const accessProjects = computed(() => projects.value);
+
+const projectDenied = (id: string) => deniedProjects.value.includes(id);
+const boardDenied = (id: string) => deniedBoards.value.includes(id);
 
 onMounted(async () => {
   try {
@@ -180,19 +184,30 @@ async function revokeInvite(i: Invite): Promise<void> {
 
 async function openAccess(role: Role): Promise<void> {
   accessFor.value = role;
-  denied.value = [];
+  deniedProjects.value = [];
+  deniedBoards.value = [];
   try {
-    const res = await api<{ deniedBoards: string[] }>(`/roles/${role.id}/access`);
-    denied.value = res.deniedBoards;
+    const res = await api<{ deniedProjects: string[]; deniedBoards: string[] }>(
+      `/roles/${role.id}/access`
+    );
+    deniedProjects.value = res.deniedProjects;
+    deniedBoards.value = res.deniedBoards;
   } catch (err) {
     report(err);
   }
 }
 
+// Closing a project leaves its board denials alone, so re-opening it gives back exactly the picture it had.
+function toggleProject(projectId: string, allowed: boolean): void {
+  deniedProjects.value = allowed
+    ? deniedProjects.value.filter((id) => id !== projectId)
+    : [...deniedProjects.value, projectId];
+}
+
 function toggleBoard(boardId: string, allowed: boolean): void {
-  denied.value = allowed
-    ? denied.value.filter((id) => id !== boardId)
-    : [...denied.value, boardId];
+  deniedBoards.value = allowed
+    ? deniedBoards.value.filter((id) => id !== boardId)
+    : [...deniedBoards.value, boardId];
 }
 
 async function saveAccess(): Promise<void> {
@@ -201,7 +216,10 @@ async function saveAccess(): Promise<void> {
   accessBusy.value = true;
   error.value = null;
   try {
-    await api(`/roles/${role.id}/access`, { method: 'PUT', body: { deniedBoards: denied.value } });
+    await api(`/roles/${role.id}/access`, {
+      method: 'PUT',
+      body: { deniedProjects: deniedProjects.value, deniedBoards: deniedBoards.value },
+    });
     accessFor.value = null;
   } catch (err) {
     report(err);
@@ -401,19 +419,29 @@ async function saveAccess(): Promise<void> {
       :width="420"
       @close="accessFor = null"
     >
-      <div v-for="p in boardsByProject" :key="p.id" class="access__group">
-        <span class="label">{{ p.shortName }} {{ p.name }}</span>
+      <div v-for="p in accessProjects" :key="p.id" class="access__group">
+        <label class="check access__proj">
+          <input
+            type="checkbox"
+            :checked="!projectDenied(p.id)"
+            :indeterminate.prop="!projectDenied(p.id) && p.boards.some((b) => boardDenied(b.id))"
+            @change="toggleProject(p.id, ($event.target as HTMLInputElement).checked)"
+          />
+          <span class="proj__k">{{ p.shortName }}</span>
+          {{ p.name }}
+        </label>
         <label v-for="b in p.boards" :key="b.id" class="check access__row">
           <input
             type="checkbox"
-            :checked="!denied.includes(b.id)"
+            :checked="!projectDenied(p.id) && !boardDenied(b.id)"
+            :disabled="projectDenied(p.id)"
             @change="toggleBoard(b.id, ($event.target as HTMLInputElement).checked)"
           />
           {{ b.name }}
         </label>
       </div>
-      <div v-if="!boardsByProject.length" class="empty empty--sm">
-        <span class="empty__g">◇</span>No boards yet.
+      <div v-if="!accessProjects.length" class="empty empty--sm">
+        <span class="empty__g">◇</span>No projects yet.
       </div>
 
       <template #footer>
@@ -495,7 +523,15 @@ async function saveAccess(): Promise<void> {
 .access__group + .access__group {
   margin-top: var(--space-4);
 }
+.access__proj {
+  font-weight: 500;
+}
 .access__row {
+  margin-left: 24px;
   font-size: 13px;
+  color: var(--text-dim);
+}
+.access__row input:disabled {
+  opacity: 0.4;
 }
 </style>

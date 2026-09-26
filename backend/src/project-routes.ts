@@ -6,7 +6,7 @@ import { inTransaction, pool } from './db.js';
 import { requireAdmin, requireAuth } from './auth.js';
 import {
   createBoardWithDefaults,
-  denialsFor,
+  deniedFor,
   publicBoard,
   type BoardRow,
   type StateRow,
@@ -94,29 +94,44 @@ export function registerProjectRoutes(app: FastifyInstance): void {
         'select id, project_id, name, slug, default_state_id, position from boards order by position, name'
       ),
     ]);
-    const denials = await denialsFor(boards.rows.map((b) => b.id));
+    // An admin manages access, so they see everything; anyone else is simply not handed what their role cannot open.
+    const denied = auth.isAdmin
+      ? { projects: new Set<string>(), boards: new Set<string>() }
+      : await deniedFor(auth.roleId);
     const byProject = new Map<string, { id: string; name: string; slug: string }[]>();
     for (const b of boards.rows) {
-      if (!auth.isAdmin && (denials.get(b.id) ?? []).includes(auth.userId)) continue;
+      if (denied.boards.has(b.id)) continue;
       const list = byProject.get(b.project_id) ?? [];
       list.push({ id: b.id, name: b.name, slug: b.slug });
       byProject.set(b.project_id, list);
     }
     return reply.send({
-      data: projects.rows.map((r) => ({ ...publicProject(r), boards: byProject.get(r.id) ?? [] })),
+      data: projects.rows
+        .filter((r) => !denied.projects.has(r.id))
+        .map((r) => ({ ...publicProject(r), boards: byProject.get(r.id) ?? [] })),
     });
   });
 
   app.get('/projects/:short', async (req, reply) => {
-    if (!(await requireAuth(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { short } = req.params as { short: string };
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
+    // A project their role cannot open is a project that is not there, the same answer a wrong key gets.
+    const denied = auth.isAdmin
+      ? { projects: new Set<string>(), boards: new Set<string>() }
+      : await deniedFor(auth.roleId);
+    if (denied.projects.has(project.id)) {
+      return reply.code(404).send({ error: 'No such project.' });
+    }
     const { rows, statesByBoard } = await boardsOfProject(project.id);
     return reply.send({
       data: {
         ...publicProject(project),
-        boards: rows.map((b) => publicBoard(b, statesByBoard.get(b.id) ?? [])),
+        boards: rows
+          .filter((b) => !denied.boards.has(b.id))
+          .map((b) => publicBoard(b, statesByBoard.get(b.id) ?? [])),
       },
     });
   });

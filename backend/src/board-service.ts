@@ -97,6 +97,25 @@ export async function createBoardWithDefaults(
   return withDefault.rows[0];
 }
 
+// What one role cannot open, both kinds of denial in one read: a whole project, or single boards inside a project it does have. Nobody wearing no role is denied anything.
+export async function deniedFor(
+  roleId: string | null
+): Promise<{ projects: Set<string>; boards: Set<string> }> {
+  if (!roleId) return { projects: new Set(), boards: new Set() };
+  const [projects, boards] = await Promise.all([
+    pool.query<{ project_id: string }>('select project_id from project_denials where role_id = $1', [
+      roleId,
+    ]),
+    pool.query<{ board_id: string }>('select board_id from board_denials where role_id = $1', [
+      roleId,
+    ]),
+  ]);
+  return {
+    projects: new Set(projects.rows.map((r) => r.project_id)),
+    boards: new Set(boards.rows.map((r) => r.board_id)),
+  };
+}
+
 // Which roles are shut out of which board. Access is a denial list, so a board missing from the answer is open to everyone — including anyone wearing no role at all.
 export async function denialsFor(boardIds: string[]): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();

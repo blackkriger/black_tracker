@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { requireAdmin, requireAuth } from './auth.js';
+import { deniedFor } from './board-service.js';
 import { pickColor } from './colors.js';
 
 interface RoleRow {
@@ -66,25 +67,36 @@ export function registerRoleRoutes(app: FastifyInstance): void {
   app.get('/roles/:id/access', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
-    const res = await pool.query<{ board_id: string }>(
-      'select board_id from board_denials where role_id = $1',
-      [id]
-    );
-    return reply.send({ data: { deniedBoards: res.rows.map((r) => r.board_id) } });
+    const denied = await deniedFor(id);
+    return reply.send({
+      data: { deniedProjects: [...denied.projects], deniedBoards: [...denied.boards] },
+    });
   });
 
   app.put('/roles/:id/access', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
     const parsed = z
-      .object({ deniedBoards: z.array(z.string().uuid()).max(500) })
+      .object({
+        deniedProjects: z.array(z.string().uuid()).max(200),
+        deniedBoards: z.array(z.string().uuid()).max(500),
+      })
       .safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: 'Send the list of board ids.' });
+    if (!parsed.success) return reply.code(400).send({ error: 'Send both lists of ids.' });
     if (!(await pool.query('select 1 from roles where id = $1', [id])).rowCount) {
       return reply.code(404).send({ error: 'No such role.' });
     }
     await inTransaction(async (client) => {
+      await client.query('delete from project_denials where role_id = $1', [id]);
       await client.query('delete from board_denials where role_id = $1', [id]);
+      if (parsed.data.deniedProjects.length) {
+        await client.query(
+          `insert into project_denials (project_id, role_id)
+           select p, $1 from unnest($2::uuid[]) as p
+           on conflict do nothing`,
+          [id, parsed.data.deniedProjects]
+        );
+      }
       if (parsed.data.deniedBoards.length) {
         await client.query(
           `insert into board_denials (board_id, role_id)
@@ -94,7 +106,9 @@ export function registerRoleRoutes(app: FastifyInstance): void {
         );
       }
     });
-    return reply.send({ data: { deniedBoards: parsed.data.deniedBoards } });
+    return reply.send({
+      data: { deniedProjects: parsed.data.deniedProjects, deniedBoards: parsed.data.deniedBoards },
+    });
   });
 
   // Whoever wore it simply stops wearing one — the column is nulled by the foreign key.

@@ -7,6 +7,7 @@ import { requireAdmin, requireAuth } from './auth.js';
 import { boardsOfProject, projectByShort } from './project-routes.js';
 import {
   createBoardWithDefaults,
+  deniedFor,
   denialsFor,
   freeSlug,
   publicBoard,
@@ -79,12 +80,16 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
 
+    const denied = auth.isAdmin
+      ? { projects: new Set<string>(), boards: new Set<string>() }
+      : await deniedFor(auth.roleId);
+    if (denied.projects.has(project.id)) {
+      return reply.code(404).send({ error: 'No such project.' });
+    }
     const { rows, statesByBoard } = await boardsOfProject(project.id);
     const denials = await denialsFor(rows.map((r) => r.id));
-    // An admin manages access, so they see every board and who is shut out; anyone else is simply not handed the boards they cannot open.
-    const visible = auth.isAdmin
-      ? rows
-      : rows.filter((r) => !auth.roleId || !(denials.get(r.id) ?? []).includes(auth.roleId));
+    // An admin manages access, so they see every board and which roles are shut out; anyone else is simply not handed the boards their role cannot open.
+    const visible = auth.isAdmin ? rows : rows.filter((r) => !denied.boards.has(r.id));
     return reply.send({
       data: visible.map((r) =>
         publicBoard(r, statesByBoard.get(r.id) ?? [], auth.isAdmin ? denials.get(r.id) ?? [] : [])
@@ -99,8 +104,11 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const board = await boardById(id);
     if (!board) return reply.code(404).send({ error: 'No such board.' });
     const denials = await denialsFor([id]);
-    if (!auth.isAdmin && auth.roleId && (denials.get(id) ?? []).includes(auth.roleId)) {
-      return reply.code(403).send({ error: 'This board is not open to you.' });
+    if (!auth.isAdmin) {
+      const denied = await deniedFor(auth.roleId);
+      if (denied.boards.has(id) || denied.projects.has(board.project_id)) {
+        return reply.code(403).send({ error: 'This board is not open to you.' });
+      }
     }
     return reply.send({
       data: publicBoard(board, await statesOf(id), auth.isAdmin ? denials.get(id) ?? [] : []),
