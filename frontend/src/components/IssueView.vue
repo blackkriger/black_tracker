@@ -80,7 +80,11 @@ const linkQuery = ref('');
 const linkResults = ref<IssueLink[]>([]);
 const searching = ref(false);
 const linking = ref(false);
+const pendingLinks = ref<IssueLink[]>([]);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+// What is shown beside the chain: the issue's links, or the ones a new issue will be given.
+const shownLinks = computed(() => (creating.value ? pendingLinks.value : (issue.value?.links ?? [])));
 
 watch(linkQuery, (term) => {
   if (searchTimer) clearTimeout(searchTimer);
@@ -96,7 +100,7 @@ watch(linkQuery, (term) => {
       const rows = await api<IssueLink[]>(
         `/issues/search?q=${encodeURIComponent(q)}&exclude=${issue.value?.id ?? ''}`
       );
-      const already = new Set((issue.value?.links ?? []).map((l) => l.id));
+      const already = new Set(shownLinks.value.map((l) => l.id));
       linkResults.value = rows.filter((r) => !already.has(r.id));
     } catch {
       linkResults.value = [];
@@ -299,6 +303,16 @@ async function create(): Promise<void> {
         tagIds: draft.value.tagIds,
       },
     });
+    if (pendingLinks.value.length) {
+      for (const link of pendingLinks.value) {
+        try {
+          await api(`/issues/${made.id}/links`, { method: 'POST', body: { key: link.key } });
+        } catch (err) {
+          error.value = err instanceof Error ? err.message : 'The issue was created without a link.';
+        }
+      }
+      pendingLinks.value = [];
+    }
     if (pending.value.length) {
       try {
         await sendFiles(made.id, pending.value);
@@ -395,8 +409,16 @@ async function saveComment(c: Comment): Promise<void> {
 }
 
 async function addLink(key: string): Promise<void> {
+  if (!key || linking.value) return;
+  if (creating.value) {
+    // Nothing to link to yet: the pair is made the moment the issue is.
+    const found = linkResults.value.find((r) => r.key === key);
+    if (found) pendingLinks.value = [...pendingLinks.value, found];
+    picking.value = false;
+    return;
+  }
   const current = issue.value;
-  if (!key || !current || linking.value) return;
+  if (!current) return;
   linking.value = true;
   error.value = null;
   try {
@@ -415,6 +437,10 @@ async function addLink(key: string): Promise<void> {
 }
 
 async function removeLink(link: IssueLink): Promise<void> {
+  if (creating.value) {
+    pendingLinks.value = pendingLinks.value.filter((l) => l.id !== link.id);
+    return;
+  }
   const current = issue.value;
   if (!current) return;
   error.value = null;
@@ -648,7 +674,7 @@ async function removeIssue(): Promise<void> {
               <div v-else class="iv__body hint">Nothing written yet.</div>
             </div>
 
-            <div v-if="issue" class="links" :class="{ 'is-fresh': fresh.has('links') }">
+            <div class="links" :class="{ 'is-fresh': fresh.has('links') }">
               <button class="links__add" type="button" title="Link an issue" @click="openPicker">
                 <svg viewBox="0 0 16 16" width="14" height="14" role="img" aria-label="Link an issue">
                   <path
@@ -662,7 +688,7 @@ async function removeIssue(): Promise<void> {
               </button>
 
               <RouterLink
-                v-for="l in issue.links"
+                v-for="l in shownLinks"
                 :key="l.id"
                 class="lk"
                 :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
