@@ -889,21 +889,23 @@ async function removeIssue(): Promise<void> {
               </div>
 
               <!-- Chosen, not yet uploaded: a picture shows itself, anything else says its name. -->
-              <div v-if="pending.some((f) => previewOf(f))" class="atts">
-                <figure v-for="f in pending.filter((x) => previewOf(x))" :key="f.name" class="att">
-                  <button class="att__img att__img--wait" type="button" @click="shown = galleryOfFile(f)">
-                    <img :src="previewOf(f) ?? ''" :alt="f.name" class="att__pic" />
+              <div v-if="pending.some((f) => previewOf(f))" class="waits">
+                <span
+                  v-for="f in pending.filter((x) => previewOf(x))"
+                  :key="f.name"
+                  class="wait"
+                  :title="`${f.name} — ${fileSize(f.size)}`"
+                >
+                  <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
+                    <img :src="previewOf(f) ?? ''" :alt="f.name" />
                   </button>
-                  <figcaption class="att__cap">
-                    <span>{{ f.name }}</span>
-                    <button
-                      class="btn btn--sm btn--icon btn--ghost"
-                      type="button"
-                      :aria-label="`Remove ${f.name}`"
-                      @click="dropPending(f.name, 'issue')"
-                    ><X class="ic ic--sm" /></button>
-                  </figcaption>
-                </figure>
+                  <button
+                    class="wait__x"
+                    type="button"
+                    :aria-label="`Remove ${f.name}`"
+                    @click="dropPending(f.name, 'issue')"
+                  ><X class="ic ic--sm" /></button>
+                </span>
               </div>
               <div
                 v-for="f in pending.filter((x) => !previewOf(x))"
@@ -1058,20 +1060,21 @@ async function removeIssue(): Promise<void> {
                   </RichText>
                   <div v-if="commentFiles.length" class="cm__waiting">
                     <template v-for="f in commentFiles" :key="f.name">
-                      <figure v-if="previewOf(f)" class="att att--sm">
-                        <button class="att__img att__img--wait" type="button" @click="shown = galleryOfFile(f)">
-                          <img :src="previewOf(f) ?? ''" :alt="f.name" class="att__pic" />
+                      <span
+                        v-if="previewOf(f)"
+                        class="wait"
+                        :title="`${f.name} — ${fileSize(f.size)}`"
+                      >
+                        <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
+                          <img :src="previewOf(f) ?? ''" :alt="f.name" />
                         </button>
-                        <figcaption class="att__cap">
-                          <span>{{ f.name }}</span>
-                          <button
-                            class="btn btn--sm btn--icon btn--ghost"
-                            type="button"
-                            :aria-label="`Remove ${f.name}`"
-                            @click="dropPending(f.name, 'comment')"
-                          ><X class="ic ic--sm" /></button>
-                        </figcaption>
-                      </figure>
+                        <button
+                          class="wait__x"
+                          type="button"
+                          :aria-label="`Remove ${f.name}`"
+                          @click="dropPending(f.name, 'comment')"
+                        ><X class="ic ic--sm" /></button>
+                      </span>
                       <span v-else class="att__cap att__row">
                         <span class="att__name">{{ f.name }}</span>
                         <span class="stamp">{{ fileSize(f.size) }}</span>
@@ -1548,22 +1551,51 @@ async function removeIssue(): Promise<void> {
   gap: 6px;
   margin-top: 8px;
 }
-/* Waiting, not yet uploaded: the dashed edge says so without a word. */
-.att__img--wait {
+/* Waiting, not yet uploaded: a small square with the whole picture in it, the name in the tooltip, and the cross in the corner. The dashed edge is what says it has not gone up yet. */
+.waits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.wait {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border: 1px dashed var(--line-2);
+  background: var(--bg);
+}
+.wait__img {
   display: block;
   width: 100%;
+  height: 100%;
   padding: 0;
   border: 0;
   background: none;
   cursor: zoom-in;
-  position: relative;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  outline: 1px dashed var(--line-2);
-  outline-offset: -1px;
 }
-.att--sm {
-  width: 148px;
+.wait__img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.wait__x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.wait__x:hover {
+  color: var(--text);
 }
 .drop {
   height: 56px;
