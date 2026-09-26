@@ -288,9 +288,9 @@ async function saveAccess(): Promise<void> {
         </table>
 
         <div v-if="loading" class="empty empty--sm"><span class="empty__g">◇</span>Loading…</div>
-        <div v-if="errors.users" class="err panel__err">{{ errors.users }}</div>
       </div>
     </section>
+    <div v-if="errors.users" class="err sheet__wide panel__err">{{ errors.users }}</div>
 
     <section class="panel sheet__wide">
       <header class="panel__h">Roles</header>
@@ -346,9 +346,9 @@ async function saveAccess(): Promise<void> {
           <input v-model="newRole" class="input" placeholder="Add role…" maxlength="40" />
           <button class="btn" type="submit" :disabled="!newRole.trim()">Add</button>
         </form>
-        <div v-if="errors.roles" class="err panel__err">{{ errors.roles }}</div>
       </div>
     </section>
+    <div v-if="errors.roles" class="err sheet__wide panel__err">{{ errors.roles }}</div>
 
     <section class="panel sheet__wide">
       <header class="panel__h">Invite links</header>
@@ -372,7 +372,6 @@ async function saveAccess(): Promise<void> {
             Create link
           </button>
         </div>
-        <div v-if="errors.invites" class="err panel__err">{{ errors.invites }}</div>
       </div>
 
       <div v-if="invites.length" class="panel__table">
@@ -415,6 +414,7 @@ async function saveAccess(): Promise<void> {
         </table>
       </div>
     </section>
+    <div v-if="errors.invites" class="err sheet__wide panel__err">{{ errors.invites }}</div>
 
     <Dialog
       v-if="removingRole"

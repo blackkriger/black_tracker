@@ -137,12 +137,13 @@ async function remove(scope: string, tag: TagItem): Promise<void> {
           @rename="(t, n) => rename('global', t, n)"
           @remove="(t) => remove('global', t)"
         />
-        <p v-if="notices.global" class="hint panel__err">{{ notices.global }}</p>
-        <div v-if="errors.global" class="err panel__err">{{ errors.global }}</div>
       </div>
     </section>
+    <p v-if="notices.global" class="hint sheet__wide panel__err">{{ notices.global }}</p>
+    <div v-if="errors.global" class="err sheet__wide panel__err">{{ errors.global }}</div>
 
-    <section v-for="p in !loading ? projects : []" :key="p.id" class="panel sheet__wide">
+    <template v-for="p in !loading ? projects : []" :key="p.id">
+    <section class="panel sheet__wide">
       <header class="panel__h">
         {{ p.name }}<span class="panel__end">{{ p.shortName }} only</span>
       </header>
@@ -154,10 +155,11 @@ async function remove(scope: string, tag: TagItem): Promise<void> {
           @rename="(t, n) => rename(p.id, t, n)"
           @remove="(t) => remove(p.id, t)"
         />
-        <p v-if="notices[p.id]" class="hint panel__err">{{ notices[p.id] }}</p>
-        <div v-if="errors[p.id]" class="err panel__err">{{ errors[p.id] }}</div>
       </div>
     </section>
+    <p v-if="notices[p.id]" class="hint sheet__wide panel__err">{{ notices[p.id] }}</p>
+    <div v-if="errors[p.id]" class="err sheet__wide panel__err">{{ errors[p.id] }}</div>
+    </template>
   </SettingsLayout>
 </template>
 

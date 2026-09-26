@@ -236,11 +236,12 @@ async function onDrop(b: Board, target: State): Promise<void> {
             {{ project.archived ? 'Restore project' : 'Archive project' }}
           </button>
           <button class="btn btn--danger p-btn" type="button" @click="deleting = true">Delete</button>
-          <div v-if="errors.project" class="err panel__err">{{ errors.project }}</div>
         </div>
       </section>
+      <div v-if="errors.project" class="err sheet__wide panel__err">{{ errors.project }}</div>
 
-      <section v-for="b in boards" :key="b.id" class="panel sheet__wide">
+      <template v-for="b in boards" :key="b.id">
+      <section class="panel sheet__wide">
         <header class="panel__h">
           <input
             class="input board-name"
@@ -329,9 +330,10 @@ async function onDrop(b: Board, target: State): Promise<void> {
             />
             <button class="btn" type="submit" :disabled="!(newStatus[b.id] ?? '').trim()">Add</button>
           </form>
-          <div v-if="errors[b.id]" class="err panel__err">{{ errors[b.id] }}</div>
         </div>
       </section>
+      <div v-if="errors[b.id]" class="err sheet__wide panel__err">{{ errors[b.id] }}</div>
+      </template>
 
       <section class="panel sheet__wide">
         <header class="panel__h">New board</header>
@@ -340,9 +342,9 @@ async function onDrop(b: Board, target: State): Promise<void> {
             <input v-model="newBoard" class="input" placeholder="Add board…" maxlength="60" />
             <button class="btn" type="submit" :disabled="!newBoard.trim()">Add</button>
           </form>
-          <div v-if="errors.newBoard" class="err panel__err">{{ errors.newBoard }}</div>
         </div>
       </section>
+      <div v-if="errors.newBoard" class="err sheet__wide panel__err">{{ errors.newBoard }}</div>
     </template>
 
     <Dialog
