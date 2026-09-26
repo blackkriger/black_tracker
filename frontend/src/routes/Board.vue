@@ -5,7 +5,14 @@ import { useRoute, useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
-import { PRIORITIES, dueLabel, priorityClass, type Issue } from '../lib/issues';
+import {
+  PRIORITIES,
+  dueLabel,
+  priorityClass,
+  priorityColor,
+  type Issue,
+  type Priority,
+} from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { Plus } from 'lucide-vue-next';
@@ -57,7 +64,7 @@ const creatingIn = ref<string | null>(null);
 // What the board is narrowed to. Nothing is remembered between visits — a filter is a way of looking at the board right now, not a setting.
 const byAssignee = ref('');
 const byAuthor = ref('');
-const byPriority = ref('');
+const byPriority = ref<Priority | ''>('');
 const people = ref<{ id: string; login: string; fullName: string }[]>([]);
 // Tags narrow the board too: pick several and a card has to wear all of them.
 const byTags = ref<string[]>([]);
@@ -287,9 +294,16 @@ watch(
         <option value="">Author</option>
         <option v-for="p in people" :key="p.id" :value="p.id">{{ p.fullName || p.login }}</option>
       </select>
-      <select v-model="byPriority" class="input input--sm filter" aria-label="Filter by priority">
+      <select
+        v-model="byPriority"
+        class="input input--sm filter"
+        aria-label="Filter by priority"
+        :style="{ color: byPriority ? priorityColor(byPriority) : undefined }"
+      >
         <option value="">Priority</option>
-        <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
+        <option v-for="p in PRIORITIES" :key="p" :value="p" :style="{ color: priorityColor(p) }">
+          {{ p }}
+        </option>
       </select>
 
       <button
