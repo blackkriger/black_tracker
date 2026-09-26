@@ -1555,13 +1555,18 @@ async function removeIssue(): Promise<void> {
   margin-top: 8px;
 }
 /* Waiting, not yet uploaded: one block per file — the picture itself at its own size, and under it the whole name, the size and the way to take it back. The dashed edge is what says it has not gone up yet. */
+/* Blocks stand side by side when they fit: a small picture takes only the width it needs, a large one takes the row. */
 .waits {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 8px;
 }
 .wait {
+  flex: 0 1 auto;
+  min-width: 200px;
+  max-width: 100%;
   border: 1px dashed var(--line-2);
   background: var(--bg);
 }
@@ -1574,13 +1579,13 @@ async function removeIssue(): Promise<void> {
   cursor: zoom-in;
   text-align: left;
 }
-/* As large as the block allows, whole: it fills the width and keeps its proportions, and a very tall picture stops at the ceiling rather than pushing everything off the screen. */
+/* Its own size, whole, bounded by the block and by a ceiling so one tall picture cannot push the rest off the screen. */
 .wait__img img {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
-  max-height: 420px;
-  object-fit: contain;
+  max-width: 100%;
+  max-height: 360px;
 }
 .wait__row {
   display: flex;
