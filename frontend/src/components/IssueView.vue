@@ -773,7 +773,7 @@ async function removeIssue(): Promise<void> {
                 :class="{ 'is-fresh': fresh.has('description') }"
                 v-html="asHtml(issue.description)"
               ></div>
-              <div v-else class="iv__body hint">Nothing written yet.</div>
+              <div v-else class="iv__body hint faint">Nothing written yet.</div>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
@@ -796,7 +796,7 @@ async function removeIssue(): Promise<void> {
                 >
                   <span class="key lk__key" :style="{ color: l.stateColor }">{{ l.key }}</span>
                 </RouterLink>
-                <span v-if="!shownLinks.length" class="hint">No links yet.</span>
+                <span v-if="!shownLinks.length" class="hint faint">No links yet.</span>
                 <div class="sp"></div>
                 <button class="btn btn--sm btn--ghost" type="button" @click="openPicker">
                   Add link…
