@@ -711,7 +711,7 @@ async function removeIssue(): Promise<void> {
     <div class="iv__scrim" @click.self="emit('close')">
       <section class="dlg iv__win" role="dialog" aria-modal="true">
         <header class="dlg__h">
-          <span class="key iv__key">{{ issueKey ?? 'New issue' }}</span>
+          <span class="key iv__key">{{ issueKey ?? 'NEW ISSUE' }}</span>
           <span v-if="state" class="iv__state" :style="{ color: state.color }">{{ state.name }}</span>
           <div class="sp"></div>
           <template v-if="creating">
