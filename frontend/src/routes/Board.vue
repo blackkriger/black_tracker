@@ -102,35 +102,37 @@ watch(
       >{{ t.name }}</span>
     </div>
 
-    <div class="page__body" :class="{ 'page__body--tags': tags.length }">
+    <div
+      v-if="loading || error || !current"
+      class="page__body"
+      :class="{ 'page__body--tags': tags.length }"
+    >
       <p v-if="loading" class="hint">Loading…</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
-      <div v-else-if="current" class="cols">
-        <section
-          v-for="s in current.states"
-          :key="s.id"
-          class="col"
-          :style="{ '--c': s.color }"
-          :aria-label="`${s.name}, 0 issues`"
-        >
-          <header class="col__head">
-            <span class="col__sw"></span>
-            <h2 class="col__name">{{ s.name }}</h2>
-            <span class="col__count">0</span>
-          </header>
-          <div class="col__body">
-            <div class="empty empty--sm"><span class="empty__g">◇</span>Nothing here yet.</div>
-          </div>
-        </section>
-      </div>
-      <div v-else class="empty"><span class="empty__g">◇</span>This project has no boards.</div>
+      <div v-else-if="!current" class="empty"><span class="empty__g">◇</span>This project has no boards.</div>
+    </div>
+
+    <div v-if="current" class="board" :class="{ 'board--tags': tags.length }">
+      <section
+        v-for="s in current.states"
+        :key="s.id"
+        class="col"
+        :style="{ '--c': s.color }"
+        :aria-label="`${s.name}, 0 issues`"
+      >
+        <header class="col__head">
+          <h2 class="col__name">{{ s.name }}</h2>
+          <span class="col__count">0</span>
+        </header>
+        <div class="col__body"></div>
+      </section>
     </div>
   </div>
 </template>
 
 <style scoped>
 .page {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -139,16 +141,9 @@ watch(
   padding: var(--space-5);
   overflow-x: auto;
 }
-/* The tag bar already spaces the columns off the header, so the body does not do it twice. */
-.page__body--tags {
+/* The tag bar already spaces what follows off the header, so neither the body nor the board does it twice. */
+.page__body--tags,
+.board--tags {
   padding-top: 0;
-}
-.cols {
-  display: flex;
-  gap: var(--space-4);
-  align-items: flex-start;
-}
-.col__name {
-  margin: 0;
 }
 </style>

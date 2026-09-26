@@ -259,7 +259,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
             <thead>
               <tr>
                 <th class="c-grip"><span class="sr">Order</span></th>
-                <th class="c-color"><span class="sr">Color</span></th>
                 <th>Status</th>
                 <th class="c-flag">Open</th>
                 <th class="c-flag">Resolved</th>
@@ -276,11 +275,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
                 @drop.prevent="onDrop(b, s)"
               >
                 <td class="c-grip grip">⠿</td>
-                <td class="c-color"><span class="dot" :style="{ background: s.color }"></span></td>
                 <td>
                   <input
-                    class="input input--sm"
+                    class="input input--sm status-name"
                     :value="s.name"
+                    :style="{ color: s.color }"
                     maxlength="60"
                     @change="patchStatus(b, s, { name: ($event.target as HTMLInputElement).value })"
                   />
@@ -423,15 +422,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
   color: var(--text-dim);
   cursor: grab;
 }
-.dot {
-  display: block;
-  width: 10px;
-  height: 10px;
+/* The status wears its colour in its own name, on the board and here alike. */
+.status-name {
+  font-weight: 500;
 }
 .c-grip {
-  width: 28px;
-}
-.c-color {
   width: 28px;
 }
 .c-flag {

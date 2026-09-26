@@ -35,14 +35,19 @@ const KNOWN_COLORS: Record<string, string> = {
   'in progress': '#6cdcff',
   review: '#c98eff',
   done: '#8effa9',
-  "won't fix": '#7d8188',
   'wont fix': '#7d8188',
   'will not fix': '#7d8188',
   duplicate: '#9aa3ad',
 };
 
+// Written with a straight apostrophe, a curly one or none at all, Won't Fix is the same status, so the apostrophe and any doubled spacing come out of the name before it is looked up.
 export function knownColor(name: string): string | null {
-  return KNOWN_COLORS[name.trim().toLowerCase()] ?? null;
+  const key = name
+    .toLowerCase()
+    .replace(/['’ʼ`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return KNOWN_COLORS[key] ?? null;
 }
 
 export function pickColor(taken: string[]): string {
