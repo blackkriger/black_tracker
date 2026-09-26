@@ -3,7 +3,6 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
-import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
 
 import { useProjects } from '../../lib/projects';
@@ -30,25 +29,18 @@ interface Board {
   name: string;
   position: number;
 }
-interface Tag extends TagItem {
-  projectId: string | null;
-}
-
 const route = useRoute();
 const projectsStore = useProjects();
 
 const project = ref<Project | null>(null);
 const states = ref<State[]>([]);
 const boards = ref<Board[]>([]);
-const tags = ref<Tag[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
 
 const defaultStateId = ref<string | null>(null);
 const savingProject = ref(false);
-
-const projectTags = computed(() => tags.value.filter((t) => t.projectId === project.value?.id));
 
 const short = computed(() => String(route.params.short ?? ''));
 
@@ -60,10 +52,7 @@ async function load(): Promise<void> {
     project.value = p;
     states.value = [...p.states].sort((a, b) => a.position - b.position);
     defaultStateId.value = p.defaultStateId;
-    [boards.value, tags.value] = await Promise.all([
-      api<Board[]>(`/projects/${encodeURIComponent(p.shortName)}/boards`),
-      api<Tag[]>(`/tags?project=${encodeURIComponent(p.shortName)}`),
-    ]);
+    boards.value = await api<Board[]>(`/projects/${encodeURIComponent(p.shortName)}/boards`);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not load the project.';
   } finally {
@@ -212,38 +201,6 @@ async function deleteBoard(b: Board): Promise<void> {
     report(err);
   }
 }
-
-// ── tags ─────────────────────────────────────────────────────────
-async function addTag(name: string): Promise<void> {
-  if (!project.value) return;
-  try {
-    const created = await api<Tag>('/tags', {
-      method: 'POST',
-      body: { name, project: project.value.shortName },
-    });
-    tags.value = [...tags.value, created];
-  } catch (err) {
-    report(err);
-  }
-}
-
-async function renameTag(t: TagItem, name: string): Promise<void> {
-  try {
-    const updated = await api<Tag>(`/tags/${t.id}`, { method: 'PATCH', body: { name } });
-    tags.value = tags.value.map((row) => (row.id === t.id ? updated : row));
-  } catch (err) {
-    report(err);
-  }
-}
-
-async function deleteTag(t: TagItem): Promise<void> {
-  try {
-    await api(`/tags/${t.id}`, { method: 'DELETE' });
-    tags.value = tags.value.filter((row) => row.id !== t.id);
-  } catch (err) {
-    report(err);
-  }
-}
 </script>
 
 <template>
@@ -380,13 +337,6 @@ async function deleteTag(t: TagItem): Promise<void> {
             </div>
           </section>
 
-          <section class="panel">
-            <header class="panel__h">Tags<span class="panel__end">{{ project.shortName }} only</span></header>
-            <div class="panel__b">
-              <div v-if="!projectTags.length" class="empty empty--sm"><span class="empty__g">◇</span>No tags yet.</div>
-              <TagLabels :tags="projectTags" @add="addTag" @rename="renameTag" @remove="deleteTag" />
-            </div>
-          </section>
         </div>
 
       <p v-if="notice" class="hint sheet__wide">{{ notice }}</p>
