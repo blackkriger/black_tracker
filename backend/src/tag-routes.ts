@@ -3,7 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
-import { requireAdmin, requireAuth } from './auth.js';
+import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
 import { pickColor } from './colors.js';
 import { projectByShort } from './project-routes.js';
 
@@ -171,7 +171,7 @@ export function registerTagRoutes(app: FastifyInstance): void {
 
   // Deleting a tag takes it off the issues that carry it — that is the point of deleting it — so the answer says how many were touched.
   app.delete('/tags/:id', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    if (!(await requireDeleter(req, reply))) return;
     const { id } = req.params as { id: string };
     const used = await pool.query<{ n: number }>(
       'select count(*)::int as n from issue_tags where tag_id = $1',

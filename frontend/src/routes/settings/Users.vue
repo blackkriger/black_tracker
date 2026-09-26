@@ -5,6 +5,7 @@ import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
+import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
 import { useSession } from '../../lib/session';
 
@@ -12,6 +13,8 @@ interface Role {
   id: string;
   name: string;
   color: string;
+  /** May delete projects, boards, statuses and tags. The creator's own key is elsewhere and is not a role. */
+  canDelete: boolean;
 }
 
 interface User {
@@ -44,7 +47,7 @@ const invites = ref<Invite[]>([]);
 const roles = ref<Role[]>([]);
 const removingRole = ref<Role | null>(null);
 const loading = ref(true);
-const error = ref<string | null>(null);
+const { errors, fail, clear } = usePanelErrors();
 
 const inviteRole = ref('');
 const inviteBusy = ref(false);
@@ -66,23 +69,20 @@ const projectDenied = (id: string) => deniedProjects.value.includes(id);
 const boardDenied = (id: string) => deniedBoards.value.includes(id);
 
 onMounted(async () => {
-  try {
-    await loadProjects();
-    [users.value, invites.value, roles.value] = await Promise.all([
-      api<User[]>('/users'),
-      api<Invite[]>('/invites'),
-      api<Role[]>('/roles'),
-    ]);
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not load the accounts.';
-  } finally {
-    loading.value = false;
-  }
+  await loadProjects();
+  await Promise.all([
+    api<User[]>('/users')
+      .then((rows) => (users.value = rows))
+      .catch((err) => fail('users', err, 'Could not load the accounts.')),
+    api<Invite[]>('/invites')
+      .then((rows) => (invites.value = rows))
+      .catch((err) => fail('invites', err, 'Could not load the invite links.')),
+    api<Role[]>('/roles')
+      .then((rows) => (roles.value = rows))
+      .catch((err) => fail('roles', err, 'Could not load the roles.')),
+  ]);
+  loading.value = false;
 });
-
-function report(err: unknown): void {
-  error.value = err instanceof Error ? err.message : 'Something went wrong.';
-}
 
 function stamp(iso: string | null): string {
   if (!iso) return '';
@@ -92,59 +92,63 @@ function stamp(iso: string | null): string {
 }
 
 async function patchUser(u: User, body: Record<string, unknown>): Promise<void> {
-  error.value = null;
+  clear('users');
   try {
     const updated = await api<User>(`/users/${u.id}`, { method: 'PATCH', body });
     users.value = users.value.map((row) => (row.id === u.id ? updated : row));
   } catch (err) {
-    report(err);
+    fail('users', err);
   }
 }
 
 async function addRole(): Promise<void> {
   const name = newRole.value.trim();
   if (!name) return;
-  error.value = null;
+  clear('roles');
   try {
     roles.value = [...roles.value, await api<Role>('/roles', { method: 'POST', body: { name } })];
     newRole.value = '';
   } catch (err) {
-    report(err);
+    fail('roles', err);
   }
 }
 
-async function renameRole(role: Role, name: string): Promise<void> {
-  if (!name.trim() || name === role.name) return;
-  error.value = null;
+async function patchRole(role: Role, body: Record<string, unknown>): Promise<void> {
+  clear('roles');
   try {
-    const updated = await api<Role>(`/roles/${role.id}`, { method: 'PATCH', body: { name } });
+    const updated = await api<Role>(`/roles/${role.id}`, { method: 'PATCH', body });
     roles.value = roles.value.map((r) => (r.id === role.id ? updated : r));
     // Whoever wears it is holding the old name on this screen until it is read again.
     users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: updated } : u));
   } catch (err) {
-    report(err);
+    fail('roles', err);
   }
+}
+
+function renameRole(role: Role, name: string): void {
+  if (!name.trim() || name === role.name) return;
+  void patchRole(role, { name });
 }
 
 async function removeRole(): Promise<void> {
   const role = removingRole.value;
   if (!role) return;
-  error.value = null;
+  clear('removeRole');
   try {
     await api(`/roles/${role.id}`, { method: 'DELETE' });
     roles.value = roles.value.filter((r) => r.id !== role.id);
     users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: null } : u));
     removingRole.value = null;
   } catch (err) {
-    report(err);
-    removingRole.value = null;
+    // The dialog stays open with the reason in it rather than closing on a failure nobody read.
+    fail('removeRole', err);
   }
 }
 
 async function createInvite(): Promise<void> {
   if (inviteBusy.value) return;
   inviteBusy.value = true;
-  error.value = null;
+  clear('invites');
   copied.value = false;
   try {
     const created = await api<Invite & { token: string }>('/invites', {
@@ -156,7 +160,7 @@ async function createInvite(): Promise<void> {
     invites.value = [row, ...invites.value];
     inviteRole.value = '';
   } catch (err) {
-    report(err);
+    fail('invites', err);
   } finally {
     inviteBusy.value = false;
   }
@@ -173,12 +177,12 @@ async function copyLink(): Promise<void> {
 }
 
 async function revokeInvite(i: Invite): Promise<void> {
-  error.value = null;
+  clear('invites');
   try {
     await api(`/invites/${i.id}`, { method: 'DELETE' });
     invites.value = invites.value.filter((row) => row.id !== i.id);
   } catch (err) {
-    report(err);
+    fail('invites', err);
   }
 }
 
@@ -186,6 +190,7 @@ async function openAccess(role: Role): Promise<void> {
   accessFor.value = role;
   deniedProjects.value = [];
   deniedBoards.value = [];
+  clear('access');
   try {
     const res = await api<{ deniedProjects: string[]; deniedBoards: string[] }>(
       `/roles/${role.id}/access`
@@ -193,7 +198,7 @@ async function openAccess(role: Role): Promise<void> {
     deniedProjects.value = res.deniedProjects;
     deniedBoards.value = res.deniedBoards;
   } catch (err) {
-    report(err);
+    fail('access', err, 'Could not read what this role can open.');
   }
 }
 
@@ -214,7 +219,7 @@ async function saveAccess(): Promise<void> {
   const role = accessFor.value;
   if (!role || accessBusy.value) return;
   accessBusy.value = true;
-  error.value = null;
+  clear('access');
   try {
     await api(`/roles/${role.id}/access`, {
       method: 'PUT',
@@ -222,7 +227,7 @@ async function saveAccess(): Promise<void> {
     });
     accessFor.value = null;
   } catch (err) {
-    report(err);
+    fail('access', err);
   } finally {
     accessBusy.value = false;
   }
@@ -231,8 +236,6 @@ async function saveAccess(): Promise<void> {
 
 <template>
   <SettingsLayout>
-    <div v-if="error" class="err sheet__wide">{{ error }}</div>
-
     <section class="panel sheet__wide">
       <header class="panel__h">Users</header>
       <div class="panel__table">
@@ -285,6 +288,7 @@ async function saveAccess(): Promise<void> {
         </table>
 
         <div v-if="loading" class="empty empty--sm"><span class="empty__g">◇</span>Loading…</div>
+        <div v-if="errors.users" class="err panel__err">{{ errors.users }}</div>
       </div>
     </section>
 
@@ -295,6 +299,7 @@ async function saveAccess(): Promise<void> {
           <thead>
             <tr>
               <th>Role</th>
+              <th class="c-flag">May delete</th>
               <th class="c-act2">Boards</th>
               <th class="c-del"><span class="sr">Delete</span></th>
             </tr>
@@ -309,6 +314,15 @@ async function saveAccess(): Promise<void> {
                   maxlength="40"
                   @change="renameRole(r, ($event.target as HTMLInputElement).value)"
                 />
+              </td>
+              <td class="c-flag">
+                <label class="check">
+                  <input
+                    type="checkbox"
+                    :checked="r.canDelete"
+                    @change="patchRole(r, { canDelete: ($event.target as HTMLInputElement).checked })"
+                  />
+                </label>
               </td>
               <td class="c-act2">
                 <button class="btn btn--sm" type="button" @click="openAccess(r)">Access…</button>
@@ -332,6 +346,7 @@ async function saveAccess(): Promise<void> {
           <input v-model="newRole" class="input" placeholder="Add role…" maxlength="40" />
           <button class="btn" type="submit" :disabled="!newRole.trim()">Add</button>
         </form>
+        <div v-if="errors.roles" class="err panel__err">{{ errors.roles }}</div>
       </div>
     </section>
 
@@ -357,6 +372,7 @@ async function saveAccess(): Promise<void> {
             Create link
           </button>
         </div>
+        <div v-if="errors.invites" class="err panel__err">{{ errors.invites }}</div>
       </div>
 
       <div v-if="invites.length" class="panel__table">
@@ -406,6 +422,7 @@ async function saveAccess(): Promise<void> {
       @close="removingRole = null"
     >
       <p>Whoever wears it stops wearing one. This cannot be undone.</p>
+      <div v-if="errors.removeRole" class="err">{{ errors.removeRole }}</div>
       <template #footer>
         <div class="sp"></div>
         <button class="btn" type="button" @click="removingRole = null">Cancel</button>
@@ -443,6 +460,7 @@ async function saveAccess(): Promise<void> {
       <div v-if="!accessProjects.length" class="empty empty--sm">
         <span class="empty__g">◇</span>No projects yet.
       </div>
+      <div v-if="errors.access" class="err access__err">{{ errors.access }}</div>
 
       <template #footer>
         <div class="sp"></div>
@@ -525,6 +543,9 @@ async function saveAccess(): Promise<void> {
 }
 .access__proj {
   font-weight: 500;
+}
+.access__err {
+  margin-top: var(--space-3);
 }
 .access__row {
   margin-left: 24px;

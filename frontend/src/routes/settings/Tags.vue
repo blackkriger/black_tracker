@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
+import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
 
 interface Tag extends TagItem {
@@ -16,8 +17,13 @@ const { projects, load: loadProjects } = useProjects();
 
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
-const error = ref<string | null>(null);
-const notice = ref<string | null>(null);
+// Keyed by the container the action happened in: 'global', or the project's id.
+const { errors, fail, clear } = usePanelErrors();
+const notices = ref<Record<string, string | null>>({});
+
+function note(scope: string, text: string | null): void {
+  notices.value = { ...notices.value, [scope]: text };
+}
 
 async function reload(): Promise<void> {
   tags.value = await api<Tag[]>('/tags');
@@ -31,19 +37,15 @@ onMounted(async () => {
     await loadProjects();
     tags.value = await api<Tag[]>('/tags');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not load tags.';
+    fail('global', err, 'Could not load tags.');
   } finally {
     loading.value = false;
   }
 });
 
-function report(err: unknown): void {
-  error.value = err instanceof Error ? err.message : 'Something went wrong.';
-}
-
-async function add(name: string, project?: string): Promise<void> {
-  error.value = null;
-  notice.value = null;
+async function add(scope: string, name: string, project?: string): Promise<void> {
+  clear(scope);
+  note(scope, null);
   try {
     const created = await api<Tag>('/tags', {
       method: 'POST',
@@ -51,47 +53,51 @@ async function add(name: string, project?: string): Promise<void> {
     });
     // A merge moves rows around — one tag becomes global and its twins are gone — so the list is read again rather than patched.
     if (created.merged) {
-      notice.value = `${created.name} already existed on another project, so it is one tag now, usable everywhere.`;
+      note(
+        scope,
+        `${created.name} already existed on another project, so it is one tag now, usable everywhere.`
+      );
       await reload();
       return;
     }
     tags.value = [...tags.value, created];
   } catch (err) {
-    report(err);
+    fail(scope, err);
   }
 }
 
-async function rename(tag: TagItem, name: string): Promise<void> {
-  error.value = null;
-  notice.value = null;
+async function rename(scope: string, tag: TagItem, name: string): Promise<void> {
+  clear(scope);
+  note(scope, null);
   try {
     const updated = await api<Tag>(`/tags/${tag.id}`, { method: 'PATCH', body: { name } });
     if (updated.merged) {
-      notice.value = `${updated.name} already existed on another project, so it is one tag now, usable everywhere.`;
+      note(
+        scope,
+        `${updated.name} already existed on another project, so it is one tag now, usable everywhere.`
+      );
       await reload();
       return;
     }
     tags.value = tags.value.map((row) => (row.id === tag.id ? updated : row));
   } catch (err) {
-    report(err);
+    fail(scope, err);
   }
 }
 
-async function remove(tag: TagItem): Promise<void> {
+async function remove(scope: string, tag: TagItem): Promise<void> {
+  clear(scope);
   try {
     await api(`/tags/${tag.id}`, { method: 'DELETE' });
     tags.value = tags.value.filter((row) => row.id !== tag.id);
   } catch (err) {
-    report(err);
+    fail(scope, err);
   }
 }
 </script>
 
 <template>
   <SettingsLayout>
-    <div v-if="error" class="err sheet__wide">{{ error }}</div>
-    <p v-if="notice" class="hint sheet__wide">{{ notice }}</p>
-
     <!-- While the tags load the page keeps its shape: the global container, then one project container under it, both filled with label-shaped placeholders. -->
     <template v-if="loading">
       <section class="panel sheet__wide">
@@ -125,7 +131,14 @@ async function remove(tag: TagItem): Promise<void> {
       <header class="panel__h">Global tags<span class="panel__end">Usable on every project</span></header>
       <div class="panel__b">
         <div v-if="!globalTags.length" class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
-        <TagLabels :tags="globalTags" @add="add($event)" @rename="rename" @remove="remove" />
+        <TagLabels
+          :tags="globalTags"
+          @add="add('global', $event)"
+          @rename="(t, n) => rename('global', t, n)"
+          @remove="(t) => remove('global', t)"
+        />
+        <p v-if="notices.global" class="hint panel__err">{{ notices.global }}</p>
+        <div v-if="errors.global" class="err panel__err">{{ errors.global }}</div>
       </div>
     </section>
 
@@ -137,10 +150,12 @@ async function remove(tag: TagItem): Promise<void> {
         <div v-if="!tagsOf(p.id).length" class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
         <TagLabels
           :tags="tagsOf(p.id)"
-          @add="add($event, p.shortName)"
-          @rename="rename"
-          @remove="remove"
+          @add="add(p.id, $event, p.shortName)"
+          @rename="(t, n) => rename(p.id, t, n)"
+          @remove="(t) => remove(p.id, t)"
         />
+        <p v-if="notices[p.id]" class="hint panel__err">{{ notices[p.id] }}</p>
+        <div v-if="errors[p.id]" class="err panel__err">{{ errors[p.id] }}</div>
       </div>
     </section>
   </SettingsLayout>

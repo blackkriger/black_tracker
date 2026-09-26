@@ -3,9 +3,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
-import { requireAdmin, requireAuth } from './auth.js';
+import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
 import { boardsOfProject, projectByShort } from './project-routes.js';
 import {
+  DENIES_NOTHING,
   createBoardWithDefaults,
   deniedFor,
   denialsFor,
@@ -80,10 +81,8 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
 
-    const denied = auth.isAdmin
-      ? { projects: new Set<string>(), boards: new Set<string>() }
-      : await deniedFor(auth.roleId);
-    if (denied.projects.has(project.id)) {
+    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    if (denied.everything || denied.projects.has(project.id)) {
       return reply.code(404).send({ error: 'No such project.' });
     }
     const { rows, statesByBoard } = await boardsOfProject(project.id);
@@ -106,7 +105,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const denials = await denialsFor([id]);
     if (!auth.isAdmin) {
       const denied = await deniedFor(auth.roleId);
-      if (denied.boards.has(id) || denied.projects.has(board.project_id)) {
+      if (denied.everything || denied.boards.has(id) || denied.projects.has(board.project_id)) {
         return reply.code(403).send({ error: 'This board is not open to you.' });
       }
     }
@@ -186,7 +185,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   });
 
   app.delete('/boards/:id', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    if (!(await requireDeleter(req, reply))) return;
     const { id } = req.params as { id: string };
     const board = await boardById(id);
     if (!board) return reply.code(404).send({ error: 'No such board.' });
@@ -282,7 +281,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   });
 
   app.delete('/states/:id', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    if (!(await requireDeleter(req, reply))) return;
     const { id } = req.params as { id: string };
     // Refusing while issues sit in the status is the point: moving them silently would lose where they were.
     const used = await pool.query<{ n: number }>(

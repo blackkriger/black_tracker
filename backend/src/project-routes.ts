@@ -3,8 +3,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
-import { requireAdmin, requireAuth } from './auth.js';
+import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
 import {
+  DENIES_NOTHING,
   createBoardWithDefaults,
   deniedFor,
   publicBoard,
@@ -94,10 +95,9 @@ export function registerProjectRoutes(app: FastifyInstance): void {
         'select id, project_id, name, slug, default_state_id, position from boards order by position, name'
       ),
     ]);
-    // An admin manages access, so they see everything; anyone else is simply not handed what their role cannot open.
-    const denied = auth.isAdmin
-      ? { projects: new Set<string>(), boards: new Set<string>() }
-      : await deniedFor(auth.roleId);
+    // An admin manages access, so they see everything; anyone else is simply not handed what their role cannot open, and someone with no role has nothing handed to them at all.
+    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    if (denied.everything) return reply.send({ data: [] });
     const byProject = new Map<string, { id: string; name: string; slug: string }[]>();
     for (const b of boards.rows) {
       if (denied.boards.has(b.id)) continue;
@@ -119,10 +119,8 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
     // A project their role cannot open is a project that is not there, the same answer a wrong key gets.
-    const denied = auth.isAdmin
-      ? { projects: new Set<string>(), boards: new Set<string>() }
-      : await deniedFor(auth.roleId);
-    if (denied.projects.has(project.id)) {
+    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    if (denied.everything || denied.projects.has(project.id)) {
       return reply.code(404).send({ error: 'No such project.' });
     }
     const { rows, statesByBoard } = await boardsOfProject(project.id);
@@ -163,7 +161,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
 
   // Deleting a project takes its boards, statuses, issues and its own tags with it — the database cascades — so the caller types the project's full name to prove it meant this one.
   app.delete('/projects/:short', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    if (!(await requireDeleter(req, reply))) return;
     const { short } = req.params as { short: string };
     const parsed = z.object({ confirm: z.string().trim() }).safeParse(req.body);
     const project = await projectByShort(short);

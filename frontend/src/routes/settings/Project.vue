@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
+import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
 
 interface State {
@@ -38,7 +39,9 @@ const projectsStore = useProjects();
 const project = ref<Project | null>(null);
 const boards = ref<Board[]>([]);
 const loading = ref(true);
-const error = ref<string | null>(null);
+// The whole screen only fails as a whole while it is loading; after that every failure belongs to one panel.
+const loadError = ref<string | null>(null);
+const { errors, fail, clear } = usePanelErrors();
 const newBoard = ref('');
 // Deleting a project is the one action here nothing can undo, so the key has to be typed before the button appears.
 const deleting = ref(false);
@@ -49,7 +52,7 @@ const newStatus = ref<Record<string, string>>({});
 
 async function load(): Promise<void> {
   loading.value = true;
-  error.value = null;
+  loadError.value = null;
   try {
     const short = String(route.params.short ?? '');
     const p = await api<Project>(`/projects/${encodeURIComponent(short)}`);
@@ -57,7 +60,7 @@ async function load(): Promise<void> {
     boards.value = [...p.boards].sort((a, b) => a.position - b.position);
   } catch (err) {
     project.value = null;
-    error.value = err instanceof Error ? err.message : 'Could not load the project.';
+    loadError.value = err instanceof Error ? err.message : 'Could not load the project.';
   } finally {
     loading.value = false;
   }
@@ -66,16 +69,13 @@ async function load(): Promise<void> {
 onMounted(load);
 watch(() => route.params.short, load);
 
-function report(err: unknown): void {
-  error.value = err instanceof Error ? err.message : 'Something went wrong.';
-}
-
 function replaceBoard(next: Board): void {
   boards.value = boards.value.map((b) => (b.id === next.id ? { ...b, ...next } : b));
 }
 
 async function toggleArchived(): Promise<void> {
   if (!project.value) return;
+  clear('project');
   try {
     const updated = await api<Project>(`/projects/${encodeURIComponent(project.value.shortName)}`, {
       method: 'PATCH',
@@ -84,12 +84,13 @@ async function toggleArchived(): Promise<void> {
     project.value = { ...project.value, archived: updated.archived };
     await projectsStore.load(true);
   } catch (err) {
-    report(err);
+    fail('project', err);
   }
 }
 
 async function deleteProject(): Promise<void> {
   if (!project.value) return;
+  clear('deleteProject');
   try {
     await api(`/projects/${encodeURIComponent(project.value.shortName)}`, {
       method: 'DELETE',
@@ -98,7 +99,7 @@ async function deleteProject(): Promise<void> {
     await projectsStore.load(true);
     await router.push('/settings');
   } catch (err) {
-    report(err);
+    fail('deleteProject', err);
   }
 }
 
@@ -106,6 +107,7 @@ async function deleteProject(): Promise<void> {
 async function addBoard(): Promise<void> {
   const name = newBoard.value.trim();
   if (!name || !project.value) return;
+  clear('newBoard');
   try {
     const created = await api<Board>(
       `/projects/${encodeURIComponent(project.value.shortName)}/boards`,
@@ -115,15 +117,16 @@ async function addBoard(): Promise<void> {
     newBoard.value = '';
     await projectsStore.load(true);
   } catch (err) {
-    report(err);
+    fail('newBoard', err);
   }
 }
 
 async function patchBoard(b: Board, body: Record<string, unknown>): Promise<void> {
+  clear(b.id);
   try {
     replaceBoard(await api<Board>(`/boards/${b.id}`, { method: 'PATCH', body }));
   } catch (err) {
-    report(err);
+    fail(b.id, err);
     await load();
   }
 }
@@ -131,14 +134,15 @@ async function patchBoard(b: Board, body: Record<string, unknown>): Promise<void
 async function deleteBoard(): Promise<void> {
   const b = deletingBoard.value;
   if (!b) return;
+  clear('deleteBoard');
   try {
     await api(`/boards/${b.id}`, { method: 'DELETE' });
     boards.value = boards.value.filter((row) => row.id !== b.id);
     deletingBoard.value = null;
     await projectsStore.load(true);
   } catch (err) {
-    report(err);
-    deletingBoard.value = null;
+    // The dialog stays open with the reason in it rather than closing on a failure nobody read.
+    fail('deleteBoard', err);
   }
 }
 
@@ -146,6 +150,7 @@ async function deleteBoard(): Promise<void> {
 async function addStatus(b: Board): Promise<void> {
   const name = (newStatus.value[b.id] ?? '').trim();
   if (!name) return;
+  clear(b.id);
   try {
     const created = await api<State>(`/boards/${b.id}/states`, {
       method: 'POST',
@@ -154,26 +159,28 @@ async function addStatus(b: Board): Promise<void> {
     replaceBoard({ ...b, states: [...b.states, created] });
     newStatus.value = { ...newStatus.value, [b.id]: '' };
   } catch (err) {
-    report(err);
+    fail(b.id, err);
   }
 }
 
 async function patchStatus(b: Board, s: State, body: Record<string, unknown>): Promise<void> {
+  clear(b.id);
   try {
     const updated = await api<State>(`/states/${s.id}`, { method: 'PATCH', body });
     replaceBoard({ ...b, states: b.states.map((row) => (row.id === s.id ? updated : row)) });
   } catch (err) {
-    report(err);
+    fail(b.id, err);
     await load();
   }
 }
 
 async function deleteStatus(b: Board, s: State): Promise<void> {
+  clear(b.id);
   try {
     await api(`/states/${s.id}`, { method: 'DELETE' });
     replaceBoard({ ...b, states: b.states.filter((row) => row.id !== s.id) });
   } catch (err) {
-    report(err);
+    fail(b.id, err);
   }
 }
 
@@ -197,7 +204,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
       body: { ids: next.map((s) => s.id) },
     });
   } catch (err) {
-    report(err);
+    fail(b.id, err);
     await load();
   }
 }
@@ -206,11 +213,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
 <template>
   <SettingsLayout>
     <p v-if="loading" class="hint sheet__wide">Loading…</p>
-    <div v-else-if="!project" class="empty sheet__wide"><span class="empty__g">✕</span>{{ error }}</div>
+    <div v-else-if="!project" class="empty sheet__wide">
+      <span class="empty__g">✕</span>{{ loadError }}
+    </div>
 
     <template v-else>
-      <div v-if="error" class="err sheet__wide">{{ error }}</div>
-
       <section class="panel sheet__wide">
         <header class="panel__h">
           Project
@@ -219,16 +226,17 @@ async function onDrop(b: Board, target: State): Promise<void> {
         <div class="panel__b p-row">
           <div class="field p-key">
             <label class="label" for="p-key">Key</label>
-            <input id="p-key" class="input" :value="project.shortName" readonly />
+            <input id="p-key" class="input" :value="project.shortName" tabindex="-1" readonly />
           </div>
           <div class="field p-name">
             <label class="label" for="p-name">Name</label>
-            <input id="p-name" class="input" :value="project.name" readonly />
+            <input id="p-name" class="input" :value="project.name" tabindex="-1" readonly />
           </div>
           <button class="btn p-btn" type="button" @click="toggleArchived">
             {{ project.archived ? 'Restore project' : 'Archive project' }}
           </button>
           <button class="btn btn--danger p-btn" type="button" @click="deleting = true">Delete</button>
+          <div v-if="errors.project" class="err panel__err">{{ errors.project }}</div>
         </div>
       </section>
 
@@ -321,6 +329,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
             />
             <button class="btn" type="submit" :disabled="!(newStatus[b.id] ?? '').trim()">Add</button>
           </form>
+          <div v-if="errors[b.id]" class="err panel__err">{{ errors[b.id] }}</div>
         </div>
       </section>
 
@@ -331,6 +340,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
             <input v-model="newBoard" class="input" placeholder="Add board…" maxlength="60" />
             <button class="btn" type="submit" :disabled="!newBoard.trim()">Add</button>
           </form>
+          <div v-if="errors.newBoard" class="err panel__err">{{ errors.newBoard }}</div>
         </div>
       </section>
     </template>
@@ -343,6 +353,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
       <p class="dialog__lede">
         This takes the board's statuses and issues with it. This cannot be undone.
       </p>
+      <div v-if="errors.deleteBoard" class="err">{{ errors.deleteBoard }}</div>
       <template #footer>
         <button class="btn" type="button" @click="deletingBoard = null">Cancel</button>
         <button class="btn btn--danger" type="button" @click="deleteBoard">Delete board</button>
@@ -361,6 +372,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
         <label class="label" for="p-confirm">Type name of the project to confirm</label>
         <input id="p-confirm" v-model="confirmKey" class="input" autofocus @keydown.enter.prevent="deleteProject" />
       </div>
+      <div v-if="errors.deleteProject" class="err">{{ errors.deleteProject }}</div>
       <template #footer>
         <button class="btn" type="button" @click="deleting = false; confirmKey = ''">Cancel</button>
         <button

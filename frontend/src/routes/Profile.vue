@@ -159,7 +159,7 @@ async function copyToken(): Promise<void> {
               </div>
               <div class="field">
                 <label class="label" for="login">Login</label>
-                <input id="login" class="input" :value="me?.login" readonly />
+                <input id="login" class="input" :value="me?.login" tabindex="-1" readonly />
               </div>
               <div v-if="nameError" class="err">{{ nameError }}</div>
               <div class="row-end">

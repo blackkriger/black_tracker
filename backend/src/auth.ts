@@ -215,6 +215,22 @@ export async function requireSession(
   return auth;
 }
 
+// Deleting is a right a role can be given: it takes away work someone else has done, so it is not simply part of being able to reach the thing. The creator holds it by virtue of is_admin; everyone else holds it only through their role. The access system itself — roles, invites, accounts — stays admin-only, or a role could be granted the power to dismantle the rules it lives under.
+export async function requireDeleter(
+  req: FastifyRequest,
+  reply: FastifyReply
+): Promise<Auth | null> {
+  const auth = await requireAuth(req, reply);
+  if (!auth) return null;
+  if (auth.isAdmin) return auth;
+  if (auth.roleId) {
+    const res = await pool.query('select 1 from roles where id = $1 and can_delete', [auth.roleId]);
+    if (res.rowCount) return auth;
+  }
+  reply.code(403).send({ error: 'Deleting is not open to your role.' });
+  return null;
+}
+
 export async function requireAdmin(
   req: FastifyRequest,
   reply: FastifyReply

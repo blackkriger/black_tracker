@@ -97,11 +97,23 @@ export async function createBoardWithDefaults(
   return withDefault.rows[0];
 }
 
-// What one role cannot open, both kinds of denial in one read: a whole project, or single boards inside a project it does have. Nobody wearing no role is denied anything.
-export async function deniedFor(
-  roleId: string | null
-): Promise<{ projects: Set<string>; boards: Set<string> }> {
-  if (!roleId) return { projects: new Set(), boards: new Set() };
+export interface Denials {
+  /** Nothing is open at all — there is no role for access to hang off. */
+  everything: boolean;
+  projects: Set<string>;
+  boards: Set<string>;
+}
+
+/** What an admin is held to: nothing. */
+export const DENIES_NOTHING: Denials = {
+  everything: false,
+  projects: new Set(),
+  boards: new Set(),
+};
+
+// What one role cannot open, both kinds of denial in one read: a whole project, or single boards inside a project it does have. Access is carried by the role, so someone wearing none is shut out of everything until they are given one.
+export async function deniedFor(roleId: string | null): Promise<Denials> {
+  if (!roleId) return { everything: true, projects: new Set(), boards: new Set() };
   const [projects, boards] = await Promise.all([
     pool.query<{ project_id: string }>('select project_id from project_denials where role_id = $1', [
       roleId,
@@ -111,6 +123,7 @@ export async function deniedFor(
     ]),
   ]);
   return {
+    everything: false,
     projects: new Set(projects.rows.map((r) => r.project_id)),
     boards: new Set(boards.rows.map((r) => r.board_id)),
   };

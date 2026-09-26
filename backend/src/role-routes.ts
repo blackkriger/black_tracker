@@ -11,11 +11,25 @@ interface RoleRow {
   id: string;
   name: string;
   color: string;
+  can_delete: boolean;
 }
 
-const publicRole = (r: RoleRow) => ({ id: r.id, name: r.name, color: r.color });
+const publicRole = (r: RoleRow) => ({
+  id: r.id,
+  name: r.name,
+  color: r.color,
+  canDelete: r.can_delete,
+});
 
-const roleName = z.object({ name: z.string().trim().min(1).max(40) });
+const roleCreate = z.object({
+  name: z.string().trim().min(1).max(40),
+  canDelete: z.boolean().optional(),
+});
+
+const rolePatch = z.object({
+  name: z.string().trim().min(1).max(40).optional(),
+  canDelete: z.boolean().optional(),
+});
 
 async function takenColors(): Promise<string[]> {
   const res = await pool.query<{ color: string }>('select color from roles');
@@ -25,39 +39,48 @@ async function takenColors(): Promise<string[]> {
 export function registerRoleRoutes(app: FastifyInstance): void {
   app.get('/roles', async (req, reply) => {
     if (!(await requireAuth(req, reply))) return;
-    const res = await pool.query<RoleRow>('select id, name, color from roles order by lower(name)');
+    const res = await pool.query<RoleRow>(
+      'select id, name, color, can_delete from roles order by lower(name)'
+    );
     return reply.send({ data: res.rows.map(publicRole) });
   });
 
   app.post('/roles', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
-    const parsed = roleName.safeParse(req.body);
+    const parsed = roleCreate.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'A role needs a name.' });
     const { name } = parsed.data;
     const taken = await pool.query('select 1 from roles where lower(name) = lower($1)', [name]);
     if (taken.rowCount) return reply.code(409).send({ error: 'That role already exists.' });
     const res = await pool.query<RoleRow>(
-      'insert into roles (name, color) values ($1, $2) returning id, name, color',
-      [name, pickColor(await takenColors())]
+      `insert into roles (name, color, can_delete) values ($1, $2, $3)
+       returning id, name, color, can_delete`,
+      [name, pickColor(await takenColors()), parsed.data.canDelete ?? false]
     );
     return reply.code(201).send({ data: publicRole(res.rows[0]) });
   });
 
-  // Only the name: the colour is the server's business, and it never changes under a role people have learned to recognise.
+  // The name and what the role may do. The colour is the server's business, and it never changes under a role people have learned to recognise.
   app.patch('/roles/:id', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
-    const parsed = roleName.safeParse(req.body);
+    const parsed = rolePatch.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'A role needs a name.' });
-    const { name } = parsed.data;
-    const taken = await pool.query('select 1 from roles where lower(name) = lower($1) and id <> $2', [
-      name,
-      id,
-    ]);
-    if (taken.rowCount) return reply.code(409).send({ error: 'That role already exists.' });
+    const { name, canDelete } = parsed.data;
+    if (name) {
+      const taken = await pool.query(
+        'select 1 from roles where lower(name) = lower($1) and id <> $2',
+        [name, id]
+      );
+      if (taken.rowCount) return reply.code(409).send({ error: 'That role already exists.' });
+    }
     const res = await pool.query<RoleRow>(
-      'update roles set name = $2 where id = $1 returning id, name, color',
-      [id, name]
+      `update roles
+          set name = coalesce($2, name),
+              can_delete = coalesce($3, can_delete)
+        where id = $1
+        returning id, name, color, can_delete`,
+      [id, name ?? null, canDelete ?? null]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'No such role.' });
     return reply.send({ data: publicRole(res.rows[0]) });

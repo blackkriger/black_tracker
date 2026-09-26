@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // The root is a junction, not a page: it sends you to the board you had open and only draws something when there is nothing to send you to.
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 import { api } from '../lib/api';
 import { lastProject } from '../lib/lastProject';
+import { useSession } from '../lib/session';
 
 interface Project {
   shortName: string;
@@ -13,6 +14,10 @@ interface Project {
 }
 
 const router = useRouter();
+const session = useSession();
+const roleless = computed(
+  () => !session.me.value?.isAdmin && !session.me.value?.role
+);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
@@ -37,6 +42,9 @@ onMounted(async () => {
     <div class="page__body">
       <p v-if="loading" class="hint">Loading…</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
+      <div v-else-if="roleless" class="empty">
+        <span class="empty__g">◇</span>Nothing is open to you yet.
+      </div>
       <div v-else class="empty"><span class="empty__g">◇</span>No projects yet.</div>
     </div>
   </div>
