@@ -212,8 +212,8 @@ function replyToSelection(): void {
   const picked = window.getSelection()?.toString().trim() ?? '';
   const source = picked || c.text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
   const quote = escapeHtml(source).replace(/\n/g, '<br>');
-  // The quote, then who is being answered, then an empty line for the answer — which is where the caret goes.
-  commentDraft.value = `${commentDraft.value}<blockquote>${quote}</blockquote><p>@${c.author.login}</p><p><br></p>`;
+  // The quote, then who is being answered, then a space to carry on from — Quill drops a trailing empty paragraph, so the space is what holds the caret's place.
+  commentDraft.value = `${commentDraft.value}<blockquote>${quote}</blockquote><p>@${c.author.login}&nbsp;</p>`;
   window.getSelection()?.removeAllRanges();
   void nextTick().then(() => composer.value?.focus(true));
 }
