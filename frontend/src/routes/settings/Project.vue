@@ -337,7 +337,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
         This takes the project's boards, statuses, issues and its own tags with it. This cannot be undone.
       </p>
       <div class="field">
-        <label class="label" for="p-confirm">Type {{ project.name }} to confirm</label>
+        <label class="label" for="p-confirm">Type name of the project to confirm</label>
         <input id="p-confirm" v-model="confirmKey" class="input" autofocus @keydown.enter.prevent="deleteProject" />
       </div>
       <template #footer>

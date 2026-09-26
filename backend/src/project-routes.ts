@@ -139,7 +139,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
       !parsed.success ||
       parsed.data.confirm.toLowerCase() !== project.name.trim().toLowerCase()
     ) {
-      return reply.code(400).send({ error: `Type ${project.name} to confirm.` });
+      return reply.code(400).send({ error: 'Type name of the project to confirm.' });
     }
     const counts = await pool.query<{ issues: number }>(
       'select count(*)::int as issues from issues where project_id = $1',
