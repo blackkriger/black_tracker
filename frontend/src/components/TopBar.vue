@@ -79,8 +79,8 @@ async function signOut(): Promise<void> {
 
     <div class="sp"></div>
 
-    <RouterLink v-if="session.me.value?.isAdmin" class="toplink" to="/settings">Settings</RouterLink>
     <RouterLink class="toplink" to="/profile">{{ session.me.value?.login }}</RouterLink>
+    <RouterLink v-if="session.me.value?.isAdmin" class="toplink" to="/settings">Settings</RouterLink>
     <button class="btn btn--ghost btn--sm" type="button" @click="signOut">Sign out</button>
   </header>
 </template>
