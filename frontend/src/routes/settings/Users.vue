@@ -38,9 +38,8 @@ interface Invite {
   expiresAt: string;
   usedAt: string | null;
   usedBy: string | null;
-  revokedAt: string | null;
   role: Role | null;
-  status: 'pending' | 'used' | 'expired' | 'revoked';
+  status: 'pending' | 'used' | 'expired';
 }
 
 const session = useSession();
@@ -185,8 +184,8 @@ async function copyLink(): Promise<void> {
 async function revokeInvite(i: Invite): Promise<void> {
   clear('invites');
   try {
-    const updated = await api<Invite>(`/invites/${i.id}/revoke`, { method: 'POST' });
-    invites.value = invites.value.map((row) => (row.id === i.id ? updated : row));
+    await api(`/invites/${i.id}`, { method: 'DELETE' });
+    invites.value = invites.value.filter((row) => row.id !== i.id);
   } catch (err) {
     fail('invites', err);
   }
@@ -465,20 +464,20 @@ async function saveAccess(): Promise<void> {
               </td>
               <td>
                 <template v-if="i.status === 'used'">Used by {{ i.usedBy }}</template>
-                <template v-else-if="i.status === 'revoked'">Revoked</template>
                 <template v-else-if="i.status === 'expired'">Expired</template>
                 <template v-else>Good until {{ stamp(i.expiresAt) }}</template>
               </td>
               <td class="stamp">{{ stamp(i.createdAt) }}, {{ i.createdBy }}</td>
               <td class="c-act">
-                <!-- Only a live link can be revoked; a used one is a record of who came in and stays as it is. -->
+                <!-- A used link is the record of how an account came to be, so only an unused one can go. -->
                 <button
-                  v-if="i.status === 'pending'"
-                  class="btn btn--sm btn--ghost"
+                  v-if="i.status !== 'used'"
+                  class="btn btn--sm btn--icon btn--ghost"
                   type="button"
+                  aria-label="Delete link"
                   @click="revokeInvite(i)"
                 >
-                  Revoke
+                  <X class="ic ic--sm" />
                 </button>
               </td>
             </tr>
