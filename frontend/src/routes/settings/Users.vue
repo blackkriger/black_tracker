@@ -15,7 +15,6 @@ interface User {
   id: string;
   login: string;
   fullName: string;
-  isAdmin: boolean;
   active: boolean;
   createdAt: string;
   lastSeenAt: string | null;
@@ -25,7 +24,6 @@ interface User {
 interface Invite {
   id: string;
   hint: string;
-  isAdmin: boolean;
   createdAt: string;
   createdBy: string | null;
   expiresAt: string;
@@ -45,7 +43,6 @@ const removingRole = ref<Role | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
-const inviteAdmin = ref(false);
 const inviteRole = ref('');
 const inviteBusy = ref(false);
 // Held only until the page is left: the server keeps a hash, so this is the one moment the link exists anywhere readable.
@@ -140,12 +137,11 @@ async function createInvite(): Promise<void> {
   try {
     const created = await api<Invite & { token: string }>('/invites', {
       method: 'POST',
-      body: { isAdmin: inviteAdmin.value, roleId: inviteRole.value || null },
+      body: { roleId: inviteRole.value || null },
     });
     const { token, ...row } = created;
     freshLink.value = `${location.origin}/join/${token}`;
     invites.value = [row, ...invites.value];
-    inviteAdmin.value = false;
     inviteRole.value = '';
   } catch (err) {
     report(err);
@@ -219,7 +215,6 @@ async function saveAccess(): Promise<void> {
             <tr>
               <th>Person</th>
               <th class="c-role">Role</th>
-              <th class="c-flag">Admin</th>
               <th class="c-flag">Active</th>
               <th class="c-when">Joined</th>
               <th class="c-when">Last seen</th>
@@ -247,16 +242,6 @@ async function saveAccess(): Promise<void> {
                   <option value="">—</option>
                   <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
                 </select>
-              </td>
-              <td>
-                <label class="check">
-                  <input
-                    type="checkbox"
-                    :checked="u.isAdmin"
-                    :disabled="u.id === session.me.value?.id"
-                    @change="patchUser(u, { isAdmin: ($event.target as HTMLInputElement).checked })"
-                  />
-                </label>
               </td>
               <td>
                 <label class="check">
@@ -312,10 +297,6 @@ async function saveAccess(): Promise<void> {
             <option value="">No role</option>
             <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
           </select>
-          <label class="check">
-            <input v-model="inviteAdmin" type="checkbox" />
-            Admin
-          </label>
           <div class="sp"></div>
           <button class="btn" type="button" :disabled="inviteBusy" @click="createInvite">
             Create link
@@ -329,7 +310,6 @@ async function saveAccess(): Promise<void> {
             <tr>
               <th>Link</th>
               <th class="c-role">Role</th>
-              <th class="c-flag">Admin</th>
               <th>Status</th>
               <th class="c-when">Created</th>
               <th class="c-act"><span class="sr">Revoke</span></th>
@@ -343,7 +323,6 @@ async function saveAccess(): Promise<void> {
                   {{ i.role.name }}
                 </span>
               </td>
-              <td>{{ i.isAdmin ? 'Yes' : '' }}</td>
               <td>
                 <template v-if="i.status === 'used'">Used by {{ i.usedBy }}</template>
                 <template v-else-if="i.status === 'expired'">Expired</template>
@@ -385,14 +364,12 @@ async function saveAccess(): Promise<void> {
       :width="420"
       @close="accessFor = null"
     >
-      <p v-if="accessFor.isAdmin" class="hint">An admin opens every board.</p>
       <div v-for="p in boardsByProject" :key="p.id" class="access__group">
         <span class="label">{{ p.shortName }} {{ p.name }}</span>
         <label v-for="b in p.boards" :key="b.id" class="check access__row">
           <input
             type="checkbox"
             :checked="!denied.includes(b.id)"
-            :disabled="accessFor.isAdmin"
             @change="toggleBoard(b.id, ($event.target as HTMLInputElement).checked)"
           />
           {{ b.name }}
@@ -408,7 +385,7 @@ async function saveAccess(): Promise<void> {
         <button
           class="btn btn--primary"
           type="button"
-          :disabled="accessBusy || accessFor.isAdmin"
+          :disabled="accessBusy"
           @click="saveAccess"
         >
           Save
