@@ -77,6 +77,10 @@ async function remove(tag: TagItem): Promise<void> {
           <div class="taglabels">
             <span v-for="w in [64, 92, 48, 76]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
           </div>
+          <div class="addrow">
+            <span class="sk field-sk"></span>
+            <span class="sk btn-sk"></span>
+          </div>
         </div>
       </section>
 
@@ -85,6 +89,10 @@ async function remove(tag: TagItem): Promise<void> {
         <div class="panel__b">
           <div class="taglabels">
             <span v-for="w in [80, 56, 68]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
+          </div>
+          <div class="addrow">
+            <span class="sk field-sk"></span>
+            <span class="sk btn-sk"></span>
           </div>
         </div>
       </section>
@@ -124,5 +132,19 @@ async function remove(tag: TagItem): Promise<void> {
   display: block;
   width: 140px;
   height: 14px;
+}
+/* The add row keeps its place too, or the panel grows the moment the tags land. */
+.addrow {
+  margin-top: var(--space-3);
+}
+.field-sk {
+  display: block;
+  flex: 1 1 auto;
+  height: 34px;
+}
+.btn-sk {
+  display: block;
+  flex: 0 0 56px;
+  height: 34px;
 }
 </style>
