@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // The far end of an invite link: the one screen where an account is made, and the person makes their own. The same shell as sign-in, so it is recognisably the same instance.
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
 import { useSession } from '../lib/session';
 
 const route = useRoute();
@@ -18,6 +18,9 @@ const password = ref('');
 const repeat = ref('');
 const busy = ref(false);
 const error = ref<string | null>(null);
+// A login that is taken is a fact about that field, so it is answered there rather than above the form.
+const loginError = ref<string | null>(null);
+watch(login, () => (loginError.value = null));
 
 const mismatch = computed(() => repeat.value.length > 0 && repeat.value !== password.value);
 const canSubmit = computed(
@@ -39,6 +42,7 @@ async function onSubmit(): Promise<void> {
   if (!canSubmit.value) return;
   busy.value = true;
   error.value = null;
+  loginError.value = null;
   try {
     await api(`/invites/${encodeURIComponent(token)}/accept`, {
       method: 'POST',
@@ -49,7 +53,12 @@ async function onSubmit(): Promise<void> {
     await session.refresh();
     await router.replace('/');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not create the account.';
+    const message = err instanceof Error ? err.message : 'Could not create the account.';
+    if (err instanceof ApiError && (err.status === 409 || /login/i.test(message))) {
+      loginError.value = message;
+    } else {
+      error.value = message;
+    }
   } finally {
     busy.value = false;
   }
@@ -87,6 +96,7 @@ async function onSubmit(): Promise<void> {
             maxlength="32"
             autofocus
           />
+          <span v-if="loginError" class="err">{{ loginError }}</span>
         </div>
         <div class="field">
           <label class="label" for="join-password">Password</label>
