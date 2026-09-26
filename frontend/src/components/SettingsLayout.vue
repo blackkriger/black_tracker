@@ -17,19 +17,19 @@ onMounted(() => void load());
     <TopBar />
 
     <div class="page__body">
-      <nav class="side admin__side" aria-label="Admin sections">
+      <nav class="side admin__side" aria-label="Settings sections">
         <div class="side__h">Projects</div>
-        <RouterLink v-for="p in live" :key="p.id" :to="`/admin/p/${p.shortName}`">
+        <RouterLink v-for="p in live" :key="p.id" :to="`/settings/p/${p.shortName}`">
           {{ p.shortName }} {{ p.name }}
         </RouterLink>
-        <RouterLink v-for="p in archived" :key="p.id" :to="`/admin/p/${p.shortName}`">
+        <RouterLink v-for="p in archived" :key="p.id" :to="`/settings/p/${p.shortName}`">
           {{ p.shortName }} {{ p.name }} (archived)
         </RouterLink>
-        <RouterLink to="/admin/new">New project…</RouterLink>
+        <RouterLink to="/settings/new">New project…</RouterLink>
 
         <div class="side__h">Workspace</div>
-        <RouterLink to="/admin/tags">Global tags</RouterLink>
-        <RouterLink to="/admin/users">Users &amp; access</RouterLink>
+        <RouterLink to="/settings/tags">Global tags</RouterLink>
+        <RouterLink to="/settings/users">Users &amp; access</RouterLink>
       </nav>
 
       <div class="admin__main">

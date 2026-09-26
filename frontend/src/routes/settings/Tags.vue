@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Global tags: usable on every project, unlike the ones a project keeps for itself.
 import { computed, onMounted, ref } from 'vue';
-import AdminLayout from '../../components/AdminLayout.vue';
+import SettingsLayout from '../../components/SettingsLayout.vue';
 import ColorSwatch from '../../components/ColorSwatch.vue';
 import { api } from '../../lib/api';
 
@@ -65,7 +65,7 @@ async function remove(t: Tag): Promise<void> {
 </script>
 
 <template>
-  <AdminLayout>
+  <SettingsLayout>
     <section class="panel">
       <header class="panel__h">Global tags<span class="panel__end">Usable on every project</span></header>
       <div class="panel__table">
@@ -107,7 +107,7 @@ async function remove(t: Tag): Promise<void> {
         </form>
       </div>
     </section>
-  </AdminLayout>
+  </SettingsLayout>
 </template>
 
 <style scoped>

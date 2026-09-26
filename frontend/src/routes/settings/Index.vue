@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// /admin is a junction like the root: it opens the first project's setup, or the workspace tags when there is no project yet.
+// /settings is a junction like the root: it opens the first project's setup, or the workspace tags when there is no project yet.
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjects } from '../../lib/projects';
@@ -13,7 +13,7 @@ onMounted(async () => {
   const live = projects.value.filter((p) => !p.archived);
   const remembered = live.find((p) => p.shortName === lastProject.get());
   const target = remembered ?? live[0];
-  await router.replace(target ? `/admin/p/${target.shortName}` : '/admin/new');
+  await router.replace(target ? `/settings/p/${target.shortName}` : '/settings/new');
 });
 </script>
 

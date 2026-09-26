@@ -2,7 +2,7 @@
 // One project's setup: what it is called, the statuses that become the board's columns, the boards themselves, and the tags that belong to it.
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import AdminLayout from '../../components/AdminLayout.vue';
+import SettingsLayout from '../../components/SettingsLayout.vue';
 import ColorSwatch from '../../components/ColorSwatch.vue';
 import { api } from '../../lib/api';
 import { useProjects } from '../../lib/projects';
@@ -256,7 +256,7 @@ async function deleteTag(t: Tag): Promise<void> {
 </script>
 
 <template>
-  <AdminLayout>
+  <SettingsLayout>
     <p v-if="loading" class="hint">Loading…</p>
     <div v-else-if="!project" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
 
@@ -438,7 +438,7 @@ async function deleteTag(t: Tag): Promise<void> {
 
       <p v-if="notice" class="hint">{{ notice }}</p>
     </template>
-  </AdminLayout>
+  </SettingsLayout>
 </template>
 
 <style scoped>

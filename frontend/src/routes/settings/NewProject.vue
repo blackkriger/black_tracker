@@ -2,7 +2,7 @@
 // Creating a project also creates its starting statuses on the server, so a fresh board is usable the moment this form closes.
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import AdminLayout from '../../components/AdminLayout.vue';
+import SettingsLayout from '../../components/SettingsLayout.vue';
 import { api } from '../../lib/api';
 import { useProjects } from '../../lib/projects';
 
@@ -27,7 +27,7 @@ async function create(): Promise<void> {
       body: { shortName: shortName.value.trim(), name: name.value.trim() },
     });
     await projects.load(true);
-    await router.push(`/admin/p/${created.shortName}`);
+    await router.push(`/settings/p/${created.shortName}`);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not create the project.';
   } finally {
@@ -37,7 +37,7 @@ async function create(): Promise<void> {
 </script>
 
 <template>
-  <AdminLayout>
+  <SettingsLayout>
     <section class="panel new">
       <header class="panel__h">New project</header>
       <form class="panel__b form" @submit.prevent="create">
@@ -63,7 +63,7 @@ async function create(): Promise<void> {
         </div>
       </form>
     </section>
-  </AdminLayout>
+  </SettingsLayout>
 </template>
 
 <style scoped>
