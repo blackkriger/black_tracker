@@ -176,10 +176,12 @@ function issueGone(id: string): void {
   closeIssue();
 }
 
-// Whatever you end up looking at is what this project opens on next time.
+// Whatever you end up looking at is what this project opens on next time — and what the address says, so /TEST becomes /TEST/test the moment it is clear which board that is.
 watch(current, (board) => {
   const short = project.value?.shortName;
-  if (board && short) lastBoard.set(short, board.slug);
+  if (!board || !short) return;
+  lastBoard.set(short, board.slug);
+  if (!route.params.slug) void router.replace(`/${short}/${board.slug}`);
 });
 
 async function load(short: string): Promise<void> {
