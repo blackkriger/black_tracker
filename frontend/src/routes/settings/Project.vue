@@ -3,6 +3,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
+import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
 import { useProjects } from '../../lib/projects';
 
@@ -219,24 +220,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
           <button class="btn p-btn" type="button" @click="toggleArchived">
             {{ project.archived ? 'Restore project' : 'Archive project' }}
           </button>
-          <button v-if="!deleting" class="btn btn--danger p-btn" type="button" @click="deleting = true">
-            Delete
-          </button>
-          <template v-else>
-            <div class="field p-confirm">
-              <label class="label" for="p-confirm">Type {{ project.shortName }} to delete</label>
-              <input id="p-confirm" v-model="confirmKey" class="input" autofocus />
-            </div>
-            <button
-              class="btn btn--danger p-btn"
-              type="button"
-              :disabled="confirmKey.trim().toUpperCase() !== project.shortName"
-              @click="deleteProject"
-            >
-              Delete project
-            </button>
-            <button class="btn p-btn" type="button" @click="deleting = false; confirmKey = ''">Cancel</button>
-          </template>
+          <button class="btn btn--danger p-btn" type="button" @click="deleting = true">Delete</button>
         </div>
       </section>
 
@@ -343,6 +327,31 @@ async function onDrop(b: Board, target: State): Promise<void> {
         </div>
       </section>
     </template>
+
+    <Dialog
+      v-if="deleting && project"
+      :title="`Delete ${project.shortName}`"
+      @close="deleting = false; confirmKey = ''"
+    >
+      <p class="dialog__lede">
+        This takes the project's boards, statuses, issues and its own tags with it. There is no undo.
+      </p>
+      <div class="field">
+        <label class="label" for="p-confirm">Type {{ project.shortName }} to confirm</label>
+        <input id="p-confirm" v-model="confirmKey" class="input" autofocus @keydown.enter.prevent="deleteProject" />
+      </div>
+      <template #footer>
+        <button class="btn" type="button" @click="deleting = false; confirmKey = ''">Cancel</button>
+        <button
+          class="btn btn--danger"
+          type="button"
+          :disabled="confirmKey.trim().toUpperCase() !== project.shortName"
+          @click="deleteProject"
+        >
+          Delete project
+        </button>
+      </template>
+    </Dialog>
   </SettingsLayout>
 </template>
 
@@ -359,8 +368,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
 .p-name {
   flex: 1 1 220px;
 }
-.p-confirm {
-  width: 200px;
+.dialog__lede {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-dim);
 }
 .p-btn {
   height: 34px;
