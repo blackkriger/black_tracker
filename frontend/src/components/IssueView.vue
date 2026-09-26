@@ -1162,8 +1162,8 @@ async function removeIssue(): Promise<void> {
         :class="{ 'is-far': !popupNear }"
         :style="{ left: `${popup.x}px`, top: `${popup.y}px` }"
       >
-        <button class="btn btn--sm" type="button" @click="copySelection">Copy</button>
-        <button class="btn btn--sm" type="button" @click="replyToSelection">Reply</button>
+        <button type="button" @click="copySelection">Copy</button>
+        <button type="button" @click="replyToSelection">Reply</button>
       </div>
 
       <ImageViewer v-model:index="shown" :images="gallery" />
@@ -1244,18 +1244,32 @@ async function removeIssue(): Promise<void> {
   flex-direction: column;
   gap: 20px;
 }
-/* Over the selection, out of the flow: it follows the highlight rather than the layout. */
+/* Over the selection, out of the flow: it follows the highlight rather than the layout. One plate with two words on it — no buttons drawn inside a box drawn inside a box. */
 .selbar {
   position: fixed;
   z-index: 50;
   display: flex;
-  gap: 4px;
-  padding: 4px;
   transform: translate(-50%, calc(-100% - 8px));
   background: var(--card);
   border: 1px solid var(--line-2);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   transition: opacity 0.12s ease-out;
+}
+.selbar button {
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 13px var(--font-ui);
+  cursor: pointer;
+}
+.selbar button:hover {
+  color: var(--text);
+  background: var(--card-hover);
+}
+.selbar button + button {
+  box-shadow: inset 1px 0 var(--line);
 }
 .selbar.is-far {
   opacity: 0.25;
