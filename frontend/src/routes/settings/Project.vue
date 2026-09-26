@@ -45,7 +45,6 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
 
-const name = ref('');
 const defaultStateId = ref<string | null>(null);
 const savingProject = ref(false);
 
@@ -60,7 +59,6 @@ async function load(): Promise<void> {
     const p = await api<Project>(`/projects/${encodeURIComponent(short.value)}`);
     project.value = p;
     states.value = [...p.states].sort((a, b) => a.position - b.position);
-    name.value = p.name;
     defaultStateId.value = p.defaultStateId;
     [boards.value, tags.value] = await Promise.all([
       api<Board[]>(`/projects/${encodeURIComponent(p.shortName)}/boards`),
@@ -87,7 +85,7 @@ async function saveProject(): Promise<void> {
   try {
     await api(`/projects/${encodeURIComponent(project.value.shortName)}`, {
       method: 'PATCH',
-      body: { name: name.value, defaultStateId: defaultStateId.value },
+      body: { defaultStateId: defaultStateId.value },
     });
     notice.value = 'Saved.';
     await projectsStore.load(true);
@@ -268,7 +266,7 @@ async function deleteTag(t: TagItem): Promise<void> {
           </div>
           <div class="field p-name">
             <label class="label" for="p-name">Name</label>
-            <input id="p-name" v-model="name" class="input" maxlength="200" />
+            <input id="p-name" class="input" :value="project.name" readonly />
           </div>
           <div class="field p-default">
             <label class="label" for="p-default">Default status</label>
@@ -283,9 +281,6 @@ async function deleteTag(t: TagItem): Promise<void> {
             Save
           </button>
         </div>
-        <p class="hint p-hint">
-          The key is locked: it is in every {{ project.shortName }}-### reference and commit.
-        </p>
       </section>
 
       <section class="panel">
@@ -419,9 +414,6 @@ async function deleteTag(t: TagItem): Promise<void> {
 }
 .p-btn {
   height: 34px;
-}
-.p-hint {
-  margin: -8px 20px 16px;
 }
 .panel__table {
   padding: 4px 8px 12px;
