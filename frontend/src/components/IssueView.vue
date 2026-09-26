@@ -2,6 +2,7 @@
 // One issue, opened over the board it lives on: the text on the left, what it is on the right, and underneath it everything that has been said and done about it. Every edit is its own small write — there is no Save for the issue as a whole.
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import Dialog from './Dialog.vue';
+import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
 import { TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank } from '../lib/richtext';
@@ -11,6 +12,7 @@ import { useSession } from '../lib/session';
 import {
   PRIORITIES,
   dueLabel,
+  MAX_FILE_BYTES,
   fileSize,
   stamp,
   stampAt,
@@ -108,6 +110,16 @@ const dragOver = ref(false);
 // Files chosen before there is anything to attach them to: a new issue, or a comment that has not been posted. They are uploaded the moment their owner exists.
 const pending = ref<File[]>([]);
 const commentFiles = ref<File[]>([]);
+
+// Every picture on the issue, in the order they are shown, and which one the viewer has open.
+const shown = ref<number | null>(null);
+const gallery = computed(() =>
+  (issue.value?.attachments ?? [])
+    .filter((a) => a.mime.startsWith('image/'))
+    .map((a) => ({ src: `/api/attachments/${a.id}`, name: a.filename }))
+);
+const galleryIndex = (id: string): number =>
+  gallery.value.findIndex((g) => g.src === `/api/attachments/${id}`);
 const deleting = ref(false);
 
 const shownStateId = computed(() => (creating.value ? draft.value.stateId : issue.value?.stateId));
@@ -306,13 +318,14 @@ async function postComment(): Promise<void> {
       method: 'POST',
       body: { text },
     });
-    const now = issue.value ?? current;
-    issue.value = { ...now, comments: [...now.comments, created] };
-    commentDraft.value = '';
+    // The comment is posted first because a file has to hang off something, but nothing is shown and nothing is cleared until its files are up: half a comment on screen is worse than a moment's wait.
     if (commentFiles.value.length) {
       await sendFiles(current.id, commentFiles.value, created.id);
       commentFiles.value = [];
     }
+    const now = issue.value ?? current;
+    issue.value = { ...now, comments: [...now.comments, created] };
+    commentDraft.value = '';
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not post the comment.';
   } finally {
@@ -402,8 +415,18 @@ async function sendFiles(issueId: string, list: File[], commentId?: string): Pro
 }
 
 // On an issue that exists the file goes straight up; on one being written it waits in the list until there is an issue to hang it on.
-async function upload(list: FileList | null): Promise<void> {
+/** Splits what was chosen into what will fit and what will not, and says so about the rest. */
+function accept(list: FileList | null): File[] {
   const chosen = list ? Array.from(list) : [];
+  const tooBig = chosen.filter((f) => f.size > MAX_FILE_BYTES);
+  if (tooBig.length) {
+    error.value = `${tooBig.map((f) => f.name).join(', ')} — a file has to be 10 MB or smaller.`;
+  }
+  return chosen.filter((f) => f.size <= MAX_FILE_BYTES);
+}
+
+async function upload(list: FileList | null): Promise<void> {
+  const chosen = accept(list);
   if (!chosen.length) return;
   dragOver.value = false;
   if (creating.value || !issue.value) {
@@ -428,8 +451,8 @@ function dropPending(name: string, from: 'issue' | 'comment'): void {
 }
 
 function pickCommentFiles(list: FileList | null): void {
-  if (!list?.length) return;
-  commentFiles.value = [...commentFiles.value, ...Array.from(list)];
+  const chosen = accept(list);
+  if (chosen.length) commentFiles.value = [...commentFiles.value, ...chosen];
 }
 
 async function removeAttachment(a: Attachment): Promise<void> {
@@ -559,9 +582,9 @@ async function removeIssue(): Promise<void> {
               </div>
               <div v-if="images.length" class="atts">
                 <figure v-for="a in images" :key="a.id" class="att">
-                  <a class="att__img" :href="`/api/attachments/${a.id}`" target="_blank">
+                  <button class="att__img" type="button" @click="shown = galleryIndex(a.id)">
                     <img :src="`/api/attachments/${a.id}`" :alt="a.filename" class="att__pic" />
-                  </a>
+                  </button>
                   <figcaption class="att__cap">
                     <span>{{ a.filename }}</span>
                     <button
@@ -692,14 +715,14 @@ async function removeIssue(): Promise<void> {
 
                   <div v-if="filesOf(c.id).length" class="cm__files">
                     <template v-for="a in filesOf(c.id)" :key="a.id">
-                      <a
+                      <button
                         v-if="a.mime.startsWith('image/')"
                         class="cm__shot"
-                        :href="`/api/attachments/${a.id}`"
-                        target="_blank"
+                        type="button"
+                        @click="shown = galleryIndex(a.id)"
                       >
                         <img :src="`/api/attachments/${a.id}`" :alt="a.filename" />
-                      </a>
+                      </button>
                       <span v-else class="att__cap att__row">
                         <a :href="`/api/attachments/${a.id}`" target="_blank">{{ a.filename }}</a>
                         <span class="stamp">{{ fileSize(a.size) }}</span>
@@ -755,6 +778,7 @@ async function removeIssue(): Promise<void> {
                     <div class="sp"></div>
                     <button
                       class="btn btn--sm btn--primary"
+                      :class="{ 'is-busy': posting }"
                       type="submit"
                       :disabled="isBlank(commentDraft) || posting"
                     >
@@ -881,6 +905,8 @@ async function removeIssue(): Promise<void> {
         <div v-if="error" class="err iv__err">{{ error }}</div>
       </section>
 
+      <ImageViewer v-model:index="shown" :images="gallery" />
+
       <Dialog v-if="deleting" :title="`Delete ${issueKey}`" @close="deleting = false">
         <p class="iv__lede">This takes its comments, files and history with it. This cannot be undone.</p>
         <template #footer>
@@ -965,6 +991,13 @@ async function removeIssue(): Promise<void> {
   flex: none;
   color: var(--accent);
 }
+.att__img {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  width: 100%;
+}
 .att__pic {
   width: 100%;
   height: 100%;
@@ -998,7 +1031,10 @@ async function removeIssue(): Promise<void> {
 .cm__shot {
   display: block;
   width: 160px;
+  padding: 0;
   border: 1px solid var(--line);
+  background: none;
+  cursor: zoom-in;
 }
 .cm__shot img {
   display: block;

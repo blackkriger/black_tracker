@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, stat, unlink } from 'node:fs/promises';
+import { mkdir, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -166,6 +166,20 @@ const issuePatch = z.object({
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
+
+// Rows go with their issue through the foreign keys; the bytes on disk are ours to sweep, whether one issue is deleted or a whole project's worth.
+export async function sweepFilesOfIssues(issueIds: string[]): Promise<void> {
+  if (!issueIds.length) return;
+  const files = await pool.query<{ storage_path: string }>(
+    'select storage_path from issue_attachments where issue_id = any($1::uuid[])',
+    [issueIds]
+  );
+  await Promise.all(files.rows.map((f) => unlink(f.storage_path).catch(() => {})));
+  // Each issue keeps its own folder, which is empty once its files are gone.
+  await Promise.all(
+    issueIds.map((id) => rm(path.join(env.uploadDir, id), { recursive: true, force: true }).catch(() => {}))
+  );
+}
 
 export function registerIssueRoutes(app: FastifyInstance): void {
   // ── the board's cards ────────────────────────────────────────────
@@ -579,13 +593,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!(await mayOpenBoard(auth, issue.board_id, issue.project_id))) {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
-    // The rows go with the issue through the foreign keys; the files on disk are ours to sweep.
-    const files = await pool.query<{ storage_path: string }>(
-      'select storage_path from issue_attachments where issue_id = $1',
-      [id]
-    );
     await pool.query('delete from issues where id = $1', [id]);
-    await Promise.all(files.rows.map((f) => unlink(f.storage_path).catch(() => {})));
+    await sweepFilesOfIssues([id]);
     void publish({
       type: 'issue.deleted',
       boardId: issue.board_id,
@@ -781,7 +790,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     await pipeline(file.file, createWriteStream(stored));
     if (file.file.truncated) {
       await unlink(stored).catch(() => {});
-      return reply.code(413).send({ error: 'That file is too large.' });
+      return reply.code(413).send({ error: 'A file has to be 10 MB or smaller.' });
     }
     const { size } = await stat(stored);
     const filename = file.filename.slice(0, 200);

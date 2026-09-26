@@ -102,6 +102,9 @@ export function stampAt(iso: string): string {
   return `${day} ${d.toLocaleTimeString('en-GB', { hour12: false })}`;
 }
 
+/** One file, ten megabytes. The server holds the same ceiling; this one is here so nobody waits for an upload that was never going to land. */
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
 export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;

@@ -3,6 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
+import { sweepFilesOfIssues } from './issue-routes.js';
 import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
 import {
   DENIES_NOTHING,
@@ -179,12 +180,12 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     ) {
       return reply.code(400).send({ error: 'Type name of the project to confirm.' });
     }
-    const counts = await pool.query<{ issues: number }>(
-      'select count(*)::int as issues from issues where project_id = $1',
-      [project.id]
-    );
+    const doomed = await pool.query<{ id: string }>('select id from issues where project_id = $1', [
+      project.id,
+    ]);
     await pool.query('delete from projects where id = $1', [project.id]);
-    return reply.send({ data: { ok: true, issues: counts.rows[0].issues } });
+    await sweepFilesOfIssues(doomed.rows.map((r) => r.id));
+    return reply.send({ data: { ok: true, issues: doomed.rowCount ?? 0 } });
   });
 
   app.patch('/projects/:short', async (req, reply) => {
