@@ -59,6 +59,14 @@ const byAssignee = ref('');
 const byAuthor = ref('');
 const byPriority = ref('');
 const people = ref<{ id: string; login: string; fullName: string }[]>([]);
+// Tags narrow the board too: pick several and a card has to wear all of them.
+const byTags = ref<string[]>([]);
+
+function toggleTag(id: string): void {
+  byTags.value = byTags.value.includes(id)
+    ? byTags.value.filter((t) => t !== id)
+    : [...byTags.value, id];
+}
 
 const filtered = computed(() =>
   issues.value.filter(
@@ -66,7 +74,8 @@ const filtered = computed(() =>
       (!byAssignee.value ||
         (byAssignee.value === 'none' ? !i.assignee : i.assignee?.id === byAssignee.value)) &&
       (!byAuthor.value || i.author?.id === byAuthor.value) &&
-      (!byPriority.value || i.priority === byPriority.value)
+      (!byPriority.value || i.priority === byPriority.value) &&
+      byTags.value.every((id) => i.tags.some((t) => t.id === id))
   )
 );
 
@@ -283,12 +292,16 @@ watch(
         <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
       </select>
 
-      <span
+      <button
         v-for="t in tags"
         :key="t.id"
-        class="taglabel taglabel--plain"
+        class="taglabel taglabel--plain taglabel--pick"
+        :class="{ 'is-off': byTags.length && !byTags.includes(t.id) }"
+        type="button"
+        :aria-pressed="byTags.includes(t.id)"
         :style="{ '--c': t.color }"
-      >{{ t.name }}</span>
+        @click="toggleTag(t.id)"
+      >{{ t.name }}</button>
     </div>
 
     <div
@@ -404,6 +417,15 @@ watch(
 .page__body--tags,
 .board--tags {
   padding-top: 0;
+}
+/* A tag in the bar is a switch: once any of them is on, the ones that are off step back rather than disappear. */
+.taglabel--pick {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.taglabel--pick.is-off {
+  opacity: 0.35;
 }
 /* A filter is as wide as what it says, and reads as one of the bar's own controls. */
 .filter {
