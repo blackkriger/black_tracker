@@ -1579,13 +1579,13 @@ async function removeIssue(): Promise<void> {
   background: none;
   cursor: zoom-in;
 }
-/* Its own proportions, as wide as the column allows, with a ceiling so one tall picture cannot run the column away. */
+/* Its own size. A picture is never stretched to fill the column — only held back when it is wider than the column or taller than the ceiling. */
 .wait__img img {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
+  max-width: 100%;
   max-height: 420px;
-  object-fit: contain;
 }
 .wait__row {
   display: flex;
