@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import ColorSwatch from '../../components/ColorSwatch.vue';
 import { api } from '../../lib/api';
+
 import { useProjects } from '../../lib/projects';
 
 interface State {
@@ -34,7 +35,6 @@ interface Tag {
   projectId: string | null;
   name: string;
   color: string;
-  used: number;
 }
 
 const route = useRoute();
@@ -405,9 +405,7 @@ async function deleteTag(t: Tag): Promise<void> {
               <table class="tbl">
                 <tbody>
                   <tr v-for="t in projectTags" :key="t.id">
-                    <td class="c-color">
-                      <ColorSwatch :model-value="t.color" @update:model-value="patchTag(t, { color: $event })" />
-                    </td>
+                    <td class="c-color"><span class="dot" :style="{ background: t.color }"></span></td>
                     <td>
                       <input
                         class="input input--sm"
@@ -416,7 +414,6 @@ async function deleteTag(t: Tag): Promise<void> {
                         @change="patchTag(t, { name: ($event.target as HTMLInputElement).value })"
                       />
                     </td>
-                    <td class="stamp c-used">{{ t.used }}</td>
                     <td class="c-del">
                       <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Delete tag" @click="deleteTag(t)">
                         ✕
@@ -477,8 +474,10 @@ async function deleteTag(t: Tag): Promise<void> {
 .c-flag {
   width: 70px;
 }
-.c-used {
-  width: 50px;
+.dot {
+  display: block;
+  width: 10px;
+  height: 10px;
 }
 .c-del {
   width: 44px;

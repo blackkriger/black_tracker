@@ -51,7 +51,7 @@ async function create(): Promise<void> {
             placeholder="PROJ"
             @input="shortName = shortName.toUpperCase()"
           />
-          <span class="hint">Upper-case letters and digits. It becomes the {{ shortName || 'PROJ' }}-### in every issue.</span>
+          <span class="hint">Upper-case letters and digits.</span>
         </div>
         <div class="field">
           <label class="label" for="name">Name</label>

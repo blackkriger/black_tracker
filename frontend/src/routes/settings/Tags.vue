@@ -2,7 +2,6 @@
 // Every tag in one place: the ones usable everywhere, and the ones a project keeps to itself. Scope is picked when the tag is made and shown in its own column.
 import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
-import ColorSwatch from '../../components/ColorSwatch.vue';
 import { api } from '../../lib/api';
 import { useProjects } from '../../lib/projects';
 
@@ -10,8 +9,8 @@ interface Tag {
   id: string;
   projectId: string | null;
   name: string;
+  /** Picked by the server from the theme palette, skipping whatever is already worn in the same scope. */
   color: string;
-  used: number;
 }
 
 const { projects, load: loadProjects } = useProjects();
@@ -98,18 +97,15 @@ async function remove(t: Tag): Promise<void> {
         <table v-if="rows.length" class="tbl">
           <thead>
             <tr>
-              <th class="c-color">Color</th>
+              <th class="c-color"><span class="sr">Color</span></th>
               <th>Tag</th>
               <th class="c-scope">Scope</th>
-              <th class="c-used">Used</th>
               <th class="c-del"><span class="sr">Delete</span></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="t in rows" :key="t.id">
-              <td class="c-color">
-                <ColorSwatch :model-value="t.color" @update:model-value="patch(t, { color: $event })" />
-              </td>
+              <td class="c-color"><span class="dot" :style="{ background: t.color }"></span></td>
               <td>
                 <input
                   class="input input--sm"
@@ -121,7 +117,6 @@ async function remove(t: Tag): Promise<void> {
               <td class="c-scope stamp">
                 {{ t.projectId ? shortById.get(t.projectId) ?? '—' : 'EVERYWHERE' }}
               </td>
-              <td class="stamp c-used">{{ t.used }}</td>
               <td class="c-del">
                 <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Delete tag" @click="remove(t)">✕</button>
               </td>
@@ -160,8 +155,10 @@ async function remove(t: Tag): Promise<void> {
 .c-scope {
   width: 120px;
 }
-.c-used {
-  width: 60px;
+.dot {
+  display: block;
+  width: 10px;
+  height: 10px;
 }
 .c-del {
   width: 44px;
