@@ -7,6 +7,7 @@ import { requireAdmin, requireAuth } from './auth.js';
 import { boardsOfProject, projectByShort } from './project-routes.js';
 import {
   createBoardWithDefaults,
+  denialsFor,
   freeSlug,
   publicBoard,
   publicState,
@@ -35,21 +36,6 @@ const statePatch = z.object({
   isResolved: z.boolean().optional(),
   position: z.number().int().min(0).optional(),
 });
-
-async function denialsFor(boardIds: string[]): Promise<Map<string, string[]>> {
-  const out = new Map<string, string[]>();
-  if (!boardIds.length) return out;
-  const res = await pool.query<{ board_id: string; user_id: string }>(
-    'select board_id, user_id from board_denials where board_id = any($1::uuid[])',
-    [boardIds]
-  );
-  for (const row of res.rows) {
-    const list = out.get(row.board_id) ?? [];
-    list.push(row.user_id);
-    out.set(row.board_id, list);
-  }
-  return out;
-}
 
 async function boardById(id: string): Promise<BoardRow | null> {
   const res = await pool.query<BoardRow>(

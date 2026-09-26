@@ -1,6 +1,7 @@
 // Making a board is never just a row: a board without columns cannot draw anything, so it comes with the starting four. Both the project and the board routes create boards, hence this sits apart from either.
 
 import type { PoolClient } from 'pg';
+import { pool } from './db.js';
 import { knownColor } from './colors.js';
 
 // The board's address. A name of nothing but punctuation or Cyrillic slugs to an empty string, so it falls back to a plain word and the counter below keeps it unique inside the project.
@@ -94,6 +95,22 @@ export async function createBoardWithDefaults(
     [first?.id ?? null, row.id]
   );
   return withDefault.rows[0];
+}
+
+// Who is shut out of which board. Access is a denial list, so a board missing from the answer is open to everyone.
+export async function denialsFor(boardIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (!boardIds.length) return out;
+  const res = await pool.query<{ board_id: string; user_id: string }>(
+    'select board_id, user_id from board_denials where board_id = any($1::uuid[])',
+    [boardIds]
+  );
+  for (const row of res.rows) {
+    const list = out.get(row.board_id) ?? [];
+    list.push(row.user_id);
+    out.set(row.board_id, list);
+  }
+  return out;
 }
 
 export const publicState = (r: StateRow) => ({

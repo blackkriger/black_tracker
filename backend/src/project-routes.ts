@@ -6,6 +6,7 @@ import { inTransaction, pool } from './db.js';
 import { requireAdmin, requireAuth } from './auth.js';
 import {
   createBoardWithDefaults,
+  denialsFor,
   publicBoard,
   type BoardRow,
   type StateRow,
@@ -84,14 +85,25 @@ export async function boardsOfProject(projectId: string) {
 
 export function registerProjectRoutes(app: FastifyInstance): void {
   app.get('/projects', async (req, reply) => {
-    if (!(await requireAuth(req, reply))) return;
-    // The board count rides along so the top bar knows whether a project has a choice of boards to offer.
-    const res = await pool.query<ProjectRow & { board_count: number }>(
-      `select p.*, (select count(*) from boards b where b.project_id = p.id)::int as board_count
-         from projects p order by p.position, p.short_name`
-    );
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    // The top bar names every project's boards, so they ride along with the list rather than one request per project.
+    const [projects, boards] = await Promise.all([
+      pool.query<ProjectRow>('select * from projects order by position, short_name'),
+      pool.query<BoardRow>(
+        'select id, project_id, name, slug, default_state_id, position from boards order by position, name'
+      ),
+    ]);
+    const denials = await denialsFor(boards.rows.map((b) => b.id));
+    const byProject = new Map<string, { id: string; name: string; slug: string }[]>();
+    for (const b of boards.rows) {
+      if (!auth.isAdmin && (denials.get(b.id) ?? []).includes(auth.userId)) continue;
+      const list = byProject.get(b.project_id) ?? [];
+      list.push({ id: b.id, name: b.name, slug: b.slug });
+      byProject.set(b.project_id, list);
+    }
     return reply.send({
-      data: res.rows.map((r) => ({ ...publicProject(r), boardCount: r.board_count })),
+      data: projects.rows.map((r) => ({ ...publicProject(r), boards: byProject.get(r.id) ?? [] })),
     });
   });
 

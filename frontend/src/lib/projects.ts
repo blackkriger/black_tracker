@@ -7,7 +7,7 @@ export interface ProjectMini {
   shortName: string;
   name: string;
   archived: boolean;
-  boardCount: number;
+  boards: { id: string; name: string; slug: string }[];
 }
 
 const projects = ref<ProjectMini[]>([]);

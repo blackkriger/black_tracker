@@ -1,9 +1,8 @@
 <script setup lang="ts">
-// The bar every screen but sign-in carries: the projects side by side, each with its boards behind a caret, and who you are.
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { api } from '../lib/api';
-import { useProjects } from '../lib/projects';
+// The bar every screen but sign-in carries: the projects side by side, each naming the board it would open, and who you are.
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { useProjects, type ProjectMini } from '../lib/projects';
 import { lastBoard } from '../lib/lastProject';
 import { useSession } from '../lib/session';
 
@@ -16,17 +15,42 @@ const props = defineProps<{
 
 const session = useSession();
 const router = useRouter();
-const route = useRoute();
 const { projects, load } = useProjects();
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const currentShort = computed(() => props.project?.shortName ?? null);
-// The address names the board once you have picked one; until then the screen itself says which board it settled on.
-const currentSlug = computed(() => props.board?.slug ?? String(route.params.slug ?? ''));
 
-// Which project's menu is open, and the boards read so far. A project's boards are fetched the first time its caret is used and kept for the rest of the page's life.
+// Which project's menu is open.
 const openShort = ref<string | null>(null);
-const boardsByProject = ref<Record<string, { id: string; name: string; slug: string }[]>>({});
+
+// The board each project would open, read once from storage and kept in step as you move around, since localStorage itself is not reactive.
+const remembered = ref<Record<string, string>>({});
+watch(
+  live,
+  (rows) => {
+    const next: Record<string, string> = { ...remembered.value };
+    for (const p of rows) {
+      const slug = lastBoard.get(p.shortName);
+      if (slug) next[p.shortName] = slug;
+    }
+    remembered.value = next;
+  },
+  { immediate: true }
+);
+watch(
+  () => [currentShort.value, props.board?.slug] as const,
+  ([short, slug]) => {
+    if (short && slug) remembered.value = { ...remembered.value, [short]: slug };
+  },
+  { immediate: true }
+);
+
+// The screen knows better than storage which board it settled on, so it wins for the project you are on.
+function shownBoard(p: ProjectMini): { name: string; slug: string } | null {
+  if (p.shortName === currentShort.value && props.board) return props.board;
+  if (!p.boards.length) return null;
+  return p.boards.find((b) => b.slug === remembered.value[p.shortName]) ?? p.boards[0];
+}
 
 onMounted(() => {
   void load();
@@ -45,26 +69,10 @@ function onKeydown(ev: KeyboardEvent): void {
   if (ev.key === 'Escape') openShort.value = null;
 }
 
-async function toggleBoards(short: string): Promise<void> {
-  if (openShort.value === short) {
-    openShort.value = null;
-    return;
-  }
-  openShort.value = short;
-  if (boardsByProject.value[short]) return;
-  try {
-    const rows = await api<{ id: string; name: string; slug: string }[]>(
-      `/projects/${encodeURIComponent(short)}/boards`
-    );
-    boardsByProject.value = { ...boardsByProject.value, [short]: rows };
-  } catch {
-    boardsByProject.value = { ...boardsByProject.value, [short]: [] };
-  }
-}
-
 async function pickBoard(short: string, slug: string): Promise<void> {
   openShort.value = null;
   lastBoard.set(short, slug);
+  remembered.value = { ...remembered.value, [short]: slug };
   await router.push(`/p/${short}/b/${slug}`);
 }
 
@@ -88,27 +96,27 @@ async function signOut(): Promise<void> {
         </RouterLink>
 
         <button
-          v-if="p.boardCount > 1"
+          v-if="p.boards.length > 1"
           class="topitem topitem--caret"
           type="button"
           :aria-expanded="openShort === p.shortName"
           :aria-label="`Boards of ${p.name}`"
-          @click="toggleBoards(p.shortName)"
+          @click="openShort = openShort === p.shortName ? null : p.shortName"
         >
-          <span v-if="p.shortName === currentShort && board" class="topitem__board">{{ board.name }}</span>
+          <span class="topitem__board">{{ shownBoard(p)?.name }}</span>
           <span class="topitem__caret">▾</span>
         </button>
         <span
-          v-else-if="p.shortName === currentShort && board"
+          v-else-if="p.boards.length === 1"
           class="topitem topitem--caret topitem__board"
-        >{{ board.name }}</span>
+        >{{ p.boards[0].name }}</span>
 
         <div v-if="openShort === p.shortName" class="menu boardmenu" role="menu">
           <button
-            v-for="b in boardsByProject[p.shortName] ?? []"
+            v-for="b in p.boards"
             :key="b.id"
             class="menu__i"
-            :class="{ 'is-cur': p.shortName === currentShort && b.slug === currentSlug }"
+            :class="{ 'is-cur': b.slug === shownBoard(p)?.slug }"
             type="button"
             role="menuitem"
             @click="pickBoard(p.shortName, b.slug)"
