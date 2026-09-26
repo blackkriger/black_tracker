@@ -590,7 +590,7 @@ async function removeIssue(): Promise<void> {
                 <div>
                   <div class="cm__head">
                     <span class="cm__who">{{ c.author.login }}</span>
-                    <time class="stamp">{{ stamp(c.createdAt) }}</time>
+                    <time class="stamp">{{ stampAt(c.createdAt) }}</time>
                     <span v-if="c.editedAt" class="cm__edited">edited</span>
                     <svg
                       v-if="c.pinnedAt"
