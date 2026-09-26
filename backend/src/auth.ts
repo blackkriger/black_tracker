@@ -259,7 +259,7 @@ const passwordSchema = z.object({
 
 const TRIES_BEFORE_LOCK = 8;
 const LOCK_MS = 5 * 60 * 1000;
-const tries = new Map<string, { count: number; until: number }>();
+const tries = new Map<string, { count: number; until: number; seen: number }>();
 
 function attemptKey(req: FastifyRequest, login: string): string {
   return `${req.ip}|${login.toLowerCase()}`;
@@ -274,17 +274,18 @@ function lockedFor(key: string): number {
 }
 
 function noteFailure(key: string): void {
-  const row = tries.get(key) ?? { count: 0, until: 0 };
+  const row = tries.get(key) ?? { count: 0, until: 0, seen: 0 };
   row.count += 1;
   if (row.count >= TRIES_BEFORE_LOCK) {
     row.count = 0;
     row.until = Date.now() + LOCK_MS;
   }
+  row.seen = Date.now();
   tries.set(key, row);
-  // The map is keyed by address and login, so it is swept rather than left to grow on a stream of invented logins.
+  // Every entry ages out, not only the locked ones: a stream of invented logins would otherwise grow the map for ever.
   if (tries.size > 500) {
-    const now = Date.now();
-    for (const [k, v] of tries) if (v.until && v.until < now) tries.delete(k);
+    const stale = Date.now() - LOCK_MS;
+    for (const [k, v] of tries) if ((v.until || v.seen) < stale) tries.delete(k);
   }
 }
 

@@ -3,7 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
-import { sweepFilesOfIssues } from './issue-routes.js';
+import { filesOfIssues, sweepFiles } from './issue-routes.js';
 import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
 import { boardsOfProject, projectByShort } from './project-routes.js';
 import {
@@ -201,8 +201,10 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const doomed = await pool.query<{ id: string }>('select id from issues where board_id = $1', [
       id,
     ]);
+    const ids = doomed.rows.map((r) => r.id);
+    const paths = await filesOfIssues(ids);
     await pool.query('delete from boards where id = $1', [id]);
-    await sweepFilesOfIssues(doomed.rows.map((r) => r.id));
+    await sweepFiles(ids, paths);
     return reply.send({ data: { ok: true, issues: doomed.rowCount ?? 0 } });
   });
 

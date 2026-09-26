@@ -73,6 +73,8 @@ function mayHear(denied: Denials, event: LiveEvent): boolean {
 export async function publish(event: LiveEvent): Promise<void> {
   if (!clients.size) return;
   const line = `data: ${JSON.stringify({ ...event, at: new Date().toISOString() })}\n\n`;
+  // Listeners share roles, and a role's denials are the same for all of them: read once per role, not once per tab.
+  const perRole = new Map<string, Denials | null>();
   for (const [id, client] of clients) {
     // A socket can die without the close handler running — a write to it would be swallowed and the client would sit in the map for good.
     if (client.reply.raw.destroyed || client.reply.raw.writableEnded) {
@@ -80,8 +82,10 @@ export async function publish(event: LiveEvent): Promise<void> {
       continue;
     }
     let denied: Denials | null;
+    const roleKey = `${client.auth.userId}`;
     try {
-      denied = await denialsFresh(client);
+      if (!perRole.has(roleKey)) perRole.set(roleKey, await denialsFresh(client));
+      denied = perRole.get(roleKey) ?? null;
     } catch {
       // A blip reading the denials is not a reason to forget a listener: it keeps its stream and misses this one event.
       continue;
@@ -99,6 +103,8 @@ export async function publish(event: LiveEvent): Promise<void> {
 
 // Everything that is not an issue — a project renamed, a status added, a tag merged, an account switched off — is announced by one hook rather than by twenty handlers that would drift apart. The screens hear the noun and read their own data again; the issue routes say more about themselves because a card needs to know which field to light up.
 const TOPICS: [RegExp, string][] = [
+  // Boards and statuses live under a project's path, so they are matched before it.
+  [/^\/projects\/[^/]+\/boards/, 'board'],
   [/^\/projects/, 'project'],
   [/^\/boards\/[^/]+\/states/, 'state'],
   [/^\/states/, 'state'],
@@ -136,6 +142,10 @@ export function registerEventRoutes(app: FastifyInstance): void {
       Connection: 'keep-alive',
       // nginx honours this and stops buffering, which is what turns a stream into a stream.
       'X-Accel-Buffering': 'no',
+    });
+    // Without a listener, an error on a socket that died mid-write is unhandled and takes the process with it.
+    reply.raw.on('error', () => {
+      clients.delete(id);
     });
     reply.raw.write(': open\n\n');
 

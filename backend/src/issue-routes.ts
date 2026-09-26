@@ -15,7 +15,7 @@ import { publish, tabOf } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
 
-// What may be shown in the browser rather than saved to disk. The list is deliberately short: the type an upload claims is the uploader's word, and anything that can carry script — html, svg — would run on our own origin, where the session cookie lives. Everything else is handed over as a download with the type stripped.
+// What may be shown in the browser rather than saved to disk. The list is deliberately short: the type an upload claims is the uploader's word, and anything that can carry script — html, svg, pdf — would run on our own origin, where the session cookie lives. Everything else is handed over as a download with the type stripped.
 const INLINE_TYPES = new Set([
   'image/png',
   'image/jpeg',
@@ -24,7 +24,6 @@ const INLINE_TYPES = new Set([
   'image/avif',
   'video/mp4',
   'video/webm',
-  'application/pdf',
 ]);
 
 interface IssueRow {
@@ -169,6 +168,12 @@ async function mayOpenBoard(auth: Auth, boardId: string, projectId: string): Pro
   return !denied.everything && !denied.boards.has(boardId) && !denied.projects.has(projectId);
 }
 
+/** The same question `loadIssueFor` asks, for routes that start from a comment or a file rather than from the issue. */
+async function mayReachIssue(auth: Auth, issueId: string): Promise<boolean> {
+  const host = await issueById(issueId);
+  return !!host && (await mayOpenBoard(auth, host.board_id, host.project_id));
+}
+
 async function loadIssueFor(
   req: FastifyRequest,
   reply: FastifyReply,
@@ -223,17 +228,24 @@ const issuePatch = z.object({
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
-// Rows go with their issue through the foreign keys; the bytes on disk are ours to sweep, whether one issue is deleted or a whole project's worth.
-export async function sweepFilesOfIssues(issueIds: string[]): Promise<void> {
-  if (!issueIds.length) return;
-  const files = await pool.query<{ storage_path: string }>(
+// Where the bytes are. This has to be asked before the issues are deleted: the rows cascade away with them, and afterwards nothing remembers the paths.
+export async function filesOfIssues(issueIds: string[]): Promise<string[]> {
+  if (!issueIds.length) return [];
+  const res = await pool.query<{ storage_path: string }>(
     'select storage_path from issue_attachments where issue_id = any($1::uuid[])',
     [issueIds]
   );
-  await Promise.all(files.rows.map((f) => unlink(f.storage_path).catch(() => {})));
+  return res.rows.map((r) => r.storage_path);
+}
+
+// Rows go with their issue through the foreign keys; the bytes on disk are ours to sweep, whether one issue is deleted or a whole project's worth.
+export async function sweepFiles(issueIds: string[], paths: string[]): Promise<void> {
+  await Promise.all(paths.map((p) => unlink(p).catch(() => {})));
   // Each issue keeps its own folder, which is empty once its files are gone.
   await Promise.all(
-    issueIds.map((id) => rm(path.join(env.uploadDir, id), { recursive: true, force: true }).catch(() => {}))
+    issueIds.map((id) =>
+      rm(path.join(env.uploadDir, id.toLowerCase()), { recursive: true, force: true }).catch(() => {})
+    )
   );
 }
 
@@ -678,8 +690,10 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!(await mayOpenBoard(auth, issue.board_id, issue.project_id))) {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
+    // Read before the delete: the rows go with the issue, and afterwards there is nothing left to look up.
+    const doomed = await filesOfIssues([id]);
     await pool.query('delete from issues where id = $1', [id]);
-    await sweepFilesOfIssues([id]);
+    await sweepFiles([id], doomed);
     void publish({
       type: 'issue.deleted',
       boardId: issue.board_id,
@@ -698,8 +712,10 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { q, exclude } = req.query as { q?: string; exclude?: string };
-    const term = (q ?? '').trim();
+    const term = (q ?? '').trim().slice(0, 100);
     if (!term) return reply.send({ data: [] });
+    // Junk in the query string is an empty search, not a five hundred.
+    const skip = exclude && /^[0-9a-fA-F-]{36}$/.test(exclude) ? exclude : null;
     const res = await pool.query<LinkRow>(
       `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
               s.name as state_name, s.color as state_color, p.short_name, b.slug
@@ -710,15 +726,17 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         where ($2::uuid is null or i.id <> $2)
           and (i.readable_id ilike $1 || '%' or i.summary ilike '%' || $1 || '%')
         order by (i.readable_id ilike $1 || '%') desc, i.updated_at desc
-        limit 20`,
-      [term, exclude ?? null]
+        limit 60`,
+      [term, skip]
     );
-    if (auth.isAdmin) return reply.send({ data: res.rows.map(publicLink) });
+    if (auth.isAdmin) return reply.send({ data: res.rows.slice(0, 20).map(publicLink) });
     const denied = await deniedFor(auth.roleId);
     if (denied.everything) return reply.send({ data: [] });
+    // Read wide, then cut: twenty rows the reader may open, rather than twenty rows of which some are hidden.
     return reply.send({
       data: res.rows
         .filter((r) => !denied.boards.has(r.board_id) && !denied.projects.has(r.project_id))
+        .slice(0, 20)
         .map(publicLink),
     });
   });
@@ -741,25 +759,28 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'That issue is not open to you.' });
     }
 
-    // The pair is stored in one order, which is what makes a second link between the same two impossible.
-    const [a, b] = [id, target.id].sort();
-    const done = await pool.query(
-      `insert into issue_links (a, b, created_by) values ($1, $2, $3)
-       on conflict do nothing`,
-      [a, b, found.auth.userId]
-    );
-    if (!done.rowCount) return reply.code(409).send({ error: 'These two are already linked.' });
-
-    // Both sides remember it, and both sides are told.
-    await writeHistory(pool, id, found.auth.userId, 'link added', null, target.readable_id);
-    await writeHistory(
-      pool,
-      target.id,
-      found.auth.userId,
-      'link added',
-      null,
-      found.issue.readable_id
-    );
+    // The pair is stored in one order, which is what makes a second link between the same two impossible. The ids are lower-cased first: the table's `a < b` check compares text, and a uuid written in capitals would sort the other way.
+    const [a, b] = [found.issue.id.toLowerCase(), target.id.toLowerCase()].sort();
+    const linked = await inTransaction(async (client) => {
+      const done = await client.query(
+        `insert into issue_links (a, b, created_by) values ($1, $2, $3)
+         on conflict do nothing`,
+        [a, b, found.auth.userId]
+      );
+      if (!done.rowCount) return false;
+      // Both sides remember it, in the same breath as the link itself.
+      await writeHistory(client, id, found.auth.userId, 'link added', null, target.readable_id);
+      await writeHistory(
+        client,
+        target.id,
+        found.auth.userId,
+        'link added',
+        null,
+        found.issue.readable_id
+      );
+      return true;
+    });
+    if (!linked) return reply.code(409).send({ error: 'These two are already linked.' });
     for (const side of [found.issue, target]) {
       void publish({
         type: 'issue.linked',
@@ -789,20 +810,24 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const { id, otherId } = req.params as { id: string; otherId: string };
     const found = await loadIssueFor(req, reply, id);
     if (!found) return;
-    const [a, b] = [id, otherId].sort();
     const other = await issueById(otherId);
-    const res = await pool.query('delete from issue_links where a = $1 and b = $2', [a, b]);
-    if (!res.rowCount) return reply.code(404).send({ error: 'They are not linked.' });
-    if (other) {
-      await writeHistory(pool, id, found.auth.userId, 'link removed', null, other.readable_id);
+    const [a, b] = [found.issue.id.toLowerCase(), (other?.id ?? otherId).toLowerCase()].sort();
+    const res = await inTransaction(async (client) => {
+      const gone = await client.query('delete from issue_links where a = $1 and b = $2', [a, b]);
+      if (!gone.rowCount || !other) return gone;
+      await writeHistory(client, id, found.auth.userId, 'link removed', null, other.readable_id);
       await writeHistory(
-        pool,
+        client,
         other.id,
         found.auth.userId,
         'link removed',
         null,
         found.issue.readable_id
       );
+      return gone;
+    });
+    if (!res.rowCount) return reply.code(404).send({ error: 'They are not linked.' });
+    if (other) {
       for (const side of [found.issue, other]) {
         void publish({
           type: 'issue.linked',
@@ -921,6 +946,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id]
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
+    if (!(await mayReachIssue(session, owner.rows[0].issue_id))) {
+      return reply.code(403).send({ error: 'This issue is not open to you.' });
+    }
     // Editing is the author's alone: an admin can delete what should not stand, but not put words in someone's mouth.
     if (owner.rows[0].author_id !== session.userId) {
       return reply.code(403).send({ error: 'Only the author can edit a comment.' });
@@ -955,6 +983,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id]
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
+    if (!(await mayReachIssue(auth, owner.rows[0].issue_id))) {
+      return reply.code(403).send({ error: 'This issue is not open to you.' });
+    }
     const mine = owner.rows[0].author_id === auth.userId && auth.kind === 'session';
     if (!mine && !(await requireDeleter(req, reply))) return;
     const files = await pool.query<{ storage_path: string }>(
@@ -994,12 +1025,17 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: 'Send a file.' });
 
-    const dir = path.join(env.uploadDir, id);
+    const dir = path.join(env.uploadDir, found.issue.id.toLowerCase());
     await mkdir(dir, { recursive: true });
     // The name on disk is ours, not the one it arrived with: two screenshots called image.png do not collide, and nothing in the name can point out of the folder.
     const ext = path.extname(file.filename).slice(0, 12).replace(/[^a-zA-Z0-9.]/g, '');
     const stored = path.join(dir, `${randomUUID()}${ext}`);
-    await pipeline(file.file, createWriteStream(stored));
+    try {
+      await pipeline(file.file, createWriteStream(stored));
+    } catch (err) {
+      await unlink(stored).catch(() => {});
+      throw err;
+    }
     if (file.file.truncated) {
       await unlink(stored).catch(() => {});
       return reply.code(413).send({ error: '10mb max for file' });
@@ -1084,6 +1120,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     ]);
     const row = res.rows[0];
     if (!row) return reply.code(404).send({ error: 'No such file.' });
+    if (!(await mayReachIssue(auth, row.issue_id))) {
+      return reply.code(403).send({ error: 'This file is not open to you.' });
+    }
     const mine = row.uploaded_by === auth.userId;
     if (!mine && !(await requireDeleter(req, reply))) return;
     await pool.query('delete from issue_attachments where id = $1', [id]);
