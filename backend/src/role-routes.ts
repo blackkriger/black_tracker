@@ -1,8 +1,8 @@
-// Roles — dev, artist, game designer, whatever the team calls itself. They are rows people create, they carry a colour nobody picks by hand, and they are worn, not obeyed: `users.is_admin` is still the only right the code checks. Reading them is open to everyone signed in; making and unmaking them is an admin's job, the same rule tags and statuses follow.
+// Roles — dev, artist, game designer, whatever the team calls itself. They are rows people create, they carry a colour nobody picks by hand, and board access hangs off them: a board is closed to a role, and whoever wears that role cannot open it. `users.is_admin` stays outside all of it — the creator's own key, held in the database and never handed out by a screen. Reading roles is open to everyone signed in; making and unmaking them is an admin's job, the same rule tags and statuses follow.
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { pool } from './db.js';
+import { inTransaction, pool } from './db.js';
 import { requireAdmin, requireAuth } from './auth.js';
 import { pickColor } from './colors.js';
 
@@ -60,6 +60,41 @@ export function registerRoleRoutes(app: FastifyInstance): void {
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'No such role.' });
     return reply.send({ data: publicRole(res.rows[0]) });
+  });
+
+  // Which boards this role cannot open, and the whole list written back at once. A role with nothing denied opens everything, and so does anyone wearing no role.
+  app.get('/roles/:id/access', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const { id } = req.params as { id: string };
+    const res = await pool.query<{ board_id: string }>(
+      'select board_id from board_denials where role_id = $1',
+      [id]
+    );
+    return reply.send({ data: { deniedBoards: res.rows.map((r) => r.board_id) } });
+  });
+
+  app.put('/roles/:id/access', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const { id } = req.params as { id: string };
+    const parsed = z
+      .object({ deniedBoards: z.array(z.string().uuid()).max(500) })
+      .safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Send the list of board ids.' });
+    if (!(await pool.query('select 1 from roles where id = $1', [id])).rowCount) {
+      return reply.code(404).send({ error: 'No such role.' });
+    }
+    await inTransaction(async (client) => {
+      await client.query('delete from board_denials where role_id = $1', [id]);
+      if (parsed.data.deniedBoards.length) {
+        await client.query(
+          `insert into board_denials (board_id, role_id)
+           select b, $1 from unnest($2::uuid[]) as b
+           on conflict do nothing`,
+          [id, parsed.data.deniedBoards]
+        );
+      }
+    });
+    return reply.send({ data: { deniedBoards: parsed.data.deniedBoards } });
   });
 
   // Whoever wore it simply stops wearing one — the column is nulled by the foreign key.

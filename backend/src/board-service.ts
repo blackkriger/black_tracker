@@ -97,17 +97,17 @@ export async function createBoardWithDefaults(
   return withDefault.rows[0];
 }
 
-// Who is shut out of which board. Access is a denial list, so a board missing from the answer is open to everyone.
+// Which roles are shut out of which board. Access is a denial list, so a board missing from the answer is open to everyone — including anyone wearing no role at all.
 export async function denialsFor(boardIds: string[]): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
   if (!boardIds.length) return out;
-  const res = await pool.query<{ board_id: string; user_id: string }>(
-    'select board_id, user_id from board_denials where board_id = any($1::uuid[])',
+  const res = await pool.query<{ board_id: string; role_id: string }>(
+    'select board_id, role_id from board_denials where board_id = any($1::uuid[])',
     [boardIds]
   );
   for (const row of res.rows) {
     const list = out.get(row.board_id) ?? [];
-    list.push(row.user_id);
+    list.push(row.role_id);
     out.set(row.board_id, list);
   }
   return out;
@@ -123,7 +123,7 @@ export const publicState = (r: StateRow) => ({
   color: r.color,
 });
 
-export const publicBoard = (r: BoardRow, states: StateRow[] = [], deniedTo: string[] = []) => ({
+export const publicBoard = (r: BoardRow, states: StateRow[] = [], deniedRoles: string[] = []) => ({
   id: r.id,
   projectId: r.project_id,
   name: r.name,
@@ -131,6 +131,6 @@ export const publicBoard = (r: BoardRow, states: StateRow[] = [], deniedTo: stri
   defaultStateId: r.default_state_id,
   position: r.position,
   states: states.map(publicState),
-  /** Who cannot see it. Settings screens read this; everyone else only ever gets boards they may open. */
-  deniedTo,
+  /** The roles that cannot see it. Settings screens read this; everyone else only ever gets boards they may open. */
+  deniedRoles,
 });

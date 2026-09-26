@@ -15,8 +15,10 @@ const LAST_SEEN_THROTTLE_MS = 15 * 60 * 1000;
 export interface Auth {
   userId: string;
   login: string;
-  /** May change how the tracker is set up: projects, statuses, tags, accounts. Proper roles come later as rows people create. */
+  /** The creator's own key: may change how the tracker is set up, and is kept out of every board denial. Held in the database, never handed out by a screen. */
   isAdmin: boolean;
+  /** What they are on the team. Board access is denied to roles, so this is what a denial is checked against. */
+  roleId: string | null;
   /** How the caller proved who they are. Comment routes accept 'session' only. */
   kind: 'session' | 'token';
 }
@@ -139,21 +141,36 @@ async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
   if (header?.startsWith('Bearer ')) {
     const raw = header.slice(7).trim();
     if (!raw) return null;
-    const res = await pool.query<{ id: string; login: string; is_admin: boolean }>(
-      `select id, login, is_admin from users where api_token_hash = $1 and active`,
-      [hashToken(raw)]
-    );
+    const res = await pool.query<{
+      id: string;
+      login: string;
+      is_admin: boolean;
+      role_id: string | null;
+    }>(`select id, login, is_admin, role_id from users where api_token_hash = $1 and active`, [
+      hashToken(raw),
+    ]);
     const row = res.rows[0];
     if (!row) return null;
     touchLastSeen(row.id);
     touchTokenUse(row.id);
-    return { userId: row.id, login: row.login, isAdmin: row.is_admin, kind: 'token' };
+    return {
+      userId: row.id,
+      login: row.login,
+      isAdmin: row.is_admin,
+      roleId: row.role_id,
+      kind: 'token',
+    };
   }
 
   const cookie = req.cookies?.[SESSION_COOKIE];
   if (!cookie) return null;
-  const res = await pool.query<{ id: string; login: string; is_admin: boolean }>(
-    `select u.id, u.login, u.is_admin
+  const res = await pool.query<{
+    id: string;
+    login: string;
+    is_admin: boolean;
+    role_id: string | null;
+  }>(
+    `select u.id, u.login, u.is_admin, u.role_id
        from sessions s
        join users u on u.id = s.user_id and u.active
       where s.token = $1 and s.expires_at > now()`,
@@ -162,7 +179,13 @@ async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
   const row = res.rows[0];
   if (!row) return null;
   touchLastSeen(row.id);
-  return { userId: row.id, login: row.login, isAdmin: row.is_admin, kind: 'session' };
+  return {
+    userId: row.id,
+    login: row.login,
+    isAdmin: row.is_admin,
+    roleId: row.role_id,
+    kind: 'session',
+  };
 }
 
 export async function requireAuth(

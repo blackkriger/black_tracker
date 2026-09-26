@@ -8,10 +8,7 @@ export interface TagItem {
   color: string;
 }
 
-// The same labels serve tags and roles, so the one thing that differs — what the add field calls them — comes in from outside.
-withDefaults(defineProps<{ tags: TagItem[]; addPlaceholder?: string }>(), {
-  addPlaceholder: 'Add tag…',
-});
+defineProps<{ tags: TagItem[] }>();
 const emit = defineEmits<{
   (e: 'add', name: string): void;
   (e: 'rename', tag: TagItem, name: string): void;
@@ -62,7 +59,7 @@ function add(): void {
   </div>
 
   <form class="addrow" @submit.prevent="add">
-    <input v-model="fresh" class="input" :placeholder="addPlaceholder" maxlength="40" />
+    <input v-model="fresh" class="input" placeholder="Add tag…" maxlength="40" />
     <button class="btn" type="submit" :disabled="!fresh.trim()">Add</button>
   </form>
 </template>

@@ -3,13 +3,16 @@
 import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
-import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
 import { useProjects } from '../../lib/projects';
 import { useSession } from '../../lib/session';
 
-interface Role extends TagItem {}
+interface Role {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface User {
   id: string;
@@ -49,7 +52,8 @@ const inviteBusy = ref(false);
 const freshLink = ref<string | null>(null);
 const copied = ref(false);
 
-const accessFor = ref<User | null>(null);
+const newRole = ref('');
+const accessFor = ref<Role | null>(null);
 const denied = ref<string[]>([]);
 const accessBusy = ref(false);
 
@@ -93,16 +97,20 @@ async function patchUser(u: User, body: Record<string, unknown>): Promise<void> 
   }
 }
 
-async function addRole(name: string): Promise<void> {
+async function addRole(): Promise<void> {
+  const name = newRole.value.trim();
+  if (!name) return;
   error.value = null;
   try {
     roles.value = [...roles.value, await api<Role>('/roles', { method: 'POST', body: { name } })];
+    newRole.value = '';
   } catch (err) {
     report(err);
   }
 }
 
-async function renameRole(role: TagItem, name: string): Promise<void> {
+async function renameRole(role: Role, name: string): Promise<void> {
+  if (!name.trim() || name === role.name) return;
   error.value = null;
   try {
     const updated = await api<Role>(`/roles/${role.id}`, { method: 'PATCH', body: { name } });
@@ -170,11 +178,11 @@ async function revokeInvite(i: Invite): Promise<void> {
   }
 }
 
-async function openAccess(u: User): Promise<void> {
-  accessFor.value = u;
+async function openAccess(role: Role): Promise<void> {
+  accessFor.value = role;
   denied.value = [];
   try {
-    const res = await api<{ deniedBoards: string[] }>(`/users/${u.id}/access`);
+    const res = await api<{ deniedBoards: string[] }>(`/roles/${role.id}/access`);
     denied.value = res.deniedBoards;
   } catch (err) {
     report(err);
@@ -188,12 +196,12 @@ function toggleBoard(boardId: string, allowed: boolean): void {
 }
 
 async function saveAccess(): Promise<void> {
-  const u = accessFor.value;
-  if (!u || accessBusy.value) return;
+  const role = accessFor.value;
+  if (!role || accessBusy.value) return;
   accessBusy.value = true;
   error.value = null;
   try {
-    await api(`/users/${u.id}/access`, { method: 'PUT', body: { deniedBoards: denied.value } });
+    await api(`/roles/${role.id}/access`, { method: 'PUT', body: { deniedBoards: denied.value } });
     accessFor.value = null;
   } catch (err) {
     report(err);
@@ -218,7 +226,6 @@ async function saveAccess(): Promise<void> {
               <th class="c-flag">Active</th>
               <th class="c-when">Joined</th>
               <th class="c-when">Last seen</th>
-              <th class="c-act"><span class="sr">Access</span></th>
             </tr>
           </thead>
           <tbody>
@@ -255,9 +262,6 @@ async function saveAccess(): Promise<void> {
               </td>
               <td class="stamp">{{ stamp(u.createdAt) }}</td>
               <td class="stamp">{{ stamp(u.lastSeenAt) || '—' }}</td>
-              <td class="c-act">
-                <button class="btn btn--sm" type="button" @click="openAccess(u)">Access…</button>
-              </td>
             </tr>
           </tbody>
         </table>
@@ -268,15 +272,48 @@ async function saveAccess(): Promise<void> {
 
     <section class="panel sheet__wide">
       <header class="panel__h">Roles</header>
-      <div class="panel__b">
-        <div v-if="!roles.length" class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
-        <TagLabels
-          :tags="roles"
-          add-placeholder="Add role…"
-          @add="addRole"
-          @rename="renameRole"
-          @remove="removingRole = $event"
-        />
+      <div class="panel__table">
+        <table v-if="roles.length" class="tbl">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th class="c-act2">Boards</th>
+              <th class="c-del"><span class="sr">Delete</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in roles" :key="r.id">
+              <td>
+                <input
+                  class="input input--sm role-name"
+                  :value="r.name"
+                  :style="{ color: r.color }"
+                  maxlength="40"
+                  @change="renameRole(r, ($event.target as HTMLInputElement).value)"
+                />
+              </td>
+              <td class="c-act2">
+                <button class="btn btn--sm" type="button" @click="openAccess(r)">Access…</button>
+              </td>
+              <td class="c-del">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  aria-label="Delete role"
+                  @click="removingRole = r"
+                >
+                  ✕
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
+
+        <form class="addrow" @submit.prevent="addRole">
+          <input v-model="newRole" class="input" placeholder="Add role…" maxlength="40" />
+          <button class="btn" type="submit" :disabled="!newRole.trim()">Add</button>
+        </form>
       </div>
     </section>
 
@@ -360,7 +397,7 @@ async function saveAccess(): Promise<void> {
 
     <Dialog
       v-if="accessFor"
-      :title="`Access — ${accessFor.fullName || accessFor.login}`"
+      :title="`Access — ${accessFor.name}`"
       :width="420"
       @close="accessFor = null"
     >
@@ -420,9 +457,16 @@ async function saveAccess(): Promise<void> {
 .c-when {
   width: 120px;
 }
-.c-act {
+.c-act2 {
   width: 92px;
+}
+.c-del {
+  width: 44px;
   text-align: right;
+}
+.role-name {
+  width: 100%;
+  font-weight: 500;
 }
 .link__row {
   display: flex;

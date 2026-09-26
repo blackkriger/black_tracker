@@ -84,7 +84,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     // An admin manages access, so they see every board and who is shut out; anyone else is simply not handed the boards they cannot open.
     const visible = auth.isAdmin
       ? rows
-      : rows.filter((r) => !(denials.get(r.id) ?? []).includes(auth.userId));
+      : rows.filter((r) => !auth.roleId || !(denials.get(r.id) ?? []).includes(auth.roleId));
     return reply.send({
       data: visible.map((r) =>
         publicBoard(r, statesByBoard.get(r.id) ?? [], auth.isAdmin ? denials.get(r.id) ?? [] : [])
@@ -99,7 +99,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const board = await boardById(id);
     if (!board) return reply.code(404).send({ error: 'No such board.' });
     const denials = await denialsFor([id]);
-    if (!auth.isAdmin && (denials.get(id) ?? []).includes(auth.userId)) {
+    if (!auth.isAdmin && auth.roleId && (denials.get(id) ?? []).includes(auth.roleId)) {
       return reply.code(403).send({ error: 'This board is not open to you.' });
     }
     return reply.send({
@@ -295,20 +295,22 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   app.put('/boards/:id/access', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
-    const parsed = z.object({ deniedTo: z.array(z.string().uuid()).max(100) }).safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: 'Send the list of user ids.' });
+    const parsed = z
+      .object({ deniedRoles: z.array(z.string().uuid()).max(100) })
+      .safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Send the list of role ids.' });
     if (!(await boardById(id))) return reply.code(404).send({ error: 'No such board.' });
     await inTransaction(async (client) => {
       await client.query('delete from board_denials where board_id = $1', [id]);
-      if (parsed.data.deniedTo.length) {
+      if (parsed.data.deniedRoles.length) {
         await client.query(
-          `insert into board_denials (board_id, user_id)
-           select $1, u from unnest($2::uuid[]) as u
+          `insert into board_denials (board_id, role_id)
+           select $1, r from unnest($2::uuid[]) as r
            on conflict do nothing`,
-          [id, parsed.data.deniedTo]
+          [id, parsed.data.deniedRoles]
         );
       }
     });
-    return reply.send({ data: { deniedTo: parsed.data.deniedTo } });
+    return reply.send({ data: { deniedRoles: parsed.data.deniedRoles } });
   });
 }

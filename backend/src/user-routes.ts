@@ -2,7 +2,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { inTransaction, pool } from './db.js';
+import { pool } from './db.js';
 import { USER_SELECT, hashPassword, publicUser, requireAdmin, userById } from './auth.js';
 
 // What it takes to become an account, wherever the account comes from: an admin filling this in, or someone filling it in themselves behind an invite link.
@@ -91,41 +91,6 @@ export function registerUserRoutes(app: FastifyInstance): void {
     // Switching an account off has to end its sessions, or the tab it is open in keeps working until the cookie expires.
     if (p.active === false) await pool.query('delete from sessions where user_id = $1', [id]);
     return reply.send({ data: publicUser(row as NonNullable<typeof row>) });
-  });
-
-  // Which boards this person cannot open. Access is a denial list, so an empty answer means every board is theirs.
-  app.get('/users/:id/access', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
-    const { id } = req.params as { id: string };
-    const res = await pool.query<{ board_id: string }>(
-      'select board_id from board_denials where user_id = $1',
-      [id]
-    );
-    return reply.send({ data: { deniedBoards: res.rows.map((r) => r.board_id) } });
-  });
-
-  app.put('/users/:id/access', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
-    const { id } = req.params as { id: string };
-    const parsed = z
-      .object({ deniedBoards: z.array(z.string().uuid()).max(500) })
-      .safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: 'Send the list of board ids.' });
-    if (!(await pool.query('select 1 from users where id = $1', [id])).rowCount) {
-      return reply.code(404).send({ error: 'No such account.' });
-    }
-    await inTransaction(async (client) => {
-      await client.query('delete from board_denials where user_id = $1', [id]);
-      if (parsed.data.deniedBoards.length) {
-        await client.query(
-          `insert into board_denials (board_id, user_id)
-           select b, $1 from unnest($2::uuid[]) as b
-           on conflict do nothing`,
-          [id, parsed.data.deniedBoards]
-        );
-      }
-    });
-    return reply.send({ data: { deniedBoards: parsed.data.deniedBoards } });
   });
 
   // An admin setting a password for someone else: the person changes it themselves from their profile, this is for handing out the first one and for rescues.
