@@ -26,6 +26,7 @@ interface InviteRow {
   created_at: Date;
   expires_at: Date;
   used_at: Date | null;
+  revoked_at: Date | null;
   created_by_login: string | null;
   used_by_login: string | null;
 }
@@ -43,11 +44,18 @@ const publicInvite = (r: InviteRow) => ({
   expiresAt: r.expires_at.toISOString(),
   usedAt: r.used_at?.toISOString() ?? null,
   usedBy: r.used_by_login,
-  status: r.used_at ? 'used' : r.expires_at.getTime() < Date.now() ? 'expired' : 'pending',
+  revokedAt: r.revoked_at?.toISOString() ?? null,
+  status: r.used_at
+    ? 'used'
+    : r.revoked_at
+      ? 'revoked'
+      : r.expires_at.getTime() < Date.now()
+        ? 'expired'
+        : 'pending',
 });
 
 const LIST_SQL = `
-  select i.id, i.hint, i.is_admin, i.created_at, i.expires_at, i.used_at,
+  select i.id, i.hint, i.is_admin, i.created_at, i.expires_at, i.used_at, i.revoked_at,
          i.role_id, r.name as role_name, r.color as role_color,
          c.login as created_by_login, u.login as used_by_login
     from invites i
@@ -88,12 +96,22 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     return reply.code(201).send({ data: { ...publicInvite(res.rows[0]), token: raw } });
   });
 
-  app.delete('/invites/:id', async (req, reply) => {
+  // Nothing about an invite is deleted: the row is how we know who came in by which link. Revoking kills the link and leaves the record standing.
+  app.post('/invites/:id/revoke', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
-    const res = await pool.query('delete from invites where id = $1', [id]);
-    if (!res.rowCount) return reply.code(404).send({ error: 'No such invite.' });
-    return reply.send({ data: { ok: true } });
+    const res = await pool.query(
+      'update invites set revoked_at = now() where id = $1 and used_at is null and revoked_at is null',
+      [id]
+    );
+    if (!res.rowCount) {
+      const exists = await pool.query('select 1 from invites where id = $1', [id]);
+      return exists.rowCount
+        ? reply.code(409).send({ error: 'That link is already used or revoked.' })
+        : reply.code(404).send({ error: 'No such invite.' });
+    }
+    const row = await pool.query<InviteRow>(`${LIST_SQL} where i.id = $1`, [id]);
+    return reply.send({ data: publicInvite(row.rows[0]) });
   });
 
   // Open to anyone holding the link: the join screen asks before drawing its form.
@@ -101,7 +119,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     const { token } = req.params as { token: string };
     const res = await pool.query<{ is_admin: boolean }>(
       `select is_admin from invites
-        where token_hash = $1 and used_at is null and expires_at > now()`,
+        where token_hash = $1 and used_at is null and revoked_at is null and expires_at > now()`,
       [hashToken(token)]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'This invite link is no longer valid.' });
@@ -123,7 +141,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
       // Locked for the length of the transaction, so the same link opened in two tabs cannot make two accounts.
       const invite = await client.query<{ id: string; is_admin: boolean; role_id: string | null }>(
         `select id, is_admin, role_id from invites
-          where token_hash = $1 and used_at is null and expires_at > now()
+          where token_hash = $1 and used_at is null and revoked_at is null and expires_at > now()
           for update`,
         [hashToken(token)]
       );
