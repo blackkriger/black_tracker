@@ -119,10 +119,11 @@ async function signOut(): Promise<void> {
             >{{ b.name }}</button>
           </div>
         </span>
-        <span
+        <RouterLink
           v-else-if="p.boards.length === 1"
           class="topitem topitem--caret topitem__board"
-        >{{ p.boards[0].name }}</span>
+          :to="`/p/${p.shortName}/b/${p.boards[0].slug}`"
+        >{{ p.boards[0].name }}</RouterLink>
       </span>
     </nav>
 
