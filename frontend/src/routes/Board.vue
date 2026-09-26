@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
-import { dueLabel, priorityClass, type Issue } from '../lib/issues';
+import { PRIORITIES, dueLabel, priorityClass, type Issue } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { Plus } from 'lucide-vue-next';
@@ -53,6 +53,22 @@ const dropAt = ref<{ stateId: string; beforeId: string | null } | null>(null);
 
 // The column a new issue is being written into, if any.
 const creatingIn = ref<string | null>(null);
+
+// What the board is narrowed to. Nothing is remembered between visits — a filter is a way of looking at the board right now, not a setting.
+const byAssignee = ref('');
+const byAuthor = ref('');
+const byPriority = ref('');
+const people = ref<{ id: string; login: string; fullName: string }[]>([]);
+
+const filtered = computed(() =>
+  issues.value.filter(
+    (i) =>
+      (!byAssignee.value ||
+        (byAssignee.value === 'none' ? !i.assignee : i.assignee?.id === byAssignee.value)) &&
+      (!byAuthor.value || i.author?.id === byAuthor.value) &&
+      (!byPriority.value || i.priority === byPriority.value)
+  )
+);
 
 // Cards that changed under us a moment ago, lit until the animation is done.
 const fresh = ref<Set<string>>(new Set());
@@ -105,7 +121,7 @@ const current = computed(() => {
 const openKey = computed(() => String(route.params.key ?? ''));
 
 const issuesOf = (stateId: string): Issue[] =>
-  issues.value.filter((i) => i.stateId === stateId).sort((a, b) => a.position - b.position);
+  filtered.value.filter((i) => i.stateId === stateId).sort((a, b) => a.position - b.position);
 
 // `quiet` is for a board that is already on screen: a card moved by someone else must not collapse every column into skeletons.
 async function loadIssues(boardId: string, quiet = false): Promise<void> {
@@ -234,7 +250,12 @@ async function load(short: string, quiet = false): Promise<void> {
   }
 }
 
-onMounted(() => load(String(route.params.short)));
+onMounted(() => {
+  void load(String(route.params.short));
+  void api<{ id: string; login: string; fullName: string }[]>('/people')
+    .then((rows) => (people.value = rows))
+    .catch(() => {});
+});
 watch(
   () => route.params.short,
   (short) => {
@@ -247,7 +268,21 @@ watch(
   <div class="page">
     <TopBar :project="project" :board="current" />
 
-    <div v-if="tags.length" class="tagbar">
+    <div v-if="current" class="tagbar">
+      <select v-model="byAssignee" class="input input--sm filter" aria-label="Filter by assignee">
+        <option value="">Assignee</option>
+        <option value="none">Nobody</option>
+        <option v-for="p in people" :key="p.id" :value="p.id">{{ p.fullName || p.login }}</option>
+      </select>
+      <select v-model="byAuthor" class="input input--sm filter" aria-label="Filter by author">
+        <option value="">Author</option>
+        <option v-for="p in people" :key="p.id" :value="p.id">{{ p.fullName || p.login }}</option>
+      </select>
+      <select v-model="byPriority" class="input input--sm filter" aria-label="Filter by priority">
+        <option value="">Priority</option>
+        <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
+      </select>
+
       <span
         v-for="t in tags"
         :key="t.id"
@@ -259,14 +294,14 @@ watch(
     <div
       v-if="loading || error || !current"
       class="page__body"
-      :class="{ 'page__body--tags': tags.length }"
+      :class="{ 'page__body--tags': current }"
     >
       <p v-if="loading" class="hint">Loading…</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
       <div v-else-if="!current" class="empty"><span class="empty__g">◇</span>This project has no boards.</div>
     </div>
 
-    <div v-if="current" class="board" :class="{ 'board--tags': tags.length }">
+    <div v-if="current" class="board board--tags">
       <section
         v-for="s in current.states"
         :key="s.id"
@@ -369,6 +404,18 @@ watch(
 .page__body--tags,
 .board--tags {
   padding-top: 0;
+}
+/* A filter is as wide as what it says, and reads as one of the bar's own controls. */
+.filter {
+  width: auto;
+  height: 26px;
+  padding: 0 6px;
+  border-color: var(--line);
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.filter:hover {
+  color: var(--text);
 }
 .card {
   user-select: none;
