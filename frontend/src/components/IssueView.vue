@@ -8,7 +8,6 @@ import {
   PRIORITIES,
   dueLabel,
   fileSize,
-  priorityClass,
   stamp,
   stampAt,
   type Attachment,
@@ -489,8 +488,10 @@ async function removeIssue(): Promise<void> {
             </div>
             <div class="prop">
               <span class="prop__k">Due</span>
+              <!-- A date that has gone by says so by being red; there is no word for it anywhere else. -->
               <input
                 class="input input--sm"
+                :class="{ 'is-late': dueLabel(issue.dueDate)?.late }"
                 type="date"
                 :value="issue.dueDate ?? ''"
                 @change="patch({ dueDate: ($event.target as HTMLInputElement).value || null })"
@@ -537,15 +538,6 @@ async function removeIssue(): Promise<void> {
             <div class="prop">
               <span class="prop__k">Created</span>
               <span class="pv pv--ro stamp">{{ stamp(issue.createdAt) }}</span>
-            </div>
-            <div class="prop">
-              <span class="prop__k">Priority</span>
-              <span class="pv pv--ro">
-                <span class="prio prio-l" :class="priorityClass(issue.priority)">
-                  <i></i><i></i><i></i><i></i>
-                </span>
-                <span v-if="dueLabel(issue.dueDate)?.late" class="due due--late">late</span>
-              </span>
             </div>
           </aside>
         </div>
@@ -655,6 +647,9 @@ async function removeIssue(): Promise<void> {
   height: 56px;
   margin-top: 8px;
   cursor: pointer;
+}
+.is-late {
+  color: var(--danger-text);
 }
 .prop--tall {
   align-items: start;
