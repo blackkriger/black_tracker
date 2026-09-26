@@ -13,6 +13,9 @@ let quill: Quill | null = null;
 // Set while the editor itself is the source of a change, so the watcher below does not reset the caret on every keystroke.
 let fromEditor = false;
 
+// Quill says when it has the caret and when it has lost it; :focus-within would keep the ring after a click that focuses nothing.
+const focused = ref(false);
+
 const marks = ref({
   bold: false,
   italic: false,
@@ -52,7 +55,10 @@ onMounted(() => {
     body.value = clean(quill?.root.innerHTML ?? '');
     readMarks();
   });
-  quill.on('selection-change', readMarks);
+  quill.on('selection-change', (range) => {
+    focused.value = range !== null;
+    readMarks();
+  });
 });
 
 onBeforeUnmount(() => {
@@ -100,13 +106,20 @@ function addLink(): void {
       <button type="button" :aria-pressed="marks.blockquote" title="Quote" @click="toggle('blockquote')">"</button>
       <button type="button" title="Link" @click="addLink">↗</button>
     </div>
-    <div ref="host" class="rt__editor" :style="{ minHeight: minHeight ?? '120px' }"></div>
+    <div
+      ref="host"
+      class="rt__editor"
+      :class="{ 'is-focus': focused }"
+      :style="{ minHeight: minHeight ?? '120px' }"
+    ></div>
   </div>
 </template>
 
 <style scoped>
+/* The box is the frame; the editable part fills it, so a click anywhere inside lands in the text and not on a dead margin. */
 .rt__editor {
-  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line-2);
   background: var(--bg);
   color: var(--text);
@@ -114,12 +127,13 @@ function addLink(): void {
   overflow-y: auto;
   max-height: 340px;
 }
-.rt__editor:focus-within {
-  border-color: var(--line-2);
-  box-shadow: var(--focus-ring);
+.rt__editor.is-focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
 }
 .rt__editor :deep(.ql-editor) {
-  padding: 0;
+  flex: 1 1 auto;
+  padding: 10px 12px;
   outline: none;
 }
 .rt__editor :deep(.ql-editor.ql-blank::before) {

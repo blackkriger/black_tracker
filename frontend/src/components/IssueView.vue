@@ -790,7 +790,8 @@ async function removeIssue(): Promise<void> {
   resize: vertical;
 }
 /* The buttons belong to the field above them, not stuck to its edge. */
-.iv__body-edit + .composer__row {
+.iv__body-edit + .composer__row,
+.rt + .composer__row {
   margin-top: 8px;
 }
 /* The day and the clock ride together in the first column, so it is wider than the theme's default. */
