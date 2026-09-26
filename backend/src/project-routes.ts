@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { requireAdmin, requireAuth } from './auth.js';
+import { pickColor } from './colors.js';
 
 interface ProjectRow {
   id: string;
@@ -46,8 +47,6 @@ const publicState = (r: StateRow) => ({
   color: r.color,
 });
 
-const COLOR = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Colour must be #rrggbb');
-
 const projectCreate = z.object({
   // The short name rides in every issue key, so it is upper-case, short and free of anything that would need escaping in a URL.
   shortName: z.string().trim().min(1).max(20).regex(/^[A-Z][A-Z0-9]*$/, 'Use upper-case letters and digits, e.g. PROJ'),
@@ -65,14 +64,12 @@ const projectPatch = z.object({
 
 const stateCreate = z.object({
   name: z.string().trim().min(1).max(60),
-  color: COLOR.optional(),
   isOpen: z.boolean().optional(),
   isResolved: z.boolean().optional(),
 });
 
 const statePatch = z.object({
   name: z.string().trim().min(1).max(60).optional(),
-  color: COLOR.optional(),
   isOpen: z.boolean().optional(),
   isResolved: z.boolean().optional(),
   position: z.number().int().min(0).optional(),
@@ -226,11 +223,15 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     if (!project) return reply.code(404).send({ error: 'No such project.' });
     const p = parsed.data;
     try {
+      const taken = await pool.query<{ color: string }>(
+        'select color from states where project_id = $1',
+        [project.id]
+      );
       const res = await pool.query<StateRow>(
         `insert into states (project_id, name, position, is_open, is_resolved, color)
          values ($1, $2, (select coalesce(max(position), -1) + 1 from states where project_id = $1), $3, $4, $5)
          returning *`,
-        [project.id, p.name, p.isOpen ?? true, p.isResolved ?? false, p.color ?? '#71767b']
+        [project.id, p.name, p.isOpen ?? true, p.isResolved ?? false, pickColor(taken.rows.map((r) => r.color))]
       );
       return reply.code(201).send({ data: publicState(res.rows[0]) });
     } catch (err) {
@@ -252,13 +253,12 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const res = await pool.query<StateRow>(
       `update states
           set name = coalesce($2, name),
-              color = coalesce($3, color),
-              is_open = coalesce($4, is_open),
-              is_resolved = coalesce($5, is_resolved),
-              position = coalesce($6, position)
+              is_open = coalesce($3, is_open),
+              is_resolved = coalesce($4, is_resolved),
+              position = coalesce($5, position)
         where id = $1
         returning *`,
-      [id, p.name ?? null, p.color ?? null, p.isOpen ?? null, p.isResolved ?? null, p.position ?? null]
+      [id, p.name ?? null, p.isOpen ?? null, p.isResolved ?? null, p.position ?? null]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'No such status.' });
     return reply.send({ data: publicState(res.rows[0]) });

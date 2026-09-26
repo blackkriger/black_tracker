@@ -3,7 +3,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
-import ColorSwatch from '../../components/ColorSwatch.vue';
+import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
 
 import { useProjects } from '../../lib/projects';
@@ -30,11 +30,8 @@ interface Board {
   name: string;
   position: number;
 }
-interface Tag {
-  id: string;
+interface Tag extends TagItem {
   projectId: string | null;
-  name: string;
-  color: string;
 }
 
 const route = useRoute();
@@ -219,33 +216,29 @@ async function deleteBoard(b: Board): Promise<void> {
 }
 
 // ── tags ─────────────────────────────────────────────────────────
-const newTag = ref('');
-
-async function addTag(): Promise<void> {
-  const value = newTag.value.trim();
-  if (!value || !project.value) return;
+async function addTag(name: string): Promise<void> {
+  if (!project.value) return;
   try {
     const created = await api<Tag>('/tags', {
       method: 'POST',
-      body: { name: value, project: project.value.shortName },
+      body: { name, project: project.value.shortName },
     });
     tags.value = [...tags.value, created];
-    newTag.value = '';
   } catch (err) {
     report(err);
   }
 }
 
-async function patchTag(t: Tag, patch: Partial<Tag>): Promise<void> {
+async function renameTag(t: TagItem, name: string): Promise<void> {
   try {
-    const updated = await api<Tag>(`/tags/${t.id}`, { method: 'PATCH', body: patch });
+    const updated = await api<Tag>(`/tags/${t.id}`, { method: 'PATCH', body: { name } });
     tags.value = tags.value.map((row) => (row.id === t.id ? updated : row));
   } catch (err) {
     report(err);
   }
 }
 
-async function deleteTag(t: Tag): Promise<void> {
+async function deleteTag(t: TagItem): Promise<void> {
   try {
     await api(`/tags/${t.id}`, { method: 'DELETE' });
     tags.value = tags.value.filter((row) => row.id !== t.id);
@@ -304,7 +297,7 @@ async function deleteTag(t: Tag): Promise<void> {
               <thead>
                 <tr>
                   <th class="c-grip"><span class="sr">Order</span></th>
-                  <th class="c-color">Color</th>
+                  <th class="c-color"><span class="sr">Color</span></th>
                   <th>Name</th>
                   <th class="c-flag">Open</th>
                   <th class="c-flag">Resolved</th>
@@ -321,12 +314,7 @@ async function deleteTag(t: Tag): Promise<void> {
                   @drop.prevent="onDrop(s)"
                 >
                   <td class="c-grip grip">⠿</td>
-                  <td>
-                    <ColorSwatch
-                      :model-value="s.color"
-                      @update:model-value="patchStatus(s, { color: $event })"
-                    />
-                  </td>
+                  <td class="c-color"><span class="dot" :style="{ background: s.color }"></span></td>
                   <td>
                     <input
                       class="input input--sm"
@@ -401,32 +389,9 @@ async function deleteTag(t: Tag): Promise<void> {
 
           <section class="panel">
             <header class="panel__h">Tags<span class="panel__end">{{ project.shortName }} only</span></header>
-            <div class="panel__table">
-              <table class="tbl">
-                <tbody>
-                  <tr v-for="t in projectTags" :key="t.id">
-                    <td class="c-color"><span class="dot" :style="{ background: t.color }"></span></td>
-                    <td>
-                      <input
-                        class="input input--sm"
-                        :value="t.name"
-                        maxlength="40"
-                        @change="patchTag(t, { name: ($event.target as HTMLInputElement).value })"
-                      />
-                    </td>
-                    <td class="c-del">
-                      <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Delete tag" @click="deleteTag(t)">
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="panel__b">
               <div v-if="!projectTags.length" class="empty empty--sm"><span class="empty__g">◇</span>No tags yet.</div>
-              <form class="addrow" @submit.prevent="addTag">
-                <input v-model="newTag" class="input input--sm" placeholder="Add tag…" maxlength="40" />
-                <button class="btn btn--sm" type="submit" :disabled="!newTag.trim()">Add</button>
-              </form>
+              <TagLabels :tags="projectTags" @add="addTag" @rename="renameTag" @remove="deleteTag" />
             </div>
           </section>
         </div>
