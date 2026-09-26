@@ -8,6 +8,8 @@ import { useProjects } from '../../lib/projects';
 
 interface Tag extends TagItem {
   projectId: string | null;
+  /** The server folded this name into one tag usable everywhere, because it already lived on another project. */
+  merged?: boolean;
 }
 
 const { projects, load: loadProjects } = useProjects();
@@ -15,6 +17,11 @@ const { projects, load: loadProjects } = useProjects();
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const notice = ref<string | null>(null);
+
+async function reload(): Promise<void> {
+  tags.value = await api<Tag[]>('/tags');
+}
 
 const globalTags = computed(() => tags.value.filter((t) => t.projectId === null));
 const tagsOf = (projectId: string) => tags.value.filter((t) => t.projectId === projectId);
@@ -35,11 +42,19 @@ function report(err: unknown): void {
 }
 
 async function add(name: string, project?: string): Promise<void> {
+  error.value = null;
+  notice.value = null;
   try {
     const created = await api<Tag>('/tags', {
       method: 'POST',
       body: project ? { name, project } : { name },
     });
+    // A merge moves rows around — one tag becomes global and its twins are gone — so the list is read again rather than patched.
+    if (created.merged) {
+      notice.value = `${created.name} already existed on another project, so it is one tag now, usable everywhere.`;
+      await reload();
+      return;
+    }
     tags.value = [...tags.value, created];
   } catch (err) {
     report(err);
@@ -47,8 +62,15 @@ async function add(name: string, project?: string): Promise<void> {
 }
 
 async function rename(tag: TagItem, name: string): Promise<void> {
+  error.value = null;
+  notice.value = null;
   try {
     const updated = await api<Tag>(`/tags/${tag.id}`, { method: 'PATCH', body: { name } });
+    if (updated.merged) {
+      notice.value = `${updated.name} already existed on another project, so it is one tag now, usable everywhere.`;
+      await reload();
+      return;
+    }
     tags.value = tags.value.map((row) => (row.id === tag.id ? updated : row));
   } catch (err) {
     report(err);
@@ -68,6 +90,7 @@ async function remove(tag: TagItem): Promise<void> {
 <template>
   <SettingsLayout>
     <div v-if="error" class="err sheet__wide">{{ error }}</div>
+    <p v-if="notice" class="hint sheet__wide">{{ notice }}</p>
 
     <!-- While the tags load the page keeps its shape: the global container, then one project container under it, both filled with label-shaped placeholders. -->
     <template v-if="loading">
