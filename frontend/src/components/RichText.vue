@@ -8,6 +8,7 @@ import { clean } from '../lib/richtext';
 const body = defineModel<string>({ required: true });
 const props = defineProps<{ placeholder?: string; minHeight?: string }>();
 
+const wrap = ref<HTMLDivElement | null>(null);
 const host = ref<HTMLDivElement | null>(null);
 let quill: Quill | null = null;
 // Set while the editor itself is the source of a change, so the watcher below does not reset the caret on every keystroke.
@@ -55,13 +56,23 @@ onMounted(() => {
     body.value = clean(quill?.root.innerHTML ?? '');
     readMarks();
   });
-  quill.on('selection-change', (range) => {
-    focused.value = range !== null;
-    readMarks();
-  });
+  quill.on('selection-change', readMarks);
+  quill.root.addEventListener('focus', () => (focused.value = true));
+  quill.root.addEventListener('blur', () => (focused.value = false));
 });
 
+// Clicking empty space in a dialog leaves a contenteditable focused — the browser has nothing there to put a caret in, so it keeps the one it has. A press anywhere outside this editor lets it go.
+function onPointerDown(ev: Event): void {
+  if (!focused.value || !quill) return;
+  const target = ev.target;
+  if (target instanceof Node && wrap.value?.contains(target)) return;
+  quill.root.blur();
+}
+
+onMounted(() => document.addEventListener('pointerdown', onPointerDown, true));
+
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onPointerDown, true);
   quill = null;
 });
 
@@ -94,7 +105,7 @@ function addLink(): void {
 </script>
 
 <template>
-  <div class="rt">
+  <div ref="wrap" class="rt">
     <div class="mdbar">
       <button type="button" :aria-pressed="marks.bold" title="Bold" @click="toggle('bold')"><b>B</b></button>
       <button type="button" :aria-pressed="marks.italic" title="Italic" @click="toggle('italic')"><i>I</i></button>
@@ -118,6 +129,7 @@ function addLink(): void {
 <style scoped>
 /* The box is the frame; the editable part fills it, so a click anywhere inside lands in the text and not on a dead margin. */
 .rt__editor {
+  position: relative;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line-2);
@@ -137,10 +149,12 @@ function addLink(): void {
   outline: none;
 }
 .rt__editor :deep(.ql-editor.ql-blank::before) {
-  color: var(--text-muted);
-  font-style: normal;
   content: attr(data-placeholder);
   position: absolute;
+  left: 12px;
+  top: 10px;
+  color: var(--text-muted);
+  font-style: normal;
   pointer-events: none;
 }
 .rt__editor :deep(p) {
