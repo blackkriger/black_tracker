@@ -6,6 +6,7 @@ import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
 import { usePanelErrors } from '../../lib/panelErrors';
+import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
 
 interface State {
@@ -35,6 +36,7 @@ interface Project {
 const route = useRoute();
 const router = useRouter();
 const projectsStore = useProjects();
+const { canDelete } = useSession();
 
 const project = ref<Project | null>(null);
 const boards = ref<Board[]>([]);
@@ -235,7 +237,14 @@ async function onDrop(b: Board, target: State): Promise<void> {
           <button class="btn p-btn" type="button" @click="toggleArchived">
             {{ project.archived ? 'Restore project' : 'Archive project' }}
           </button>
-          <button class="btn btn--danger p-btn" type="button" @click="deleting = true">Delete</button>
+          <button
+            class="btn btn--danger p-btn"
+            type="button"
+            :disabled="!canDelete"
+            @click="deleting = true"
+          >
+            Delete
+          </button>
         </div>
       </section>
       <div v-if="errors.project" class="err sheet__wide panel__err">{{ errors.project }}</div>
@@ -259,7 +268,14 @@ async function onDrop(b: Board, target: State): Promise<void> {
             >
               <option v-for="s in b.states" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
-            <button class="btn btn--sm btn--danger" type="button" @click="deletingBoard = b">Delete board</button>
+            <button
+              class="btn btn--sm btn--danger"
+              type="button"
+              :disabled="!canDelete"
+              @click="deletingBoard = b"
+            >
+              Delete board
+            </button>
           </span>
         </header>
 
@@ -312,7 +328,13 @@ async function onDrop(b: Board, target: State): Promise<void> {
                   </label>
                 </td>
                 <td class="c-del">
-                  <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Delete status" @click="deleteStatus(b, s)">
+                  <button
+                    class="btn btn--sm btn--icon btn--ghost"
+                    type="button"
+                    aria-label="Delete status"
+                    :disabled="!canDelete"
+                    @click="deleteStatus(b, s)"
+                  >
                     ✕
                   </button>
                 </td>

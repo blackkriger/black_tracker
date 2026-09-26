@@ -5,6 +5,7 @@ import SettingsLayout from '../../components/SettingsLayout.vue';
 import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
 import { usePanelErrors } from '../../lib/panelErrors';
+import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
 
 interface Tag extends TagItem {
@@ -14,6 +15,7 @@ interface Tag extends TagItem {
 }
 
 const { projects, load: loadProjects } = useProjects();
+const { canDelete } = useSession();
 
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
@@ -133,6 +135,7 @@ async function remove(scope: string, tag: TagItem): Promise<void> {
         <div v-if="!globalTags.length" class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
         <TagLabels
           :tags="globalTags"
+          :can-remove="canDelete"
           @add="add('global', $event)"
           @rename="(t, n) => rename('global', t, n)"
           @remove="(t) => remove('global', t)"
@@ -151,6 +154,7 @@ async function remove(scope: string, tag: TagItem): Promise<void> {
         <div v-if="!tagsOf(p.id).length" class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
         <TagLabels
           :tags="tagsOf(p.id)"
+          :can-remove="canDelete"
           @add="add(p.id, $event, p.shortName)"
           @rename="(t, n) => rename(p.id, t, n)"
           @remove="(t) => remove(p.id, t)"

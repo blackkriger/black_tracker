@@ -8,7 +8,7 @@ export interface TagItem {
   color: string;
 }
 
-defineProps<{ tags: TagItem[] }>();
+withDefaults(defineProps<{ tags: TagItem[]; canRemove?: boolean }>(), { canRemove: true });
 const emit = defineEmits<{
   (e: 'add', name: string): void;
   (e: 'rename', tag: TagItem, name: string): void;
@@ -54,7 +54,13 @@ function add(): void {
         @blur="commitEdit(t)"
       />
       <button v-else class="taglabel__name" type="button" @click="startEdit(t)">{{ t.name }}</button>
-      <button class="taglabel__x" type="button" :aria-label="`Delete ${t.name}`" @click="emit('remove', t)">✕</button>
+      <button
+        class="taglabel__x"
+        type="button"
+        :aria-label="`Delete ${t.name}`"
+        :disabled="!canRemove"
+        @click="emit('remove', t)"
+      >✕</button>
     </span>
   </div>
 

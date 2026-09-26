@@ -70,6 +70,7 @@ interface UserRow {
   role_id: string | null;
   role_name: string | null;
   role_color: string | null;
+  role_can_delete: boolean | null;
   api_token_hash: string | null;
   api_token_hint: string | null;
   api_token_created_at: Date | null;
@@ -80,7 +81,7 @@ interface UserRow {
 
 // Every route that hands back a person reads them through this, so the role always travels with them.
 export const USER_SELECT = `
-  select u.*, r.name as role_name, r.color as role_color
+  select u.*, r.name as role_name, r.color as role_color, r.can_delete as role_can_delete
     from users u
     left join roles r on r.id = u.role_id`;
 
@@ -98,7 +99,9 @@ export function publicUser(row: UserRow) {
     active: row.active,
     createdAt: row.created_at.toISOString(),
     lastSeenAt: row.last_seen_at?.toISOString() ?? null,
-    // What they are called on the team. Nothing hangs off it yet — is_admin is still the only right in the code.
+    /** Whether the delete buttons do anything for them: the creator always, everyone else through their role. */
+    canDelete: row.is_admin || row.role_can_delete === true,
+    // What they are called on the team, and what it lets them do.
     role:
       row.role_id && row.role_name
         ? { id: row.role_id, name: row.role_name, color: row.role_color ?? '' }

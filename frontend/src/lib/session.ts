@@ -10,6 +10,8 @@ export interface Me {
   createdAt: string;
   lastSeenAt: string | null;
   authKind: 'session' | 'token';
+  /** May delete projects, boards, statuses and tags. */
+  canDelete: boolean;
   /** What they are called on the team. Nothing hangs off it — isAdmin is still the only right the code checks. */
   role: { id: string; name: string; color: string } | null;
   /** Null until a token is minted; the raw value is never part of this — only its tail and dates. */
@@ -24,6 +26,7 @@ export function useSession() {
     me,
     ready,
     isAdmin: computed(() => me.value?.isAdmin === true),
+    canDelete: computed(() => me.value?.canDelete === true),
     async refresh(): Promise<void> {
       try {
         me.value = await api<Me>('/me');
