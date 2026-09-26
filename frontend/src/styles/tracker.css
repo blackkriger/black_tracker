@@ -281,10 +281,10 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 
 /* ---------- dialog (forms & confirmations) ---------- */
 .dlg { background: var(--surface); border: 1px solid var(--line-2); box-shadow: 0 24px 64px rgba(0, 0, 0, .7); }
-.dlg__h { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 8px 0 20px; border-bottom: 1px solid var(--line); font: 600 14px var(--font-ui); }
+.dlg__h { flex: none; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 8px 0 20px; border-bottom: 1px solid var(--line); font: 600 14px var(--font-ui); }
 .dlg__h span { flex: 1; }
 .dlg__b { display: flex; flex-direction: column; gap: 14px; padding: 20px; }
-.dlg__f { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 20px; }
+.dlg__f { flex: none; display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 20px; }
 .scrim { position: absolute; inset: 0; z-index: 6; background: rgba(0, 0, 0, .7); }
 
 /* ---------- side nav (admin) ---------- */
