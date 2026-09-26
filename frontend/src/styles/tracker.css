@@ -35,7 +35,6 @@
   --font-ui: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
   --font-num: 'IBM Plex Mono', 'Consolas', monospace;     /* issue keys, counts, dates */
   --font-mono: 'IBM Plex Mono', 'Consolas', monospace;    /* code in markdown */
-  --font-display: 'Cinzel', 'Times New Roman', serif;     /* sign-in only */
   /* spacing (another project scale) */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-8: 48px;
