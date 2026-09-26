@@ -10,6 +10,12 @@ export class ApiError extends Error {
   }
 }
 
+// One id per tab, minted when the page loads. It rides along with every write so the live channel can tell this tab's own doing from everyone else's — including this same person in another window.
+export const TAB_ID =
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
 export async function api<T>(
   path: string,
   init: Omit<RequestInit, 'body'> & { body?: unknown } = {}
@@ -21,6 +27,7 @@ export async function api<T>(
     credentials: 'include',
     headers: {
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      'X-Tab-Id': TAB_ID,
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,

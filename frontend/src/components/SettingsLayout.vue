@@ -2,6 +2,7 @@
 // The frame every admin screen sits in: the top bar, the section list on the left, and whatever the screen puts in the slot.
 import { computed, onMounted } from 'vue';
 import TopBar from './TopBar.vue';
+import { useLive } from '../lib/live';
 import { useProjects } from '../lib/projects';
 
 const { projects, loaded, load } = useProjects();
@@ -10,6 +11,10 @@ const live = computed(() => projects.value.filter((p) => !p.archived));
 const archived = computed(() => projects.value.filter((p) => p.archived));
 
 onMounted(() => void load());
+
+useLive((ev) => {
+  if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
+});
 </script>
 
 <template>

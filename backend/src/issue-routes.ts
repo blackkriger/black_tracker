@@ -11,7 +11,7 @@ import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { deniedFor } from './board-service.js';
-import { publish } from './events.js';
+import { publish, tabOf } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
 
@@ -258,6 +258,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueId: created,
       issueKey: row?.readable_id,
       by: auth.login,
+      origin: tabOf(req),
     });
     return reply.code(201).send({ data: publicIssue(row as IssueRow, tags.get(created) ?? []) });
   });
@@ -327,6 +328,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueKey: moved.readable_id,
       fields: moved.state_id === stateId ? [] : ['status'],
       by: auth.login,
+      origin: tabOf(req),
     });
     return reply.send({ data: { ok: true } });
   });
@@ -542,6 +544,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueKey: issue.readable_id,
       fields: Object.keys(p),
       by: auth.login,
+      origin: tabOf(req),
     });
     return reply.send({ data: publicIssue(row as IssueRow, tags.get(id) ?? []) });
   });
@@ -569,6 +572,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueId: id,
       issueKey: issue.readable_id,
       by: auth.login,
+      origin: tabOf(req),
     });
     return reply.send({ data: { ok: true } });
   });
@@ -597,6 +601,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueKey: found.issue.readable_id,
       commentId: row.id,
       by: session.login,
+      origin: tabOf(req),
     });
     return reply.code(201).send({
       data: {
@@ -637,6 +642,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueKey: host?.readable_id,
       commentId: id,
       by: session.login,
+      origin: tabOf(req),
     });
     return reply.send({
       data: { id, text: parsed.data.text, editedAt: res.rows[0].edited_at.toISOString() },
@@ -669,6 +675,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueKey: host?.readable_id,
       commentId: id,
       by: auth.login,
+      origin: tabOf(req),
     });
     return reply.send({ data: { ok: true } });
   });
@@ -707,6 +714,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueId: id,
       issueKey: found.issue.readable_id,
       by: found.auth.login,
+      origin: tabOf(req),
     });
     return reply.code(201).send({
       data: {
@@ -766,6 +774,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueId: row.issue_id,
       issueKey: host?.readable_id,
       by: auth.login,
+      origin: tabOf(req),
     });
     return reply.send({ data: { ok: true } });
   });

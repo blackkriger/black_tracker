@@ -150,7 +150,6 @@ watch(() => props.issueKey, load, { immediate: true });
 useLive((ev) => {
   const current = issue.value;
   if (!current || ev.issueId !== current.id) return;
-  if (ev.by && ev.by === session.me.value?.login) return;
   void reload().then(() => {
     if (ev.type.startsWith('comment.')) flash(['comments']);
     else if (ev.type.startsWith('attachment.')) flash(['files']);
@@ -207,6 +206,8 @@ async function patch(body: Record<string, unknown>): Promise<void> {
     const updated = await api<Issue>(`/issues/${current.id}`, { method: 'PATCH', body });
     issue.value = { ...current, ...updated };
     emit('changed', updated);
+    // The answer carries the issue but not what it did to the record: history is read again so it grows as you work.
+    await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not save the change.';
   }

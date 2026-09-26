@@ -1,5 +1,6 @@
 // The tracker's live channel, opened once per tab. The server sends one event per change; a screen says which kinds it cares about and gets them until it goes away. The browser's own EventSource reconnects after a drop, and we give up only when the session is gone.
 import { onUnmounted } from 'vue';
+import { TAB_ID } from './api';
 
 export interface LiveEvent {
   type: string;
@@ -10,6 +11,7 @@ export interface LiveEvent {
   commentId?: string;
   fields?: string[];
   by?: string;
+  origin?: string;
   at: string;
 }
 
@@ -28,6 +30,8 @@ function open(): void {
     } catch {
       return;
     }
+    // The tab that made the change has already drawn it; everyone else hears about it.
+    if (parsed.origin && parsed.origin === TAB_ID) return;
     for (const handler of handlers) handler(parsed);
   };
   // A stream that fails is reopened by the browser on its own; nothing to do but let it.

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
+import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
@@ -70,6 +71,10 @@ async function load(): Promise<void> {
 
 onMounted(load);
 watch(() => route.params.short, load);
+
+useLive((ev) => {
+  if (['project.changed', 'board.changed', 'state.changed'].includes(ev.type)) void load();
+});
 
 function replaceBoard(next: Board): void {
   boards.value = boards.value.map((b) => (b.id === next.id ? { ...b, ...next } : b));

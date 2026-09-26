@@ -17,9 +17,15 @@ export interface LiveEvent {
   commentId?: string;
   /** Which fields changed, so the reader can light them up rather than guess. */
   fields?: string[];
-  /** The login behind the change: a tab does not flash at its own doing. */
+  /** The login behind the change, for the history line and for who to blame. */
   by?: string;
+  /** The tab that caused it: that one tab already shows the change and is told to ignore the echo. */
+  origin?: string;
 }
+
+/** Which tab a request came from, when it said. */
+export const tabOf = (req: { headers: Record<string, unknown> }): string =>
+  typeof req.headers['x-tab-id'] === 'string' ? (req.headers['x-tab-id'] as string) : '';
 
 interface Client {
   reply: FastifyReply;
@@ -61,6 +67,33 @@ export async function publish(event: LiveEvent): Promise<void> {
       clients.delete(id);
     }
   }
+}
+
+// Everything that is not an issue — a project renamed, a status added, a tag merged, an account switched off — is announced by one hook rather than by twenty handlers that would drift apart. The screens hear the noun and read their own data again; the issue routes say more about themselves because a card needs to know which field to light up.
+const TOPICS: [RegExp, string][] = [
+  [/^\/projects/, 'project'],
+  [/^\/boards\/[^/]+\/states/, 'state'],
+  [/^\/states/, 'state'],
+  [/^\/boards/, 'board'],
+  [/^\/tags/, 'tag'],
+  [/^\/roles/, 'role'],
+  [/^\/users/, 'user'],
+  [/^\/invites/, 'invite'],
+];
+
+// These say enough about themselves already.
+const SPOKEN_FOR = /^\/(issues|comments|attachments)|\/issues/;
+
+export function registerChangeFeed(app: FastifyInstance): void {
+  app.addHook('onResponse', async (req, reply) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return;
+    if (reply.statusCode >= 300) return;
+    const route = req.routeOptions?.url ?? req.url;
+    if (SPOKEN_FOR.test(route)) return;
+    const topic = TOPICS.find(([pattern]) => pattern.test(route))?.[1];
+    if (!topic) return;
+    void publish({ type: `${topic}.changed`, by: req.auth?.login, origin: tabOf(req) });
+  });
 }
 
 export function registerEventRoutes(app: FastifyInstance): void {

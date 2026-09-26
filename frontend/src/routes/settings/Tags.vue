@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
+import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
@@ -30,6 +31,10 @@ function note(scope: string, text: string | null): void {
 async function reload(): Promise<void> {
   tags.value = await api<Tag[]>('/tags');
 }
+
+useLive((ev) => {
+  if (['tag.changed', 'project.changed'].includes(ev.type)) void reload().catch(() => {});
+});
 
 const globalTags = computed(() => tags.value.filter((t) => t.projectId === null));
 const tagsOf = (projectId: string) => tags.value.filter((t) => t.projectId === projectId);

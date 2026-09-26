@@ -8,7 +8,6 @@ import { api } from '../lib/api';
 import { dueLabel, priorityClass, type Issue } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
-import { useSession } from '../lib/session';
 
 interface State {
   id: string;
@@ -40,7 +39,6 @@ interface Project {
 
 const route = useRoute();
 const router = useRouter();
-const session = useSession();
 const project = ref<Project | null>(null);
 const issues = ref<Issue[]>([]);
 const issuesLoading = ref(true);
@@ -67,9 +65,13 @@ function flash(issueId: string): void {
 // Someone else's work on this board, arriving as it happens. Our own changes are already on screen.
 useLive((ev) => {
   const board = current.value;
-  if (!board || ev.boardId !== board.id) return;
-  if (ev.by && ev.by === session.me.value?.login) return;
-  if (!ev.type.startsWith('issue.')) return;
+  if (!board) return;
+  // The board's own furniture — its columns, its name, the project's tags — changed in settings.
+  if (['state.changed', 'board.changed', 'project.changed', 'tag.changed'].includes(ev.type)) {
+    void load(String(route.params.short));
+    return;
+  }
+  if (!ev.type.startsWith('issue.') || ev.boardId !== board.id) return;
   if (ev.type === 'issue.deleted') {
     issues.value = issues.value.filter((i) => i.id !== ev.issueId);
     return;

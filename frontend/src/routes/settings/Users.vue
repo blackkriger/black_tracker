@@ -5,6 +5,7 @@ import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
+import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
 import { useSession } from '../../lib/session';
@@ -83,6 +84,18 @@ onMounted(async () => {
       .catch((err) => fail('roles', err, 'Could not load the roles.')),
   ]);
   loading.value = false;
+});
+
+useLive((ev) => {
+  if (ev.type === 'user.changed') {
+    void api<User[]>('/users').then((rows) => (users.value = rows)).catch(() => {});
+  }
+  if (ev.type === 'role.changed') {
+    void api<Role[]>('/roles').then((rows) => (roles.value = rows)).catch(() => {});
+  }
+  if (ev.type === 'invite.changed') {
+    void api<Invite[]>('/invites').then((rows) => (invites.value = rows)).catch(() => {});
+  }
 });
 
 function stamp(iso: string | null): string {

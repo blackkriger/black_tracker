@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjects, type ProjectMini } from '../lib/projects';
 import { lastBoard } from '../lib/lastProject';
+import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
 
 const props = defineProps<{
@@ -68,6 +69,11 @@ function closeMenu(): void {
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key === 'Escape') openShort.value = null;
 }
+
+// Someone added a project or a board while this bar was on screen.
+useLive((ev) => {
+  if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
+});
 
 async function pickBoard(short: string, slug: string): Promise<void> {
   openShort.value = null;
