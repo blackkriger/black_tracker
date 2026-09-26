@@ -890,22 +890,25 @@ async function removeIssue(): Promise<void> {
 
               <!-- Chosen, not yet uploaded: a picture shows itself, anything else says its name. -->
               <div v-if="pending.some((f) => previewOf(f))" class="waits">
-                <span
+                <div
                   v-for="f in pending.filter((x) => previewOf(x))"
                   :key="f.name"
                   class="wait"
-                  :title="`${f.name} — ${fileSize(f.size)}`"
                 >
                   <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
                     <img :src="previewOf(f) ?? ''" :alt="f.name" />
                   </button>
-                  <button
-                    class="wait__x"
-                    type="button"
-                    :aria-label="`Remove ${f.name}`"
-                    @click="dropPending(f.name, 'issue')"
-                  ><X class="ic ic--sm" /></button>
-                </span>
+                  <div class="wait__row">
+                    <span class="wait__name">{{ f.name }}</span>
+                    <span class="stamp">{{ fileSize(f.size) }}</span>
+                    <button
+                      class="btn btn--sm btn--icon btn--ghost"
+                      type="button"
+                      :aria-label="`Remove ${f.name}`"
+                      @click="dropPending(f.name, 'issue')"
+                    ><X class="ic ic--sm" /></button>
+                  </div>
+                </div>
               </div>
               <div
                 v-for="f in pending.filter((x) => !previewOf(x))"
@@ -1060,21 +1063,21 @@ async function removeIssue(): Promise<void> {
                   </RichText>
                   <div v-if="commentFiles.length" class="cm__waiting">
                     <template v-for="f in commentFiles" :key="f.name">
-                      <span
-                        v-if="previewOf(f)"
-                        class="wait"
-                        :title="`${f.name} — ${fileSize(f.size)}`"
-                      >
+                      <div v-if="previewOf(f)" class="wait">
                         <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
                           <img :src="previewOf(f) ?? ''" :alt="f.name" />
                         </button>
-                        <button
-                          class="wait__x"
-                          type="button"
-                          :aria-label="`Remove ${f.name}`"
-                          @click="dropPending(f.name, 'comment')"
-                        ><X class="ic ic--sm" /></button>
-                      </span>
+                        <div class="wait__row">
+                          <span class="wait__name">{{ f.name }}</span>
+                          <span class="stamp">{{ fileSize(f.size) }}</span>
+                          <button
+                            class="btn btn--sm btn--icon btn--ghost"
+                            type="button"
+                            :aria-label="`Remove ${f.name}`"
+                            @click="dropPending(f.name, 'comment')"
+                          ><X class="ic ic--sm" /></button>
+                        </div>
+                      </div>
                       <span v-else class="att__cap att__row">
                         <span class="att__name">{{ f.name }}</span>
                         <span class="stamp">{{ fileSize(f.size) }}</span>
@@ -1551,51 +1554,46 @@ async function removeIssue(): Promise<void> {
   gap: 6px;
   margin-top: 8px;
 }
-/* Waiting, not yet uploaded: a small square with the whole picture in it, the name in the tooltip, and the cross in the corner. The dashed edge is what says it has not gone up yet. */
+/* Waiting, not yet uploaded: one block per file — the picture itself at its own size, and under it the whole name, the size and the way to take it back. The dashed edge is what says it has not gone up yet. */
 .waits {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 8px;
 }
 .wait {
-  position: relative;
-  width: 96px;
-  height: 96px;
   border: 1px dashed var(--line-2);
   background: var(--bg);
 }
 .wait__img {
   display: block;
   width: 100%;
-  height: 100%;
   padding: 0;
   border: 0;
   background: none;
   cursor: zoom-in;
+  text-align: left;
 }
+/* As large as the block allows, whole: it fills the width and keeps its proportions, and a very tall picture stops at the ceiling rather than pushing everything off the screen. */
 .wait__img img {
+  display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 420px;
   object-fit: contain;
 }
-.wait__x {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  display: inline-flex;
+.wait__row {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  background: rgba(0, 0, 0, 0.55);
-  color: var(--text-dim);
-  cursor: pointer;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 4px 0 8px;
+  border-top: 1px dashed var(--line-2);
 }
-.wait__x:hover {
-  color: var(--text);
+.wait__name {
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: 12.5px;
 }
 .drop {
   height: 56px;
