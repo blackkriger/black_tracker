@@ -114,6 +114,12 @@ function toggle(format: string, value: unknown = true): void {
   readMarks();
 }
 
+defineExpose({
+  focus(): void {
+    quill?.focus();
+  },
+});
+
 function addLink(): void {
   if (!quill) return;
   const range = quill.getSelection(true);

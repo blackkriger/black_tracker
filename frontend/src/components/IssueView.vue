@@ -117,6 +117,85 @@ function openPicker(): void {
 }
 
 const commentDraft = ref('');
+const composer = ref<InstanceType<typeof RichText> | null>(null);
+
+// Selecting text inside a comment raises a small bar over it: copy what is highlighted, or answer it with a quote. It fades when the cursor wanders off and is gone once the selection is.
+const popup = ref<{ x: number; y: number; commentId: string } | null>(null);
+const popupNear = ref(true);
+
+function commentUnder(node: Node | null): string | null {
+  let el = node ? (node.nodeType === 1 ? (node as HTMLElement) : node.parentElement) : null;
+  while (el) {
+    if (el.id.startsWith('comment-')) return el.id.slice('comment-'.length);
+    el = el.parentElement;
+  }
+  return null;
+}
+
+function onMouseUp(): void {
+  // After the mouse is up the browser still has the old selection for a tick.
+  setTimeout(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+      popup.value = null;
+      return;
+    }
+    const commentId = commentUnder(sel.anchorNode);
+    if (!commentId) {
+      popup.value = null;
+      return;
+    }
+    const box = sel.getRangeAt(0).getBoundingClientRect();
+    if (!box.width && !box.height) {
+      popup.value = null;
+      return;
+    }
+    popup.value = { x: box.left + box.width / 2, y: box.top, commentId };
+    popupNear.value = true;
+  }, 0);
+}
+
+function onMouseDownAnywhere(ev: MouseEvent): void {
+  if (!popup.value) return;
+  const bar = document.getElementById('sel-bar');
+  if (bar && ev.target instanceof Node && bar.contains(ev.target)) return;
+  popup.value = null;
+}
+
+// Walk away from it and it fades; come back and it returns. Distance to the bar's box, with room around it.
+function onMouseMove(ev: MouseEvent): void {
+  if (!popup.value) return;
+  const bar = document.getElementById('sel-bar');
+  if (!bar) return;
+  const r = bar.getBoundingClientRect();
+  const dx = ev.clientX < r.left ? r.left - ev.clientX : Math.max(0, ev.clientX - r.right);
+  const dy = ev.clientY < r.top ? r.top - ev.clientY : Math.max(0, ev.clientY - r.bottom);
+  popupNear.value = dx <= 80 && dy <= 80;
+}
+
+function copySelection(): void {
+  const text = window.getSelection()?.toString() ?? '';
+  if (text) void navigator.clipboard.writeText(text).catch(() => {});
+  window.getSelection()?.removeAllRanges();
+  popup.value = null;
+}
+
+const escapeHtml = (text: string): string =>
+  text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
+
+// A reply is the quoted words, then the author's name, then room to write. Several replies stack in one comment rather than replacing each other.
+function replyToSelection(): void {
+  const id = popup.value?.commentId;
+  const c = issue.value?.comments.find((row) => row.id === id);
+  popup.value = null;
+  if (!c) return;
+  const picked = window.getSelection()?.toString().trim() ?? '';
+  const source = picked || c.text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+  const quote = escapeHtml(source).replace(/\n/g, '<br>');
+  commentDraft.value = `${commentDraft.value}<blockquote>${quote}</blockquote><p>@${c.author.login} </p>`;
+  window.getSelection()?.removeAllRanges();
+  requestAnimationFrame(() => composer.value?.focus());
+}
 const posting = ref(false);
 const editingComment = ref<string | null>(null);
 const commentEdit = ref('');
@@ -198,11 +277,19 @@ function onKeydown(ev: KeyboardEvent): void {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown);
+  window.addEventListener('mouseup', onMouseUp);
+  window.addEventListener('mousedown', onMouseDownAnywhere);
+  window.addEventListener('mousemove', onMouseMove);
   void api<{ id: string; login: string; fullName: string }[]>('/people')
     .then((rows) => (people.value = rows))
     .catch(() => {});
 });
-onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('mouseup', onMouseUp);
+  window.removeEventListener('mousedown', onMouseDownAnywhere);
+  window.removeEventListener('mousemove', onMouseMove);
+});
 
 watch(() => props.issueKey, load, { immediate: true });
 
@@ -791,6 +878,7 @@ async function removeIssue(): Promise<void> {
             >
               <article
                 v-for="c in issue.comments"
+                :id="`comment-${c.id}`"
                 :key="c.id"
                 class="cm"
               >
@@ -866,6 +954,7 @@ async function removeIssue(): Promise<void> {
                 <span class="av av--lg" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
                 <div>
                   <RichText
+                    ref="composer"
                     v-model="commentDraft"
                     min-height="90px"
                     placeholder="Write a comment…"
@@ -1070,6 +1159,17 @@ async function removeIssue(): Promise<void> {
         </div>
       </Dialog>
 
+      <div
+        v-if="popup"
+        id="sel-bar"
+        class="selbar"
+        :class="{ 'is-far': !popupNear }"
+        :style="{ left: `${popup.x}px`, top: `${popup.y}px` }"
+      >
+        <button class="btn btn--sm" type="button" @click="copySelection">Copy</button>
+        <button class="btn btn--sm" type="button" @click="replyToSelection">Reply</button>
+      </div>
+
       <ImageViewer v-model:index="shown" :images="gallery" />
 
       <Dialog v-if="deleting" :title="`Delete ${issueKey}`" @close="deleting = false">
@@ -1147,6 +1247,28 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+/* Over the selection, out of the flow: it follows the highlight rather than the layout. */
+.selbar {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  transform: translate(-50%, calc(-100% - 8px));
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.12s ease-out;
+}
+.selbar.is-far {
+  opacity: 0.25;
+}
+.cm__body :deep(blockquote) {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-2);
+  color: var(--text-dim);
 }
 .cm__body :deep(p:last-child) {
   margin-bottom: 0;
