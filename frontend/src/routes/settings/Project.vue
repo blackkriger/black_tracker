@@ -334,10 +334,10 @@ async function onDrop(b: Board, target: State): Promise<void> {
       @close="deleting = false; confirmKey = ''"
     >
       <p class="dialog__lede">
-        This takes the project's boards, statuses, issues and its own tags with it. There is no undo.
+        This takes the project's boards, statuses, issues and its own tags with it. This cannot be undone.
       </p>
       <div class="field">
-        <label class="label" for="p-confirm">Type {{ project.shortName }} to confirm</label>
+        <label class="label" for="p-confirm">Type {{ project.name }} to confirm</label>
         <input id="p-confirm" v-model="confirmKey" class="input" autofocus @keydown.enter.prevent="deleteProject" />
       </div>
       <template #footer>
@@ -345,7 +345,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
         <button
           class="btn btn--danger"
           type="button"
-          :disabled="confirmKey.trim().toUpperCase() !== project.shortName"
+          :disabled="confirmKey.trim().toLowerCase() !== project.name.trim().toLowerCase()"
           @click="deleteProject"
         >
           Delete project
