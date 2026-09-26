@@ -115,8 +115,11 @@ function toggle(format: string, value: unknown = true): void {
 }
 
 defineExpose({
-  focus(): void {
-    quill?.focus();
+  /** `atEnd` puts the caret after everything already written, which is where a reply carries on. */
+  focus(atEnd = false): void {
+    if (!quill) return;
+    quill.focus();
+    if (atEnd) quill.setSelection(quill.getLength(), 0, 'silent');
   },
 });
 

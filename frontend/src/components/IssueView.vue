@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // One issue, opened over the board it lives on: the text on the left, what it is on the right, and underneath it everything that has been said and done about it. Every edit is its own small write — there is no Save for the issue as a whole.
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
@@ -211,9 +211,10 @@ function replyToSelection(): void {
   const picked = window.getSelection()?.toString().trim() ?? '';
   const source = picked || c.text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
   const quote = escapeHtml(source).replace(/\n/g, '<br>');
-  commentDraft.value = `${commentDraft.value}<blockquote>${quote}</blockquote><p>@${c.author.login} </p>`;
+  // The quote, then who is being answered, then an empty line for the answer — which is where the caret goes.
+  commentDraft.value = `${commentDraft.value}<blockquote>${quote}</blockquote><p>@${c.author.login}</p><p><br></p>`;
   window.getSelection()?.removeAllRanges();
-  requestAnimationFrame(() => composer.value?.focus());
+  void nextTick().then(() => composer.value?.focus(true));
 }
 const posting = ref(false);
 const editingComment = ref<string | null>(null);
