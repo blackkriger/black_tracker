@@ -420,7 +420,7 @@ function accept(list: FileList | null): File[] {
   const chosen = list ? Array.from(list) : [];
   const tooBig = chosen.filter((f) => f.size > MAX_FILE_BYTES);
   if (tooBig.length) {
-    error.value = `${tooBig.map((f) => f.name).join(', ')} — a file has to be 10 MB or smaller.`;
+    error.value = `${tooBig.map((f) => f.name).join(', ')} — 10mb max for file`;
   }
   return chosen.filter((f) => f.size <= MAX_FILE_BYTES);
 }

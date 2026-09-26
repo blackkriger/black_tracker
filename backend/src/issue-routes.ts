@@ -790,7 +790,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     await pipeline(file.file, createWriteStream(stored));
     if (file.file.truncated) {
       await unlink(stored).catch(() => {});
-      return reply.code(413).send({ error: 'A file has to be 10 MB or smaller.' });
+      return reply.code(413).send({ error: '10mb max for file' });
     }
     const { size } = await stat(stored);
     const filename = file.filename.slice(0, 200);
