@@ -760,7 +760,6 @@ async function removeIssue(): Promise<void> {
             >{{ issue?.summary }}</h1>
 
             <div>
-              <div class="sec-h">Description</div>
               <RichText
                 v-if="editing"
                 v-model="bodyDraft"
