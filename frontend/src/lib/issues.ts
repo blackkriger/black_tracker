@@ -82,6 +82,15 @@ export interface IssueFull extends Issue {
 
 export const PRIORITIES: Priority[] = ['Critical', 'Major', 'Normal', 'Minor'];
 
+/** The colour a priority speaks in, from loudest to quietest. */
+export const priorityColor = (p: Priority): string =>
+  ({
+    Critical: 'var(--danger-text)',
+    Major: 'var(--warn)',
+    Normal: 'var(--text)',
+    Minor: 'var(--text-muted)',
+  })[p];
+
 /** How many of the four bars are lit, which is how priority reads on a card without relying on hue alone. */
 export const priorityClass = (p: Priority): string =>
   ({ Critical: 'p4', Major: 'p3', Normal: 'p2', Minor: 'p1' })[p];

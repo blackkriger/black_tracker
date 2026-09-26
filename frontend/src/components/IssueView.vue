@@ -14,6 +14,7 @@ import {
   dueLabel,
   MAX_FILE_BYTES,
   fileSize,
+  priorityColor,
   stamp,
   stampAt,
   type Attachment,
@@ -1041,6 +1042,7 @@ async function removeIssue(): Promise<void> {
               <select
                 class="input input--sm"
                 :value="shownPriority"
+                :style="{ color: priorityColor(shownPriority) }"
                 @change="setProp({ priority: ($event.target as HTMLSelectElement).value as Priority })"
               >
                 <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
@@ -1254,6 +1256,23 @@ async function removeIssue(): Promise<void> {
   border: 1px solid var(--line-2);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   transition: opacity 0.12s ease-out;
+}
+/* The same pointer the board menu has, upside down: the border's triangle, then the surface's a pixel over it, so the line runs around the tip instead of across it. */
+.selbar::before,
+.selbar::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border: 6px solid transparent;
+}
+.selbar::before {
+  border-top-color: var(--line-2);
+}
+.selbar::after {
+  margin-top: -1px;
+  border-top-color: var(--card);
 }
 .selbar button {
   height: 28px;
