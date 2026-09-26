@@ -1555,34 +1555,34 @@ async function removeIssue(): Promise<void> {
   margin-top: 8px;
 }
 /* Waiting, not yet uploaded: one block per file — the picture itself at its own size, and under it the whole name, the size and the way to take it back. The dashed edge is what says it has not gone up yet. */
-/* Columns rather than rows: pictures are of every shape, and a row of them leaves holes under the short ones. Each block drops into the shortest column and nothing is left empty between them. */
+/* A grid of equal cells: pictures come in every shape, and any layout that keeps their own heights leaves holes under the short ones. Each picture is shown whole inside its cell — scaled to fit, never cropped — and the cells tile without a gap. */
 .waits {
-  columns: 240px;
-  column-gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
   margin-top: 8px;
 }
 .wait {
-  break-inside: avoid;
-  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
   border: 1px dashed var(--line-2);
   background: var(--bg);
 }
 .wait__img {
   display: block;
+  flex: 1 1 auto;
   width: 100%;
+  height: 190px;
   padding: 0;
   border: 0;
   background: none;
   cursor: zoom-in;
-  text-align: left;
 }
-/* Its own size, whole, bounded by the block and by a ceiling so one tall picture cannot push the rest off the screen. */
 .wait__img img {
   display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 360px;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .wait__row {
   display: flex;
