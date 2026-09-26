@@ -140,7 +140,6 @@ watch(
   align-items: center;
   gap: 8px;
   padding: 10px var(--space-5);
-  border-bottom: 1px solid var(--line);
 }
 .page__body {
   flex: 1 1 auto;
