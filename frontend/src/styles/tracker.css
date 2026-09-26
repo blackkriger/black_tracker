@@ -212,6 +212,8 @@ button { font-family: var(--font-ui); }
 .btn--danger:active, .btn--danger.is-active { background: #d83a50; border-color: #d83a50; color: var(--on-accent); }
 .btn--danger:disabled { border-color: rgba(255, 80, 102, .45); }
 .btn--ghost { border-color: transparent; color: var(--text-dim); }
+/* A ghost button lights up the way the top bar's links do: the mark itself, no plate behind it. */
+.btn--ghost:hover, .btn--ghost.is-hover { background: none; border-color: transparent; color: var(--text); }
 .btn--sm { height: 26px; padding: 0 8px; font-size: 12px; }
 .btn--icon { width: 32px; padding: 0; }
 .btn--sm.btn--icon { width: 26px; }

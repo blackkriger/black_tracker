@@ -306,6 +306,8 @@ onMounted(() => {
     .catch(() => {});
 });
 onUnmounted(() => {
+  for (const url of previewUrls.values()) URL.revokeObjectURL(url);
+  previewUrls.clear();
   window.removeEventListener('keydown', onKeydown);
   window.removeEventListener('mouseup', onMouseUp);
   window.removeEventListener('mousedown', onMouseDownAnywhere);
@@ -645,10 +647,33 @@ async function upload(list: FileList | null): Promise<void> {
   }
 }
 
+// A preview lives as long as the window does: the url is made once per file and released when the window closes.
+const previewUrls = new Map<File, string>();
+
+function previewOf(file: File): string | null {
+  if (!file.type.startsWith('image/')) return null;
+  let url = previewUrls.get(file);
+  if (!url) {
+    url = URL.createObjectURL(file);
+    previewUrls.set(file, url);
+  }
+  return url;
+}
+
+function forgetPreview(file: File): void {
+  const url = previewUrls.get(file);
+  if (url) {
+    URL.revokeObjectURL(url);
+    previewUrls.delete(file);
+  }
+}
+
 function dropPending(name: string, from: 'issue' | 'comment'): void {
   const list = from === 'issue' ? pending : commentFiles;
   const at = list.value.findIndex((f) => f.name === name);
-  if (at >= 0) list.value = list.value.filter((_, i) => i !== at);
+  if (at < 0) return;
+  forgetPreview(list.value[at]);
+  list.value = list.value.filter((_, i) => i !== at);
 }
 
 function pickCommentFiles(list: FileList | null): void {
@@ -857,8 +882,28 @@ async function removeIssue(): Promise<void> {
                 ><X class="ic ic--sm" /></button>
               </div>
 
-              <!-- Chosen, not yet uploaded: they go up the moment the issue exists. -->
-              <div v-for="f in pending" :key="f.name" class="att__cap att__row att__row--wait">
+              <!-- Chosen, not yet uploaded: a picture shows itself, anything else says its name. -->
+              <div v-if="pending.some((f) => previewOf(f))" class="atts">
+                <figure v-for="f in pending.filter((x) => previewOf(x))" :key="f.name" class="att">
+                  <span class="att__img att__img--wait">
+                    <img :src="previewOf(f) ?? ''" :alt="f.name" class="att__pic" />
+                  </span>
+                  <figcaption class="att__cap">
+                    <span>{{ f.name }}</span>
+                    <button
+                      class="btn btn--sm btn--icon btn--ghost"
+                      type="button"
+                      :aria-label="`Remove ${f.name}`"
+                      @click="dropPending(f.name, 'issue')"
+                    ><X class="ic ic--sm" /></button>
+                  </figcaption>
+                </figure>
+              </div>
+              <div
+                v-for="f in pending.filter((x) => !previewOf(x))"
+                :key="f.name"
+                class="att__cap att__row att__row--wait"
+              >
                 <span class="att__name">{{ f.name }}</span>
                 <span class="stamp">{{ fileSize(f.size) }}</span>
                 <button
@@ -1006,16 +1051,32 @@ async function removeIssue(): Promise<void> {
                     </template>
                   </RichText>
                   <div v-if="commentFiles.length" class="cm__waiting">
-                    <span v-for="f in commentFiles" :key="f.name" class="att__cap att__row">
-                      <span class="att__name">{{ f.name }}</span>
-                      <span class="stamp">{{ fileSize(f.size) }}</span>
-                      <button
-                        class="btn btn--sm btn--icon btn--ghost"
-                        type="button"
-                        :aria-label="`Remove ${f.name}`"
-                        @click="dropPending(f.name, 'comment')"
-                      ><X class="ic ic--sm" /></button>
-                    </span>
+                    <template v-for="f in commentFiles" :key="f.name">
+                      <figure v-if="previewOf(f)" class="att att--sm">
+                        <span class="att__img att__img--wait">
+                          <img :src="previewOf(f) ?? ''" :alt="f.name" class="att__pic" />
+                        </span>
+                        <figcaption class="att__cap">
+                          <span>{{ f.name }}</span>
+                          <button
+                            class="btn btn--sm btn--icon btn--ghost"
+                            type="button"
+                            :aria-label="`Remove ${f.name}`"
+                            @click="dropPending(f.name, 'comment')"
+                          ><X class="ic ic--sm" /></button>
+                        </figcaption>
+                      </figure>
+                      <span v-else class="att__cap att__row">
+                        <span class="att__name">{{ f.name }}</span>
+                        <span class="stamp">{{ fileSize(f.size) }}</span>
+                        <button
+                          class="btn btn--sm btn--icon btn--ghost"
+                          type="button"
+                          :aria-label="`Remove ${f.name}`"
+                          @click="dropPending(f.name, 'comment')"
+                        ><X class="ic ic--sm" /></button>
+                      </span>
+                    </template>
                   </div>
                   <div class="composer__row">
                     <div class="sp"></div>
@@ -1476,9 +1537,22 @@ async function removeIssue(): Promise<void> {
 }
 .cm__waiting {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 6px;
   margin-top: 8px;
+}
+/* Waiting, not yet uploaded: the dashed edge says so without a word. */
+.att__img--wait {
+  display: block;
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  outline: 1px dashed var(--line-2);
+  outline-offset: -1px;
+}
+.att--sm {
+  width: 148px;
 }
 .drop {
   height: 56px;
