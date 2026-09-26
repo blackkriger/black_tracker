@@ -38,7 +38,7 @@ async function create(): Promise<void> {
 
 <template>
   <SettingsLayout>
-    <section class="panel new">
+    <section class="panel sheet__wide">
       <header class="panel__h">New project</header>
       <form class="panel__b form" @submit.prevent="create">
         <div class="field">
@@ -67,9 +67,6 @@ async function create(): Promise<void> {
 </template>
 
 <style scoped>
-.new {
-  max-width: 520px;
-}
 .form {
   display: flex;
   flex-direction: column;
