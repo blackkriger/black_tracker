@@ -5,6 +5,7 @@ import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
+import { stamp } from '../../lib/issues';
 import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
@@ -97,13 +98,6 @@ useLive((ev) => {
     void api<Invite[]>('/invites').then((rows) => (invites.value = rows)).catch(() => {});
   }
 });
-
-function stamp(iso: string | null): string {
-  if (!iso) return '';
-  return new Date(iso)
-    .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    .toUpperCase();
-}
 
 async function patchUser(u: User, body: Record<string, unknown>): Promise<void> {
   clear('users');

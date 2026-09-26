@@ -15,6 +15,18 @@ import { publish, tabOf } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
 
+// What may be shown in the browser rather than saved to disk. The list is deliberately short: the type an upload claims is the uploader's word, and anything that can carry script — html, svg — would run on our own origin, where the session cookie lives. Everything else is handed over as a download with the type stripped.
+const INLINE_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+  'video/mp4',
+  'video/webm',
+  'application/pdf',
+]);
+
 interface IssueRow {
   id: string;
   readable_id: string;
@@ -292,12 +304,15 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!state.rowCount) return reply.code(400).send({ error: 'That status is on another board.' });
 
     await inTransaction(async (client) => {
+      // A stale tab can send a list that still holds a card someone else has since moved away; only the card it says it dragged is allowed to change column.
       await client.query(
         `update issues i
-            set position = o.pos, state_id = $2, updated_at = now()
+            set position = o.pos,
+                state_id = case when i.id = $4 then $2 else i.state_id end,
+                updated_at = now()
            from unnest($3::uuid[]) with ordinality as o(id, pos)
           where i.id = o.id and i.board_id = $1`,
-        [id, stateId, ids]
+        [id, stateId, ids, issueId]
       );
       if (moved.state_id !== stateId) {
         const was = await client.query<{ name: string }>('select name from states where id = $1', [
@@ -701,12 +716,19 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const { size } = await stat(stored);
     const filename = file.filename.slice(0, 200);
 
-    const res = await pool.query(
-      `insert into issue_attachments (issue_id, comment_id, filename, mime, size, storage_path, uploaded_by)
-       values ($1, $2, $3, $4, $5, $6, $7)
-       returning id, created_at`,
-      [id, null, filename, file.mimetype, size, stored, found.auth.userId]
-    );
+    let res;
+    try {
+      res = await pool.query(
+        `insert into issue_attachments (issue_id, comment_id, filename, mime, size, storage_path, uploaded_by)
+         values ($1, $2, $3, $4, $5, $6, $7)
+         returning id, created_at`,
+        [id, null, filename, file.mimetype, size, stored, found.auth.userId]
+      );
+    } catch (err) {
+      // The issue went away while the bytes were landing: take the bytes with it.
+      await unlink(stored).catch(() => {});
+      throw err;
+    }
     void publish({
       type: 'attachment.added',
       boardId: found.issue.board_id,
@@ -746,8 +768,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!issue || !(await mayOpenBoard(auth, issue.board_id, issue.project_id))) {
       return reply.code(403).send({ error: 'This file is not open to you.' });
     }
-    reply.header('Content-Type', row.mime);
-    reply.header('Content-Disposition', `inline; filename="${encodeURIComponent(row.filename)}"`);
+    const inline = INLINE_TYPES.has(row.mime);
+    reply.header('Content-Type', inline ? row.mime : 'application/octet-stream');
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header(
+      'Content-Disposition',
+      `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(row.filename)}"`
+    );
     return reply.send(createReadStream(row.storage_path));
   });
 

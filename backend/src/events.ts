@@ -4,6 +4,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { requireAuth, type Auth } from './auth.js';
+import { pool } from './db.js';
 import { DENIES_NOTHING, deniedFor, type Denials } from './board-service.js';
 
 export interface LiveEvent {
@@ -34,19 +35,32 @@ interface Client {
   deniedAt: number;
 }
 
+/** Null when the account is gone or switched off, which ends the stream. */
+async function stillAllowed(client: Client): Promise<Denials | null> {
+  const res = await pool.query<{ is_admin: boolean; role_id: string | null; active: boolean }>(
+    'select is_admin, role_id, active from users where id = $1',
+    [client.auth.userId]
+  );
+  const row = res.rows[0];
+  if (!row || !row.active) return null;
+  client.auth = { ...client.auth, isAdmin: row.is_admin, roleId: row.role_id };
+  return row.is_admin ? DENIES_NOTHING : await deniedFor(row.role_id);
+}
+
 const DENIALS_TTL = 30_000;
 const HEARTBEAT_MS = 25_000;
 
 const clients = new Map<number, Client>();
 let nextId = 1;
 
-async function denialsFresh(client: Client): Promise<Denials> {
-  if (client.auth.isAdmin) return DENIES_NOTHING;
-  if (Date.now() - client.deniedAt > DENIALS_TTL) {
-    client.denied = await deniedFor(client.auth.roleId);
-    client.deniedAt = Date.now();
-  }
-  return client.denied;
+// The connection outlives any single request, so what the listener is allowed to hear is re-read on a timer: a role swapped or an account switched off has to take effect without waiting for them to reload.
+async function denialsFresh(client: Client): Promise<Denials | null> {
+  if (Date.now() - client.deniedAt <= DENIALS_TTL) return client.denied;
+  const denied = await stillAllowed(client);
+  if (!denied) return null;
+  client.denied = denied;
+  client.deniedAt = Date.now();
+  return denied;
 }
 
 function mayHear(denied: Denials, event: LiveEvent): boolean {
@@ -65,12 +79,21 @@ export async function publish(event: LiveEvent): Promise<void> {
       clients.delete(id);
       continue;
     }
+    let denied: Denials | null;
     try {
-      if (!mayHear(await denialsFresh(client), event)) continue;
-      client.reply.raw.write(line);
+      denied = await denialsFresh(client);
     } catch {
-      clients.delete(id);
+      // A blip reading the denials is not a reason to forget a listener: it keeps its stream and misses this one event.
+      continue;
     }
+    if (!denied) {
+      // The account is off. Ending the stream is what tells the browser to stop asking.
+      client.reply.raw.end();
+      clients.delete(id);
+      continue;
+    }
+    if (!mayHear(denied, event)) continue;
+    client.reply.raw.write(line);
   }
 }
 

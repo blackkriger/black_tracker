@@ -42,6 +42,9 @@ const router = useRouter();
 const project = ref<Project | null>(null);
 const issues = ref<Issue[]>([]);
 const issuesLoading = ref(true);
+// Which read is the current one: an older answer landing late is dropped rather than painted.
+let issuesRead = 0;
+let projectRead = 0;
 
 // The card being carried, and where it would land: the column under the cursor and the card it would go in front of.
 const dragId = ref<string | null>(null);
@@ -68,7 +71,7 @@ useLive((ev) => {
   if (!board) return;
   // The board's own furniture — its columns, its name, the project's tags — changed in settings.
   if (['state.changed', 'board.changed', 'project.changed', 'tag.changed'].includes(ev.type)) {
-    void load(String(route.params.short));
+    void load(String(route.params.short), true);
     return;
   }
   if (!ev.type.startsWith('issue.') || ev.boardId !== board.id) return;
@@ -76,7 +79,7 @@ useLive((ev) => {
     issues.value = issues.value.filter((i) => i.id !== ev.issueId);
     return;
   }
-  void loadIssues(board.id).then(() => {
+  void loadIssues(board.id, true).then(() => {
     if (ev.issueId) flash(ev.issueId);
   });
 });
@@ -103,15 +106,22 @@ const openKey = computed(() => String(route.params.key ?? ''));
 const issuesOf = (stateId: string): Issue[] =>
   issues.value.filter((i) => i.stateId === stateId).sort((a, b) => a.position - b.position);
 
-async function loadIssues(boardId: string): Promise<void> {
-  issuesLoading.value = true;
+// `quiet` is for a board that is already on screen: a card moved by someone else must not collapse every column into skeletons.
+async function loadIssues(boardId: string, quiet = false): Promise<void> {
+  const mine = ++issuesRead;
+  if (!quiet) issuesLoading.value = true;
   try {
-    issues.value = await api<Issue[]>(`/boards/${boardId}/issues`);
+    const rows = await api<Issue[]>(`/boards/${boardId}/issues`);
+    // Two board switches in a row can answer out of order; only the newest read may paint.
+    if (mine !== issuesRead) return;
+    issues.value = rows;
+    error.value = null;
   } catch (err) {
+    if (mine !== issuesRead) return;
     issues.value = [];
     error.value = err instanceof Error ? err.message : 'Could not load the issues.';
   } finally {
-    issuesLoading.value = false;
+    if (mine === issuesRead) issuesLoading.value = false;
   }
 }
 
@@ -194,23 +204,32 @@ watch(current, (board) => {
   if (!route.params.slug) void router.replace(`/${short}/${board.slug}`);
 });
 
-async function load(short: string): Promise<void> {
-  loading.value = true;
+async function load(short: string, quiet = false): Promise<void> {
+  const mine = ++projectRead;
+  if (!quiet) {
+    // A project left on screen while the next one loads is a board you can still click into by mistake.
+    loading.value = true;
+    project.value = null;
+    issues.value = [];
+    tags.value = [];
+  }
   error.value = null;
   try {
     const [loaded, tagRows] = await Promise.all([
       api<Project>(`/projects/${encodeURIComponent(short)}`),
       api<Tag[]>(`/tags?project=${encodeURIComponent(short)}`),
     ]);
+    if (mine !== projectRead) return;
     project.value = loaded;
     tags.value = tagRows;
     lastProject.set(loaded.shortName);
   } catch (err) {
+    if (mine !== projectRead) return;
     project.value = null;
     tags.value = [];
     error.value = err instanceof Error ? err.message : 'Could not load the project.';
   } finally {
-    loading.value = false;
+    if (mine === projectRead) loading.value = false;
   }
 }
 

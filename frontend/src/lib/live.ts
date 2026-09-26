@@ -38,19 +38,9 @@ function open(): void {
   source.onerror = () => {};
 }
 
-function close(): void {
-  if (!handlers.size && source) {
-    source.close();
-    source = null;
-  }
-}
-
-/** Listen for as long as the component lives. */
+/** Listen for as long as the component lives. The stream itself stays open: navigating from one screen to the next unmounts before it mounts, and closing on the way would tear the connection down and build it again on every click. */
 export function useLive(handler: Handler): void {
   handlers.add(handler);
   open();
-  onUnmounted(() => {
-    handlers.delete(handler);
-    close();
-  });
+  onUnmounted(() => handlers.delete(handler));
 }

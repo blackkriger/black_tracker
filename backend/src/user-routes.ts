@@ -35,7 +35,7 @@ const userPatch = z.object({
 });
 
 export function registerUserRoutes(app: FastifyInstance): void {
-  // Everyone signed in can read the list: assignee pickers and mentions need names. It carries no secrets — no email, no token, no hash.
+  // The admin's own view of the accounts, with dates and the tail of each API token. The open list everyone else reads is /people below.
   app.get('/users', async (req, reply) => {
     const auth = await requireAdmin(req, reply);
     if (!auth) return;

@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
+import { deniedFor } from './board-service.js';
 import { pickColor } from './colors.js';
 import { projectByShort } from './project-routes.js';
 
@@ -35,10 +36,14 @@ const tagPatch = z.object({
 });
 
 // One name, one tag. A name that already lives on another project cannot become a second tag with the same word on it — the two are the same idea, so they are merged into a single tag that works everywhere. The survivor keeps its id, so every issue already wearing it keeps its tag; the others hand over their issues and go.
-async function mergeIntoGlobal(name: string): Promise<TagRow> {
+async function mergeIntoGlobal(name: string, renameFirst?: string): Promise<TagRow> {
   return inTransaction(async (client) => {
-    const existing = await client.query<{ id: string; project_id: string | null; created: string }>(
-      `select id, project_id, id::text as created from tags where lower(name) = lower($1) order by (project_id is null) desc, id`,
+    // A rename that ends in a merge happens inside the merge: a committed rename with a failed merge would leave exactly the duplicate this function exists to remove.
+    if (renameFirst) {
+      await client.query('update tags set name = $2 where id = $1', [renameFirst, name]);
+    }
+    const existing = await client.query<{ id: string; project_id: string | null }>(
+      `select id, project_id from tags where lower(name) = lower($1) order by (project_id is null) desc, id`,
       [name]
     );
     const rows = existing.rows;
@@ -67,12 +72,18 @@ async function mergeIntoGlobal(name: string): Promise<TagRow> {
 export function registerTagRoutes(app: FastifyInstance): void {
   // `?project=PROJ` narrows to what that project can actually use: its own tags plus the global ones.
   app.get('/tags', async (req, reply) => {
-    if (!(await requireAuth(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const q = req.query as { project?: string };
+    const denied = auth.isAdmin ? null : await deniedFor(auth.roleId);
     let projectId: string | null = null;
     if (q.project) {
       const project = await projectByShort(q.project);
       if (!project) return reply.code(404).send({ error: 'No such project.' });
+      // A project their role cannot open is a project that is not there, tags and all.
+      if (denied && (denied.everything || denied.projects.has(project.id))) {
+        return reply.code(404).send({ error: 'No such project.' });
+      }
       projectId = project.id;
     }
     const res = await pool.query<TagRow>(
@@ -83,7 +94,10 @@ export function registerTagRoutes(app: FastifyInstance): void {
         order by t.project_id nulls first, lower(t.name)`,
       [projectId]
     );
-    return reply.send({ data: res.rows.map(publicTag) });
+    const visible = denied
+      ? res.rows.filter((r) => !r.project_id || !denied.projects.has(r.project_id))
+      : res.rows;
+    return reply.send({ data: (denied?.everything ? [] : visible).map(publicTag) });
   });
 
   app.post('/tags', async (req, reply) => {
@@ -155,6 +169,10 @@ export function registerTagRoutes(app: FastifyInstance): void {
     if (twins.rows.some((t) => t.project_id === current.rows[0].project_id)) {
       return reply.code(409).send({ error: 'A tag with that name already exists here.' });
     }
+    if (twins.rowCount) {
+      const merged = await mergeIntoGlobal(parsed.data.name, id);
+      return reply.send({ data: { ...publicTag(merged), merged: true } });
+    }
     const res = await pool.query<TagRow>(
       `update tags set name = $2
         where id = $1
@@ -162,10 +180,6 @@ export function registerTagRoutes(app: FastifyInstance): void {
                   (select count(*)::int from issue_tags it where it.tag_id = tags.id) as used`,
       [id, parsed.data.name]
     );
-    if (twins.rowCount) {
-      const merged = await mergeIntoGlobal(parsed.data.name);
-      return reply.send({ data: { ...publicTag(merged), merged: true } });
-    }
     return reply.send({ data: publicTag(res.rows[0]) });
   });
 

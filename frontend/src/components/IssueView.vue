@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // One issue, opened over the board it lives on: the text on the left, what it is on the right, and underneath it everything that has been said and done about it. Every edit is its own small write — there is no Save for the issue as a whole.
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import Dialog from './Dialog.vue';
 import RichText from './RichText.vue';
-import { api } from '../lib/api';
+import { TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank } from '../lib/richtext';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
@@ -132,8 +133,9 @@ const files = computed(() =>
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
-  if (editing.value) editing.value = false;
-  else emit('close');
+  if (deleting.value) deleting.value = false;
+  else if (creating.value || !editing.value) emit('close');
+  else editing.value = false;
 }
 
 onMounted(() => {
@@ -198,18 +200,21 @@ async function load(): Promise<void> {
 }
 
 // Every property writes on its own and hands the card the new shape.
-async function patch(body: Record<string, unknown>): Promise<void> {
+async function patch(body: Record<string, unknown>): Promise<boolean> {
   const current = issue.value;
-  if (!current) return;
+  if (!current) return false;
   error.value = null;
   try {
     const updated = await api<Issue>(`/issues/${current.id}`, { method: 'PATCH', body });
-    issue.value = { ...current, ...updated };
+    // Read from the ref again rather than the snapshot: an event may have replaced the issue while this was in flight.
+    issue.value = { ...(issue.value ?? current), ...updated };
     emit('changed', updated);
     // The answer carries the issue but not what it did to the record: history is read again so it grows as you work.
     await reload();
+    return true;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not save the change.';
+    return false;
   }
 }
 
@@ -263,7 +268,8 @@ async function saveText(): Promise<void> {
   if (bodyDraft.value !== current.description) body.description = bodyDraft.value;
   saving.value = true;
   try {
-    if (Object.keys(body).length) await patch(body);
+    // Leaving edit mode on a failed write would throw away what they just typed.
+    if (Object.keys(body).length && !(await patch(body))) return;
     editing.value = false;
   } finally {
     saving.value = false;
@@ -288,7 +294,8 @@ async function postComment(): Promise<void> {
       method: 'POST',
       body: { text },
     });
-    issue.value = { ...current, comments: [...current.comments, created] };
+    const now = issue.value ?? current;
+    issue.value = { ...now, comments: [...now.comments, created] };
     commentDraft.value = '';
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not post the comment.';
@@ -307,9 +314,10 @@ async function saveComment(c: Comment): Promise<void> {
       method: 'PATCH',
       body: { text },
     });
+    const now = issue.value ?? current;
     issue.value = {
-      ...current,
-      comments: current.comments.map((row) =>
+      ...now,
+      comments: now.comments.map((row) =>
         row.id === c.id ? { ...row, text, editedAt: updated.editedAt } : row
       ),
     };
@@ -323,7 +331,8 @@ async function removeComment(c: Comment): Promise<void> {
   if (!current) return;
   try {
     await api(`/comments/${c.id}`, { method: 'DELETE' });
-    issue.value = { ...current, comments: current.comments.filter((row) => row.id !== c.id) };
+    const now = issue.value ?? current;
+    issue.value = { ...now, comments: now.comments.filter((row) => row.id !== c.id) };
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not delete the comment.';
   }
@@ -341,6 +350,7 @@ async function upload(list: FileList | null): Promise<void> {
       const res = await fetch(`/api/issues/${current.id}/attachments`, {
         method: 'POST',
         credentials: 'include',
+        headers: { 'X-Tab-Id': TAB_ID },
         body: form,
       });
       const payload = (await res.json().catch(() => null)) as
@@ -365,10 +375,8 @@ async function removeAttachment(a: Attachment): Promise<void> {
   if (!current) return;
   try {
     await api(`/attachments/${a.id}`, { method: 'DELETE' });
-    issue.value = {
-      ...current,
-      attachments: current.attachments.filter((row) => row.id !== a.id),
-    };
+    const now = issue.value ?? current;
+    issue.value = { ...now, attachments: now.attachments.filter((row) => row.id !== a.id) };
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not delete the file.';
   }
@@ -581,7 +589,7 @@ async function removeIssue(): Promise<void> {
                 </div>
               </article>
 
-              <form class="cm cm--new" @submit.prevent="postComment">
+              <form class="cm" @submit.prevent="postComment">
                 <span class="av av--lg" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
                 <div>
                   <RichText v-model="commentDraft" min-height="90px" placeholder="Write a comment…" />
@@ -715,18 +723,13 @@ async function removeIssue(): Promise<void> {
         <div v-if="error" class="err iv__err">{{ error }}</div>
       </section>
 
-      <div v-if="deleting" class="iv__confirm">
-        <section class="dlg iv__confirm-win" role="dialog" aria-modal="true">
-          <header class="dlg__h"><span>Delete {{ issueKey }}</span></header>
-          <div class="dlg__b">
-            <p>This takes its comments, files and history with it. This cannot be undone.</p>
-          </div>
-          <div class="dlg__f">
-            <button class="btn" type="button" @click="deleting = false">Cancel</button>
-            <button class="btn btn--danger" type="button" @click="removeIssue">Delete issue</button>
-          </div>
-        </section>
-      </div>
+      <Dialog v-if="deleting" :title="`Delete ${issueKey}`" @close="deleting = false">
+        <p class="iv__lede">This takes its comments, files and history with it. This cannot be undone.</p>
+        <template #footer>
+          <button class="btn" type="button" @click="deleting = false">Cancel</button>
+          <button class="btn btn--danger" type="button" @click="removeIssue">Delete issue</button>
+        </template>
+      </Dialog>
     </div>
   </Teleport>
 </template>
@@ -783,15 +786,7 @@ async function removeIssue(): Promise<void> {
 .iv__body :deep(p:last-child) {
   margin-bottom: 0;
 }
-.iv__body-edit {
-  width: 100%;
-  height: 120px;
-  padding: 10px;
-  line-height: 1.55;
-  resize: vertical;
-}
 /* The buttons belong to the field above them, not stuck to its edge. */
-.iv__body-edit + .composer__row,
 .rt + .composer__row {
   margin-top: 8px;
 }
@@ -842,18 +837,7 @@ async function removeIssue(): Promise<void> {
 .iv__err {
   padding: 0 24px 16px;
 }
-.iv__confirm {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-}
-.iv__confirm-win {
-  width: 360px;
-}
-.iv__confirm p {
+.iv__lede {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;

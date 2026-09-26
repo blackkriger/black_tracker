@@ -4,6 +4,8 @@ import { hashPassword } from './auth.js';
 import { pool } from './db.js';
 
 const [login, password, admin = '', fullName = ''] = process.argv.slice(2);
+// Saying nothing about admin means saying nothing: a password reset leaves the flag as it stands.
+const setsAdmin = admin === 'admin';
 
 if (!login || !password) {
   console.error('Usage: npm run create-user -- <login> <password> [admin] ["Full name"]');
@@ -24,11 +26,11 @@ const res = await pool.query<{ login: string; is_admin: boolean }>(
    values ($1, $2, $3, $4)
    on conflict (login) do update
       set password_hash = excluded.password_hash,
-          is_admin = excluded.is_admin,
+          is_admin = case when $5 then excluded.is_admin else users.is_admin end,
           full_name = case when excluded.full_name = '' then users.full_name else excluded.full_name end,
           active = true
    returning login, is_admin`,
-  [login, hash, admin === 'admin', fullName]
+  [login, hash, setsAdmin, fullName, setsAdmin]
 );
 
 console.log(`Ready: ${res.rows[0].login}${res.rows[0].is_admin ? ' (admin)' : ''}`);

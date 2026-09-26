@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import TopBar from '../components/TopBar.vue';
 import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
+import { stamp } from '../lib/issues';
 import { useSession, type Me } from '../lib/session';
 
 const session = useSession();
@@ -41,13 +42,6 @@ const since = computed(() => stamp(me.value?.createdAt ?? null));
 const role = computed(() => me.value?.role ?? null);
 const tokenCreated = computed(() => stamp(me.value?.token?.createdAt ?? null));
 const tokenUsed = computed(() => stamp(me.value?.token?.lastUsedAt ?? null));
-
-function stamp(iso: string | null): string {
-  if (!iso) return '';
-  return new Date(iso)
-    .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    .toUpperCase();
-}
 
 async function saveName(): Promise<void> {
   if (nameBusy.value) return;

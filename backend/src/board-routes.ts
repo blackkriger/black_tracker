@@ -185,10 +185,17 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   });
 
   app.delete('/boards/:id', async (req, reply) => {
-    if (!(await requireDeleter(req, reply))) return;
+    const auth = await requireDeleter(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
     const board = await boardById(id);
     if (!board) return reply.code(404).send({ error: 'No such board.' });
+    if (!auth.isAdmin) {
+      const denied = await deniedFor(auth.roleId);
+      if (denied.everything || denied.boards.has(id) || denied.projects.has(board.project_id)) {
+        return reply.code(403).send({ error: 'This board is not open to you.' });
+      }
+    }
     // The board's statuses and issues go with it, which is what the confirmation on the screen spells out.
     const used = await pool.query<{ n: number }>(
       'select count(*)::int as n from issues where board_id = $1',
@@ -251,16 +258,26 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     );
     if (!before.rowCount) return reply.code(404).send({ error: 'No such status.' });
     const flags = settleFlags(p, before.rows[0]);
-    const res = await pool.query<StateRow>(
-      `update states
-          set name = coalesce($2, name),
-              is_open = $3,
-              is_resolved = $4,
-              position = coalesce($5, position)
-        where id = $1
-        returning *`,
-      [id, p.name ?? null, flags.isOpen, flags.isResolved, p.position ?? null]
-    );
+    let res;
+    try {
+      res = await pool.query<StateRow>(
+        `update states
+            set name = coalesce($2, name),
+                is_open = $3,
+                is_resolved = $4,
+                position = coalesce($5, position)
+          where id = $1
+          returning *`,
+        [id, p.name ?? null, flags.isOpen, flags.isResolved, p.position ?? null]
+      );
+    } catch (err) {
+      // The board's own unique index answers before we do; a renamed status that collides gets the same 409 a new one would.
+      if ((err as { code?: string }).code === '23505') {
+        return reply.code(409).send({ error: 'That board already has a status with this name.' });
+      }
+      throw err;
+    }
+    if (!res.rowCount) return reply.code(404).send({ error: 'No such status.' });
     return reply.send({ data: publicState(res.rows[0]) });
   });
 
@@ -281,8 +298,22 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   });
 
   app.delete('/states/:id', async (req, reply) => {
-    if (!(await requireDeleter(req, reply))) return;
+    const auth = await requireDeleter(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
+    const onBoard = await pool.query<{ board_id: string; project_id: string }>(
+      `select s.board_id, b.project_id from states s join boards b on b.id = s.board_id
+        where s.id = $1`,
+      [id]
+    );
+    if (!onBoard.rowCount) return reply.code(404).send({ error: 'No such status.' });
+    if (!auth.isAdmin) {
+      const denied = await deniedFor(auth.roleId);
+      const { board_id: boardId, project_id: projectId } = onBoard.rows[0];
+      if (denied.everything || denied.boards.has(boardId) || denied.projects.has(projectId)) {
+        return reply.code(403).send({ error: 'This board is not open to you.' });
+      }
+    }
     // Refusing while issues sit in the status is the point: moving them silently would lose where they were.
     const used = await pool.query<{ n: number }>(
       'select count(*)::int as n from issues where state_id = $1',

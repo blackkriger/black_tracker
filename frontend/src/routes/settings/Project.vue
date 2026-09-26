@@ -53,8 +53,8 @@ const confirmKey = ref('');
 const deletingBoard = ref<Board | null>(null);
 const newStatus = ref<Record<string, string>>({});
 
-async function load(): Promise<void> {
-  loading.value = true;
+async function load(quiet = false): Promise<void> {
+  if (!quiet) loading.value = true;
   loadError.value = null;
   try {
     const short = String(route.params.short ?? '');
@@ -69,11 +69,14 @@ async function load(): Promise<void> {
   }
 }
 
-onMounted(load);
-watch(() => route.params.short, load);
+onMounted(() => void load());
+watch(
+  () => route.params.short,
+  () => void load()
+);
 
 useLive((ev) => {
-  if (['project.changed', 'board.changed', 'state.changed'].includes(ev.type)) void load();
+  if (['project.changed', 'board.changed', 'state.changed'].includes(ev.type)) void load(true);
 });
 
 function replaceBoard(next: Board): void {
@@ -455,7 +458,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
 
     <Dialog
       v-if="deleting && project"
-      :title="`Delete ${project.shortName}`"
+      :title="`Delete ${project.name}`"
       @close="deleting = false; confirmKey = ''"
     >
       <p class="dialog__lede">

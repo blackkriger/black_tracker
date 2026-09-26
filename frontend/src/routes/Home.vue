@@ -3,23 +3,18 @@
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
-import { api } from '../lib/api';
 import { lastProject } from '../lib/lastProject';
-
-interface Project {
-  shortName: string;
-  name: string;
-  archived: boolean;
-}
+import { useProjects } from '../lib/projects';
 
 const router = useRouter();
+const { projects, load } = useProjects();
 const loading = ref(true);
 const error = ref<string | null>(null);
 
 onMounted(async () => {
   try {
-    const projects = await api<Project[]>('/projects');
-    const open = projects.filter((p) => !p.archived);
+    await load();
+    const open = projects.value.filter((p) => !p.archived);
     const remembered = open.find((p) => p.shortName === lastProject.get());
     const target = remembered ?? open[0];
     if (target) await router.replace(`/${target.shortName}`);

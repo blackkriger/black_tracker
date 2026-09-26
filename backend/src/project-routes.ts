@@ -161,11 +161,18 @@ export function registerProjectRoutes(app: FastifyInstance): void {
 
   // Deleting a project takes its boards, statuses, issues and its own tags with it — the database cascades — so the caller types the project's full name to prove it meant this one.
   app.delete('/projects/:short', async (req, reply) => {
-    if (!(await requireDeleter(req, reply))) return;
+    const auth = await requireDeleter(req, reply);
+    if (!auth) return;
     const { short } = req.params as { short: string };
     const parsed = z.object({ confirm: z.string().trim() }).safeParse(req.body);
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
+    if (!auth.isAdmin) {
+      const denied = await deniedFor(auth.roleId);
+      if (denied.everything || denied.projects.has(project.id)) {
+        return reply.code(404).send({ error: 'No such project.' });
+      }
+    }
     if (
       !parsed.success ||
       parsed.data.confirm.toLowerCase() !== project.name.trim().toLowerCase()

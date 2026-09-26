@@ -1,10 +1,10 @@
 // Two ways in, one place that sets `req.auth`: a session cookie for the browser and a personal API token for agents and scripts. The token is deliberately weaker — it can move issues around, but it cannot speak as a person, so comment routes demand a session.
 
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { pool } from './db.js';
+import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 
 export const SESSION_COOKIE = 'tracker_session';
@@ -257,10 +257,49 @@ const passwordSchema = z.object({
   newPassword: z.string().min(8).max(200),
 });
 
+const TRIES_BEFORE_LOCK = 8;
+const LOCK_MS = 5 * 60 * 1000;
+const tries = new Map<string, { count: number; until: number }>();
+
+function attemptKey(req: FastifyRequest, login: string): string {
+  return `${req.ip}|${login.toLowerCase()}`;
+}
+
+function lockedFor(key: string): number {
+  const row = tries.get(key);
+  if (!row) return 0;
+  if (row.until > Date.now()) return row.until - Date.now();
+  if (row.until) tries.delete(key);
+  return 0;
+}
+
+function noteFailure(key: string): void {
+  const row = tries.get(key) ?? { count: 0, until: 0 };
+  row.count += 1;
+  if (row.count >= TRIES_BEFORE_LOCK) {
+    row.count = 0;
+    row.until = Date.now() + LOCK_MS;
+  }
+  tries.set(key, row);
+  // The map is keyed by address and login, so it is swept rather than left to grow on a stream of invented logins.
+  if (tries.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of tries) if (v.until && v.until < now) tries.delete(k);
+  }
+}
+
 export function registerAuthRoutes(app: FastifyInstance): void {
   app.post('/login', async (req, reply) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Login and password required.' });
+
+    const key = attemptKey(req, parsed.data.login);
+    const waiting = lockedFor(key);
+    if (waiting) {
+      return reply
+        .code(429)
+        .send({ error: `Too many attempts. Try again in ${Math.ceil(waiting / 60000)} minutes.` });
+    }
 
     const res = await pool.query<UserRow & { password_hash: string }>(
       `${USER_SELECT} where lower(u.login) = lower($1)`,
@@ -271,8 +310,10 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     const hash = row?.password_hash ?? '$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidiu';
     const ok = await checkPassword(parsed.data.password, hash);
     if (!row || !ok || !row.active) {
+      noteFailure(key);
       return reply.code(401).send({ error: 'Wrong login or password.' });
     }
+    tries.delete(key);
 
     await startSession(reply, row.id);
     return reply.send({ data: publicUser(row) });
@@ -353,9 +394,12 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'Current password is wrong.' });
     }
     const hash = await hashPassword(parsed.data.newPassword);
-    // Changing the password drops every other session; this one is re-issued so the browser stays signed in.
-    await pool.query('update users set password_hash = $1 where id = $2', [hash, auth.userId]);
-    await pool.query('delete from sessions where user_id = $1', [auth.userId]);
+    // Changing the password drops every other session, and the two happen together: a new password that left the old cookies working would be the one failure this route exists to prevent.
+    await inTransaction(async (client) => {
+      await client.query('update users set password_hash = $1 where id = $2', [hash, auth.userId]);
+      await client.query('delete from sessions where user_id = $1', [auth.userId]);
+    });
+    // The browser's own session is re-issued afterwards: if this fails, they are signed out, which is the safe end of it.
     const raw = await createSession(auth.userId);
     reply.setCookie(SESSION_COOKIE, raw, {
       httpOnly: true,
@@ -373,11 +417,4 @@ export async function pruneSessions(): Promise<void> {
   await pool
     .query('delete from sessions where expires_at < now()')
     .catch((err) => console.error('[auth] session prune failed', err));
-}
-
-// Constant-time compare for anything that needs it later (webhook secrets, invite codes).
-export function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  return ab.length === bb.length && timingSafeEqual(ab, bb);
 }
