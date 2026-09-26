@@ -27,39 +27,66 @@ async function signOut(): Promise<void> {
 
 <template>
   <header class="top">
-    <nav v-if="live.length" class="tabs projects" aria-label="Projects">
+    <nav v-if="live.length" class="topitems" aria-label="Projects">
       <RouterLink
         v-for="p in live"
         :key="p.id"
-        class="tab project"
+        class="topitem"
         :to="`/p/${p.shortName}`"
         :aria-current="p.shortName === currentShort ? 'page' : undefined"
       >
         <span class="proj__k">{{ p.shortName }}</span>
-        <span class="project__name">{{ p.name }}</span>
+        <span class="topitem__name">{{ p.name }}</span>
       </RouterLink>
     </nav>
 
     <div class="sp"></div>
 
-    <RouterLink class="toplink" to="/profile">{{ session.me.value?.login }}</RouterLink>
-    <RouterLink v-if="session.me.value?.isAdmin" class="toplink" to="/settings">Settings</RouterLink>
-    <button class="btn btn--ghost btn--sm" type="button" @click="signOut">Sign out</button>
+    <nav class="topitems" aria-label="Account">
+      <RouterLink class="topitem" to="/profile">{{ session.me.value?.login }}</RouterLink>
+      <RouterLink v-if="session.me.value?.isAdmin" class="topitem" to="/settings">Settings</RouterLink>
+      <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
+    </nav>
   </header>
 </template>
 
 <style scoped>
-.projects {
-  /* The bar's first element, so it carries no divider of its own. */
-  padding-left: 0;
-  border-left: 0;
-  height: auto;
+/* One treatment for everything in the bar: a flat item that fills on hover and stays filled where you are. Only signing out reads differently, and only because it is the one thing here you would not want to hit by accident. */
+.topitems {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
-.project {
+.topitem {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
   height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 13px var(--font-ui);
+  text-decoration: none;
+  cursor: pointer;
 }
-.project__name {
+.topitem:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+.topitem[aria-current] {
+  color: var(--text);
+  background: var(--surface);
+}
+.topitem:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.topitem__name {
   font-weight: 500;
+}
+.topitem--danger:hover {
+  color: var(--danger-text);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 </style>
