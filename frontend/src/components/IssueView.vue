@@ -1310,12 +1310,9 @@ async function removeIssue(): Promise<void> {
   font: 13px var(--font-ui);
   cursor: pointer;
 }
+/* The words light up and nothing else, the way the top bar's do. */
 .selbar button:hover {
   color: var(--text);
-  background: var(--card-hover);
-}
-.selbar button + button {
-  box-shadow: inset 1px 0 var(--line);
 }
 .selbar.is-far {
   opacity: 0.25;
