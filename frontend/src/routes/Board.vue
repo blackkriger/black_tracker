@@ -102,7 +102,7 @@ watch(
       >{{ t.name }}</span>
     </div>
 
-    <div class="page__body">
+    <div class="page__body" :class="{ 'page__body--tags': tags.length }">
       <p v-if="loading" class="hint">Loading…</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
       <div v-else-if="current" class="cols">
@@ -138,6 +138,10 @@ watch(
   flex: 1 1 auto;
   padding: var(--space-5);
   overflow-x: auto;
+}
+/* The tag bar already spaces the columns off the header, so the body does not do it twice. */
+.page__body--tags {
+  padding-top: 0;
 }
 .cols {
   display: flex;
