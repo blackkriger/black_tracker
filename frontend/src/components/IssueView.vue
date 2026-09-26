@@ -583,6 +583,8 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-direction: column;
   width: min(1100px, 100%);
+  /* An issue with nothing in it yet keeps the same window as one with a year of history behind it. */
+  min-height: min(760px, 100%);
   max-height: 100%;
   overflow: hidden;
 }
