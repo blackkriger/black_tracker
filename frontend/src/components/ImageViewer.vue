@@ -107,11 +107,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
       </div>
 
       <div class="iviewer__bar">
-        <button v-if="count > 1" class="btn btn--sm" type="button" aria-label="Previous" @click="go(-1)">‹</button>
-        <span v-if="count > 1" class="iviewer__n">{{ (index ?? 0) + 1 }} / {{ count }}</span>
-        <button v-if="count > 1" class="btn btn--sm" type="button" aria-label="Next" @click="go(1)">›</button>
         <span class="iviewer__name">{{ current.name }}</span>
-        <button class="btn btn--sm" type="button" aria-label="Close" @click="close">✕</button>
+        <div class="iviewer__nav">
+          <button v-if="count > 1" class="btn btn--sm" type="button" aria-label="Previous" @click="go(-1)">‹</button>
+          <span v-if="count > 1" class="iviewer__n">{{ (index ?? 0) + 1 }} / {{ count }}</span>
+          <button v-if="count > 1" class="btn btn--sm" type="button" aria-label="Next" @click="go(1)">›</button>
+        </div>
+        <button class="btn btn--sm iviewer__close" type="button" aria-label="Close" @click="close">✕</button>
       </div>
     </div>
   </Teleport>
@@ -146,15 +148,24 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 .iviewer__img:active {
   cursor: grabbing;
 }
+/* Three columns of equal weight on the outside: the name reads from the left edge, the close sits on the right, and the walk stays in the middle of the screen however long the name is. */
 .iviewer__bar {
   flex: none;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  padding: 8px;
+  padding: 8px 12px;
   background: var(--surface);
   border-top: 1px solid var(--line);
+}
+.iviewer__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.iviewer__close {
+  justify-self: end;
 }
 .iviewer__n {
   min-width: 56px;
@@ -163,7 +174,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   color: var(--accent);
 }
 .iviewer__name {
-  max-width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
