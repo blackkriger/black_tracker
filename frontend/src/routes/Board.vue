@@ -5,7 +5,6 @@ import { useRoute, useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
-import { buddyAvatarStyle } from '../lib/avatar';
 import { dueLabel, priorityClass, type Issue } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
 
@@ -278,6 +277,15 @@ watch(
                 </span>
               </div>
               <div class="card__title">{{ i.summary }}</div>
+              <div v-if="i.assignee || i.dueDate" class="card__meta">
+                <span v-if="i.assignee" class="card__who">{{ i.assignee.login }}</span>
+                <div class="sp"></div>
+                <span
+                  v-if="dueLabel(i.dueDate)"
+                  class="due"
+                  :class="{ 'due--late': dueLabel(i.dueDate)?.late }"
+                >{{ dueLabel(i.dueDate)?.text }}</span>
+              </div>
               <div v-if="i.tags.length" class="card__tags">
                 <span
                   v-for="t in i.tags"
@@ -285,19 +293,6 @@ watch(
                   class="taglabel taglabel--plain taglabel--sm"
                   :style="{ '--c': t.color }"
                 >{{ t.name }}</span>
-              </div>
-              <div v-if="i.assignee || i.dueDate" class="card__meta">
-                <span
-                  v-if="dueLabel(i.dueDate)"
-                  class="due"
-                  :class="{ 'due--late': dueLabel(i.dueDate)?.late }"
-                >{{ dueLabel(i.dueDate)?.text }}</span>
-                <span
-                  v-if="i.assignee"
-                  class="av card__av"
-                  :style="buddyAvatarStyle(i.assignee.login)"
-                  :title="i.assignee.login"
-                ></span>
               </div>
             </article>
 
@@ -360,11 +355,8 @@ watch(
   flex-wrap: wrap;
   gap: 4px;
 }
-.card__meta {
-  justify-content: flex-end;
-}
-.card__av {
-  width: 22px;
-  height: 22px;
+.card__who {
+  font-size: 12.5px;
+  color: var(--text-dim);
 }
 </style>
