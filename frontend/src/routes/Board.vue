@@ -78,7 +78,7 @@ watch(
 
 <template>
   <div class="page">
-    <TopBar :project="project" />
+    <TopBar :project="project" :board="current" />
 
     <div class="page__body">
       <p v-if="loading" class="hint">Loading…</p>

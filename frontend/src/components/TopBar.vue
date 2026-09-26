@@ -10,6 +10,8 @@ import { useSession } from '../lib/session';
 const props = defineProps<{
   /** The project this screen belongs to, when it belongs to one. */
   project?: { shortName: string; name: string } | null;
+  /** The board being looked at, named beside its project so you can see where you are. */
+  board?: { name: string; slug: string } | null;
 }>();
 
 const session = useSession();
@@ -19,7 +21,8 @@ const { projects, load } = useProjects();
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const currentShort = computed(() => props.project?.shortName ?? null);
-const currentSlug = computed(() => String(route.params.slug ?? ''));
+// The address names the board once you have picked one; until then the screen itself says which board it settled on.
+const currentSlug = computed(() => props.board?.slug ?? String(route.params.slug ?? ''));
 
 // Which project's menu is open, and the boards read so far. A project's boards are fetched the first time its caret is used and kept for the rest of the page's life.
 const openShort = ref<string | null>(null);
@@ -91,7 +94,14 @@ async function signOut(): Promise<void> {
           :aria-expanded="openShort === p.shortName"
           :aria-label="`Boards of ${p.name}`"
           @click="toggleBoards(p.shortName)"
-        >▾</button>
+        >
+          <span v-if="p.shortName === currentShort && board" class="topitem__board">{{ board.name }}</span>
+          <span class="topitem__caret">▾</span>
+        </button>
+        <span
+          v-else-if="p.shortName === currentShort && board"
+          class="topitem topitem--caret topitem__board"
+        >{{ board.name }}</span>
 
         <div v-if="openShort === p.shortName" class="menu boardmenu" role="menu">
           <button
@@ -157,7 +167,14 @@ async function signOut(): Promise<void> {
   align-items: center;
 }
 .topitem--caret {
+  gap: 6px;
   padding: 0 6px;
+}
+.topitem__board {
+  color: var(--text);
+  font-size: 13px;
+}
+.topitem__caret {
   font-size: 10px;
 }
 .boardmenu {
