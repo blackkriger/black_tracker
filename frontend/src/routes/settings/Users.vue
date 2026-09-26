@@ -10,6 +10,7 @@ import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
 import { useSession } from '../../lib/session';
+import { X } from 'lucide-vue-next';
 
 interface Role {
   id: string;
@@ -361,7 +362,7 @@ async function saveAccess(): Promise<void> {
                   aria-label="Delete role"
                   @click="removingRole = r"
                 >
-                  ✕
+                  <X class="ic ic--sm" />
                 </button>
               </td>
             </tr>
@@ -397,7 +398,7 @@ async function saveAccess(): Promise<void> {
               aria-label="Hide the link"
               @click="freshLink = null"
             >
-              ✕
+              <X class="ic ic--sm" />
             </button>
           </div>
           <span class="hint">It is stored as a hash, so this is the only time it can be read.</span>
@@ -474,7 +475,7 @@ async function saveAccess(): Promise<void> {
                   aria-label="Revoke link"
                   @click="revokeInvite(i)"
                 >
-                  ✕
+                  <X class="ic ic--sm" />
                 </button>
               </td>
             </tr>

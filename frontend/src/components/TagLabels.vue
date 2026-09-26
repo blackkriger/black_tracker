@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // One scope's tags: coloured labels, a click renames, the cross deletes, and the row below adds. The colour is the server's, so there is nothing here to pick.
 import { nextTick, ref } from 'vue';
+import { X } from 'lucide-vue-next';
 
 export interface TagItem {
   id: string;
@@ -60,7 +61,7 @@ function add(): void {
         :aria-label="`Delete ${t.name}`"
         :disabled="!canRemove"
         @click="emit('remove', t)"
-      >✕</button>
+      ><X class="ic ic--sm" /></button>
     </span>
   </div>
 

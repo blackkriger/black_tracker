@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { stamp } from '../lib/issues';
 import { useSession, type Me } from '../lib/session';
+import { Check, X } from 'lucide-vue-next';
 
 const session = useSession();
 const me = session.me;
@@ -232,8 +233,8 @@ async function copyToken(): Promise<void> {
             <div class="token__can">
               <span class="label token__can-h">What the token can do:</span>
               <ul class="token__list">
-                <li><span class="token__yes">✓</span>Create issues, change status, priority, assignee, tags</li>
-                <li><span class="token__no">✕</span>Post or edit comments</li>
+                <li><Check class="ic token__yes" />Create issues, change status, priority, assignee, tags</li>
+                <li><X class="ic token__no" />Post or edit comments</li>
               </ul>
             </div>
 
@@ -345,11 +346,10 @@ async function copyToken(): Promise<void> {
   display: flex;
   gap: 10px;
 }
+/* The tick and the cross are icons now; they only need to sit on the first line of their item. */
 .token__yes,
 .token__no {
-  width: 14px;
-  flex: none;
-  font-family: var(--font-num);
+  margin-top: 3px;
 }
 .token__yes {
   color: #8effa9;

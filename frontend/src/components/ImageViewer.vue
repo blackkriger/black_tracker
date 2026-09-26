@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // A picture, full screen: the viewer from another project, brought over and dressed in this theme. Wheel zooms towards the cursor, drag moves the picture, double click puts it back, arrows walk the set. `v-model:index` holds which one is open, null closes it.
 import { computed, onUnmounted, ref, watch } from 'vue';
+import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 
 const props = defineProps<{ images: { src: string; name: string }[]; index: number | null }>();
 const emit = defineEmits<{ (e: 'update:index', v: number | null): void }>();
@@ -109,11 +110,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
       <div class="iviewer__bar">
         <span class="iviewer__name">{{ current.name }}</span>
         <div class="iviewer__nav">
-          <button v-if="count > 1" class="btn btn--sm" type="button" aria-label="Previous" @click="go(-1)">‹</button>
+          <button v-if="count > 1" class="btn btn--sm" type="button" aria-label="Previous" @click="go(-1)"><ChevronLeft class="ic" /></button>
           <span v-if="count > 1" class="iviewer__n">{{ (index ?? 0) + 1 }} / {{ count }}</span>
-          <button v-if="count > 1" class="btn btn--sm" type="button" aria-label="Next" @click="go(1)">›</button>
+          <button v-if="count > 1" class="btn btn--sm" type="button" aria-label="Next" @click="go(1)"><ChevronRight class="ic" /></button>
         </div>
-        <button class="btn btn--sm iviewer__close" type="button" aria-label="Close" @click="close">✕</button>
+        <button class="btn btn--sm iviewer__close" type="button" aria-label="Close" @click="close"><X class="ic" /></button>
       </div>
     </div>
   </Teleport>

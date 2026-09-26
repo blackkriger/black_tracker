@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { dueLabel, priorityClass, type Issue } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
+import { Plus } from 'lucide-vue-next';
 
 interface State {
   id: string;
@@ -332,7 +333,7 @@ watch(
               type="button"
               :aria-label="`Add an issue to ${s.name}`"
               @click="creatingIn = s.id"
-            >+</button>
+            ><Plus class="ic" /></button>
           </template>
         </div>
       </section>

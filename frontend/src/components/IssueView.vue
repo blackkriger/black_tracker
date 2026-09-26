@@ -9,6 +9,7 @@ import { asHtml, isBlank } from '../lib/richtext';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
+import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Trash2, X } from 'lucide-vue-next';
 import {
   PRIORITIES,
   dueLabel,
@@ -713,7 +714,7 @@ async function removeIssue(): Promise<void> {
               :disabled="!issue"
               @click="startEditing"
             >
-              ✎
+              <Pencil class="ic" />
             </button>
             <button
               class="btn btn--sm btn--icon btn--ghost iv__trash"
@@ -723,16 +724,7 @@ async function removeIssue(): Promise<void> {
               :disabled="!session.canDelete.value"
               @click="deleting = true"
             >
-              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.3"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M3 4.5h10M6.4 4.5V3h3.2v1.5M4.6 4.5l.5 8.1a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.5-8.1M6.7 7v4M9.3 7v4"
-                />
-              </svg>
+              <Trash2 class="ic" />
             </button>
           </template>
           <button
@@ -741,7 +733,7 @@ async function removeIssue(): Promise<void> {
             aria-label="Close"
             @click="emit('close')"
           >
-            ✕
+            <X class="ic" />
           </button>
         </header>
 
@@ -788,15 +780,7 @@ async function removeIssue(): Promise<void> {
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
               <div class="sec-h links">
-                <svg class="links__icon" viewBox="0 0 16 16" width="13" height="13" role="img" aria-hidden="true">
-                  <path
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.3"
-                    stroke-linecap="round"
-                    d="M6.4 9.6 9.6 6.4M6.9 4.7 8.5 3.1a2.9 2.9 0 0 1 4.1 4.1L11 8.8M9.1 11.3l-1.6 1.6a2.9 2.9 0 0 1-4.1-4.1L5 7.2"
-                  />
-                </svg>
+                <Link2 class="ic links__icon" aria-hidden="true" />
                 <RouterLink
                   v-for="l in shownLinks"
                   :key="l.id"
@@ -827,7 +811,7 @@ async function removeIssue(): Promise<void> {
                       type="button"
                       :aria-label="`Delete ${a.filename}`"
                       @click="removeAttachment(a)"
-                    >✕</button>
+                    ><X class="ic ic--sm" /></button>
                   </figcaption>
                 </figure>
               </div>
@@ -839,7 +823,7 @@ async function removeIssue(): Promise<void> {
                   type="button"
                   :aria-label="`Delete ${a.filename}`"
                   @click="removeAttachment(a)"
-                >✕</button>
+                ><X class="ic ic--sm" /></button>
               </div>
 
               <!-- Chosen, not yet uploaded: they go up the moment the issue exists. -->
@@ -851,7 +835,7 @@ async function removeIssue(): Promise<void> {
                   type="button"
                   :aria-label="`Remove ${f.name}`"
                   @click="dropPending(f.name, 'issue')"
-                >✕</button>
+                ><X class="ic ic--sm" /></button>
               </div>
               <label
                 class="drop"
@@ -895,7 +879,7 @@ async function removeIssue(): Promise<void> {
                 :title="order === 'oldest' ? 'Oldest first' : 'Newest first'"
                 @click="flipOrder"
               >
-                {{ order === 'oldest' ? '↑' : '↓' }}
+                <component :is="order === 'oldest' ? ArrowUp : ArrowDown" class="ic" />
               </button>
             </nav>
 
@@ -916,21 +900,11 @@ async function removeIssue(): Promise<void> {
                     <span class="cm__who">{{ c.author.login }}</span>
                     <time class="stamp">{{ stampAt(c.createdAt) }}</time>
                     <span v-if="c.editedAt" class="cm__edited">edited</span>
-                    <svg
+                    <Pin
                       v-if="c.pinnedAt"
-                      class="cm__pin"
-                      viewBox="0 0 16 16"
-                      width="12"
-                      height="12"
-                      role="img"
+                      class="ic ic--sm cm__pin"
                       :aria-label="c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned'"
-                    >
-                      <title>{{ c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned' }}</title>
-                      <path
-                        fill="currentColor"
-                        d="M9.5 1.5 14.5 6.5 12.9 8.1 12 7.9 9.2 10.7 9.6 13.2 8.6 14.2 5.3 10.9 1.9 14.3 1.7 14.1 5.1 10.7 1.8 7.4 2.8 6.4 5.3 6.8 8.1 4 7.9 3.1z"
-                      />
-                    </svg>
+                    />
                     <span class="cm__acts">
                       <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
                         {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
@@ -996,16 +970,7 @@ async function removeIssue(): Promise<void> {
                           class="sr"
                           @change="pickCommentFiles(($event.target as HTMLInputElement).files)"
                         />
-                        <svg viewBox="0 0 16 16" width="13" height="13" role="img" aria-label="Attach files">
-                          <path
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.3"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M12.4 7.3 7 12.7a3 3 0 0 1-4.2-4.2l5.8-5.8a2 2 0 0 1 2.8 2.8l-5.7 5.7a1 1 0 0 1-1.4-1.4l5.1-5.1"
-                          />
-                        </svg>
+                        <Paperclip class="ic" />
                       </label>
                     </template>
                   </RichText>
@@ -1018,7 +983,7 @@ async function removeIssue(): Promise<void> {
                         type="button"
                         :aria-label="`Remove ${f.name}`"
                         @click="dropPending(f.name, 'comment')"
-                      >✕</button>
+                      ><X class="ic ic--sm" /></button>
                     </span>
                   </div>
                   <div class="composer__row">
@@ -1121,7 +1086,7 @@ async function removeIssue(): Promise<void> {
                     type="button"
                     :aria-label="`Remove ${t.name}`"
                     @click="toggleTag(t.id, false)"
-                  >✕</button>
+                  ><X class="ic ic--sm" /></button>
                 </span>
                 <select
                   v-if="freeTags.length"
@@ -1275,6 +1240,10 @@ async function removeIssue(): Promise<void> {
 /* The day and the clock ride together in the first column, so it is wider than the theme's default. */
 .hi {
   grid-template-columns: 152px 96px minmax(0, 1fr);
+}
+/* Newest first puts the box you write in at the head of the thread, where the next comment will appear. */
+.cm--lead {
+  order: -1;
 }
 /* The one control in the tab row that is not a tab: it never carries the selected underline. */
 .itab--order {

@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Quill from 'quill';
 import 'quill/dist/quill.core.css';
 import { clean } from '../lib/richtext';
+import { Bold, Code, Heading3, Italic, Link, List, ListOrdered, Quote, Strikethrough } from 'lucide-vue-next';
 
 const body = defineModel<string>({ required: true });
 const props = defineProps<{ placeholder?: string; minHeight?: string }>();
@@ -137,15 +138,15 @@ function addLink(): void {
 <template>
   <div ref="wrap" class="rt">
     <div class="mdbar">
-      <button type="button" :aria-pressed="marks.bold" title="Bold" @click="toggle('bold')"><b>B</b></button>
-      <button type="button" :aria-pressed="marks.italic" title="Italic" @click="toggle('italic')"><i>I</i></button>
-      <button type="button" :aria-pressed="marks.strike" title="Strikethrough" @click="toggle('strike')"><s>S</s></button>
-      <button type="button" :aria-pressed="marks.code" title="Code" @click="toggle('code')">&lt;/&gt;</button>
-      <button type="button" :aria-pressed="marks.header" title="Heading" @click="toggle('header', 3)">H</button>
-      <button type="button" :aria-pressed="marks.bullet" title="Bulleted list" @click="toggle('list', 'bullet')">•</button>
-      <button type="button" :aria-pressed="marks.ordered" title="Numbered list" @click="toggle('list', 'ordered')">1.</button>
-      <button type="button" :aria-pressed="marks.blockquote" title="Quote" @click="toggle('blockquote')">"</button>
-      <button type="button" title="Link" @click="addLink">↗</button>
+      <button type="button" :aria-pressed="marks.bold" title="Bold" @click="toggle('bold')"><Bold class="ic" /></button>
+      <button type="button" :aria-pressed="marks.italic" title="Italic" @click="toggle('italic')"><Italic class="ic" /></button>
+      <button type="button" :aria-pressed="marks.strike" title="Strikethrough" @click="toggle('strike')"><Strikethrough class="ic" /></button>
+      <button type="button" :aria-pressed="marks.code" title="Code" @click="toggle('code')"><Code class="ic" /></button>
+      <button type="button" :aria-pressed="marks.header" title="Heading" @click="toggle('header', 3)"><Heading3 class="ic" /></button>
+      <button type="button" :aria-pressed="marks.bullet" title="Bulleted list" @click="toggle('list', 'bullet')"><List class="ic" /></button>
+      <button type="button" :aria-pressed="marks.ordered" title="Numbered list" @click="toggle('list', 'ordered')"><ListOrdered class="ic" /></button>
+      <button type="button" :aria-pressed="marks.blockquote" title="Quote" @click="toggle('blockquote')"><Quote class="ic" /></button>
+      <button type="button" title="Link" @click="addLink"><Link class="ic" /></button>
       <slot name="tools" />
     </div>
     <div

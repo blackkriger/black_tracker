@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The modal every confirmation and short form uses: a dimmed page, a panel in the middle, Esc and a click outside to leave. It teleports to <body> so no parent's stacking context can trap it.
 import { onMounted, onUnmounted } from 'vue';
+import { X } from 'lucide-vue-next';
 
 defineProps<{ title: string; width?: number }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
@@ -20,7 +21,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
         <header class="dlg__h">
           <span>{{ title }}</span>
           <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Close" @click="emit('close')">
-            ✕
+            <X class="ic" />
           </button>
         </header>
         <div class="dlg__b"><slot /></div>

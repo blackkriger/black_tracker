@@ -6,6 +6,7 @@ import { useProjects, type ProjectMini } from '../lib/projects';
 import { lastBoard } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
+import { ChevronDown } from 'lucide-vue-next';
 
 const props = defineProps<{
   /** The project this screen belongs to, when it belongs to one. */
@@ -110,7 +111,7 @@ async function signOut(): Promise<void> {
             @click="openShort = openShort === p.shortName ? null : p.shortName"
           >
             <span class="topitem__board">{{ shownBoard(p)?.name }}</span>
-            <span class="topitem__caret">▾</span>
+            <ChevronDown class="ic ic--sm" />
           </button>
 
           <div v-if="openShort === p.shortName" class="menu boardmenu" role="menu">

@@ -9,6 +9,7 @@ import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
+import { GripVertical, X } from 'lucide-vue-next';
 
 interface State {
   id: string;
@@ -261,7 +262,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
             </thead>
             <tbody>
               <tr v-for="w in [110, 86, 74, 64]" :key="w">
-                <td class="c-grip grip">⠿</td>
+                <td class="c-grip grip"><GripVertical class="ic" /></td>
                 <td><span class="sk sk--ctl" :style="{ width: `${w}px` }"></span></td>
                 <td><span class="sk sk--box"></span></td>
                 <td><span class="sk sk--box"></span></td>
@@ -371,7 +372,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
                 @dragover.prevent
                 @drop.prevent="onDrop(b, s)"
               >
-                <td class="c-grip grip">⠿</td>
+                <td class="c-grip grip"><GripVertical class="ic" /></td>
                 <td>
                   <input
                     class="input input--sm status-name"
@@ -407,7 +408,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
                     :disabled="!canDelete"
                     @click="deleteStatus(b, s)"
                   >
-                    ✕
+                    <X class="ic ic--sm" />
                   </button>
                 </td>
               </tr>

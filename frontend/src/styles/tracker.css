@@ -56,6 +56,14 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 .num { font-family: var(--font-num); }
 .sp { flex: 1 1 auto; }
 a { color: var(--accent); } a:hover { color: var(--accent-bright); }
+/* Every icon is drawn at the same weight and sits on the text's own colour. */
+.ic { flex: none; width: 14px; height: 14px; stroke-width: 1.5; }
+.ic--sm { width: 12px; height: 12px; }
+
+/* Every icon is drawn at the same weight and sits on the text's own colour. */
+.ic { flex: none; width: 14px; height: 14px; stroke-width: 1.5; }
+.ic--sm { width: 12px; height: 12px; }
+
 ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text); }
 svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
 button { font-family: var(--font-ui); }
