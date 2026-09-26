@@ -97,6 +97,7 @@ async function onSubmit(): Promise<void> {
             type="password"
             autocomplete="new-password"
           />
+          <span class="hint">At least 8 characters.</span>
         </div>
         <div class="field">
           <label class="label" for="join-repeat">Repeat password</label>
