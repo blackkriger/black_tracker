@@ -20,6 +20,7 @@ import {
   type Comment,
   type Issue,
   type IssueFull,
+  type IssueLink,
   type IssueTag,
   type Priority,
 } from '../lib/issues';
@@ -72,6 +73,10 @@ const editing = ref(false);
 const saving = ref(false);
 const titleDraft = ref('');
 const bodyDraft = ref('');
+
+// A link is made by naming the other issue's key; nothing else about it is stored.
+const linkKey = ref('');
+const linking = ref(false);
 
 const commentDraft = ref('');
 const posting = ref(false);
@@ -355,6 +360,40 @@ async function saveComment(c: Comment): Promise<void> {
   }
 }
 
+async function addLink(): Promise<void> {
+  const key = linkKey.value.trim().toUpperCase();
+  const current = issue.value;
+  if (!key || !current || linking.value) return;
+  linking.value = true;
+  error.value = null;
+  try {
+    const made = await api<IssueLink>(`/issues/${current.id}/links`, {
+      method: 'POST',
+      body: { key },
+    });
+    const now = issue.value ?? current;
+    issue.value = { ...now, links: [...now.links, made] };
+    linkKey.value = '';
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Could not link them.';
+  } finally {
+    linking.value = false;
+  }
+}
+
+async function removeLink(link: IssueLink): Promise<void> {
+  const current = issue.value;
+  if (!current) return;
+  error.value = null;
+  try {
+    await api(`/issues/${current.id}/links/${link.id}`, { method: 'DELETE' });
+    const now = issue.value ?? current;
+    issue.value = { ...now, links: now.links.filter((l) => l.id !== link.id) };
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Could not unlink them.';
+  }
+}
+
 async function togglePin(c: Comment): Promise<void> {
   const current = issue.value;
   if (!current) return;
@@ -573,7 +612,38 @@ async function removeIssue(): Promise<void> {
                 :class="{ 'is-fresh': fresh.has('description') }"
                 v-html="asHtml(issue.description)"
               ></div>
-              <div v-else class="md iv__body hint">Nothing written yet.</div>
+              <div v-else class="iv__body hint">Nothing written yet.</div>
+            </div>
+
+            <div v-if="issue" :class="{ 'is-fresh': fresh.has('links') }">
+              <div class="sec-h">Linked<span class="n">{{ issue.links.length }}</span></div>
+              <RouterLink
+                v-for="l in issue.links"
+                :key="l.id"
+                class="lk"
+                :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
+              >
+                <span class="key">{{ l.key }}</span>
+                <span class="lk__sum">{{ l.summary }}</span>
+                <span class="lk__state" :style="{ color: l.stateColor }">{{ l.stateName }}</span>
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  :aria-label="`Unlink ${l.key}`"
+                  @click.prevent="removeLink(l)"
+                >✕</button>
+              </RouterLink>
+
+              <form class="addrow" @submit.prevent="addLink">
+                <input
+                  v-model="linkKey"
+                  class="input"
+                  placeholder="Link an issue by its key…"
+                  maxlength="30"
+                  @input="linkKey = linkKey.toUpperCase()"
+                />
+                <button class="btn" type="submit" :disabled="!linkKey.trim() || linking">Link</button>
+              </form>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('files') }">
@@ -1020,6 +1090,32 @@ async function removeIssue(): Promise<void> {
 }
 .att__row--wait {
   border-style: dashed;
+}
+/* A linked issue reads as one line: its key, what it says, and where it stands. */
+.lk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--line);
+  margin-bottom: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+.lk:hover {
+  border-color: var(--line-2);
+  background: var(--card-hover);
+}
+.lk__sum {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.lk__state {
+  font-size: 12px;
 }
 .cm__files {
   display: flex;

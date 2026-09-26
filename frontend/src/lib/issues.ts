@@ -62,10 +62,22 @@ export interface Attachment {
   createdAt: string;
 }
 
+/** The other issue of a pair. A link says nothing but "these two are related". */
+export interface IssueLink {
+  id: string;
+  key: string;
+  summary: string;
+  stateName: string;
+  stateColor: string;
+  projectShort: string;
+  boardSlug: string;
+}
+
 export interface IssueFull extends Issue {
   comments: Comment[];
   history: HistoryEntry[];
   attachments: Attachment[];
+  links: IssueLink[];
 }
 
 export const PRIORITIES: Priority[] = ['Critical', 'Major', 'Normal', 'Minor'];

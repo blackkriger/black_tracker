@@ -101,6 +101,51 @@ async function tagsFor(issueIds: string[]): Promise<Map<string, TagRow[]>> {
   return out;
 }
 
+interface LinkRow {
+  id: string;
+  readable_id: string;
+  summary: string;
+  state_name: string;
+  state_color: string;
+  short_name: string;
+  slug: string;
+  board_id: string;
+  project_id: string;
+}
+
+// The other issue of every pair this one is in. A link to something the reader's role cannot open is not shown at all — it would be a keyhole into a closed board.
+async function linksOf(issueId: string, auth: Auth): Promise<LinkRow[]> {
+  const res = await pool.query<LinkRow>(
+    `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
+            s.name as state_name, s.color as state_color,
+            p.short_name, b.slug
+       from issue_links l
+       join issues i on i.id = case when l.a = $1 then l.b else l.a end
+       join states s on s.id = i.state_id
+       join projects p on p.id = i.project_id
+       join boards b on b.id = i.board_id
+      where l.a = $1 or l.b = $1
+      order by i.readable_id`,
+    [issueId]
+  );
+  if (auth.isAdmin) return res.rows;
+  const denied = await deniedFor(auth.roleId);
+  if (denied.everything) return [];
+  return res.rows.filter(
+    (r) => !denied.boards.has(r.board_id) && !denied.projects.has(r.project_id)
+  );
+}
+
+const publicLink = (r: LinkRow) => ({
+  id: r.id,
+  key: r.readable_id,
+  summary: r.summary,
+  stateName: r.state_name,
+  stateColor: r.state_color,
+  projectShort: r.short_name,
+  boardSlug: r.slug,
+});
+
 async function issueById(id: string): Promise<IssueRow | null> {
   const res = await pool.query<IssueRow>(`${ISSUE_SELECT} where i.id = $1`, [id]);
   return res.rows[0] ?? null;
@@ -376,7 +421,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
 
-    const [tags, comments, history, attachments] = await Promise.all([
+    const [tags, comments, history, attachments, links] = await Promise.all([
       tagsFor([issue.id]),
       pool.query(
         `select c.id, c.text, c.created_at, c.edited_at, c.author_id, c.pinned_at,
@@ -400,6 +445,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           where a.issue_id = $1 order by a.created_at`,
         [issue.id]
       ),
+      linksOf(issue.id, auth),
     ]);
 
     return reply.send({
@@ -422,6 +468,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           by: h.user_login,
           at: h.created_at.toISOString(),
         })),
+        links: links.map(publicLink),
         attachments: attachments.rows.map((a) => ({
           id: a.id,
           filename: a.filename,
@@ -604,6 +651,103 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       by: auth.login,
       origin: tabOf(req),
     });
+    return reply.send({ data: { ok: true } });
+  });
+
+  // ── links ────────────────────────────────────────────────────────
+  app.post('/issues/:id/links', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const found = await loadIssueFor(req, reply, id);
+    if (!found) return;
+    const parsed = z.object({ key: z.string().trim().min(3).max(30) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Which issue? Give its key.' });
+
+    const other = await pool.query<IssueRow>(
+      `${ISSUE_SELECT} where lower(i.readable_id) = lower($1)`,
+      [parsed.data.key]
+    );
+    const target = other.rows[0];
+    if (!target) return reply.code(404).send({ error: 'No issue with that key.' });
+    if (target.id === id) return reply.code(400).send({ error: 'An issue cannot link to itself.' });
+    if (!(await mayOpenBoard(found.auth, target.board_id, target.project_id))) {
+      return reply.code(403).send({ error: 'That issue is not open to you.' });
+    }
+
+    // The pair is stored in one order, which is what makes a second link between the same two impossible.
+    const [a, b] = [id, target.id].sort();
+    const done = await pool.query(
+      `insert into issue_links (a, b, created_by) values ($1, $2, $3)
+       on conflict do nothing`,
+      [a, b, found.auth.userId]
+    );
+    if (!done.rowCount) return reply.code(409).send({ error: 'These two are already linked.' });
+
+    // Both sides remember it, and both sides are told.
+    await writeHistory(pool, id, found.auth.userId, 'link added', null, target.readable_id);
+    await writeHistory(
+      pool,
+      target.id,
+      found.auth.userId,
+      'link added',
+      null,
+      found.issue.readable_id
+    );
+    for (const side of [found.issue, target]) {
+      void publish({
+        type: 'issue.linked',
+        boardId: side.board_id,
+        projectId: side.project_id,
+        issueId: side.id,
+        issueKey: side.readable_id,
+        fields: ['links'],
+        by: found.auth.login,
+        origin: tabOf(req),
+      });
+    }
+    const row = await pool.query<LinkRow>(
+      `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
+              s.name as state_name, s.color as state_color, p.short_name, b.slug
+         from issues i
+         join states s on s.id = i.state_id
+         join projects p on p.id = i.project_id
+         join boards b on b.id = i.board_id
+        where i.id = $1`,
+      [target.id]
+    );
+    return reply.code(201).send({ data: publicLink(row.rows[0]) });
+  });
+
+  app.delete('/issues/:id/links/:otherId', async (req, reply) => {
+    const { id, otherId } = req.params as { id: string; otherId: string };
+    const found = await loadIssueFor(req, reply, id);
+    if (!found) return;
+    const [a, b] = [id, otherId].sort();
+    const other = await issueById(otherId);
+    const res = await pool.query('delete from issue_links where a = $1 and b = $2', [a, b]);
+    if (!res.rowCount) return reply.code(404).send({ error: 'They are not linked.' });
+    if (other) {
+      await writeHistory(pool, id, found.auth.userId, 'link removed', null, other.readable_id);
+      await writeHistory(
+        pool,
+        other.id,
+        found.auth.userId,
+        'link removed',
+        null,
+        found.issue.readable_id
+      );
+      for (const side of [found.issue, other]) {
+        void publish({
+          type: 'issue.linked',
+          boardId: side.board_id,
+          projectId: side.project_id,
+          issueId: side.id,
+          issueKey: side.readable_id,
+          fields: ['links'],
+          by: found.auth.login,
+          origin: tabOf(req),
+        });
+      }
+    }
     return reply.send({ data: { ok: true } });
   });
 
