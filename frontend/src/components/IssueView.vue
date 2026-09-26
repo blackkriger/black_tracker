@@ -1207,7 +1207,12 @@ async function removeIssue(): Promise<void> {
 
             <div class="hr"></div>
 
-            <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('tags') }">
+            <!-- Nothing to wear and nothing to choose from: the row would only say the word Tags. -->
+            <div
+              v-if="wornTags.length || freeTags.length"
+              class="prop prop--tall"
+              :class="{ 'is-fresh': fresh.has('tags') }"
+            >
               <span class="prop__k">Tags</span>
               <div class="prop__tags">
                 <span
