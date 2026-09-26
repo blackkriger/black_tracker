@@ -328,12 +328,14 @@ watch(
         @click="toggleTag(t.id)"
       >{{ t.name }}</button>
 
-      <template v-if="filtering">
-        <div class="sp"></div>
-        <button class="btn btn--sm btn--ghost" type="button" @click="clearFilters">
-          Clear filters
-        </button>
-      </template>
+      <button
+        v-if="filtering"
+        class="btn btn--sm btn--ghost"
+        type="button"
+        @click="clearFilters"
+      >
+        Clear filters
+      </button>
     </div>
 
     <div
