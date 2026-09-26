@@ -20,10 +20,10 @@ onMounted(() => void load());
       <nav class="side settings__side" aria-label="Settings sections">
         <div class="side__h">Projects</div>
         <span v-for="n in loaded ? 0 : 3" :key="n" class="sk sk--row side__sk"></span>
-        <RouterLink v-for="p in live" :key="p.id" :to="`/settings/p/${p.shortName}`">
+        <RouterLink v-for="p in live" :key="p.id" :to="`/settings/${p.shortName}`">
           {{ p.shortName }} {{ p.name }}
         </RouterLink>
-        <RouterLink v-for="p in archived" :key="p.id" :to="`/settings/p/${p.shortName}`">
+        <RouterLink v-for="p in archived" :key="p.id" :to="`/settings/${p.shortName}`">
           {{ p.shortName }} {{ p.name }} (archived)
         </RouterLink>
         <RouterLink to="/settings/new">New project…</RouterLink>

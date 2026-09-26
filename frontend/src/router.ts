@@ -20,14 +20,15 @@ export const router = createRouter({
     { path: '/login', name: 'login', component: Login, meta: { public: true } },
     // The far end of an invite link: open to whoever holds it, and the only way an account is ever born in the browser.
     { path: '/join/:token', name: 'join', component: Join, meta: { public: true } },
-    { path: '/p/:short', name: 'project-board', component: Board },
-    { path: '/p/:short/b/:slug', name: 'board', component: Board },
+    // A project key is upper-case by its own rule and every page of ours is lower-case, so the two can share the root without a marker between them.
+    { path: '/:short([A-Z][A-Z0-9]*)', name: 'project-board', component: Board },
+    { path: '/:short([A-Z][A-Z0-9]*)/:slug', name: 'board', component: Board },
     // The same board with one of its issues open over it, so a card can be linked to.
-    { path: '/p/:short/b/:slug/i/:key', name: 'issue', component: Board },
+    { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
     { path: '/profile', name: 'profile', component: Profile },
     { path: '/settings', name: 'settings', component: SettingsIndex, meta: { admin: true } },
     { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject, meta: { admin: true } },
-    { path: '/settings/p/:short', name: 'settings-project', component: SettingsProject, meta: { admin: true } },
+    { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject, meta: { admin: true } },
     { path: '/settings/tags', name: 'settings-tags', component: SettingsTags, meta: { admin: true } },
     { path: '/settings/users', name: 'settings-users', component: SettingsUsers, meta: { admin: true } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },

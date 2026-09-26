@@ -531,8 +531,8 @@ async function removeIssue(): Promise<void> {
             <div class="hr"></div>
 
             <div class="prop">
-              <span class="prop__k">Reporter</span>
-              <span class="pv pv--ro">{{ issue.reporter?.login ?? '—' }}</span>
+              <span class="prop__k">Author</span>
+              <span class="pv pv--ro">{{ issue.author?.login ?? '—' }}</span>
             </div>
             <div class="prop">
               <span class="prop__k">Created</span>

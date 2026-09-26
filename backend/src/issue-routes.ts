@@ -25,14 +25,14 @@ interface IssueRow {
   state_id: string;
   priority: string;
   assignee_id: string | null;
-  reporter_id: string | null;
+  author_id: string | null;
   due_date: string | null;
   position: number;
   created_at: Date;
   updated_at: Date;
   resolved_at: Date | null;
   assignee_login: string | null;
-  reporter_login: string | null;
+  author_login: string | null;
 }
 
 interface TagRow {
@@ -54,7 +54,7 @@ const publicIssue = (r: IssueRow, tags: TagRow[] = []) => ({
   stateId: r.state_id,
   priority: r.priority,
   assignee: person(r.assignee_id, r.assignee_login),
-  reporter: person(r.reporter_id, r.reporter_login),
+  author: person(r.author_id, r.author_login),
   dueDate: r.due_date,
   position: r.position,
   createdAt: r.created_at.toISOString(),
@@ -64,10 +64,10 @@ const publicIssue = (r: IssueRow, tags: TagRow[] = []) => ({
 });
 
 const ISSUE_SELECT = `
-  select i.*, a.login as assignee_login, rp.login as reporter_login
+  select i.*, a.login as assignee_login, w.login as author_login
     from issues i
     left join users a on a.id = i.assignee_id
-    left join users rp on rp.id = i.reporter_id`;
+    left join users w on w.id = i.author_id`;
 
 // Tags for a set of issues in one query rather than one per card.
 async function tagsFor(issueIds: string[]): Promise<Map<string, TagRow[]>> {
@@ -219,7 +219,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       const row = await client.query<{ id: string }>(
         `insert into issues
            (readable_id, project_id, board_id, number, summary, description, state_id,
-            priority, assignee_id, reporter_id, due_date, position)
+            priority, assignee_id, author_id, due_date, position)
          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          returning id`,
         [

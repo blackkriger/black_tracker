@@ -19,7 +19,7 @@ export const lastProject = {
   },
 };
 
-// One remembered board per project: opening `/p/PROJ` returns you to the board you were last on there.
+// One remembered board per project: opening `/PROJ` returns you to the board you were last on there.
 export const lastBoard = {
   get(shortName: string): string | null {
     try {

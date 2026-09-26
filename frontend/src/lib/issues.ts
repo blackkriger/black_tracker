@@ -23,7 +23,7 @@ export interface Issue {
   stateId: string;
   priority: Priority;
   assignee: Person | null;
-  reporter: Person | null;
+  author: Person | null;
   dueDate: string | null;
   position: number;
   createdAt: string;

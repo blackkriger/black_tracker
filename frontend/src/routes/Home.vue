@@ -22,7 +22,7 @@ onMounted(async () => {
     const open = projects.filter((p) => !p.archived);
     const remembered = open.find((p) => p.shortName === lastProject.get());
     const target = remembered ?? open[0];
-    if (target) await router.replace(`/p/${target.shortName}`);
+    if (target) await router.replace(`/${target.shortName}`);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not load projects.';
   } finally {

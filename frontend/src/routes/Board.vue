@@ -158,13 +158,13 @@ async function addIssue(stateId: string): Promise<void> {
 function openIssue(issue: Issue): void {
   const short = project.value?.shortName;
   const slug = current.value?.slug;
-  if (short && slug) void router.push(`/p/${short}/b/${slug}/i/${issue.key}`);
+  if (short && slug) void router.push(`/${short}/${slug}/${issue.key}`);
 }
 
 function closeIssue(): void {
   const short = project.value?.shortName;
   const slug = current.value?.slug;
-  if (short && slug) void router.push(`/p/${short}/b/${slug}`);
+  if (short && slug) void router.push(`/${short}/${slug}`);
 }
 
 // What changed in the view is what the card shows, without reading the whole board again.

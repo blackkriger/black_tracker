@@ -27,7 +27,7 @@ async function create(): Promise<void> {
       body: { shortName: shortName.value.trim(), name: name.value.trim() },
     });
     await projects.load(true);
-    await router.push(`/settings/p/${created.shortName}`);
+    await router.push(`/settings/${created.shortName}`);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not create the project.';
   } finally {

@@ -73,7 +73,7 @@ async function pickBoard(short: string, slug: string): Promise<void> {
   openShort.value = null;
   lastBoard.set(short, slug);
   remembered.value = { ...remembered.value, [short]: slug };
-  await router.push(`/p/${short}/b/${slug}`);
+  await router.push(`/${short}/${slug}`);
 }
 
 async function signOut(): Promise<void> {
@@ -88,7 +88,7 @@ async function signOut(): Promise<void> {
       <span v-for="p in live" :key="p.id" class="topproj" @click.stop>
         <RouterLink
           class="topitem topitem--project"
-          :to="`/p/${p.shortName}`"
+          :to="`/${p.shortName}`"
           :aria-current="p.shortName === currentShort ? 'page' : undefined"
         >
           <span class="proj__k">{{ p.shortName }}</span>
@@ -122,7 +122,7 @@ async function signOut(): Promise<void> {
         <RouterLink
           v-else-if="p.boards.length === 1"
           class="topitem topitem--caret topitem__board"
-          :to="`/p/${p.shortName}/b/${p.boards[0].slug}`"
+          :to="`/${p.shortName}/${p.boards[0].slug}`"
         >{{ p.boards[0].name }}</RouterLink>
       </span>
     </nav>

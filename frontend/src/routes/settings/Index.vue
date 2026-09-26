@@ -14,7 +14,7 @@ onMounted(async () => {
   const live = projects.value.filter((p) => !p.archived);
   const remembered = live.find((p) => p.shortName === lastProject.get());
   const target = remembered ?? live[0];
-  await router.replace(target ? `/settings/p/${target.shortName}` : '/settings/new');
+  await router.replace(target ? `/settings/${target.shortName}` : '/settings/new');
 });
 </script>
 
