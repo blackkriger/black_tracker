@@ -28,9 +28,9 @@ export const lastBoard = {
       return null;
     }
   },
-  set(shortName: string, boardId: string): void {
+  set(shortName: string, slug: string): void {
     try {
-      localStorage.setItem(BOARD_KEY + shortName, boardId);
+      localStorage.setItem(BOARD_KEY + shortName, slug);
     } catch {
       /* falls back to the project's first board */
     }

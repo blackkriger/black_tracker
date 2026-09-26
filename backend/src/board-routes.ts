@@ -7,6 +7,7 @@ import { requireAdmin, requireAuth } from './auth.js';
 import { boardsOfProject, projectByShort } from './project-routes.js';
 import {
   createBoardWithDefaults,
+  freeSlug,
   publicBoard,
   publicState,
   type BoardRow,
@@ -52,10 +53,28 @@ async function denialsFor(boardIds: string[]): Promise<Map<string, string[]>> {
 
 async function boardById(id: string): Promise<BoardRow | null> {
   const res = await pool.query<BoardRow>(
-    'select id, project_id, name, default_state_id, position from boards where id = $1',
+    'select id, project_id, name, slug, default_state_id, position from boards where id = $1',
     [id]
   );
   return res.rows[0] ?? null;
+}
+
+// Open and resolved are two ends of the same question, so setting one clears the other rather than leaving a status that is both.
+function settleFlags(
+  next: { isOpen?: boolean; isResolved?: boolean },
+  current: { is_open: boolean; is_resolved: boolean }
+): { isOpen: boolean; isResolved: boolean } {
+  if (next.isResolved !== undefined) {
+    return next.isResolved
+      ? { isOpen: false, isResolved: true }
+      : { isOpen: next.isOpen ?? true, isResolved: false };
+  }
+  if (next.isOpen !== undefined) {
+    return next.isOpen
+      ? { isOpen: true, isResolved: false }
+      : { isOpen: false, isResolved: current.is_resolved };
+  }
+  return { isOpen: current.is_open, isResolved: current.is_resolved };
 }
 
 async function statesOf(boardId: string): Promise<StateRow[]> {
@@ -126,6 +145,12 @@ export function registerBoardRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     const p = parsed.data;
+    const board = await boardById(id);
+    if (!board) return reply.code(404).send({ error: 'No such board.' });
+    // Renaming moves the address with the name, so a board is never reachable under a word it no longer wears.
+    const slug = p.name
+      ? await inTransaction((client) => freeSlug(client, board.project_id, p.name as string, id))
+      : null;
     if (p.defaultStateId) {
       const belongs = await pool.query('select 1 from states where id = $1 and board_id = $2', [
         p.defaultStateId,
@@ -138,13 +163,13 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const res = await pool.query<BoardRow>(
       `update boards
           set name = coalesce($2, name),
-              default_state_id = coalesce($3, default_state_id),
-              position = coalesce($4, position)
+              slug = coalesce($3, slug),
+              default_state_id = coalesce($4, default_state_id),
+              position = coalesce($5, position)
         where id = $1
-        returning id, project_id, name, default_state_id, position`,
-      [id, p.name ?? null, p.defaultStateId ?? null, p.position ?? null]
+        returning id, project_id, name, slug, default_state_id, position`,
+      [id, p.name ?? null, slug, p.defaultStateId ?? null, p.position ?? null]
     );
-    if (!res.rowCount) return reply.code(404).send({ error: 'No such board.' });
     return reply.send({ data: publicBoard(res.rows[0], await statesOf(id)) });
   });
 
@@ -191,6 +216,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const board = await boardById(id);
     if (!board) return reply.code(404).send({ error: 'No such board.' });
     const p = parsed.data;
+    const flags = settleFlags(p, { is_open: true, is_resolved: false });
     try {
       const taken = await pool.query<{ color: string }>(
         'select color from states where board_id = $1',
@@ -203,8 +229,8 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         [
           id,
           p.name,
-          p.isOpen ?? true,
-          p.isResolved ?? false,
+          flags.isOpen,
+          flags.isResolved,
           // A status everyone names the same way keeps its usual colour; anything else gets one no sibling wears.
           knownColor(p.name) ?? pickColor(taken.rows.map((r) => r.color)),
         ]
@@ -226,17 +252,22 @@ export function registerBoardRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     const p = parsed.data;
+    const before = await pool.query<{ is_open: boolean; is_resolved: boolean }>(
+      'select is_open, is_resolved from states where id = $1',
+      [id]
+    );
+    if (!before.rowCount) return reply.code(404).send({ error: 'No such status.' });
+    const flags = settleFlags(p, before.rows[0]);
     const res = await pool.query<StateRow>(
       `update states
           set name = coalesce($2, name),
-              is_open = coalesce($3, is_open),
-              is_resolved = coalesce($4, is_resolved),
+              is_open = $3,
+              is_resolved = $4,
               position = coalesce($5, position)
         where id = $1
         returning *`,
-      [id, p.name ?? null, p.isOpen ?? null, p.isResolved ?? null, p.position ?? null]
+      [id, p.name ?? null, flags.isOpen, flags.isResolved, p.position ?? null]
     );
-    if (!res.rowCount) return reply.code(404).send({ error: 'No such status.' });
     return reply.send({ data: publicState(res.rows[0]) });
   });
 

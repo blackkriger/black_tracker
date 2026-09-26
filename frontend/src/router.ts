@@ -17,7 +17,7 @@ export const router = createRouter({
     { path: '/', name: 'home', component: Home },
     { path: '/login', name: 'login', component: Login, meta: { public: true } },
     { path: '/p/:short', name: 'project-board', component: Board },
-    { path: '/p/:short/b/:boardId', name: 'board', component: Board },
+    { path: '/p/:short/b/:slug', name: 'board', component: Board },
     { path: '/profile', name: 'profile', component: Profile },
     { path: '/settings', name: 'settings', component: SettingsIndex, meta: { admin: true } },
     { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject, meta: { admin: true } },

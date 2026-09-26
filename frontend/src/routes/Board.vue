@@ -17,6 +17,7 @@ interface State {
 interface Board {
   id: string;
   name: string;
+  slug: string;
   position: number;
   states: State[];
 }
@@ -38,17 +39,18 @@ const boards = computed(() =>
 );
 // The address names a board; without one, the board you were last on here, and failing that the first.
 const current = computed(() => {
-  const wanted = String(route.params.boardId ?? '');
-  if (wanted) return boards.value.find((b) => b.id === wanted) ?? boards.value[0] ?? null;
+  const wanted = String(route.params.slug ?? '').toLowerCase();
+  if (wanted)
+    return boards.value.find((b) => b.slug.toLowerCase() === wanted) ?? boards.value[0] ?? null;
   const short = project.value?.shortName;
-  const remembered = short ? boards.value.find((b) => b.id === lastBoard.get(short)) : null;
+  const remembered = short ? boards.value.find((b) => b.slug === lastBoard.get(short)) : null;
   return remembered ?? boards.value[0] ?? null;
 });
 
 // Whatever you end up looking at is what this project opens on next time.
 watch(current, (board) => {
   const short = project.value?.shortName;
-  if (board && short) lastBoard.set(short, board.id);
+  if (board && short) lastBoard.set(short, board.slug);
 });
 
 async function load(short: string): Promise<void> {

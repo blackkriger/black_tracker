@@ -3,10 +3,39 @@
 import type { PoolClient } from 'pg';
 import { knownColor } from './colors.js';
 
+// The board's address. A name of nothing but punctuation or Cyrillic slugs to an empty string, so it falls back to a plain word and the counter below keeps it unique inside the project.
+export function slugify(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base || 'board';
+}
+
+export async function freeSlug(
+  client: PoolClient,
+  projectId: string,
+  name: string,
+  exceptBoardId?: string
+): Promise<string> {
+  const base = slugify(name);
+  const taken = await client.query<{ slug: string }>(
+    'select slug from boards where project_id = $1 and ($2::uuid is null or id <> $2)',
+    [projectId, exceptBoardId ?? null]
+  );
+  const used = new Set(taken.rows.map((r) => r.slug.toLowerCase()));
+  if (!used.has(base)) return base;
+  for (let n = 2; ; n++) {
+    const candidate = `${base}-${n}`;
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
 export interface BoardRow {
   id: string;
   project_id: string;
   name: string;
+  slug: string;
   default_state_id: string | null;
   position: number;
 }
@@ -35,10 +64,10 @@ export async function createBoardWithDefaults(
   name: string
 ): Promise<BoardRow> {
   const board = await client.query<BoardRow>(
-    `insert into boards (project_id, name, position)
-     values ($1, $2, (select coalesce(max(position), -1) + 1 from boards where project_id = $1))
-     returning id, project_id, name, default_state_id, position`,
-    [projectId, name]
+    `insert into boards (project_id, name, slug, position)
+     values ($1, $2, $3, (select coalesce(max(position), -1) + 1 from boards where project_id = $1))
+     returning id, project_id, name, slug, default_state_id, position`,
+    [projectId, name, await freeSlug(client, projectId, name)]
   );
   const row = board.rows[0];
 
@@ -61,7 +90,7 @@ export async function createBoardWithDefaults(
   const first = [...states.rows].sort((a, b) => a.position - b.position)[0];
   const withDefault = await client.query<BoardRow>(
     `update boards set default_state_id = $1 where id = $2
-     returning id, project_id, name, default_state_id, position`,
+     returning id, project_id, name, slug, default_state_id, position`,
     [first?.id ?? null, row.id]
   );
   return withDefault.rows[0];
@@ -81,6 +110,7 @@ export const publicBoard = (r: BoardRow, states: StateRow[] = [], deniedTo: stri
   id: r.id,
   projectId: r.project_id,
   name: r.name,
+  slug: r.slug,
   defaultStateId: r.default_state_id,
   position: r.position,
   states: states.map(publicState),

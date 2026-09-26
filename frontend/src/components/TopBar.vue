@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// The bar every screen but sign-in carries: the projects side by side, the boards of the one you are in behind a caret, and who you are.
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+// The bar every screen but sign-in carries: the projects side by side, each with its boards behind a caret, and who you are.
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../lib/api';
 import { useProjects } from '../lib/projects';
+import { lastBoard } from '../lib/lastProject';
 import { useSession } from '../lib/session';
 
 const props = defineProps<{
@@ -18,30 +19,11 @@ const { projects, load } = useProjects();
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const currentShort = computed(() => props.project?.shortName ?? null);
-const currentBoardId = computed(() => String(route.params.boardId ?? ''));
+const currentSlug = computed(() => String(route.params.slug ?? ''));
 
-// Only the project in view needs its boards, and only to fill the menu, so they are read when that project changes.
-const boards = ref<{ id: string; name: string }[]>([]);
-const open = ref(false);
-
-watch(
-  currentShort,
-  async (short) => {
-    open.value = false;
-    if (!short) {
-      boards.value = [];
-      return;
-    }
-    try {
-      boards.value = await api<{ id: string; name: string }[]>(
-        `/projects/${encodeURIComponent(short)}/boards`
-      );
-    } catch {
-      boards.value = [];
-    }
-  },
-  { immediate: true }
-);
+// Which project's menu is open, and the boards read so far. A project's boards are fetched the first time its caret is used and kept for the rest of the page's life.
+const openShort = ref<string | null>(null);
+const boardsByProject = ref<Record<string, { id: string; name: string; slug: string }[]>>({});
 
 onMounted(() => {
   void load();
@@ -54,15 +36,33 @@ onUnmounted(() => {
 });
 
 function closeMenu(): void {
-  open.value = false;
+  openShort.value = null;
 }
 function onKeydown(ev: KeyboardEvent): void {
-  if (ev.key === 'Escape') open.value = false;
+  if (ev.key === 'Escape') openShort.value = null;
 }
 
-async function pickBoard(id: string): Promise<void> {
-  open.value = false;
-  await router.push(`/p/${currentShort.value}/b/${id}`);
+async function toggleBoards(short: string): Promise<void> {
+  if (openShort.value === short) {
+    openShort.value = null;
+    return;
+  }
+  openShort.value = short;
+  if (boardsByProject.value[short]) return;
+  try {
+    const rows = await api<{ id: string; name: string; slug: string }[]>(
+      `/projects/${encodeURIComponent(short)}/boards`
+    );
+    boardsByProject.value = { ...boardsByProject.value, [short]: rows };
+  } catch {
+    boardsByProject.value = { ...boardsByProject.value, [short]: [] };
+  }
+}
+
+async function pickBoard(short: string, slug: string): Promise<void> {
+  openShort.value = null;
+  lastBoard.set(short, slug);
+  await router.push(`/p/${short}/b/${slug}`);
 }
 
 async function signOut(): Promise<void> {
@@ -85,24 +85,24 @@ async function signOut(): Promise<void> {
         </RouterLink>
 
         <button
-          v-if="p.shortName === currentShort && boards.length > 1"
           class="topitem topitem--caret"
           type="button"
-          :aria-expanded="open"
-          aria-label="Boards"
-          @click="open = !open"
+          :aria-expanded="openShort === p.shortName"
+          :aria-label="`Boards of ${p.name}`"
+          @click="toggleBoards(p.shortName)"
         >▾</button>
 
-        <div v-if="open && p.shortName === currentShort" class="menu boardmenu" role="menu">
+        <div v-if="openShort === p.shortName" class="menu boardmenu" role="menu">
           <button
-            v-for="b in boards"
+            v-for="b in boardsByProject[p.shortName] ?? []"
             :key="b.id"
             class="menu__i"
-            :class="{ 'is-cur': b.id === currentBoardId }"
+            :class="{ 'is-cur': p.shortName === currentShort && b.slug === currentSlug }"
             type="button"
             role="menuitem"
-            @click="pickBoard(b.id)"
+            @click="pickBoard(p.shortName, b.slug)"
           >{{ b.name }}</button>
+          <div v-if="!(boardsByProject[p.shortName] ?? []).length" class="menu__h">No boards yet.</div>
         </div>
       </span>
     </nav>
