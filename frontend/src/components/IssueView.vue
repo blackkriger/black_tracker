@@ -326,6 +326,32 @@ async function saveComment(c: Comment): Promise<void> {
   }
 }
 
+async function togglePin(c: Comment): Promise<void> {
+  const current = issue.value;
+  if (!current) return;
+  error.value = null;
+  try {
+    const updated = await api<{ pinnedAt: string | null; pinnedBy: string | null }>(
+      `/comments/${c.id}/pin`,
+      { method: 'PUT', body: { pinned: !c.pinnedAt } }
+    );
+    const now = issue.value ?? current;
+    const comments = now.comments.map((row) =>
+      row.id === c.id ? { ...row, pinnedAt: updated.pinnedAt, pinnedBy: updated.pinnedBy } : row
+    );
+    // Pinned ones lead the thread, and the rest keep their order.
+    issue.value = {
+      ...now,
+      comments: [...comments].sort(
+        (a, b) =>
+          Number(!!b.pinnedAt) - Number(!!a.pinnedAt) || a.createdAt.localeCompare(b.createdAt)
+      ),
+    };
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Could not pin the comment.';
+  }
+}
+
 async function removeComment(c: Comment): Promise<void> {
   const current = issue.value;
   if (!current) return;
@@ -555,14 +581,23 @@ async function removeIssue(): Promise<void> {
               class="iv__list"
               :class="{ 'is-fresh': fresh.has('comments') }"
             >
-              <article v-for="c in issue.comments" :key="c.id" class="cm">
+              <article
+                v-for="c in issue.comments"
+                :key="c.id"
+                class="cm"
+                :class="{ 'cm--pinned': c.pinnedAt }"
+              >
                 <span class="av av--lg" :style="buddyAvatarStyle(c.author.login)"></span>
                 <div>
                   <div class="cm__head">
                     <span class="cm__who">{{ c.author.login }}</span>
                     <time class="stamp">{{ stamp(c.createdAt) }}</time>
                     <span v-if="c.editedAt" class="cm__edited">edited</span>
+                    <span v-if="c.pinnedAt" class="cm__pin">Pinned</span>
                     <span class="cm__acts">
+                      <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
+                        {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
+                      </button>
                       <button
                         v-if="c.author.id === session.me.value?.id"
                         class="btn btn--sm btn--ghost"
@@ -762,6 +797,11 @@ async function removeIssue(): Promise<void> {
 .props {
   overflow-y: auto;
 }
+/* The theme lets a dialog's title span take the whole bar; here the key and the status are two labels that belong side by side. */
+.iv__key,
+.iv__state {
+  flex: 0 0 auto;
+}
 .iv__key {
   font-size: 13px;
 }
@@ -801,6 +841,16 @@ async function removeIssue(): Promise<void> {
 }
 .cm__body :deep(p:last-child) {
   margin-bottom: 0;
+}
+/* A pinned comment is marked where it stands, by the same gold that marks the current tab. */
+.cm--pinned {
+  border-left: 2px solid var(--accent);
+  margin-left: -12px;
+  padding-left: 10px;
+}
+.cm__pin {
+  font-size: 12px;
+  color: var(--accent);
 }
 .att__pic {
   width: 100%;

@@ -365,9 +365,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const [tags, comments, history, attachments] = await Promise.all([
       tagsFor([issue.id]),
       pool.query(
-        `select c.id, c.text, c.created_at, c.edited_at, c.author_id, u.login as author_login
-           from issue_comments c join users u on u.id = c.author_id
-          where c.issue_id = $1 order by c.created_at`,
+        `select c.id, c.text, c.created_at, c.edited_at, c.author_id, c.pinned_at,
+                u.login as author_login, p.login as pinned_by_login
+           from issue_comments c
+           join users u on u.id = c.author_id
+           left join users p on p.id = c.pinned_by
+          where c.issue_id = $1
+          order by (c.pinned_at is null), c.created_at`,
         [issue.id]
       ),
       pool.query(
@@ -393,6 +397,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           author: { id: c.author_id, login: c.author_login },
           createdAt: c.created_at.toISOString(),
           editedAt: c.edited_at?.toISOString() ?? null,
+          pinnedAt: c.pinned_at?.toISOString() ?? null,
+          pinnedBy: c.pinned_by_login,
         })),
         history: history.rows.map((h) => ({
           id: h.id,
@@ -608,6 +614,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id, session.userId, parsed.data.text]
     );
     const row = res.rows[0];
+    await writeHistory(pool, id, session.userId, 'comment added', null, null);
     void publish({
       type: 'comment.added',
       boardId: found.issue.board_id,
@@ -625,6 +632,59 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         author: { id: session.userId, login: session.login },
         createdAt: row.created_at.toISOString(),
         editedAt: null,
+        pinnedAt: null,
+        pinnedBy: null,
+      },
+    });
+  });
+
+  // Pinning says "read this one first". It changes nobody's words, so it is not the author's alone — anyone who can open the issue can pin and unpin.
+  app.put('/comments/:id/pin', async (req, reply) => {
+    const session = await requireSession(req, reply);
+    if (!session) return;
+    const { id } = req.params as { id: string };
+    const parsed = z.object({ pinned: z.boolean() }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Say pinned true or false.' });
+    const owner = await pool.query<{ issue_id: string }>(
+      'select issue_id from issue_comments where id = $1',
+      [id]
+    );
+    if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
+    const host = await issueById(owner.rows[0].issue_id);
+    if (!host || !(await mayOpenBoard(session, host.board_id, host.project_id))) {
+      return reply.code(403).send({ error: 'This issue is not open to you.' });
+    }
+    const res = await pool.query<{ pinned_at: Date | null }>(
+      `update issue_comments
+          set pinned_at = case when $2 then now() else null end,
+              pinned_by = case when $2 then $3::uuid else null end
+        where id = $1
+        returning pinned_at`,
+      [id, parsed.data.pinned, session.userId]
+    );
+    await writeHistory(
+      pool,
+      host.id,
+      session.userId,
+      parsed.data.pinned ? 'comment pinned' : 'comment unpinned',
+      null,
+      null
+    );
+    void publish({
+      type: 'comment.pinned',
+      boardId: host.board_id,
+      projectId: host.project_id,
+      issueId: host.id,
+      issueKey: host.readable_id,
+      commentId: id,
+      by: session.login,
+      origin: tabOf(req),
+    });
+    return reply.send({
+      data: {
+        id,
+        pinnedAt: res.rows[0].pinned_at?.toISOString() ?? null,
+        pinnedBy: parsed.data.pinned ? session.login : null,
       },
     });
   });
@@ -649,6 +709,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id, parsed.data.text]
     );
     const host = await issueById(owner.rows[0].issue_id);
+    await writeHistory(pool, owner.rows[0].issue_id, session.userId, 'comment edited', null, null);
     void publish({
       type: 'comment.edited',
       boardId: host?.board_id,
@@ -682,6 +743,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     await pool.query('delete from issue_comments where id = $1', [id]);
     await Promise.all(files.rows.map((f) => unlink(f.storage_path).catch(() => {})));
     const host = await issueById(owner.rows[0].issue_id);
+    await writeHistory(pool, owner.rows[0].issue_id, auth.userId, 'comment deleted', null, null);
     void publish({
       type: 'comment.deleted',
       boardId: host?.board_id,
@@ -729,6 +791,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       await unlink(stored).catch(() => {});
       throw err;
     }
+    await writeHistory(pool, id, found.auth.userId, 'file added', null, filename);
     void publish({
       type: 'attachment.added',
       boardId: found.issue.board_id,
@@ -786,7 +849,10 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       storage_path: string;
       uploaded_by: string | null;
       issue_id: string;
-    }>('select storage_path, uploaded_by, issue_id from issue_attachments where id = $1', [id]);
+      filename: string;
+    }>('select storage_path, uploaded_by, issue_id, filename from issue_attachments where id = $1', [
+      id,
+    ]);
     const row = res.rows[0];
     if (!row) return reply.code(404).send({ error: 'No such file.' });
     const mine = row.uploaded_by === auth.userId;
@@ -794,6 +860,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     await pool.query('delete from issue_attachments where id = $1', [id]);
     await unlink(row.storage_path).catch(() => {});
     const host = await issueById(row.issue_id);
+    await writeHistory(pool, row.issue_id, auth.userId, 'file removed', null, row.filename);
     void publish({
       type: 'attachment.deleted',
       boardId: host?.board_id,

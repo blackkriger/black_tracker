@@ -38,6 +38,9 @@ export interface Comment {
   author: Person;
   createdAt: string;
   editedAt: string | null;
+  /** Pinned comments sit at the head of the thread. */
+  pinnedAt: string | null;
+  pinnedBy: string | null;
 }
 
 export interface HistoryEntry {
