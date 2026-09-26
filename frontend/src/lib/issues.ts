@@ -29,6 +29,8 @@ export interface Issue {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /** Starred by whoever is reading it; nobody else's star is visible. */
+  favourite: boolean;
   tags: IssueTag[];
 }
 

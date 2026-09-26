@@ -15,7 +15,7 @@ import {
 } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
-import { Plus } from 'lucide-vue-next';
+import { Plus, Star } from 'lucide-vue-next';
 
 interface State {
   id: string;
@@ -68,9 +68,15 @@ const byPriority = ref<Priority | ''>('');
 const people = ref<{ id: string; login: string; fullName: string }[]>([]);
 // Tags narrow the board too: pick several and a card has to wear all of them.
 const byTags = ref<string[]>([]);
+const starred = ref(false);
 
 const filtering = computed(
-  () => !!byAssignee.value || !!byAuthor.value || !!byPriority.value || byTags.value.length > 0
+  () =>
+    !!byAssignee.value ||
+    !!byAuthor.value ||
+    !!byPriority.value ||
+    byTags.value.length > 0 ||
+    starred.value
 );
 
 function clearFilters(): void {
@@ -78,6 +84,7 @@ function clearFilters(): void {
   byAuthor.value = '';
   byPriority.value = '';
   byTags.value = [];
+  starred.value = false;
 }
 
 function toggleTag(id: string): void {
@@ -93,7 +100,8 @@ const filtered = computed(() =>
         (byAssignee.value === 'none' ? !i.assignee : i.assignee?.id === byAssignee.value)) &&
       (!byAuthor.value || i.author?.id === byAuthor.value) &&
       (!byPriority.value || i.priority === byPriority.value) &&
-      byTags.value.every((id) => i.tags.some((t) => t.id === id))
+      byTags.value.every((id) => i.tags.some((t) => t.id === id)) &&
+      (!starred.value || i.favourite)
   )
 );
 
@@ -329,6 +337,17 @@ watch(
       >{{ t.name }}</button>
 
       <button
+        class="btn btn--sm btn--icon btn--ghost star"
+        :class="{ 'is-on': starred }"
+        type="button"
+        title="Only my favourites"
+        :aria-pressed="starred"
+        @click="starred = !starred"
+      >
+        <Star class="ic" :fill="starred ? 'currentColor' : 'none'" />
+      </button>
+
+      <button
         v-if="filtering"
         class="btn btn--sm btn--ghost"
         type="button"
@@ -460,6 +479,9 @@ watch(
 }
 .taglabel--pick.is-off {
   opacity: 0.35;
+}
+.star.is-on {
+  color: var(--accent);
 }
 /* A filter is as wide as what it says, and reads as one of the bar's own controls. */
 .filter {

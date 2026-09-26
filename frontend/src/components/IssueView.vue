@@ -10,7 +10,7 @@ import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
 import { useWall } from '../lib/masonry';
 import { useSession } from '../lib/session';
-import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Trash2, X } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Star, Trash2, X } from 'lucide-vue-next';
 import {
   PRIORITIES,
   dueLabel,
@@ -453,6 +453,20 @@ async function create(): Promise<void> {
   }
 }
 
+async function toggleFavourite(): Promise<void> {
+  const current = issue.value;
+  if (!current) return;
+  const next = !current.favourite;
+  issue.value = { ...current, favourite: next };
+  try {
+    await api(`/issues/${current.id}/favourite`, { method: 'PUT', body: { favourite: next } });
+    emit('changed', { ...current, favourite: next });
+  } catch (err) {
+    issue.value = { ...(issue.value as IssueFull), favourite: current.favourite };
+    error.value = err instanceof Error ? err.message : 'Could not change the star.';
+  }
+}
+
 function startEditing(): void {
   titleDraft.value = issue.value?.summary ?? '';
   bodyDraft.value = issue.value?.description ?? '';
@@ -745,6 +759,17 @@ async function removeIssue(): Promise<void> {
             </button>
           </template>
           <template v-else>
+            <button
+              class="btn btn--sm btn--icon btn--ghost iv__star"
+              :class="{ 'is-on': issue?.favourite }"
+              type="button"
+              :title="issue?.favourite ? 'In favourites' : 'Add to favourites'"
+              :aria-pressed="issue?.favourite === true"
+              :disabled="!issue"
+              @click="toggleFavourite"
+            >
+              <Star class="ic" :fill="issue?.favourite ? 'currentColor' : 'none'" />
+            </button>
             <button
               class="btn btn--sm btn--icon btn--ghost"
               type="button"
@@ -1316,6 +1341,9 @@ async function removeIssue(): Promise<void> {
   overflow-y: auto;
 }
 /* The theme lets a dialog's title span take the whole bar; here the key and the status are two labels that belong side by side. */
+.iv__star.is-on {
+  color: var(--accent);
+}
 /* It sits with the pencil and the close, and only says what it is when reached for. */
 .iv__trash:hover:enabled {
   color: var(--danger-text);

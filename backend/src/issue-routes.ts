@@ -57,7 +57,7 @@ interface TagRow {
 const person = (id: string | null, login: string | null) =>
   id && login ? { id, login } : null;
 
-const publicIssue = (r: IssueRow, tags: TagRow[] = []) => ({
+const publicIssue = (r: IssueRow, tags: TagRow[] = [], favourite = false) => ({
   id: r.id,
   key: r.readable_id,
   projectId: r.project_id,
@@ -73,6 +73,7 @@ const publicIssue = (r: IssueRow, tags: TagRow[] = []) => ({
   createdAt: r.created_at.toISOString(),
   updatedAt: r.updated_at.toISOString(),
   resolvedAt: r.resolved_at?.toISOString() ?? null,
+  favourite,
   tags,
 });
 
@@ -145,6 +146,16 @@ const publicLink = (r: LinkRow) => ({
   projectShort: r.short_name,
   boardSlug: r.slug,
 });
+
+// Stars are personal, so they are read for whoever is asking and travel with the issue rather than inside it.
+async function starredBy(userId: string, issueIds: string[]): Promise<Set<string>> {
+  if (!issueIds.length) return new Set();
+  const res = await pool.query<{ issue_id: string }>(
+    'select issue_id from issue_favourites where user_id = $1 and issue_id = any($2::uuid[])',
+    [userId, issueIds]
+  );
+  return new Set(res.rows.map((r) => r.issue_id));
+}
 
 async function issueById(id: string): Promise<IssueRow | null> {
   const res = await pool.query<IssueRow>(`${ISSUE_SELECT} where i.id = $1`, [id]);
@@ -244,8 +255,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       `${ISSUE_SELECT} where i.board_id = $1 order by i.position, i.created_at`,
       [id]
     );
-    const tags = await tagsFor(res.rows.map((r) => r.id));
-    return reply.send({ data: res.rows.map((r) => publicIssue(r, tags.get(r.id) ?? [])) });
+    const [tags, stars] = await Promise.all([
+      tagsFor(res.rows.map((r) => r.id)),
+      starredBy(auth.userId, res.rows.map((r) => r.id)),
+    ]);
+    return reply.send({
+      data: res.rows.map((r) => publicIssue(r, tags.get(r.id) ?? [], stars.has(r.id))),
+    });
   });
 
   app.post('/boards/:id/issues', async (req, reply) => {
@@ -421,7 +437,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
 
-    const [tags, comments, history, attachments, links] = await Promise.all([
+    const [tags, comments, history, attachments, links, stars] = await Promise.all([
       tagsFor([issue.id]),
       pool.query(
         `select c.id, c.text, c.created_at, c.edited_at, c.author_id, c.pinned_at,
@@ -446,11 +462,12 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [issue.id]
       ),
       linksOf(issue.id, auth),
+      starredBy(auth.userId, [issue.id]),
     ]);
 
     return reply.send({
       data: {
-        ...publicIssue(issue, tags.get(issue.id) ?? []),
+        ...publicIssue(issue, tags.get(issue.id) ?? [], stars.has(issue.id)),
         comments: comments.rows.map((c) => ({
           id: c.id,
           text: c.text,
@@ -617,7 +634,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     });
 
     const row = await issueById(id);
-    const tags = await tagsFor([id]);
+    const [tags, stars] = await Promise.all([tagsFor([id]), starredBy(auth.userId, [id])]);
     void publish({
       type: 'issue.updated',
       boardId: issue.board_id,
@@ -628,7 +645,28 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       by: auth.login,
       origin: tabOf(req),
     });
-    return reply.send({ data: publicIssue(row as IssueRow, tags.get(id) ?? []) });
+    return reply.send({ data: publicIssue(row as IssueRow, tags.get(id) ?? [], stars.has(id)) });
+  });
+
+  // A star is one person's mark on one issue; nobody else is told and nothing goes into the history.
+  app.put('/issues/:id/favourite', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const found = await loadIssueFor(req, reply, id);
+    if (!found) return;
+    const parsed = z.object({ favourite: z.boolean() }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Say favourite true or false.' });
+    if (parsed.data.favourite) {
+      await pool.query(
+        'insert into issue_favourites (issue_id, user_id) values ($1, $2) on conflict do nothing',
+        [id, found.auth.userId]
+      );
+    } else {
+      await pool.query('delete from issue_favourites where issue_id = $1 and user_id = $2', [
+        id,
+        found.auth.userId,
+      ]);
+    }
+    return reply.send({ data: { favourite: parsed.data.favourite } });
   });
 
   app.delete('/issues/:id', async (req, reply) => {
