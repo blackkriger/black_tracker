@@ -2,6 +2,7 @@
 // /settings is a junction like the root: it opens the first project's setup, or the workspace tags when there is no project yet.
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import SettingsLayout from '../../components/SettingsLayout.vue';
 import { useProjects } from '../../lib/projects';
 import { lastProject } from '../../lib/lastProject';
 
@@ -18,5 +19,24 @@ onMounted(async () => {
 </script>
 
 <template>
-  <p class="hint" style="padding: var(--space-5)">Loading…</p>
+  <SettingsLayout>
+    <section class="panel sheet__wide">
+      <header class="panel__h"><span class="sk sk--line head-sk"></span></header>
+      <div class="panel__b p-row">
+        <span class="sk sk--field" style="width: 120px"></span>
+        <span class="sk sk--field" style="flex: 1 1 220px"></span>
+      </div>
+    </section>
+  </SettingsLayout>
 </template>
+
+<style scoped>
+.head-sk {
+  width: 140px;
+}
+.p-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+</style>

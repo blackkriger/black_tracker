@@ -4,7 +4,7 @@ import { computed, onMounted } from 'vue';
 import TopBar from './TopBar.vue';
 import { useProjects } from '../lib/projects';
 
-const { projects, load } = useProjects();
+const { projects, loaded, load } = useProjects();
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const archived = computed(() => projects.value.filter((p) => p.archived));
@@ -19,6 +19,7 @@ onMounted(() => void load());
     <div class="page__body">
       <nav class="side settings__side" aria-label="Settings sections">
         <div class="side__h">Projects</div>
+        <span v-for="n in loaded ? 0 : 3" :key="n" class="sk sk--row side__sk"></span>
         <RouterLink v-for="p in live" :key="p.id" :to="`/settings/p/${p.shortName}`">
           {{ p.shortName }} {{ p.name }}
         </RouterLink>
@@ -40,6 +41,10 @@ onMounted(() => void load());
 </template>
 
 <style scoped>
+/* The links sit at 32px with a 2px gap; the placeholders stand in the same rhythm. */
+.side__sk {
+  margin: 0 10px;
+}
 .page {
   min-height: 100vh;
   display: flex;

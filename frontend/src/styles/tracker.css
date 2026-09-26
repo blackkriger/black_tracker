@@ -297,6 +297,13 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 /* ---------- skeleton / empty ---------- */
 .sk { background: linear-gradient(90deg, rgba(255, 255, 255, .04) 0%, rgba(255, 255, 255, .09) 50%, rgba(255, 255, 255, .04) 100%); background-size: 200% 100%; animation: sk 1.4s linear infinite; }
 @keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+/* Each shape is the height of the real control it waits for, so nothing moves when the data lands. */
+.sk--line { display: block; height: 12px; }
+.sk--field { display: block; height: 34px; }
+.sk--ctl { display: block; height: 26px; }
+.sk--box { display: block; width: 16px; height: 16px; }
+.sk--av { display: block; width: 28px; height: 28px; }
+.sk--row { display: block; height: 32px; }
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
 .empty__g { font: 28px/1 var(--font-num); color: var(--line-2); }
 .empty--sm { padding: 20px 12px; gap: 6px; font-size: 12.5px; }

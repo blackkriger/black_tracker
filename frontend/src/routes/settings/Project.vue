@@ -214,7 +214,71 @@ async function onDrop(b: Board, target: State): Promise<void> {
 
 <template>
   <SettingsLayout>
-    <p v-if="loading" class="hint sheet__wide">Loading…</p>
+    <template v-if="loading">
+      <section class="panel sheet__wide">
+        <header class="panel__h">Project</header>
+        <div class="panel__b p-row">
+          <div class="field p-key">
+            <span class="label">Key</span>
+            <span class="sk sk--field"></span>
+          </div>
+          <div class="field p-name">
+            <span class="label">Name</span>
+            <span class="sk sk--field"></span>
+          </div>
+          <span class="sk sk--field p-btn" style="width: 132px"></span>
+          <span class="sk sk--field p-btn" style="width: 74px"></span>
+        </div>
+      </section>
+
+      <section class="panel sheet__wide">
+        <header class="panel__h">
+          <span class="sk board-name-sk"></span>
+          <span class="panel__end">
+            <span class="label">Default status</span>
+            <span class="sk default-pick-sk"></span>
+            <span class="sk sk--ctl" style="width: 96px"></span>
+          </span>
+        </header>
+        <div class="panel__table">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="c-grip"><span class="sr">Order</span></th>
+                <th>Status</th>
+                <th class="c-flag">Open</th>
+                <th class="c-flag">Resolved</th>
+                <th class="c-del"><span class="sr">Delete</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="w in [110, 86, 74, 64]" :key="w">
+                <td class="c-grip grip">⠿</td>
+                <td><span class="sk sk--ctl" :style="{ width: `${w}px` }"></span></td>
+                <td><span class="sk sk--box"></span></td>
+                <td><span class="sk sk--box"></span></td>
+                <td class="c-del"><span class="sk sk--ctl sk--right" style="width: 26px"></span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="addrow">
+            <span class="sk sk--field"></span>
+            <span class="sk sk--field" style="flex: 0 0 56px"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel sheet__wide">
+        <header class="panel__h">New board</header>
+        <div class="panel__b">
+          <div class="addrow">
+            <span class="sk sk--field"></span>
+            <span class="sk sk--field" style="flex: 0 0 56px"></span>
+          </div>
+        </div>
+      </section>
+    </template>
     <div v-else-if="!project" class="empty sheet__wide">
       <span class="empty__g">✕</span>{{ loadError }}
     </div>
@@ -438,6 +502,19 @@ async function onDrop(b: Board, target: State): Promise<void> {
   width: 220px;
   height: 30px;
   font-weight: 600;
+}
+.board-name-sk {
+  display: block;
+  width: 220px;
+  height: 30px;
+}
+.default-pick-sk {
+  display: block;
+  width: 160px;
+  height: 30px;
+}
+.sk--right {
+  margin-left: auto;
 }
 .default-pick {
   width: 160px;

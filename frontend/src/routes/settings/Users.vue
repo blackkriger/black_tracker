@@ -250,7 +250,21 @@ async function saveAccess(): Promise<void> {
               <th class="c-when">Last seen</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="loading">
+            <tr v-for="w in [120, 96, 140]" :key="w">
+              <td>
+                <span class="who">
+                  <span class="sk sk--av"></span>
+                  <span class="sk sk--line" :style="{ width: `${w}px` }"></span>
+                </span>
+              </td>
+              <td class="c-role"><span class="sk sk--ctl"></span></td>
+              <td><span class="sk sk--box"></span></td>
+              <td class="c-when"><span class="sk sk--line" style="width: 88px"></span></td>
+              <td class="c-when"><span class="sk sk--line" style="width: 88px"></span></td>
+            </tr>
+          </tbody>
+          <tbody v-else>
             <tr v-for="u in users" :key="u.id">
               <td>
                 <span class="who">
@@ -288,7 +302,6 @@ async function saveAccess(): Promise<void> {
           </tbody>
         </table>
 
-        <div v-if="loading" class="empty empty--sm"><span class="empty__g">◇</span>Loading…</div>
       </div>
     </section>
     <div v-if="errors.users" class="err sheet__wide panel__err">{{ errors.users }}</div>
@@ -296,7 +309,23 @@ async function saveAccess(): Promise<void> {
     <section class="panel sheet__wide">
       <header class="panel__h">Roles</header>
       <div class="panel__table">
-        <table v-if="roles.length" class="tbl">
+        <table v-if="loading" class="tbl">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th class="c-act2">Access</th>
+              <th class="c-del"><span class="sr">Delete</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="n in 2" :key="n">
+              <td><span class="sk sk--ctl"></span></td>
+              <td class="c-act2"><span class="sk sk--ctl" style="width: 72px"></span></td>
+              <td class="c-del"><span class="sk sk--ctl sk--right" style="width: 26px"></span></td>
+            </tr>
+          </tbody>
+        </table>
+        <table v-else-if="roles.length" class="tbl">
           <thead>
             <tr>
               <th>Role</th>
@@ -331,9 +360,15 @@ async function saveAccess(): Promise<void> {
             </tr>
           </tbody>
         </table>
-        <div v-else class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
+        <div v-else-if="!loading" class="empty empty--sm">
+          <span class="empty__g">◇</span>None yet.
+        </div>
 
-        <form class="addrow" @submit.prevent="addRole">
+        <div v-if="loading" class="addrow">
+          <span class="sk sk--field"></span>
+          <span class="sk sk--field" style="flex: 0 0 56px"></span>
+        </div>
+        <form v-else class="addrow" @submit.prevent="addRole">
           <input v-model="newRole" class="input" placeholder="Add role…" maxlength="40" />
           <button class="btn" type="submit" :disabled="!newRole.trim()">Add</button>
         </form>
@@ -361,7 +396,12 @@ async function saveAccess(): Promise<void> {
           <span class="hint">It is stored as a hash, so this is the only time it can be read.</span>
         </div>
 
-        <div v-if="!freshLink" class="addrow">
+        <div v-if="loading" class="addrow">
+          <span class="sk sk--field" style="flex: 0 0 180px"></span>
+          <div class="sp"></div>
+          <span class="sk sk--field" style="flex: 0 0 96px"></span>
+        </div>
+        <div v-else-if="!freshLink" class="addrow">
           <select v-model="inviteRole" class="input invite__role">
             <option value="">No role</option>
             <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
@@ -373,7 +413,29 @@ async function saveAccess(): Promise<void> {
         </div>
       </div>
 
-      <div v-if="invites.length" class="panel__table">
+      <div v-if="loading" class="panel__table">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Link</th>
+              <th class="c-role">Role</th>
+              <th>Status</th>
+              <th class="c-when">Created</th>
+              <th class="c-act"><span class="sr">Revoke</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="n in 2" :key="n">
+              <td><span class="sk sk--line" style="width: 64px"></span></td>
+              <td class="c-role"><span class="sk sk--line" style="width: 80px; height: 24px"></span></td>
+              <td><span class="sk sk--line" style="width: 150px"></span></td>
+              <td class="c-when"><span class="sk sk--line" style="width: 130px"></span></td>
+              <td class="c-act"><span class="sk sk--ctl sk--right" style="width: 26px"></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else-if="invites.length" class="panel__table">
         <table class="tbl">
           <thead>
             <tr>
@@ -510,6 +572,9 @@ async function saveAccess(): Promise<void> {
 }
 .c-act2 {
   width: 92px;
+}
+.sk--right {
+  margin-left: auto;
 }
 .c-del {
   width: 44px;
