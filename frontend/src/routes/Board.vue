@@ -145,6 +145,9 @@ async function addIssue(stateId: string): Promise<void> {
     });
     issues.value = [...issues.value, created];
     draft.value = '';
+    composing.value = null;
+    // The card exists the moment it has a title; everything else about it is filled in where it is read.
+    openIssue(created);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not create the issue.';
   } finally {
