@@ -8,7 +8,7 @@ import { TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank } from '../lib/richtext';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
-import { useMasonry } from '../lib/masonry';
+import { useWall } from '../lib/masonry';
 import { useSession } from '../lib/session';
 import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Trash2, X } from 'lucide-vue-next';
 import {
@@ -258,8 +258,8 @@ const commentFiles = ref<File[]>([]);
 // The two walls of waiting files pack themselves: blocks keep their own heights and drop into whichever column is shortest.
 const issueWall = ref<HTMLElement | null>(null);
 const commentWall = ref<HTMLElement | null>(null);
-const issuePack = useMasonry(issueWall, () => pending.value.length);
-const commentPack = useMasonry(commentWall, () => commentFiles.value.length);
+const issuePack = useWall(issueWall, () => pending.value.length);
+const commentPack = useWall(commentWall, () => commentFiles.value.length);
 
 // Every picture on the issue, in the order they are shown, and which one the viewer has open.
 const shown = ref<number | null>(null);
@@ -1556,18 +1556,16 @@ async function removeIssue(): Promise<void> {
 }
 
 /* Waiting, not yet uploaded: one block per file — the picture itself at its own size, and under it the whole name, the size and the way to take it back. The dashed edge is what says it has not gone up yet. */
-/* One-pixel rows and no row gap: the packer in lib/masonry.ts measures each block and spans it over as many rows as it is tall, so blocks of different heights sit under one another without a hole. */
+/* No columns: every block is the size of the picture in it, and lib/masonry.ts puts each one at the lowest free place it fits. The blocks are placed absolutely, which is what lets one start under a short neighbour rather than after the tallest block beside it. */
 .waits {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  grid-auto-rows: 1px;
-  column-gap: 8px;
-  align-items: start;
+  position: relative;
   margin-top: 8px;
 }
 .wait {
-  display: flex;
-  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 100%;
   border: 1px dashed var(--line-2);
   background: var(--bg);
 }

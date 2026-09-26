@@ -1,34 +1,57 @@
-// Masonry packing, carried over from the Crons tab in another project. CSS cannot do it on its own — `grid-template-rows: masonry` is still behind a flag — so the grid is given one-pixel rows and each block is measured and placed by hand: the column that is currently shortest gets the next block, and it spans as many rows as it is tall. Blocks keep their own heights and nothing is left empty under a short one.
+// Packing blocks that each keep their own size. A picture is shown as large as it is, so the blocks differ in width as well as height, and neither CSS grid nor flex can lay that out without holes: grid forces equal columns, flex leaves the rest of a row empty under a short block.
+//
+// So the wall is packed by hand, the way a shelf is stacked: the container is measured, every block keeps its natural size, and each one is put at the lowest free place it fits — sliding along the top edge of what is already there. Blocks are absolutely placed, which is what lets the next one start under a short neighbour instead of after the tallest in its row.
 import { onBeforeUnmount, watch, type Ref } from 'vue';
 
 const GAP = 8;
+/** The top edge is sampled every few pixels; finer than a block ever needs and cheap to scan. */
+const STEP = 4;
 
-export function packMasonry(root: HTMLElement | null): void {
+export function packWall(root: HTMLElement | null): void {
   if (!root) return;
   const items = Array.from(root.children) as HTMLElement[];
-  if (!items.length) return;
-
-  // Cleared first, or every measurement would be the span we gave it last time.
-  for (const el of items) {
-    el.style.gridColumn = '';
-    el.style.gridRow = '';
+  if (!items.length) {
+    root.style.height = '';
+    return;
   }
-  const columns = getComputedStyle(root).gridTemplateColumns.split(' ').filter(Boolean).length || 1;
-  const heights = items.map((el) => Math.ceil(el.getBoundingClientRect().height));
-  const ends = new Array<number>(columns).fill(0);
 
-  items.forEach((el, i) => {
-    const col = ends.indexOf(Math.min(...ends));
-    const height = Math.max(heights[i], 1);
-    const start = ends[col] === 0 ? 1 : ends[col] + GAP + 1;
-    el.style.gridColumn = String(col + 1);
-    el.style.gridRow = `${start} / span ${height}`;
-    ends[col] = start + height - 1;
-  });
+  const width = Math.max(Math.floor(root.clientWidth), 1);
+  const slots = Math.ceil(width / STEP);
+  // How far down the wall is filled at each sampled x.
+  const top = new Array<number>(slots).fill(0);
+
+  let bottom = 0;
+  for (const item of items) {
+    const box = item.getBoundingClientRect();
+    const w = Math.min(Math.ceil(box.width), width);
+    const h = Math.ceil(box.height);
+    const span = Math.max(Math.ceil(w / STEP), 1);
+
+    // The lowest place it fits, and the leftmost of those.
+    let bestAt = 0;
+    let bestY = Infinity;
+    for (let at = 0; at + span <= slots; at++) {
+      let y = 0;
+      for (let i = at; i < at + span; i++) if (top[i] > y) y = top[i];
+      if (y < bestY) {
+        bestY = y;
+        bestAt = at;
+        if (y === 0) break;
+      }
+    }
+    if (!Number.isFinite(bestY)) bestY = 0;
+
+    const x = Math.min(bestAt * STEP, Math.max(width - w, 0));
+    item.style.transform = `translate(${x}px, ${bestY}px)`;
+    for (let i = bestAt; i < Math.min(bestAt + span, slots); i++) top[i] = bestY + h + GAP;
+    bottom = Math.max(bottom, bestY + h);
+  }
+
+  root.style.height = `${bottom}px`;
 }
 
-/** Keeps one grid packed: on its own resize, on any block's, and whenever what is in it changes. Pictures arrive after their block does, so `repack()` is also called from each image's load. */
-export function useMasonry(root: Ref<HTMLElement | null>, source: () => unknown) {
+/** Keeps one wall packed: on its own resize, on any block's, and whenever what is in it changes. Pictures arrive after their block does, so `repack()` is also called from each image's load. */
+export function useWall(root: Ref<HTMLElement | null>, source: () => unknown) {
   let observer: ResizeObserver | null = null;
   let frame: number | null = null;
 
@@ -36,7 +59,7 @@ export function useMasonry(root: Ref<HTMLElement | null>, source: () => unknown)
     if (frame !== null) return;
     frame = requestAnimationFrame(() => {
       frame = null;
-      packMasonry(root.value);
+      packWall(root.value);
     });
   }
 
