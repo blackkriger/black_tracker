@@ -797,9 +797,8 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-direction: column;
   width: min(1100px, 100%);
-  /* An issue with nothing in it yet keeps the same window as one with a year of history behind it. */
-  min-height: min(760px, 100%);
-  max-height: 100%;
+  /* The window is the screen, less the scrim's gutter: an issue with nothing in it yet is the same window as one with a year of history behind it. */
+  height: 100%;
   overflow: hidden;
 }
 .iv {
