@@ -585,7 +585,6 @@ async function removeIssue(): Promise<void> {
                 v-for="c in issue.comments"
                 :key="c.id"
                 class="cm"
-                :class="{ 'cm--pinned': c.pinnedAt }"
               >
                 <span class="av av--lg" :style="buddyAvatarStyle(c.author.login)"></span>
                 <div>
@@ -841,12 +840,6 @@ async function removeIssue(): Promise<void> {
 }
 .cm__body :deep(p:last-child) {
   margin-bottom: 0;
-}
-/* A pinned comment is marked where it stands, by the same gold that marks the current tab. */
-.cm--pinned {
-  border-left: 2px solid var(--accent);
-  margin-left: -12px;
-  padding-left: 10px;
 }
 .cm__pin {
   font-size: 12px;
