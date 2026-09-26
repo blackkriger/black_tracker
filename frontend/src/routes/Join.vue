@@ -16,7 +16,6 @@ const valid = ref(false);
 const login = ref('');
 const password = ref('');
 const repeat = ref('');
-const fullName = ref('');
 const busy = ref(false);
 const error = ref<string | null>(null);
 
@@ -43,11 +42,8 @@ async function onSubmit(): Promise<void> {
   try {
     await api(`/invites/${encodeURIComponent(token)}/accept`, {
       method: 'POST',
-      body: {
-        login: login.value.trim(),
-        password: password.value,
-        fullName: fullName.value.trim(),
-      },
+      // The display name is theirs to set later, in their own profile.
+      body: { login: login.value.trim(), password: password.value },
     });
     // Accepting signs the new account in, so the root can decide where it lands like any other visit.
     await session.refresh();
@@ -90,17 +86,6 @@ async function onSubmit(): Promise<void> {
             autocomplete="username"
             maxlength="32"
             autofocus
-          />
-        </div>
-        <div class="field">
-          <label class="label" for="join-name">Display name</label>
-          <input
-            id="join-name"
-            v-model="fullName"
-            class="input"
-            autocomplete="name"
-            maxlength="120"
-            :placeholder="login"
           />
         </div>
         <div class="field">
