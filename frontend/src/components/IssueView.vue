@@ -8,6 +8,7 @@ import { TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank } from '../lib/richtext';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
+import { useMasonry } from '../lib/masonry';
 import { useSession } from '../lib/session';
 import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Trash2, X } from 'lucide-vue-next';
 import {
@@ -253,6 +254,12 @@ const dragOver = ref(false);
 // Files chosen before there is anything to attach them to: a new issue, or a comment that has not been posted. They are uploaded the moment their owner exists.
 const pending = ref<File[]>([]);
 const commentFiles = ref<File[]>([]);
+
+// The two walls of waiting files pack themselves: blocks keep their own heights and drop into whichever column is shortest.
+const issueWall = ref<HTMLElement | null>(null);
+const commentWall = ref<HTMLElement | null>(null);
+const issuePack = useMasonry(issueWall, () => pending.value.length);
+const commentPack = useMasonry(commentWall, () => commentFiles.value.length);
 
 // Every picture on the issue, in the order they are shown, and which one the viewer has open.
 const shown = ref<number | null>(null);
@@ -889,14 +896,14 @@ async function removeIssue(): Promise<void> {
               </div>
 
               <!-- Chosen, not yet uploaded: a picture shows itself, anything else says its name. -->
-              <div v-if="pending.some((f) => previewOf(f))" class="waits">
+              <div v-if="pending.some((f) => previewOf(f))" ref="issueWall" class="waits">
                 <div
                   v-for="f in pending.filter((x) => previewOf(x))"
                   :key="f.name"
                   class="wait"
                 >
                   <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
-                    <img :src="previewOf(f) ?? ''" :alt="f.name" />
+                    <img :src="previewOf(f) ?? ''" :alt="f.name" @load="issuePack.repack()" />
                   </button>
                   <div class="wait__row">
                     <span class="wait__name">{{ f.name }}</span>
@@ -1061,11 +1068,11 @@ async function removeIssue(): Promise<void> {
                       </label>
                     </template>
                   </RichText>
-                  <div v-if="commentFiles.length" class="cm__waiting">
+                  <div v-if="commentFiles.length" ref="commentWall" class="cm__waiting waits">
                     <template v-for="f in commentFiles" :key="f.name">
                       <div v-if="previewOf(f)" class="wait">
                         <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
-                          <img :src="previewOf(f) ?? ''" :alt="f.name" />
+                          <img :src="previewOf(f) ?? ''" :alt="f.name" @load="commentPack.repack()" />
                         </button>
                         <div class="wait__row">
                           <span class="wait__name">{{ f.name }}</span>
@@ -1547,19 +1554,15 @@ async function removeIssue(): Promise<void> {
   color: var(--text);
   background: var(--surface);
 }
-.cm__waiting {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 6px;
-  margin-top: 8px;
-}
+
 /* Waiting, not yet uploaded: one block per file — the picture itself at its own size, and under it the whole name, the size and the way to take it back. The dashed edge is what says it has not gone up yet. */
-/* A grid of equal cells: pictures come in every shape, and any layout that keeps their own heights leaves holes under the short ones. Each picture is shown whole inside its cell — scaled to fit, never cropped — and the cells tile without a gap. */
+/* One-pixel rows and no row gap: the packer in lib/masonry.ts measures each block and spans it over as many rows as it is tall, so blocks of different heights sit under one another without a hole. */
 .waits {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 8px;
+  grid-auto-rows: 1px;
+  column-gap: 8px;
+  align-items: start;
   margin-top: 8px;
 }
 .wait {
@@ -1570,18 +1573,18 @@ async function removeIssue(): Promise<void> {
 }
 .wait__img {
   display: block;
-  flex: 1 1 auto;
   width: 100%;
-  height: 190px;
   padding: 0;
   border: 0;
   background: none;
   cursor: zoom-in;
 }
+/* Its own proportions, as wide as the column allows, with a ceiling so one tall picture cannot run the column away. */
 .wait__img img {
   display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 420px;
   object-fit: contain;
 }
 .wait__row {
