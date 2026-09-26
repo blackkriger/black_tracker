@@ -171,6 +171,7 @@ button { font-family: var(--font-ui); }
 /* A tag as a label in its own colour: square corners, dark text, the way a tag reads on a board card and in settings alike. */
 .taglabel { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px 0 9px; background: var(--c); color: #12131a; font-size: 12.5px; font-weight: 500; }
 .taglabel--plain { padding: 0 9px; }
+.taglabel--sm { height: 18px; padding: 0 6px; font-size: 11px; }
 .taglabel__x { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: 0; background: none; color: inherit; opacity: .55; cursor: pointer; font-size: 12px; }
 .taglabel__x:hover:enabled { opacity: 1; background: rgba(0, 0, 0, .18); }
 /* The cross on a tag has no border to dash, so a closed one simply goes quiet. */

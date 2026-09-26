@@ -22,6 +22,8 @@ export const router = createRouter({
     { path: '/join/:token', name: 'join', component: Join, meta: { public: true } },
     { path: '/p/:short', name: 'project-board', component: Board },
     { path: '/p/:short/b/:slug', name: 'board', component: Board },
+    // The same board with one of its issues open over it, so a card can be linked to.
+    { path: '/p/:short/b/:slug/i/:key', name: 'issue', component: Board },
     { path: '/profile', name: 'profile', component: Profile },
     { path: '/settings', name: 'settings', component: SettingsIndex, meta: { admin: true } },
     { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject, meta: { admin: true } },

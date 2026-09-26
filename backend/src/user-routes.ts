@@ -3,7 +3,14 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { pool } from './db.js';
-import { USER_SELECT, hashPassword, publicUser, requireAdmin, userById } from './auth.js';
+import {
+  USER_SELECT,
+  hashPassword,
+  publicUser,
+  requireAdmin,
+  requireAuth,
+  userById,
+} from './auth.js';
 
 // What it takes to become an account, wherever the account comes from: an admin filling this in, or someone filling it in themselves behind an invite link.
 export const accountCredentials = z.object({
@@ -36,6 +43,18 @@ export function registerUserRoutes(app: FastifyInstance): void {
       `${USER_SELECT} order by u.active desc, lower(coalesce(nullif(u.full_name, ''), u.login))`
     );
     return reply.send({ data: res.rows.map(publicUser) });
+  });
+
+  // Everyone signed in needs the names: an assignee picker, a comment's author, a mention later. It carries no dates, no token and no flags — just who there is.
+  app.get('/people', async (req, reply) => {
+    if (!(await requireAuth(req, reply))) return;
+    const res = await pool.query<{ id: string; login: string; full_name: string }>(
+      `select id, login, full_name from users where active
+        order by lower(coalesce(nullif(full_name, ''), login))`
+    );
+    return reply.send({
+      data: res.rows.map((r) => ({ id: r.id, login: r.login, fullName: r.full_name })),
+    });
   });
 
   app.post('/users', async (req, reply) => {
