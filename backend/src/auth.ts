@@ -28,14 +28,26 @@ declare module 'fastify' {
 }
 
 // What lands in the sessions table is a hash, so a database dump is not a pile of working cookies. Salted with SESSION_SECRET so the hashes are useless against another instance too.
-function hashToken(raw: string): string {
+export function hashToken(raw: string): string {
   return createHash('sha256').update(`${env.sessionSecret}:${raw}`).digest('hex');
 }
 
-const newRawToken = () => randomBytes(32).toString('base64url');
+export const newRawToken = () => randomBytes(32).toString('base64url');
 
 export const hashPassword = (plain: string) => bcrypt.hash(plain, 10);
 export const checkPassword = (plain: string, hash: string) => bcrypt.compare(plain, hash);
+
+// Signing someone in: one place, so /login and an accepted invite hand out the same cookie.
+export async function startSession(reply: FastifyReply, userId: string): Promise<void> {
+  const raw = await createSession(userId);
+  reply.setCookie(SESSION_COOKIE, raw, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.secureCookies,
+    path: '/',
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
+  });
+}
 
 async function createSession(userId: string): Promise<string> {
   const raw = newRawToken();
@@ -201,14 +213,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       return reply.code(401).send({ error: 'Wrong login or password.' });
     }
 
-    const raw = await createSession(row.id);
-    reply.setCookie(SESSION_COOKIE, raw, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: env.secureCookies,
-      path: '/',
-      maxAge: SESSION_DAYS * 24 * 60 * 60,
-    });
+    await startSession(reply, row.id);
     return reply.send({ data: publicUser(row) });
   });
 

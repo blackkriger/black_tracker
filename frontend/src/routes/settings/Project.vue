@@ -412,9 +412,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
   align-items: center;
   gap: var(--space-2);
 }
-.panel__table {
-  padding: 4px 8px 12px;
-}
 .addrow {
   padding: 8px 4px 0;
 }

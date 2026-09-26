@@ -108,6 +108,7 @@ button { font-family: var(--font-ui); }
 .panel__h { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--line); font: 600 14px var(--font-ui); color: var(--text); }
 .panel__end { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 400; color: var(--text-muted); }
 .panel__b { padding: 20px; }
+.panel__table { padding: 4px 8px 12px; }
 .group { background: var(--bg); border: 1px solid var(--line); }
 .group__h { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--text-dim); }
 

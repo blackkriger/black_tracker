@@ -9,6 +9,8 @@ import SettingsIndex from './routes/settings/Index.vue';
 import SettingsProject from './routes/settings/Project.vue';
 import SettingsNewProject from './routes/settings/NewProject.vue';
 import SettingsTags from './routes/settings/Tags.vue';
+import SettingsUsers from './routes/settings/Users.vue';
+import Join from './routes/Join.vue';
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -16,6 +18,8 @@ export const router = createRouter({
     // The root decides where you belong: the board of the project you last had open, or an empty state when there are no projects yet.
     { path: '/', name: 'home', component: Home },
     { path: '/login', name: 'login', component: Login, meta: { public: true } },
+    // The far end of an invite link: open to whoever holds it, and the only way an account is ever born in the browser.
+    { path: '/join/:token', name: 'join', component: Join, meta: { public: true } },
     { path: '/p/:short', name: 'project-board', component: Board },
     { path: '/p/:short/b/:slug', name: 'board', component: Board },
     { path: '/profile', name: 'profile', component: Profile },
@@ -23,6 +27,7 @@ export const router = createRouter({
     { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject, meta: { admin: true } },
     { path: '/settings/p/:short', name: 'settings-project', component: SettingsProject, meta: { admin: true } },
     { path: '/settings/tags', name: 'settings-tags', component: SettingsTags, meta: { admin: true } },
+    { path: '/settings/users', name: 'settings-users', component: SettingsUsers, meta: { admin: true } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },
   ],
 });

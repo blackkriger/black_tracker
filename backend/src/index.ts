@@ -9,6 +9,7 @@ import { registerProjectRoutes } from './project-routes.js';
 import { registerBoardRoutes } from './board-routes.js';
 import { registerTagRoutes } from './tag-routes.js';
 import { registerUserRoutes } from './user-routes.js';
+import { registerInviteRoutes } from './invite-routes.js';
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
@@ -27,6 +28,7 @@ registerProjectRoutes(app);
 registerBoardRoutes(app);
 registerTagRoutes(app);
 registerUserRoutes(app);
+registerInviteRoutes(app);
 
 // Every route answers the same two shapes: `{ data }` when it worked, `{ error }` when it did not.
 app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found.' }));
