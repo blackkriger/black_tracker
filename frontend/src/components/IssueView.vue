@@ -762,7 +762,7 @@ async function removeIssue(): Promise<void> {
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
-              <div class="sec-h">
+              <div class="sec-h links">
                 <svg class="links__icon" viewBox="0 0 16 16" width="13" height="13" role="img" aria-hidden="true">
                   <path
                     fill="none"
@@ -772,24 +772,20 @@ async function removeIssue(): Promise<void> {
                     d="M6.4 9.6 9.6 6.4M6.9 4.7 8.5 3.1a2.9 2.9 0 0 1 4.1 4.1L11 8.8M9.1 11.3l-1.6 1.6a2.9 2.9 0 0 1-4.1-4.1L5 7.2"
                   />
                 </svg>
-                Links<span class="n">{{ shownLinks.length }}</span>
+                <RouterLink
+                  v-for="l in shownLinks"
+                  :key="l.id"
+                  class="lk"
+                  :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
+                  :title="`${l.summary} — ${l.stateName}`"
+                >
+                  <span class="key lk__key" :style="{ color: l.stateColor }">{{ l.key }}</span>
+                </RouterLink>
+                <span v-if="!shownLinks.length">No links yet.</span>
                 <div class="sp"></div>
                 <button class="btn btn--sm btn--ghost" type="button" @click="openPicker">
                   Add link…
                 </button>
-              </div>
-
-              <div v-if="!shownLinks.length" class="hint">No links yet.</div>
-              <div class="links">
-              <RouterLink
-                v-for="l in shownLinks"
-                :key="l.id"
-                class="lk"
-                :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
-                :title="`${l.summary} — ${l.stateName}`"
-              >
-                <span class="key lk__key" :style="{ color: l.stateColor }">{{ l.key }}</span>
-              </RouterLink>
               </div>
             </div>
 
@@ -1308,12 +1304,12 @@ async function removeIssue(): Promise<void> {
 .att__row--wait {
   border-style: dashed;
 }
-/* The keys are enough on the line; the title rides in the tooltip. */
+/* One line: the chain, what it holds, and the way to add more. The keys are enough — the title rides in the tooltip. */
 .links {
-  display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 6px;
+  height: auto;
+  min-height: 26px;
 }
 .links__icon {
   flex: none;
