@@ -14,8 +14,8 @@ Nine tables from the brief, plus per-board denials and sessions: `users`, `proje
 
 Two decisions everything else leans on:
 
-- **Statuses are rows, not an enum.** Adding one is an insert; the board grows a column with no deploy. `is_resolved` is what "closed" means and stamps `issues.resolved_at`.
-- **A board is a saved filter over a project, and its columns are the project's states.** There is no column entity to keep in sync with anything.
+- **Statuses are rows, not an enum.** Adding one is an insert; the board grows a column with no deploy. `is_resolved` is what "closed" means and stamps `issues.resolved_at`; a status is open or resolved, never both.
+- **A board owns its columns.** Statuses hang off `boards`, so two boards in one project can run different workflows, and an issue lives on exactly one board. A board is addressed by a slug unique inside the project, not by its id.
 
 ## Running it
 
@@ -40,4 +40,15 @@ npm run dev               # 127.0.0.1:5174, proxies /api to 127.0.0.1:3100
 
 ## Server
 
-nginx terminates HTTPS for `tracker.example.com` and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The process runs under PM2 as `tracker-api`. Postgres role and database `tracker`.
+`server.example`. nginx terminates HTTPS for `tracker.example.com` and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The backend lives in `/opt/issues_tracker` and runs under PM2 as `tracker-api`. Postgres role and database `tracker`. Uploads land in `/var/lib/tracker/uploads`.
+
+`./deploy.sh` from the repo root does the whole round: push, build the SPA, ship `dist` to the docroot, then `git pull` + `npm install` + `npm run migrate` + pm2 restart on the server, and poll `/health`. Commit first — the server pulls.
+
+```bash
+ssh root@server.example
+cd /opt/issues_tracker/backend
+npm run create-user -- <login> <password> admin "Full name"   # also resets a password
+pm2 logs tracker-api --lines 50
+pm2 restart tracker-api --update-env
+sudo -u postgres psql -d tracker
+```
