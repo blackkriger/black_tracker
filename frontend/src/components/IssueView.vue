@@ -948,10 +948,6 @@ async function removeIssue(): Promise<void> {
 .iv__body :deep(p:last-child) {
   margin-bottom: 0;
 }
-/* The buttons belong to the field above them, not stuck to its edge. */
-.rt + .composer__row {
-  margin-top: 8px;
-}
 /* The day and the clock ride together in the first column, so it is wider than the theme's default. */
 .hi {
   grid-template-columns: 152px 96px minmax(0, 1fr);
@@ -981,9 +977,13 @@ async function removeIssue(): Promise<void> {
 }
 .att__row a,
 .att__name {
-  flex: 1;
+  flex: 0 1 auto;
   color: var(--text);
   text-decoration: none;
+}
+.att__row .stamp {
+  flex: 0 0 auto;
+  margin-right: auto;
 }
 .att__row--wait {
   border-style: dashed;
