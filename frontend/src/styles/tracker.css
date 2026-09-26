@@ -60,10 +60,6 @@ a { color: var(--accent); } a:hover { color: var(--accent-bright); }
 .ic { flex: none; width: 14px; height: 14px; stroke-width: 1.5; }
 .ic--sm { width: 12px; height: 12px; }
 
-/* Every icon is drawn at the same weight and sits on the text's own colour. */
-.ic { flex: none; width: 14px; height: 14px; stroke-width: 1.5; }
-.ic--sm { width: 12px; height: 12px; }
-
 ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text); }
 svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
 button { font-family: var(--font-ui); }
@@ -345,7 +341,13 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .md { font-size: 14px; line-height: 1.65; color: var(--text); }
 .md p { margin: 0 0 10px; }
 .md ol, .md ul { margin: 0 0 10px; padding-left: 22px; }
-.md h4 { margin: 14px 0 6px; font: 600 13.5px var(--font-ui); color: var(--text); }
+.md h3, .md h4 { margin: 14px 0 6px; font: 600 15px var(--font-ui); color: var(--text); }
+.md h4 { font-size: 13.5px; }
+.md blockquote { margin: 0 0 10px; padding-left: 10px; border-left: 2px solid var(--line-2); color: var(--text-dim); }
+.md pre { margin: 0 0 10px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); font: 12.5px var(--font-mono); overflow-x: auto; }
+/* A bulleted list is an <ol> with data-list="bullet" — Quill's doing, and the reader has to honour it. */
+.md ol li[data-list="bullet"] { list-style-type: disc; }
+.md ol li[data-list="ordered"] { list-style-type: decimal; }
 .md code { font: 12.5px var(--font-mono); padding: 1px 5px; background: var(--bg); border: 1px solid var(--line); }
 .md a { color: var(--focus); }
 .itabs { display: flex; border-bottom: 1px solid var(--line); }

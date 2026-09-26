@@ -22,7 +22,8 @@ const ALLOWED_TAGS = [
 export function clean(html: string): string {
   return DOMPurify.sanitize(html ?? '', {
     ALLOWED_TAGS,
-    ALLOWED_ATTR: ['href', 'target', 'rel'],
+    // Quill writes both kinds of list as <ol> and says which in data-list, so dropping that attribute turned every bullet into a number.
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'data-list'],
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#|\/)/i,
   });
 }

@@ -199,10 +199,12 @@ async function onDrop(): Promise<void> {
   const board = current.value;
   if (!target || !moved || !board) return;
 
-  const column = issuesOf(target.stateId).filter((i) => i.id !== moved.id);
+  // The whole column, not just what is on screen: a filter hides cards, and sending only the visible ones would renumber them and leave the rest interleaved.
+  const column = issues.value
+    .filter((i) => i.stateId === target.stateId && i.id !== moved.id)
+    .sort((a, b) => a.position - b.position);
   const at = target.beforeId ? column.findIndex((i) => i.id === target.beforeId) : column.length;
   column.splice(at < 0 ? column.length : at, 0, moved);
-  if (column.every((i, n) => i.id === issuesOf(target.stateId)[n]?.id)) return;
 
   // The board answers to the hand that moved the card; the server is told afterwards and only corrects us if it disagrees.
   moved.stateId = target.stateId;

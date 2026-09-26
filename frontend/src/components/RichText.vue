@@ -224,6 +224,16 @@ function addLink(): void {
   margin: 0 0 8px;
   padding-left: 22px;
 }
+/* Quill's own bullet lives in a span it draws; the marker is ours to set. */
+.rt__editor :deep(li[data-list='bullet']) {
+  list-style-type: disc;
+}
+.rt__editor :deep(li[data-list='ordered']) {
+  list-style-type: decimal;
+}
+.rt__editor :deep(.ql-ui) {
+  display: none;
+}
 .rt__editor :deep(a) {
   color: var(--focus);
 }

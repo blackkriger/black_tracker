@@ -43,7 +43,9 @@ export function packWall(root: HTMLElement | null): void {
 
     const x = Math.min(bestAt * STEP, Math.max(width - w, 0));
     item.style.transform = `translate(${x}px, ${bestY}px)`;
-    for (let i = bestAt; i < Math.min(bestAt + span, slots); i++) top[i] = bestY + h + GAP;
+    // The reserved width includes the gap, or the next block would sit flush against this one.
+    const reach = Math.ceil((w + GAP) / STEP);
+    for (let i = bestAt; i < Math.min(bestAt + reach, slots); i++) top[i] = bestY + h + GAP;
     bottom = Math.max(bottom, bestY + h);
   }
 

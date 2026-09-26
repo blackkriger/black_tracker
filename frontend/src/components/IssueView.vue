@@ -141,7 +141,7 @@ const commentDraft = ref('');
 const composer = ref<InstanceType<typeof RichText> | null>(null);
 
 // Selecting text inside a comment raises a small bar over it: copy what is highlighted, or answer it with a quote. It fades when the cursor wanders off and is gone once the selection is.
-const popup = ref<{ x: number; y: number; commentId: string } | null>(null);
+const popup = ref<{ x: number; y: number; commentId: string; above: boolean } | null>(null);
 const popupNear = ref(true);
 
 function commentUnder(node: Node | null): string | null {
@@ -171,7 +171,14 @@ function onMouseUp(): void {
       popup.value = null;
       return;
     }
-    popup.value = { x: box.left + box.width / 2, y: box.top, commentId };
+    // Below the selection when there is no room above it, so it is never drawn off the top of the window.
+    const above = box.top > 48;
+    popup.value = {
+      x: box.left + box.width / 2,
+      y: above ? box.top : box.bottom,
+      commentId,
+      above,
+    };
     popupNear.value = true;
   }, 0);
 }
@@ -304,8 +311,9 @@ const filesOf = (commentId: string) =>
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
-  if (deleting.value) deleting.value = false;
-  else if (creating.value || !editing.value) emit('close');
+  // Anything opened over this window answers Escape first; only when nothing is does it close the issue.
+  if (deleting.value || picking.value || shown.value !== null) return;
+  if (creating.value || !editing.value) emit('close');
   else editing.value = false;
 }
 
@@ -333,6 +341,11 @@ watch(() => props.issueKey, load, { immediate: true });
 useLive((ev) => {
   const current = issue.value;
   if (!current || ev.issueId !== current.id) return;
+  if (ev.type === 'issue.deleted') {
+    // Someone deleted it while it was open; there is nothing left to read.
+    emit('close');
+    return;
+  }
   void reload().then(() => {
     if (ev.type.startsWith('comment.')) flash(['comments']);
     else if (ev.type.startsWith('attachment.')) flash(['files']);
@@ -477,8 +490,12 @@ async function saveText(): Promise<void> {
   const current = issue.value;
   if (!current || saving.value) return;
   const summary = titleDraft.value.trim();
+  if (!summary) {
+    error.value = 'An issue needs a title.';
+    return;
+  }
   const body: Record<string, unknown> = {};
-  if (summary && summary !== current.summary) body.summary = summary;
+  if (summary !== current.summary) body.summary = summary;
   if (bodyDraft.value !== current.description) body.description = bodyDraft.value;
   saving.value = true;
   try {
@@ -508,13 +525,19 @@ async function postComment(): Promise<void> {
       method: 'POST',
       body: { text },
     });
-    // The comment is posted first because a file has to hang off something, but nothing is shown and nothing is cleared until its files are up: half a comment on screen is worse than a moment's wait.
+    // The comment is posted first because a file has to hang off something, and nothing is shown until its files are up: half a comment on screen is worse than a moment's wait. If the files fail the comment still exists, so it is shown anyway and only the files are complained about.
     if (commentFiles.value.length) {
-      await sendFiles(current.id, commentFiles.value, created.id);
+      try {
+        await sendFiles(current.id, commentFiles.value, created.id);
+      } catch (err) {
+        error.value = err instanceof Error ? err.message : 'The comment was posted without the files.';
+      }
       commentFiles.value = [];
     }
     const now = issue.value ?? current;
-    issue.value = { ...now, comments: [...now.comments, created] };
+    if (!now.comments.some((row) => row.id === created.id)) {
+      issue.value = { ...now, comments: [...now.comments, created] };
+    }
     commentDraft.value = '';
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not post the comment.';
@@ -525,9 +548,12 @@ async function postComment(): Promise<void> {
 
 async function saveComment(c: Comment): Promise<void> {
   const text = commentEdit.value;
-  editingComment.value = null;
   const current = issue.value;
-  if (!current || isBlank(text) || text === c.text) return;
+  if (!current) return;
+  if (isBlank(text) || text === c.text) {
+    editingComment.value = null;
+    return;
+  }
   try {
     const updated = await api<{ editedAt: string }>(`/comments/${c.id}`, {
       method: 'PATCH',
@@ -540,7 +566,9 @@ async function saveComment(c: Comment): Promise<void> {
         row.id === c.id ? { ...row, text, editedAt: updated.editedAt } : row
       ),
     };
+    editingComment.value = null;
   } catch (err) {
+    // The editor stays open with the text still in it; closing it would throw the words away.
     error.value = err instanceof Error ? err.message : 'Could not save the comment.';
   }
 }
@@ -656,15 +684,14 @@ function accept(list: FileList | null): File[] {
 }
 
 async function upload(list: FileList | null): Promise<void> {
+  dragOver.value = false;
   const chosen = accept(list);
   if (!chosen.length) return;
-  dragOver.value = false;
   if (creating.value || !issue.value) {
     pending.value = [...pending.value, ...chosen];
     return;
   }
   uploading.value = true;
-  error.value = null;
   try {
     await sendFiles(issue.value.id, chosen);
   } catch (err) {
@@ -695,12 +722,23 @@ function forgetPreview(file: File): void {
   }
 }
 
-function dropPending(name: string, from: 'issue' | 'comment'): void {
+// Files are told apart by identity, not by name: two screenshots pasted a minute apart are both "image.png".
+const fileKeys = new WeakMap<File, string>();
+let nextFileKey = 1;
+
+function keyOf(file: File): string {
+  let key = fileKeys.get(file);
+  if (!key) {
+    key = `f${nextFileKey++}`;
+    fileKeys.set(file, key);
+  }
+  return key;
+}
+
+function dropPending(file: File, from: 'issue' | 'comment'): void {
   const list = from === 'issue' ? pending : commentFiles;
-  const at = list.value.findIndex((f) => f.name === name);
-  if (at < 0) return;
-  forgetPreview(list.value[at]);
-  list.value = list.value.filter((_, i) => i !== at);
+  forgetPreview(file);
+  list.value = list.value.filter((f) => f !== file);
 }
 
 function pickCommentFiles(list: FileList | null): void {
@@ -924,7 +962,7 @@ async function removeIssue(): Promise<void> {
               <div v-if="pending.some((f) => previewOf(f))" ref="issueWall" class="waits">
                 <div
                   v-for="f in pending.filter((x) => previewOf(x))"
-                  :key="f.name"
+                  :key="keyOf(f)"
                   class="wait"
                 >
                   <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
@@ -937,14 +975,14 @@ async function removeIssue(): Promise<void> {
                       class="btn btn--sm btn--icon btn--ghost"
                       type="button"
                       :aria-label="`Remove ${f.name}`"
-                      @click="dropPending(f.name, 'issue')"
+                      @click="dropPending(f, 'issue')"
                     ><X class="ic ic--sm" /></button>
                   </div>
                 </div>
               </div>
               <div
                 v-for="f in pending.filter((x) => !previewOf(x))"
-                :key="f.name"
+                :key="keyOf(f)"
                 class="att__cap att__row att__row--wait"
               >
                 <span class="att__name">{{ f.name }}</span>
@@ -953,7 +991,7 @@ async function removeIssue(): Promise<void> {
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
                   :aria-label="`Remove ${f.name}`"
-                  @click="dropPending(f.name, 'issue')"
+                  @click="dropPending(f, 'issue')"
                 ><X class="ic ic--sm" /></button>
               </div>
               <label
@@ -1094,7 +1132,7 @@ async function removeIssue(): Promise<void> {
                     </template>
                   </RichText>
                   <div v-if="commentFiles.length" ref="commentWall" class="cm__waiting waits">
-                    <template v-for="f in commentFiles" :key="f.name">
+                    <template v-for="f in commentFiles" :key="keyOf(f)">
                       <div v-if="previewOf(f)" class="wait">
                         <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
                           <img :src="previewOf(f) ?? ''" :alt="f.name" @load="commentPack.repack()" />
@@ -1106,7 +1144,7 @@ async function removeIssue(): Promise<void> {
                             class="btn btn--sm btn--icon btn--ghost"
                             type="button"
                             :aria-label="`Remove ${f.name}`"
-                            @click="dropPending(f.name, 'comment')"
+                            @click="dropPending(f, 'comment')"
                           ><X class="ic ic--sm" /></button>
                         </div>
                       </div>
@@ -1117,7 +1155,7 @@ async function removeIssue(): Promise<void> {
                           class="btn btn--sm btn--icon btn--ghost"
                           type="button"
                           :aria-label="`Remove ${f.name}`"
-                          @click="dropPending(f.name, 'comment')"
+                          @click="dropPending(f, 'comment')"
                         ><X class="ic ic--sm" /></button>
                       </span>
                     </template>
@@ -1298,7 +1336,7 @@ async function removeIssue(): Promise<void> {
         v-if="popup"
         id="sel-bar"
         class="selbar"
-        :class="{ 'is-far': !popupNear }"
+        :class="{ 'is-far': !popupNear, 'is-below': !popup.above }"
         :style="{ left: `${popup.x}px`, top: `${popup.y}px` }"
       >
         <button type="button" @click="copySelection">Copy</button>
@@ -1441,6 +1479,23 @@ async function removeIssue(): Promise<void> {
 }
 .selbar.is-far {
   opacity: 0.25;
+}
+.selbar.is-below {
+  transform: translate(-50%, 8px);
+}
+.selbar.is-below::before,
+.selbar.is-below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+}
+.selbar.is-below::before {
+  border-bottom-color: var(--line-2);
+}
+.selbar.is-below::after {
+  margin-top: 0;
+  margin-bottom: -1px;
+  border-bottom-color: var(--card);
 }
 .cm__body :deep(blockquote) {
   margin: 0 0 8px;
