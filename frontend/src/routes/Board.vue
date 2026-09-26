@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The board itself is still a shell: columns come from the project's states, the cards land in the next pass.
-import { onMounted, ref, watch } from 'vue';
+// A board and its columns. Cards land in the next pass; what is here is the frame they will sit in.
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 import { api } from '../lib/api';
@@ -14,18 +14,33 @@ interface State {
   isResolved: boolean;
   color: string;
 }
+interface Board {
+  id: string;
+  name: string;
+  position: number;
+  states: State[];
+}
 interface Project {
   id: string;
   shortName: string;
   name: string;
   archived: boolean;
-  states: State[];
+  boards: Board[];
 }
 
 const route = useRoute();
 const project = ref<Project | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
+
+const boards = computed(() =>
+  [...(project.value?.boards ?? [])].sort((a, b) => a.position - b.position)
+);
+// The address names a board, or the project's first one stands in.
+const current = computed(() => {
+  const wanted = String(route.params.boardId ?? '');
+  return boards.value.find((b) => b.id === wanted) ?? boards.value[0] ?? null;
+});
 
 async function load(short: string): Promise<void> {
   loading.value = true;
@@ -54,12 +69,22 @@ watch(
   <div class="page">
     <TopBar :project="project" />
 
+    <nav v-if="boards.length > 1" class="tabs boardtabs" aria-label="Boards">
+      <RouterLink
+        v-for="b in boards"
+        :key="b.id"
+        class="tab"
+        :to="`/p/${project?.shortName}/b/${b.id}`"
+        :aria-current="b.id === current?.id ? 'page' : undefined"
+      >{{ b.name }}</RouterLink>
+    </nav>
+
     <div class="page__body">
       <p v-if="loading" class="hint">Loading…</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
-      <div v-else-if="project" class="cols">
+      <div v-else-if="current" class="cols">
         <section
-          v-for="s in project.states"
+          v-for="s in current.states"
           :key="s.id"
           class="col"
           :style="{ '--c': s.color }"
@@ -75,6 +100,7 @@ watch(
           </div>
         </section>
       </div>
+      <div v-else class="empty"><span class="empty__g">◇</span>This project has no boards.</div>
     </div>
   </div>
 </template>
@@ -85,12 +111,16 @@ watch(
   display: flex;
   flex-direction: column;
 }
+.boardtabs {
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--line);
+  height: 44px;
+}
 .page__body {
   flex: 1 1 auto;
   padding: var(--space-5);
   overflow-x: auto;
 }
-/* The column itself, its header and its body are styled globally — this only lays the columns out in a row. */
 .cols {
   display: flex;
   gap: var(--space-4);

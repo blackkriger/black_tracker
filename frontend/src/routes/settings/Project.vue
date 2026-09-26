@@ -1,59 +1,55 @@
 <script setup lang="ts">
-// One project's setup: what it is called, the statuses that become the board's columns, the boards themselves, and the tags that belong to it.
-import { computed, onMounted, ref, watch } from 'vue';
+// One project's setup. Each board owns its columns, so the statuses live inside the board's panel rather than in one list for the whole project.
+import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import { api } from '../../lib/api';
-
 import { useProjects } from '../../lib/projects';
 
 interface State {
   id: string;
+  boardId: string;
   name: string;
   position: number;
   isOpen: boolean;
   isResolved: boolean;
   color: string;
 }
+interface Board {
+  id: string;
+  name: string;
+  defaultStateId: string | null;
+  position: number;
+  states: State[];
+}
 interface Project {
   id: string;
   shortName: string;
   name: string;
-  description: string;
-  defaultStateId: string | null;
   archived: boolean;
-  states: State[];
+  boards: Board[];
 }
-interface Board {
-  id: string;
-  name: string;
-  position: number;
-}
+
 const route = useRoute();
 const projectsStore = useProjects();
 
 const project = ref<Project | null>(null);
-const states = ref<State[]>([]);
 const boards = ref<Board[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
-const notice = ref<string | null>(null);
-
-const defaultStateId = ref<string | null>(null);
-const savingProject = ref(false);
-
-const short = computed(() => String(route.params.short ?? ''));
+const newBoard = ref('');
+const newStatus = ref<Record<string, string>>({});
 
 async function load(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    const p = await api<Project>(`/projects/${encodeURIComponent(short.value)}`);
+    const short = String(route.params.short ?? '');
+    const p = await api<Project>(`/projects/${encodeURIComponent(short)}`);
     project.value = p;
-    states.value = [...p.states].sort((a, b) => a.position - b.position);
-    defaultStateId.value = p.defaultStateId;
-    boards.value = await api<Board[]>(`/projects/${encodeURIComponent(p.shortName)}/boards`);
+    boards.value = [...p.boards].sort((a, b) => a.position - b.position);
   } catch (err) {
+    project.value = null;
     error.value = err instanceof Error ? err.message : 'Could not load the project.';
   } finally {
     loading.value = false;
@@ -61,28 +57,14 @@ async function load(): Promise<void> {
 }
 
 onMounted(load);
-watch(short, load);
+watch(() => route.params.short, load);
 
 function report(err: unknown): void {
   error.value = err instanceof Error ? err.message : 'Something went wrong.';
 }
 
-async function saveProject(): Promise<void> {
-  if (!project.value || savingProject.value) return;
-  savingProject.value = true;
-  error.value = null;
-  try {
-    await api(`/projects/${encodeURIComponent(project.value.shortName)}`, {
-      method: 'PATCH',
-      body: { defaultStateId: defaultStateId.value },
-    });
-    notice.value = 'Saved.';
-    await projectsStore.load(true);
-  } catch (err) {
-    report(err);
-  } finally {
-    savingProject.value = false;
-  }
+function replaceBoard(next: Board): void {
+  boards.value = boards.value.map((b) => (b.id === next.id ? { ...b, ...next } : b));
 }
 
 async function toggleArchived(): Promise<void> {
@@ -99,81 +81,14 @@ async function toggleArchived(): Promise<void> {
   }
 }
 
-// ── statuses ─────────────────────────────────────────────────────
-const newStatus = ref('');
-
-async function addStatus(): Promise<void> {
-  const value = newStatus.value.trim();
-  if (!value || !project.value) return;
-  try {
-    const created = await api<State>(
-      `/projects/${encodeURIComponent(project.value.shortName)}/states`,
-      { method: 'POST', body: { name: value } }
-    );
-    states.value = [...states.value, created];
-    newStatus.value = '';
-  } catch (err) {
-    report(err);
-  }
-}
-
-async function patchStatus(s: State, patch: Partial<State>): Promise<void> {
-  try {
-    const updated = await api<State>(`/states/${s.id}`, { method: 'PATCH', body: patch });
-    states.value = states.value.map((row) => (row.id === s.id ? updated : row));
-  } catch (err) {
-    report(err);
-    await load();
-  }
-}
-
-async function deleteStatus(s: State): Promise<void> {
-  try {
-    await api(`/states/${s.id}`, { method: 'DELETE' });
-    states.value = states.value.filter((row) => row.id !== s.id);
-  } catch (err) {
-    report(err);
-  }
-}
-
-// Plain HTML5 drag between rows: the order is the list itself, and the server is told the whole sequence once the row lands.
-const dragId = ref<string | null>(null);
-
-function onDrop(target: State): void {
-  const from = states.value.findIndex((s) => s.id === dragId.value);
-  const to = states.value.findIndex((s) => s.id === target.id);
-  dragId.value = null;
-  if (from < 0 || to < 0 || from === to) return;
-  const next = [...states.value];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  states.value = next;
-  void saveStatusOrder();
-}
-
-async function saveStatusOrder(): Promise<void> {
-  if (!project.value) return;
-  try {
-    await api(`/projects/${encodeURIComponent(project.value.shortName)}/states/order`, {
-      method: 'POST',
-      body: { ids: states.value.map((s) => s.id) },
-    });
-  } catch (err) {
-    report(err);
-    await load();
-  }
-}
-
 // ── boards ───────────────────────────────────────────────────────
-const newBoard = ref('');
-
 async function addBoard(): Promise<void> {
-  const value = newBoard.value.trim();
-  if (!value || !project.value) return;
+  const name = newBoard.value.trim();
+  if (!name || !project.value) return;
   try {
     const created = await api<Board>(
       `/projects/${encodeURIComponent(project.value.shortName)}/boards`,
-      { method: 'POST', body: { name: value } }
+      { method: 'POST', body: { name } }
     );
     boards.value = [...boards.value, created];
     newBoard.value = '';
@@ -182,14 +97,12 @@ async function addBoard(): Promise<void> {
   }
 }
 
-async function renameBoard(b: Board, value: string): Promise<void> {
-  const next = value.trim();
-  if (!next || next === b.name) return;
+async function patchBoard(b: Board, body: Record<string, unknown>): Promise<void> {
   try {
-    const updated = await api<Board>(`/boards/${b.id}`, { method: 'PATCH', body: { name: next } });
-    boards.value = boards.value.map((row) => (row.id === b.id ? { ...row, name: updated.name } : row));
+    replaceBoard(await api<Board>(`/boards/${b.id}`, { method: 'PATCH', body }));
   } catch (err) {
     report(err);
+    await load();
   }
 }
 
@@ -199,6 +112,66 @@ async function deleteBoard(b: Board): Promise<void> {
     boards.value = boards.value.filter((row) => row.id !== b.id);
   } catch (err) {
     report(err);
+  }
+}
+
+// ── the columns of one board ─────────────────────────────────────
+async function addStatus(b: Board): Promise<void> {
+  const name = (newStatus.value[b.id] ?? '').trim();
+  if (!name) return;
+  try {
+    const created = await api<State>(`/boards/${b.id}/states`, {
+      method: 'POST',
+      body: { name },
+    });
+    replaceBoard({ ...b, states: [...b.states, created] });
+    newStatus.value = { ...newStatus.value, [b.id]: '' };
+  } catch (err) {
+    report(err);
+  }
+}
+
+async function patchStatus(b: Board, s: State, body: Record<string, unknown>): Promise<void> {
+  try {
+    const updated = await api<State>(`/states/${s.id}`, { method: 'PATCH', body });
+    replaceBoard({ ...b, states: b.states.map((row) => (row.id === s.id ? updated : row)) });
+  } catch (err) {
+    report(err);
+    await load();
+  }
+}
+
+async function deleteStatus(b: Board, s: State): Promise<void> {
+  try {
+    await api(`/states/${s.id}`, { method: 'DELETE' });
+    replaceBoard({ ...b, states: b.states.filter((row) => row.id !== s.id) });
+  } catch (err) {
+    report(err);
+  }
+}
+
+// Plain HTML5 drag between rows: the order is the list itself, and the server hears the whole sequence once a row lands.
+const dragging = ref<{ boardId: string; stateId: string } | null>(null);
+
+async function onDrop(b: Board, target: State): Promise<void> {
+  const drag = dragging.value;
+  dragging.value = null;
+  if (!drag || drag.boardId !== b.id) return;
+  const from = b.states.findIndex((s) => s.id === drag.stateId);
+  const to = b.states.findIndex((s) => s.id === target.id);
+  if (from < 0 || to < 0 || from === to) return;
+  const next = [...b.states];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  replaceBoard({ ...b, states: next });
+  try {
+    await api(`/boards/${b.id}/states/order`, {
+      method: 'POST',
+      body: { ids: next.map((s) => s.id) },
+    });
+  } catch (err) {
+    report(err);
+    await load();
   }
 }
 </script>
@@ -225,121 +198,114 @@ async function deleteBoard(b: Board): Promise<void> {
             <label class="label" for="p-name">Name</label>
             <input id="p-name" class="input" :value="project.name" readonly />
           </div>
-          <div class="field p-default">
-            <label class="label" for="p-default">Default status</label>
-            <select id="p-default" v-model="defaultStateId" class="input">
-              <option v-for="s in states" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-          </div>
           <button class="btn p-btn" type="button" @click="toggleArchived">
             {{ project.archived ? 'Restore project' : 'Archive project' }}
-          </button>
-          <button class="btn btn--primary p-btn" type="button" :disabled="savingProject" @click="saveProject">
-            Save
           </button>
         </div>
       </section>
 
-      <section class="panel">
-          <header class="panel__h">Statuses</header>
-          <div class="panel__table">
-            <table class="tbl">
-              <thead>
-                <tr>
-                  <th class="c-grip"><span class="sr">Order</span></th>
-                  <th class="c-color"><span class="sr">Color</span></th>
-                  <th>Name</th>
-                  <th class="c-flag">Open</th>
-                  <th class="c-flag">Resolved</th>
-                  <th class="c-del"><span class="sr">Delete</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="s in states"
-                  :key="s.id"
-                  draggable="true"
-                  @dragstart="dragId = s.id"
-                  @dragover.prevent
-                  @drop.prevent="onDrop(s)"
-                >
-                  <td class="c-grip grip">⠿</td>
-                  <td class="c-color"><span class="dot" :style="{ background: s.color }"></span></td>
-                  <td>
+      <section v-for="b in boards" :key="b.id" class="panel sheet__wide">
+        <header class="panel__h">
+          <input
+            class="input board-name"
+            :value="b.name"
+            maxlength="60"
+            @change="patchBoard(b, { name: ($event.target as HTMLInputElement).value })"
+          />
+          <span class="panel__end">
+            <label class="label" :for="`default-${b.id}`">Default status</label>
+            <select
+              :id="`default-${b.id}`"
+              class="input default-pick"
+              :value="b.defaultStateId ?? ''"
+              @change="patchBoard(b, { defaultStateId: ($event.target as HTMLSelectElement).value })"
+            >
+              <option v-for="s in b.states" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+            <button class="btn btn--sm btn--danger" type="button" @click="deleteBoard(b)">Delete board</button>
+          </span>
+        </header>
+
+        <div class="panel__table">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="c-grip"><span class="sr">Order</span></th>
+                <th class="c-color"><span class="sr">Color</span></th>
+                <th>Status</th>
+                <th class="c-flag">Open</th>
+                <th class="c-flag">Resolved</th>
+                <th class="c-del"><span class="sr">Delete</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="s in b.states"
+                :key="s.id"
+                draggable="true"
+                @dragstart="dragging = { boardId: b.id, stateId: s.id }"
+                @dragover.prevent
+                @drop.prevent="onDrop(b, s)"
+              >
+                <td class="c-grip grip">⠿</td>
+                <td class="c-color"><span class="dot" :style="{ background: s.color }"></span></td>
+                <td>
+                  <input
+                    class="input input--sm"
+                    :value="s.name"
+                    maxlength="60"
+                    @change="patchStatus(b, s, { name: ($event.target as HTMLInputElement).value })"
+                  />
+                </td>
+                <td>
+                  <label class="check">
                     <input
-                      class="input input--sm"
-                      :value="s.name"
-                      maxlength="60"
-                      @change="patchStatus(s, { name: ($event.target as HTMLInputElement).value })"
+                      type="checkbox"
+                      :checked="s.isOpen"
+                      @change="patchStatus(b, s, { isOpen: ($event.target as HTMLInputElement).checked })"
                     />
-                  </td>
-                  <td>
-                    <label class="check">
-                      <input
-                        type="checkbox"
-                        :checked="s.isOpen"
-                        @change="patchStatus(s, { isOpen: ($event.target as HTMLInputElement).checked })"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <label class="check">
-                      <input
-                        type="checkbox"
-                        :checked="s.isResolved"
-                        @change="patchStatus(s, { isResolved: ($event.target as HTMLInputElement).checked })"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Delete status" @click="deleteStatus(s)">
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <form class="addrow" @submit.prevent="addStatus">
-              <input v-model="newStatus" class="input input--sm" placeholder="Add status…" maxlength="60" />
-              <button class="btn btn--sm" type="submit" :disabled="!newStatus.trim()">Add</button>
-            </form>
-          </div>
-        </section>
+                  </label>
+                </td>
+                <td>
+                  <label class="check">
+                    <input
+                      type="checkbox"
+                      :checked="s.isResolved"
+                      @change="patchStatus(b, s, { isResolved: ($event.target as HTMLInputElement).checked })"
+                    />
+                  </label>
+                </td>
+                <td class="c-del">
+                  <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Delete status" @click="deleteStatus(b, s)">
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-        <div class="stack">
-          <section class="panel">
-            <header class="panel__h">Boards<span class="panel__end">Saved filters</span></header>
-            <div class="panel__table">
-              <table class="tbl">
-                <tbody>
-                  <tr v-for="b in boards" :key="b.id">
-                    <td>
-                      <input
-                        class="input input--sm"
-                        :value="b.name"
-                        maxlength="60"
-                        @change="renameBoard(b, ($event.target as HTMLInputElement).value)"
-                      />
-                    </td>
-                    <td class="c-del">
-                      <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Delete board" @click="deleteBoard(b)">
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <div v-if="!boards.length" class="empty empty--sm"><span class="empty__g">◇</span>No boards yet.</div>
-              <form class="addrow" @submit.prevent="addBoard">
-                <input v-model="newBoard" class="input input--sm" placeholder="Add board…" maxlength="60" />
-                <button class="btn btn--sm" type="submit" :disabled="!newBoard.trim()">Add</button>
-              </form>
-            </div>
-          </section>
-
+          <form class="addrow" @submit.prevent="addStatus(b)">
+            <input
+              :value="newStatus[b.id] ?? ''"
+              class="input"
+              placeholder="Add status…"
+              maxlength="60"
+              @input="newStatus = { ...newStatus, [b.id]: ($event.target as HTMLInputElement).value }"
+            />
+            <button class="btn" type="submit" :disabled="!(newStatus[b.id] ?? '').trim()">Add</button>
+          </form>
         </div>
+      </section>
 
-      <p v-if="notice" class="hint sheet__wide">{{ notice }}</p>
+      <section class="panel sheet__wide">
+        <header class="panel__h">New board</header>
+        <div class="panel__b">
+          <form class="addrow" @submit.prevent="addBoard">
+            <input v-model="newBoard" class="input" placeholder="Add board…" maxlength="60" />
+            <button class="btn" type="submit" :disabled="!newBoard.trim()">Add</button>
+          </form>
+        </div>
+      </section>
     </template>
   </SettingsLayout>
 </template>
@@ -357,37 +323,48 @@ async function deleteBoard(b: Board): Promise<void> {
 .p-name {
   flex: 1 1 220px;
 }
-.p-default {
-  width: 200px;
-}
 .p-btn {
   height: 34px;
+}
+.board-name {
+  width: 220px;
+  height: 30px;
+  font-weight: 600;
+}
+.default-pick {
+  width: 160px;
+  height: 30px;
+}
+.panel__end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 .panel__table {
   padding: 4px 8px 12px;
 }
+.addrow {
+  padding: 8px 4px 0;
+}
 .grip {
   color: var(--text-dim);
   cursor: grab;
-}
-.c-grip {
-  width: 28px;
-}
-.c-color {
-  width: 40px;
-}
-.c-flag {
-  width: 70px;
 }
 .dot {
   display: block;
   width: 10px;
   height: 10px;
 }
+.c-grip {
+  width: 28px;
+}
+.c-color {
+  width: 28px;
+}
+.c-flag {
+  width: 70px;
+}
 .c-del {
   width: 44px;
-}
-.addrow {
-  padding: 8px 4px 0;
 }
 </style>

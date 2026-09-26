@@ -1,48 +1,37 @@
-// Boards are saved filters over a project; their columns are the project's statuses, so there is nothing here about columns. Access is open by default and what gets stored is the exception: this person does not see this board.
+// Boards and the statuses that are their columns. A board owns its columns, so two boards in one project can run entirely different workflows; access is open by default and what gets stored is the exception — this person does not see this board.
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { requireAdmin, requireAuth } from './auth.js';
-import { projectByShort } from './project-routes.js';
+import { boardsOfProject, projectByShort } from './project-routes.js';
+import {
+  createBoardWithDefaults,
+  publicBoard,
+  publicState,
+  type BoardRow,
+  type StateRow,
+} from './board-service.js';
+import { knownColor, pickColor } from './colors.js';
 
-interface BoardRow {
-  id: string;
-  project_id: string;
-  name: string;
-  filter_json: Record<string, unknown>;
-  position: number;
-}
-
-const publicBoard = (r: BoardRow, deniedTo: string[] = []) => ({
-  id: r.id,
-  projectId: r.project_id,
-  name: r.name,
-  filter: r.filter_json,
-  position: r.position,
-  /** Who cannot see it. Admin screens read this; everyone else only ever gets boards they may open. */
-  deniedTo,
-});
-
-// Whatever the list screen can filter by. Unknown keys are refused rather than stored, so a board cannot quietly carry a filter nothing understands.
-const filterSchema = z
-  .object({
-    states: z.array(z.string().uuid()).max(20).optional(),
-    assignees: z.array(z.string().uuid()).max(20).optional(),
-    tags: z.array(z.string().uuid()).max(20).optional(),
-    priorities: z.array(z.enum(['Critical', 'Major', 'Normal', 'Minor'])).max(4).optional(),
-    query: z.string().trim().max(200).optional(),
-  })
-  .strict();
-
-const boardCreate = z.object({
-  name: z.string().trim().min(1).max(60),
-  filter: filterSchema.optional(),
-});
+const boardCreate = z.object({ name: z.string().trim().min(1).max(60) });
 
 const boardPatch = z.object({
   name: z.string().trim().min(1).max(60).optional(),
-  filter: filterSchema.optional(),
+  defaultStateId: z.string().uuid().optional(),
+  position: z.number().int().min(0).optional(),
+});
+
+const stateCreate = z.object({
+  name: z.string().trim().min(1).max(60),
+  isOpen: z.boolean().optional(),
+  isResolved: z.boolean().optional(),
+});
+
+const statePatch = z.object({
+  name: z.string().trim().min(1).max(60).optional(),
+  isOpen: z.boolean().optional(),
+  isResolved: z.boolean().optional(),
   position: z.number().int().min(0).optional(),
 });
 
@@ -61,6 +50,22 @@ async function denialsFor(boardIds: string[]): Promise<Map<string, string[]>> {
   return out;
 }
 
+async function boardById(id: string): Promise<BoardRow | null> {
+  const res = await pool.query<BoardRow>(
+    'select id, project_id, name, default_state_id, position from boards where id = $1',
+    [id]
+  );
+  return res.rows[0] ?? null;
+}
+
+async function statesOf(boardId: string): Promise<StateRow[]> {
+  const res = await pool.query<StateRow>(
+    'select * from states where board_id = $1 order by position, name',
+    [boardId]
+  );
+  return res.rows;
+}
+
 export function registerBoardRoutes(app: FastifyInstance): void {
   app.get('/projects/:short/boards', async (req, reply) => {
     const auth = await requireAuth(req, reply);
@@ -69,18 +74,32 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
 
-    const res = await pool.query<BoardRow>(
-      'select * from boards where project_id = $1 order by position, name',
-      [project.id]
-    );
-    const denials = await denialsFor(res.rows.map((r) => r.id));
+    const { rows, statesByBoard } = await boardsOfProject(project.id);
+    const denials = await denialsFor(rows.map((r) => r.id));
     // An admin manages access, so they see every board and who is shut out; anyone else is simply not handed the boards they cannot open.
-    const rows = auth.isAdmin
-      ? res.rows.map((r) => publicBoard(r, denials.get(r.id) ?? []))
-      : res.rows
-          .filter((r) => !(denials.get(r.id) ?? []).includes(auth.userId))
-          .map((r) => publicBoard(r));
-    return reply.send({ data: rows });
+    const visible = auth.isAdmin
+      ? rows
+      : rows.filter((r) => !(denials.get(r.id) ?? []).includes(auth.userId));
+    return reply.send({
+      data: visible.map((r) =>
+        publicBoard(r, statesByBoard.get(r.id) ?? [], auth.isAdmin ? denials.get(r.id) ?? [] : [])
+      ),
+    });
+  });
+
+  app.get('/boards/:id', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const { id } = req.params as { id: string };
+    const board = await boardById(id);
+    if (!board) return reply.code(404).send({ error: 'No such board.' });
+    const denials = await denialsFor([id]);
+    if (!auth.isAdmin && (denials.get(id) ?? []).includes(auth.userId)) {
+      return reply.code(403).send({ error: 'This board is not open to you.' });
+    }
+    return reply.send({
+      data: publicBoard(board, await statesOf(id), auth.isAdmin ? denials.get(id) ?? [] : []),
+    });
   });
 
   app.post('/projects/:short/boards', async (req, reply) => {
@@ -92,13 +111,11 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     }
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
-    const res = await pool.query<BoardRow>(
-      `insert into boards (project_id, name, filter_json, position)
-       values ($1, $2, $3::jsonb, (select coalesce(max(position), -1) + 1 from boards where project_id = $1))
-       returning *`,
-      [project.id, parsed.data.name, JSON.stringify(parsed.data.filter ?? {})]
+    // A new board arrives with the starting four columns; from there they are edited per board.
+    const board = await inTransaction((client) =>
+      createBoardWithDefaults(client, project.id, parsed.data.name)
     );
-    return reply.code(201).send({ data: publicBoard(res.rows[0]) });
+    return reply.code(201).send({ data: publicBoard(board, await statesOf(board.id)) });
   });
 
   app.patch('/boards/:id', async (req, reply) => {
@@ -109,18 +126,26 @@ export function registerBoardRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     const p = parsed.data;
+    if (p.defaultStateId) {
+      const belongs = await pool.query('select 1 from states where id = $1 and board_id = $2', [
+        p.defaultStateId,
+        id,
+      ]);
+      if (!belongs.rowCount) {
+        return reply.code(400).send({ error: 'That status belongs to another board.' });
+      }
+    }
     const res = await pool.query<BoardRow>(
       `update boards
           set name = coalesce($2, name),
-              filter_json = coalesce($3::jsonb, filter_json),
+              default_state_id = coalesce($3, default_state_id),
               position = coalesce($4, position)
         where id = $1
-        returning *`,
-      [id, p.name ?? null, p.filter ? JSON.stringify(p.filter) : null, p.position ?? null]
+        returning id, project_id, name, default_state_id, position`,
+      [id, p.name ?? null, p.defaultStateId ?? null, p.position ?? null]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'No such board.' });
-    const denials = await denialsFor([id]);
-    return reply.send({ data: publicBoard(res.rows[0], denials.get(id) ?? []) });
+    return reply.send({ data: publicBoard(res.rows[0], await statesOf(id)) });
   });
 
   app.post('/projects/:short/boards/order', async (req, reply) => {
@@ -137,19 +162,127 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         where b.id = o.id and b.project_id = $1`,
       [project.id, parsed.data.ids]
     );
-    const res = await pool.query<BoardRow>(
-      'select * from boards where project_id = $1 order by position, name',
-      [project.id]
-    );
-    const denials = await denialsFor(res.rows.map((r) => r.id));
-    return reply.send({ data: res.rows.map((r) => publicBoard(r, denials.get(r.id) ?? [])) });
+    const { rows, statesByBoard } = await boardsOfProject(project.id);
+    return reply.send({ data: rows.map((r) => publicBoard(r, statesByBoard.get(r.id) ?? [])) });
   });
 
+  // The last board of a project cannot go: its issues would have nowhere to live.
   app.delete('/boards/:id', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
-    const res = await pool.query('delete from boards where id = $1', [id]);
-    if (!res.rowCount) return reply.code(404).send({ error: 'No such board.' });
+    const board = await boardById(id);
+    if (!board) return reply.code(404).send({ error: 'No such board.' });
+    const siblings = await pool.query<{ n: number }>(
+      'select count(*)::int as n from boards where project_id = $1',
+      [board.project_id]
+    );
+    if (siblings.rows[0].n <= 1) {
+      return reply.code(409).send({ error: 'A project keeps at least one board.' });
+    }
+    const used = await pool.query<{ n: number }>(
+      'select count(*)::int as n from issues where board_id = $1',
+      [id]
+    );
+    if (used.rows[0].n > 0) {
+      return reply.code(409).send({
+        error: `Move the ${used.rows[0].n} issue(s) off this board first.`,
+      });
+    }
+    await pool.query('delete from boards where id = $1', [id]);
+    return reply.send({ data: { ok: true } });
+  });
+
+  // ── the board's columns ────────────────────────────────────────
+  app.post('/boards/:id/states', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const { id } = req.params as { id: string };
+    const parsed = stateCreate.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad status.' });
+    }
+    const board = await boardById(id);
+    if (!board) return reply.code(404).send({ error: 'No such board.' });
+    const p = parsed.data;
+    try {
+      const taken = await pool.query<{ color: string }>(
+        'select color from states where board_id = $1',
+        [id]
+      );
+      const res = await pool.query<StateRow>(
+        `insert into states (board_id, name, position, is_open, is_resolved, color)
+         values ($1, $2, (select coalesce(max(position), -1) + 1 from states where board_id = $1), $3, $4, $5)
+         returning *`,
+        [
+          id,
+          p.name,
+          p.isOpen ?? true,
+          p.isResolved ?? false,
+          // A status everyone names the same way keeps its usual colour; anything else gets one no sibling wears.
+          knownColor(p.name) ?? pickColor(taken.rows.map((r) => r.color)),
+        ]
+      );
+      return reply.code(201).send({ data: publicState(res.rows[0]) });
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505') {
+        return reply.code(409).send({ error: 'This board already has a status with that name.' });
+      }
+      throw err;
+    }
+  });
+
+  app.patch('/states/:id', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const { id } = req.params as { id: string };
+    const parsed = statePatch.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
+    }
+    const p = parsed.data;
+    const res = await pool.query<StateRow>(
+      `update states
+          set name = coalesce($2, name),
+              is_open = coalesce($3, is_open),
+              is_resolved = coalesce($4, is_resolved),
+              position = coalesce($5, position)
+        where id = $1
+        returning *`,
+      [id, p.name ?? null, p.isOpen ?? null, p.isResolved ?? null, p.position ?? null]
+    );
+    if (!res.rowCount) return reply.code(404).send({ error: 'No such status.' });
+    return reply.send({ data: publicState(res.rows[0]) });
+  });
+
+  // Column order, sent as the whole list: dragging one column moves the others, and one statement keeps them consistent.
+  app.post('/boards/:id/states/order', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const { id } = req.params as { id: string };
+    const parsed = z.object({ ids: z.array(z.string().uuid()).min(1) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Send the ids in their new order.' });
+    await pool.query(
+      `update states s
+          set position = o.pos
+         from unnest($2::uuid[]) with ordinality as o(sid, pos)
+        where s.id = o.sid and s.board_id = $1`,
+      [id, parsed.data.ids]
+    );
+    return reply.send({ data: (await statesOf(id)).map(publicState) });
+  });
+
+  app.delete('/states/:id', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const { id } = req.params as { id: string };
+    // Refusing while issues sit in the status is the point: moving them silently would lose where they were.
+    const used = await pool.query<{ n: number }>(
+      'select count(*)::int as n from issues where state_id = $1',
+      [id]
+    );
+    if (used.rows[0].n > 0) {
+      return reply.code(409).send({
+        error: `Move the ${used.rows[0].n} issue(s) out of this status first.`,
+      });
+    }
+    const res = await pool.query('delete from states where id = $1', [id]);
+    if (!res.rowCount) return reply.code(404).send({ error: 'No such status.' });
     return reply.send({ data: { ok: true } });
   });
 
@@ -157,12 +290,9 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   app.put('/boards/:id/access', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
-    const parsed = z
-      .object({ deniedTo: z.array(z.string().uuid()).max(100) })
-      .safeParse(req.body);
+    const parsed = z.object({ deniedTo: z.array(z.string().uuid()).max(100) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Send the list of user ids.' });
-    const board = await pool.query('select 1 from boards where id = $1', [id]);
-    if (!board.rowCount) return reply.code(404).send({ error: 'No such board.' });
+    if (!(await boardById(id))) return reply.code(404).send({ error: 'No such board.' });
     await inTransaction(async (client) => {
       await client.query('delete from board_denials where board_id = $1', [id]);
       if (parsed.data.deniedTo.length) {

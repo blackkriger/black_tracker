@@ -29,6 +29,22 @@ export function hslToHex(h: number, s: number, l: number): string {
   return `#${channel(0)}${channel(8)}${channel(4)}`;
 }
 
+// A handful of status names mean the same thing on every board, so they always wear the same colour: the starting four in the theme's own hues, and the two ways an issue ends without being done in grey and steel.
+const KNOWN_COLORS: Record<string, string> = {
+  backlog: '#d9b95c',
+  'in progress': '#6cdcff',
+  review: '#c98eff',
+  done: '#8effa9',
+  "won't fix": '#7d8188',
+  'wont fix': '#7d8188',
+  'will not fix': '#7d8188',
+  duplicate: '#9aa3ad',
+};
+
+export function knownColor(name: string): string | null {
+  return KNOWN_COLORS[name.trim().toLowerCase()] ?? null;
+}
+
 export function pickColor(taken: string[]): string {
   const hues = taken
     .map(hexToHue)
