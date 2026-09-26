@@ -284,9 +284,7 @@ async function deleteTag(t: TagItem): Promise<void> {
       </section>
 
       <section class="panel">
-          <header class="panel__h">
-            Statuses<span class="panel__end">Columns on every {{ project.shortName }} board</span>
-          </header>
+          <header class="panel__h">Statuses</header>
           <div class="panel__table">
             <table class="tbl">
               <thead>
