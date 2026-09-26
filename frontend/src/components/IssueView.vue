@@ -674,9 +674,9 @@ async function removeIssue(): Promise<void> {
               <div v-else class="iv__body hint">Nothing written yet.</div>
             </div>
 
-            <div class="links" :class="{ 'is-fresh': fresh.has('links') }">
-              <button class="links__add" type="button" title="Link an issue" @click="openPicker">
-                <svg viewBox="0 0 16 16" width="14" height="14" role="img" aria-label="Link an issue">
+            <div :class="{ 'is-fresh': fresh.has('links') }">
+              <div class="sec-h">
+                <svg class="links__icon" viewBox="0 0 16 16" width="13" height="13" role="img" aria-hidden="true">
                   <path
                     fill="none"
                     stroke="currentColor"
@@ -685,8 +685,15 @@ async function removeIssue(): Promise<void> {
                     d="M6.4 9.6 9.6 6.4M6.9 4.7 8.5 3.1a2.9 2.9 0 0 1 4.1 4.1L11 8.8M9.1 11.3l-1.6 1.6a2.9 2.9 0 0 1-4.1-4.1L5 7.2"
                   />
                 </svg>
-              </button>
+                Links<span class="n">{{ shownLinks.length }}</span>
+                <div class="sp"></div>
+                <button class="btn btn--sm btn--ghost" type="button" @click="openPicker">
+                  Add link…
+                </button>
+              </div>
 
+              <div v-if="!shownLinks.length" class="hint">No links yet.</div>
+              <div class="links">
               <RouterLink
                 v-for="l in shownLinks"
                 :key="l.id"
@@ -696,6 +703,7 @@ async function removeIssue(): Promise<void> {
               >
                 <span class="key lk__key" :style="{ color: l.stateColor }">{{ l.key }}</span>
               </RouterLink>
+              </div>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('files') }">
@@ -1178,27 +1186,16 @@ async function removeIssue(): Promise<void> {
 .att__row--wait {
   border-style: dashed;
 }
-/* The chain and what hangs off it stand on one line: the keys are enough, and the title rides in the tooltip. */
+/* The keys are enough on the line; the title rides in the tooltip. */
 .links {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-.links__add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-.links__add:hover {
-  color: var(--text);
+.links__icon {
+  flex: none;
+  color: var(--text-muted);
 }
 .lk {
   display: inline-flex;
