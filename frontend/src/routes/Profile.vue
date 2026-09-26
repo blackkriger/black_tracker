@@ -38,8 +38,7 @@ const canChangePassword = computed(
 );
 
 const since = computed(() => stamp(me.value?.createdAt ?? null));
-// Roles are the next thing to land: a row people create, with its own name and colour. Nobody has one yet.
-const role = computed<{ name: string; color: string } | null>(() => null);
+const role = computed(() => me.value?.role ?? null);
 const tokenCreated = computed(() => stamp(me.value?.token?.createdAt ?? null));
 const tokenUsed = computed(() => stamp(me.value?.token?.lastUsedAt ?? null));
 
@@ -142,7 +141,7 @@ async function copyToken(): Promise<void> {
               <div class="who">
                 <span class="av av--xl" :style="buddyAvatarStyle(me?.login ?? '')"></span>
                 <div class="who__lines">
-                  <!-- The name and the login are both in the fields below, so this line is kept for the role. Until roles exist it stays empty and only the date shows. -->
+                  <!-- The name and the login are both in the fields below, so this line carries the role; with no role it is the date alone. -->
                   <span v-if="role" class="who__role" :style="{ color: role.color }">{{ role.name }}</span>
                   <span class="stamp">SINCE {{ since }}</span>
                 </div>

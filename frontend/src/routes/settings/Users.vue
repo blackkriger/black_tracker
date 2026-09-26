@@ -3,10 +3,13 @@
 import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
+import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
 import { useProjects } from '../../lib/projects';
 import { useSession } from '../../lib/session';
+
+interface Role extends TagItem {}
 
 interface User {
   id: string;
@@ -16,6 +19,7 @@ interface User {
   active: boolean;
   createdAt: string;
   lastSeenAt: string | null;
+  role: Role | null;
 }
 
 interface Invite {
@@ -27,6 +31,7 @@ interface Invite {
   expiresAt: string;
   usedAt: string | null;
   usedBy: string | null;
+  role: Role | null;
   status: 'pending' | 'used' | 'expired';
 }
 
@@ -35,10 +40,13 @@ const { projects, load: loadProjects } = useProjects();
 
 const users = ref<User[]>([]);
 const invites = ref<Invite[]>([]);
+const roles = ref<Role[]>([]);
+const removingRole = ref<Role | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
 const inviteAdmin = ref(false);
+const inviteRole = ref('');
 const inviteBusy = ref(false);
 // Held only until the page is left: the server keeps a hash, so this is the one moment the link exists anywhere readable.
 const freshLink = ref<string | null>(null);
@@ -55,9 +63,10 @@ const boardsByProject = computed(() =>
 onMounted(async () => {
   try {
     await loadProjects();
-    [users.value, invites.value] = await Promise.all([
+    [users.value, invites.value, roles.value] = await Promise.all([
       api<User[]>('/users'),
       api<Invite[]>('/invites'),
+      api<Role[]>('/roles'),
     ]);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not load the accounts.';
@@ -87,6 +96,42 @@ async function patchUser(u: User, body: Record<string, unknown>): Promise<void> 
   }
 }
 
+async function addRole(name: string): Promise<void> {
+  error.value = null;
+  try {
+    roles.value = [...roles.value, await api<Role>('/roles', { method: 'POST', body: { name } })];
+  } catch (err) {
+    report(err);
+  }
+}
+
+async function renameRole(role: TagItem, name: string): Promise<void> {
+  error.value = null;
+  try {
+    const updated = await api<Role>(`/roles/${role.id}`, { method: 'PATCH', body: { name } });
+    roles.value = roles.value.map((r) => (r.id === role.id ? updated : r));
+    // Whoever wears it is holding the old name on this screen until it is read again.
+    users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: updated } : u));
+  } catch (err) {
+    report(err);
+  }
+}
+
+async function removeRole(): Promise<void> {
+  const role = removingRole.value;
+  if (!role) return;
+  error.value = null;
+  try {
+    await api(`/roles/${role.id}`, { method: 'DELETE' });
+    roles.value = roles.value.filter((r) => r.id !== role.id);
+    users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: null } : u));
+    removingRole.value = null;
+  } catch (err) {
+    report(err);
+    removingRole.value = null;
+  }
+}
+
 async function createInvite(): Promise<void> {
   if (inviteBusy.value) return;
   inviteBusy.value = true;
@@ -95,12 +140,13 @@ async function createInvite(): Promise<void> {
   try {
     const created = await api<Invite & { token: string }>('/invites', {
       method: 'POST',
-      body: { isAdmin: inviteAdmin.value },
+      body: { isAdmin: inviteAdmin.value, roleId: inviteRole.value || null },
     });
     const { token, ...row } = created;
     freshLink.value = `${location.origin}/join/${token}`;
     invites.value = [row, ...invites.value];
     inviteAdmin.value = false;
+    inviteRole.value = '';
   } catch (err) {
     report(err);
   } finally {
@@ -172,6 +218,7 @@ async function saveAccess(): Promise<void> {
           <thead>
             <tr>
               <th>Person</th>
+              <th class="c-role">Role</th>
               <th class="c-flag">Admin</th>
               <th class="c-flag">Active</th>
               <th class="c-when">Joined</th>
@@ -189,6 +236,17 @@ async function saveAccess(): Promise<void> {
                     <span v-if="u.fullName" class="who__login">{{ u.login }}</span>
                   </span>
                 </span>
+              </td>
+              <td class="c-role">
+                <select
+                  class="input input--sm"
+                  :value="u.role?.id ?? ''"
+                  :style="{ color: u.role?.color ?? 'var(--text-dim)' }"
+                  @change="patchUser(u, { roleId: ($event.target as HTMLSelectElement).value || null })"
+                >
+                  <option value="">—</option>
+                  <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
+                </select>
               </td>
               <td>
                 <label class="check">
@@ -224,6 +282,20 @@ async function saveAccess(): Promise<void> {
     </section>
 
     <section class="panel sheet__wide">
+      <header class="panel__h">Roles</header>
+      <div class="panel__b">
+        <div v-if="!roles.length" class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
+        <TagLabels
+          :tags="roles"
+          add-placeholder="Add role…"
+          @add="addRole"
+          @rename="renameRole"
+          @remove="removingRole = $event"
+        />
+      </div>
+    </section>
+
+    <section class="panel sheet__wide">
       <header class="panel__h">Invite links</header>
       <div class="panel__b">
         <div v-if="freshLink" class="field">
@@ -236,6 +308,10 @@ async function saveAccess(): Promise<void> {
         </div>
 
         <div class="addrow">
+          <select v-model="inviteRole" class="input invite__role">
+            <option value="">No role</option>
+            <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
+          </select>
           <label class="check">
             <input v-model="inviteAdmin" type="checkbox" />
             Admin
@@ -252,6 +328,7 @@ async function saveAccess(): Promise<void> {
           <thead>
             <tr>
               <th>Link</th>
+              <th class="c-role">Role</th>
               <th class="c-flag">Admin</th>
               <th>Status</th>
               <th class="c-when">Created</th>
@@ -261,6 +338,11 @@ async function saveAccess(): Promise<void> {
           <tbody>
             <tr v-for="i in invites" :key="i.id">
               <td class="key">…{{ i.hint }}</td>
+              <td class="c-role">
+                <span v-if="i.role" class="taglabel taglabel--plain" :style="{ '--c': i.role.color }">
+                  {{ i.role.name }}
+                </span>
+              </td>
               <td>{{ i.isAdmin ? 'Yes' : '' }}</td>
               <td>
                 <template v-if="i.status === 'used'">Used by {{ i.usedBy }}</template>
@@ -283,6 +365,19 @@ async function saveAccess(): Promise<void> {
         </table>
       </div>
     </section>
+
+    <Dialog
+      v-if="removingRole"
+      :title="`Delete ${removingRole.name}?`"
+      @close="removingRole = null"
+    >
+      <p>Whoever wears it stops wearing one. This cannot be undone.</p>
+      <template #footer>
+        <div class="sp"></div>
+        <button class="btn" type="button" @click="removingRole = null">Cancel</button>
+        <button class="btn btn--danger" type="button" @click="removeRole">Delete</button>
+      </template>
+    </Dialog>
 
     <Dialog
       v-if="accessFor"
@@ -324,8 +419,9 @@ async function saveAccess(): Promise<void> {
 </template>
 
 <style scoped>
+/* A block flex row rather than an inline one: an inline box sits on the text baseline, which drops the avatar below the middle of the row. */
 .who {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
 }
@@ -337,6 +433,9 @@ async function saveAccess(): Promise<void> {
 .who__login {
   font: 11px/1 var(--font-num);
   color: var(--text-muted);
+}
+.c-role {
+  width: 150px;
 }
 .c-flag {
   width: 70px;
@@ -362,6 +461,10 @@ async function saveAccess(): Promise<void> {
 }
 .addrow {
   align-items: center;
+}
+.invite__role {
+  flex: 0 0 180px;
+  height: 34px;
 }
 .access__group {
   display: flex;

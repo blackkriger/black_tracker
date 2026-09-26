@@ -3,7 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
-import { hashPassword, publicUser, requireAdmin } from './auth.js';
+import { USER_SELECT, hashPassword, publicUser, requireAdmin, userById } from './auth.js';
 
 // What it takes to become an account, wherever the account comes from: an admin filling this in, or someone filling it in themselves behind an invite link.
 export const accountCredentials = z.object({
@@ -23,6 +23,8 @@ const userPatch = z.object({
   fullName: z.string().trim().max(120).optional(),
   isAdmin: z.boolean().optional(),
   active: z.boolean().optional(),
+  /** Null takes the role off; leaving it out keeps whatever they wear. */
+  roleId: z.string().uuid().nullable().optional(),
 });
 
 export function registerUserRoutes(app: FastifyInstance): void {
@@ -31,7 +33,7 @@ export function registerUserRoutes(app: FastifyInstance): void {
     const auth = await requireAdmin(req, reply);
     if (!auth) return;
     const res = await pool.query(
-      `select * from users order by active desc, lower(coalesce(nullif(full_name, ''), login))`
+      `${USER_SELECT} order by u.active desc, lower(coalesce(nullif(u.full_name, ''), u.login))`
     );
     return reply.send({ data: res.rows.map(publicUser) });
   });
@@ -45,13 +47,14 @@ export function registerUserRoutes(app: FastifyInstance): void {
     const { login, password, fullName, isAdmin } = parsed.data;
     const taken = await pool.query('select 1 from users where lower(login) = lower($1)', [login]);
     if (taken.rowCount) return reply.code(409).send({ error: 'That login is taken.' });
-    const res = await pool.query(
+    const res = await pool.query<{ id: string }>(
       `insert into users (login, password_hash, full_name, is_admin)
        values ($1, $2, $3, $4)
-       returning *`,
+       returning id`,
       [login, await hashPassword(password), fullName ?? '', isAdmin ?? false]
     );
-    return reply.code(201).send({ data: publicUser(res.rows[0]) });
+    const row = await userById(res.rows[0].id);
+    return reply.code(201).send({ data: publicUser(row as NonNullable<typeof row>) });
   });
 
   app.patch('/users/:id', async (req, reply) => {
@@ -71,15 +74,23 @@ export function registerUserRoutes(app: FastifyInstance): void {
       `update users
           set full_name = coalesce($2, full_name),
               is_admin = coalesce($3, is_admin),
-              active = coalesce($4, active)
-        where id = $1
-        returning *`,
-      [id, p.fullName ?? null, p.isAdmin ?? null, p.active ?? null]
+              active = coalesce($4, active),
+              role_id = case when $5 then $6::uuid else role_id end
+        where id = $1`,
+      [
+        id,
+        p.fullName ?? null,
+        p.isAdmin ?? null,
+        p.active ?? null,
+        p.roleId !== undefined,
+        p.roleId ?? null,
+      ]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'No such account.' });
+    const row = await userById(id);
     // Switching an account off has to end its sessions, or the tab it is open in keeps working until the cookie expires.
     if (p.active === false) await pool.query('delete from sessions where user_id = $1', [id]);
-    return reply.send({ data: publicUser(res.rows[0]) });
+    return reply.send({ data: publicUser(row as NonNullable<typeof row>) });
   });
 
   // Which boards this person cannot open. Access is a denial list, so an empty answer means every board is theirs.

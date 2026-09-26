@@ -10,6 +10,7 @@ import {
   publicUser,
   requireAdmin,
   startSession,
+  userById,
 } from './auth.js';
 import { accountCredentials } from './user-routes.js';
 
@@ -19,6 +20,9 @@ interface InviteRow {
   id: string;
   hint: string;
   is_admin: boolean;
+  role_id: string | null;
+  role_name: string | null;
+  role_color: string | null;
   created_at: Date;
   expires_at: Date;
   used_at: Date | null;
@@ -30,6 +34,10 @@ const publicInvite = (r: InviteRow) => ({
   id: r.id,
   hint: r.hint,
   isAdmin: r.is_admin,
+  role:
+    r.role_id && r.role_name
+      ? { id: r.role_id, name: r.role_name, color: r.role_color ?? '' }
+      : null,
   createdAt: r.created_at.toISOString(),
   createdBy: r.created_by_login,
   expiresAt: r.expires_at.toISOString(),
@@ -40,10 +48,12 @@ const publicInvite = (r: InviteRow) => ({
 
 const LIST_SQL = `
   select i.id, i.hint, i.is_admin, i.created_at, i.expires_at, i.used_at,
+         i.role_id, r.name as role_name, r.color as role_color,
          c.login as created_by_login, u.login as used_by_login
     from invites i
     join users c on c.id = i.created_by
-    left join users u on u.id = i.used_by`;
+    left join users u on u.id = i.used_by
+    left join roles r on r.id = i.role_id`;
 
 export function registerInviteRoutes(app: FastifyInstance): void {
   app.get('/invites', async (req, reply) => {
@@ -55,14 +65,23 @@ export function registerInviteRoutes(app: FastifyInstance): void {
   app.post('/invites', async (req, reply) => {
     const auth = await requireAdmin(req, reply);
     if (!auth) return;
-    const parsed = z.object({ isAdmin: z.boolean().optional() }).safeParse(req.body ?? {});
+    const parsed = z
+      .object({ isAdmin: z.boolean().optional(), roleId: z.string().uuid().nullable().optional() })
+      .safeParse(req.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: 'Bad invite.' });
     const raw = newRawToken();
     const created = await pool.query<{ id: string }>(
-      `insert into invites (token_hash, hint, is_admin, created_by, expires_at)
-       values ($1, $2, $3, $4, now() + make_interval(days => $5::int))
+      `insert into invites (token_hash, hint, is_admin, role_id, created_by, expires_at)
+       values ($1, $2, $3, $4, $5, now() + make_interval(days => $6::int))
        returning id`,
-      [hashToken(raw), raw.slice(-6), parsed.data.isAdmin ?? false, auth.userId, INVITE_DAYS]
+      [
+        hashToken(raw),
+        raw.slice(-6),
+        parsed.data.isAdmin ?? false,
+        parsed.data.roleId ?? null,
+        auth.userId,
+        INVITE_DAYS,
+      ]
     );
     const res = await pool.query<InviteRow>(`${LIST_SQL} where i.id = $1`, [created.rows[0].id]);
     // The only moment the token exists anywhere readable; from here on the row carries its tail and nothing else.
@@ -98,14 +117,12 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     const { login, password, fullName } = parsed.data;
     const hash = await hashPassword(password);
 
-    type Outcome =
-      | { ok: false; error: string; code: number }
-      | { ok: true; user: Parameters<typeof publicUser>[0] };
+    type Outcome = { ok: false; error: string; code: number } | { ok: true; userId: string };
 
     const outcome = await inTransaction(async (client): Promise<Outcome> => {
       // Locked for the length of the transaction, so the same link opened in two tabs cannot make two accounts.
-      const invite = await client.query<{ id: string; is_admin: boolean }>(
-        `select id, is_admin from invites
+      const invite = await client.query<{ id: string; is_admin: boolean; role_id: string | null }>(
+        `select id, is_admin, role_id from invites
           where token_hash = $1 and used_at is null and expires_at > now()
           for update`,
         [hashToken(token)]
@@ -118,21 +135,22 @@ export function registerInviteRoutes(app: FastifyInstance): void {
       ]);
       if (taken.rowCount) return { ok: false, error: 'That login is taken.', code: 409 };
 
-      const user = await client.query(
-        `insert into users (login, password_hash, full_name, is_admin)
-         values ($1, $2, $3, $4)
-         returning *`,
-        [login, hash, fullName ?? '', invite.rows[0].is_admin]
+      const user = await client.query<{ id: string }>(
+        `insert into users (login, password_hash, full_name, is_admin, role_id)
+         values ($1, $2, $3, $4, $5)
+         returning id`,
+        [login, hash, fullName ?? '', invite.rows[0].is_admin, invite.rows[0].role_id]
       );
       await client.query('update invites set used_at = now(), used_by = $2 where id = $1', [
         invite.rows[0].id,
         user.rows[0].id,
       ]);
-      return { ok: true, user: user.rows[0] };
+      return { ok: true, userId: user.rows[0].id };
     });
 
     if (!outcome.ok) return reply.code(outcome.code).send({ error: outcome.error });
-    await startSession(reply, outcome.user.id);
-    return reply.code(201).send({ data: publicUser(outcome.user) });
+    const row = await userById(outcome.userId);
+    await startSession(reply, outcome.userId);
+    return reply.code(201).send({ data: publicUser(row as NonNullable<typeof row>) });
   });
 }

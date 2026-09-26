@@ -65,12 +65,26 @@ interface UserRow {
   full_name: string;
   is_admin: boolean;
   active: boolean;
+  role_id: string | null;
+  role_name: string | null;
+  role_color: string | null;
   api_token_hash: string | null;
   api_token_hint: string | null;
   api_token_created_at: Date | null;
   api_token_last_used_at: Date | null;
   created_at: Date;
   last_seen_at: Date | null;
+}
+
+// Every route that hands back a person reads them through this, so the role always travels with them.
+export const USER_SELECT = `
+  select u.*, r.name as role_name, r.color as role_color
+    from users u
+    left join roles r on r.id = u.role_id`;
+
+export async function userById(id: string): Promise<UserRow | null> {
+  const res = await pool.query<UserRow>(`${USER_SELECT} where u.id = $1`, [id]);
+  return res.rows[0] ?? null;
 }
 
 export function publicUser(row: UserRow) {
@@ -82,6 +96,11 @@ export function publicUser(row: UserRow) {
     active: row.active,
     createdAt: row.created_at.toISOString(),
     lastSeenAt: row.last_seen_at?.toISOString() ?? null,
+    // What they are called on the team. Nothing hangs off it yet — is_admin is still the only right in the code.
+    role:
+      row.role_id && row.role_name
+        ? { id: row.role_id, name: row.role_name, color: row.role_color ?? '' }
+        : null,
     // The raw token is gone the moment it is handed over, so the profile shows the tail and the dates instead.
     token: row.api_token_hash
       ? {
@@ -202,7 +221,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     if (!parsed.success) return reply.code(400).send({ error: 'Login and password required.' });
 
     const res = await pool.query<UserRow & { password_hash: string }>(
-      `select * from users where lower(login) = lower($1)`,
+      `${USER_SELECT} where lower(u.login) = lower($1)`,
       [parsed.data.login]
     );
     const row = res.rows[0];
@@ -227,8 +246,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
   app.get('/me', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const res = await pool.query<UserRow>('select * from users where id = $1', [auth.userId]);
-    const row = res.rows[0];
+    const row = await userById(auth.userId);
     if (!row) return reply.code(404).send({ error: 'User not found.' });
     return reply.send({ data: { ...publicUser(row), authKind: auth.kind } });
   });
@@ -269,11 +287,12 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       .object({ fullName: z.string().trim().max(120) })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Name is too long.' });
-    const res = await pool.query<UserRow>(
-      'update users set full_name = $1 where id = $2 returning *',
-      [parsed.data.fullName, auth.userId]
-    );
-    return reply.send({ data: publicUser(res.rows[0]) });
+    await pool.query('update users set full_name = $1 where id = $2', [
+      parsed.data.fullName,
+      auth.userId,
+    ]);
+    const row = await userById(auth.userId);
+    return reply.send({ data: publicUser(row as NonNullable<typeof row>) });
   });
 
   app.post('/me/password', async (req, reply) => {
