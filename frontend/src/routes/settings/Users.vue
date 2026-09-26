@@ -349,11 +349,19 @@ async function saveAccess(): Promise<void> {
           <div class="link__row">
             <code class="input link__value">{{ freshLink }}</code>
             <button class="btn" type="button" @click="copyLink">{{ copied ? 'Copied' : 'Copy' }}</button>
+            <button
+              class="btn btn--icon btn--ghost"
+              type="button"
+              aria-label="Hide the link"
+              @click="freshLink = null"
+            >
+              ✕
+            </button>
           </div>
           <span class="hint">It is stored as a hash, so this is the only time it can be read.</span>
         </div>
 
-        <div class="addrow">
+        <div v-if="!freshLink" class="addrow">
           <select v-model="inviteRole" class="input invite__role">
             <option value="">No role</option>
             <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
