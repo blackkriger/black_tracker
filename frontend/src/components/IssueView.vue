@@ -805,9 +805,6 @@ async function removeIssue(): Promise<void> {
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('files') }">
-              <div class="sec-h">
-                Files<span class="n">{{ own.length + pending.length }}</span>
-              </div>
               <div v-if="images.length" class="atts">
                 <figure v-for="a in images" :key="a.id" class="att">
                   <button class="att__img" type="button" @click="shown = galleryIndex(a.id)">
