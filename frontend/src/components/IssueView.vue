@@ -716,12 +716,23 @@ async function removeIssue(): Promise<void> {
               ✎
             </button>
             <button
-              class="btn btn--sm btn--danger"
+              class="btn btn--sm btn--icon btn--ghost iv__trash"
               type="button"
+              title="Delete"
+              aria-label="Delete"
               :disabled="!session.canDelete.value"
               @click="deleting = true"
             >
-              Delete
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3 4.5h10M6.4 4.5V3h3.2v1.5M4.6 4.5l.5 8.1a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.5-8.1M6.7 7v4M9.3 7v4"
+                />
+              </svg>
             </button>
           </template>
           <button
@@ -1229,6 +1240,10 @@ async function removeIssue(): Promise<void> {
   overflow-y: auto;
 }
 /* The theme lets a dialog's title span take the whole bar; here the key and the status are two labels that belong side by side. */
+/* It sits with the pencil and the close, and only says what it is when reached for. */
+.iv__trash:hover:enabled {
+  color: var(--danger-text);
+}
 .iv__key,
 .iv__state {
   flex: 0 0 auto;
