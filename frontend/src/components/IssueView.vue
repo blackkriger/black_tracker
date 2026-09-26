@@ -1205,7 +1205,7 @@ async function removeIssue(): Promise<void> {
               />
             </div>
 
-            <div class="hr"></div>
+            <div v-if="wornTags.length || freeTags.length" class="hr"></div>
 
             <!-- Nothing to wear and nothing to choose from: the row would only say the word Tags. -->
             <div
