@@ -31,7 +31,7 @@ async function signOut(): Promise<void> {
       <RouterLink
         v-for="p in live"
         :key="p.id"
-        class="topitem"
+        class="topitem topitem--project"
         :to="`/p/${p.shortName}`"
         :aria-current="p.shortName === currentShort ? 'page' : undefined"
       >
@@ -51,7 +51,7 @@ async function signOut(): Promise<void> {
 </template>
 
 <style scoped>
-/* One treatment for everything in the bar: a flat item that fills on hover and stays filled where you are. Only signing out reads differently, and only because it is the one thing here you would not want to hit by accident. */
+/* Nothing in the bar takes a background: the text itself does the talking. It brightens on hover, turns gold on a project — the bright gold, a shade up from the key beside it — and red on the one action you would not want to hit by accident. */
 .topitems {
   display: flex;
   align-items: center;
@@ -72,11 +72,10 @@ async function signOut(): Promise<void> {
 }
 .topitem:hover {
   color: var(--text);
-  background: var(--surface);
 }
-.topitem[aria-current] {
-  color: var(--text);
-  background: var(--surface);
+.topitem--project:hover,
+.topitem--project[aria-current] {
+  color: var(--accent-bright);
 }
 .topitem:focus-visible {
   outline: none;
@@ -87,6 +86,5 @@ async function signOut(): Promise<void> {
 }
 .topitem--danger:hover {
   color: var(--danger-text);
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 </style>
