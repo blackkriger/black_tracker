@@ -4,7 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 import { api } from '../lib/api';
-import { lastProject } from '../lib/lastProject';
+import { lastBoard, lastProject } from '../lib/lastProject';
 
 interface State {
   id: string;
@@ -36,10 +36,19 @@ const error = ref<string | null>(null);
 const boards = computed(() =>
   [...(project.value?.boards ?? [])].sort((a, b) => a.position - b.position)
 );
-// The address names a board, or the project's first one stands in.
+// The address names a board; without one, the board you were last on here, and failing that the first.
 const current = computed(() => {
   const wanted = String(route.params.boardId ?? '');
-  return boards.value.find((b) => b.id === wanted) ?? boards.value[0] ?? null;
+  if (wanted) return boards.value.find((b) => b.id === wanted) ?? boards.value[0] ?? null;
+  const short = project.value?.shortName;
+  const remembered = short ? boards.value.find((b) => b.id === lastBoard.get(short)) : null;
+  return remembered ?? boards.value[0] ?? null;
+});
+
+// Whatever you end up looking at is what this project opens on next time.
+watch(current, (board) => {
+  const short = project.value?.shortName;
+  if (board && short) lastBoard.set(short, board.id);
 });
 
 async function load(short: string): Promise<void> {
@@ -68,16 +77,6 @@ watch(
 <template>
   <div class="page">
     <TopBar :project="project" />
-
-    <nav v-if="boards.length > 1" class="tabs boardtabs" aria-label="Boards">
-      <RouterLink
-        v-for="b in boards"
-        :key="b.id"
-        class="tab"
-        :to="`/p/${project?.shortName}/b/${b.id}`"
-        :aria-current="b.id === current?.id ? 'page' : undefined"
-      >{{ b.name }}</RouterLink>
-    </nav>
 
     <div class="page__body">
       <p v-if="loading" class="hint">Loading…</p>
@@ -110,11 +109,6 @@ watch(
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-.boardtabs {
-  padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--line);
-  height: 44px;
 }
 .page__body {
   flex: 1 1 auto;
