@@ -257,13 +257,13 @@ async function deleteTag(t: Tag): Promise<void> {
 
 <template>
   <SettingsLayout>
-    <p v-if="loading" class="hint">Loading…</p>
-    <div v-else-if="!project" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
+    <p v-if="loading" class="hint sheet__wide">Loading…</p>
+    <div v-else-if="!project" class="empty sheet__wide"><span class="empty__g">✕</span>{{ error }}</div>
 
     <template v-else>
-      <div v-if="error" class="err">{{ error }}</div>
+      <div v-if="error" class="err sheet__wide">{{ error }}</div>
 
-      <section class="panel">
+      <section class="panel sheet__wide">
         <header class="panel__h">
           Project
           <span class="panel__end">{{ project.archived ? 'Archived' : '' }}</span>
@@ -295,8 +295,7 @@ async function deleteTag(t: Tag): Promise<void> {
         </p>
       </section>
 
-      <div class="two">
-        <section class="panel">
+      <section class="panel">
           <header class="panel__h">
             Statuses<span class="panel__end">Columns on every {{ project.shortName }} board</span>
           </header>
@@ -369,7 +368,7 @@ async function deleteTag(t: Tag): Promise<void> {
           </div>
         </section>
 
-        <div class="two__col">
+        <div class="stack">
           <section class="panel">
             <header class="panel__h">Boards<span class="panel__end">Saved filters</span></header>
             <div class="panel__table">
@@ -434,9 +433,8 @@ async function deleteTag(t: Tag): Promise<void> {
             </div>
           </section>
         </div>
-      </div>
 
-      <p v-if="notice" class="hint">{{ notice }}</p>
+      <p v-if="notice" class="hint sheet__wide">{{ notice }}</p>
     </template>
   </SettingsLayout>
 </template>
@@ -463,23 +461,6 @@ async function deleteTag(t: Tag): Promise<void> {
 .p-hint {
   margin: -8px 20px 16px;
 }
-.two {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-@media (max-width: 1100px) {
-  .two {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-.two__col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 0;
-}
 .panel__table {
   padding: 4px 8px 12px;
 }
@@ -503,11 +484,6 @@ async function deleteTag(t: Tag): Promise<void> {
   width: 44px;
 }
 .addrow {
-  display: flex;
-  gap: 6px;
   padding: 8px 4px 0;
-}
-.addrow .input {
-  flex: 1 1 auto;
 }
 </style>

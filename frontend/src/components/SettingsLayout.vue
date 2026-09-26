@@ -17,7 +17,7 @@ onMounted(() => void load());
     <TopBar />
 
     <div class="page__body">
-      <nav class="side admin__side" aria-label="Settings sections">
+      <nav class="side settings__side" aria-label="Settings sections">
         <div class="side__h">Projects</div>
         <RouterLink v-for="p in live" :key="p.id" :to="`/settings/p/${p.shortName}`">
           {{ p.shortName }} {{ p.name }}
@@ -28,11 +28,11 @@ onMounted(() => void load());
         <RouterLink to="/settings/new">New project…</RouterLink>
 
         <div class="side__h">Workspace</div>
-        <RouterLink to="/settings/tags">Global tags</RouterLink>
+        <RouterLink to="/settings/tags">Tags</RouterLink>
         <RouterLink to="/settings/users">Users &amp; access</RouterLink>
       </nav>
 
-      <div class="admin__main">
+      <div class="sheet">
         <slot />
       </div>
     </div>
@@ -45,30 +45,30 @@ onMounted(() => void load());
   display: flex;
   flex-direction: column;
 }
+/* The section list plus the sheet travel as one block, centred: the sheet stays the same 960px it is everywhere else. */
 .page__body {
   flex: 1 1 auto;
   display: flex;
   gap: var(--space-5);
   padding: var(--space-5);
   align-items: flex-start;
+  justify-content: center;
   min-height: 0;
 }
-.admin__side {
+.settings__side {
   width: 220px;
   flex: none;
 }
-.admin__main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+@media (max-width: 1240px) {
+  .page__body {
+    justify-content: flex-start;
+  }
 }
 @media (max-width: 860px) {
   .page__body {
     flex-direction: column;
   }
-  .admin__side {
+  .settings__side {
     width: 100%;
   }
 }

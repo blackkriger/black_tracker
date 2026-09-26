@@ -132,7 +132,7 @@ async function copyToken(): Promise<void> {
     <TopBar />
 
     <div class="page__body">
-      <div class="grid">
+      <div class="sheet">
         <div class="stack">
           <section class="panel">
             <header class="panel__h">Profile</header>
@@ -267,27 +267,6 @@ async function copyToken(): Promise<void> {
 }
 .page__body {
   padding: var(--space-6) var(--space-5);
-}
-.grid {
-  width: 960px;
-  max-width: 100%;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-@media (max-width: 880px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-/* Named apart from the board's `.col`, which carries a surface background — reusing that name painted the gap between the panels. */
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 0;
 }
 .form {
   display: flex;

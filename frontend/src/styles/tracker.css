@@ -87,6 +87,22 @@ button { font-family: var(--font-ui); }
 .tf:focus-visible, .tf.is-focus { outline: none; box-shadow: var(--focus-ring); }
 .tf .n { font: 11px/1 var(--font-num); color: var(--text-muted); }
 
+/* ---------- sheet: the one measure every screen lays panels on ----------
+   960px across, split into two equal columns. A panel takes one column, or
+   the whole row with `.sheet__wide`. Nothing sets its own width. */
+.sheet { width: 960px; max-width: 100%; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.sheet__wide { grid-column: 1 / -1; }
+/* Panels stacked inside one column of the sheet. */
+.stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+@media (max-width: 880px) {
+  .sheet { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* A row that adds something to the list above it: the field takes the width, the button sits beside it at the same height. */
+.addrow { display: flex; gap: 6px; align-items: stretch; }
+.addrow .input { flex: 1 1 auto; height: 34px; }
+.addrow .btn { height: 34px; }
+
 /* ---------- panel (replaces the PSone window inside the tracker) ---------- */
 .panel { position: relative; background: var(--surface); border: 1px solid var(--line); }
 .panel__h { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--line); font: 600 14px var(--font-ui); color: var(--text); }
