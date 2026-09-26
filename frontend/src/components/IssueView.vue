@@ -10,6 +10,7 @@ import {
   fileSize,
   priorityClass,
   stamp,
+  stampAt,
   type Attachment,
   type Comment,
   type Issue,
@@ -435,7 +436,7 @@ async function removeIssue(): Promise<void> {
 
             <div v-else class="hist">
               <div v-for="h in issue.history" :key="h.id" class="hi">
-                <time>{{ stamp(h.at) }}</time>
+                <time>{{ stampAt(h.at) }}</time>
                 <span class="hi__who">{{ h.by }}</span>
                 <span class="hi__what">
                   <span class="hi__f">{{ h.field }}</span>
@@ -622,6 +623,10 @@ async function removeIssue(): Promise<void> {
   padding: 10px;
   line-height: 1.55;
   resize: vertical;
+}
+/* The day and the clock ride together in the first column, so it is wider than the theme's default. */
+.hi {
+  grid-template-columns: 152px 96px minmax(0, 1fr);
 }
 .iv__list {
   display: flex;

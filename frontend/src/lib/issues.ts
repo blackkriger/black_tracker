@@ -90,6 +90,15 @@ export function dueLabel(date: string | null): { text: string; late: boolean } |
   };
 }
 
+/** History is read to answer "when exactly", so it carries the clock as well as the day. */
+export function stampAt(iso: string): string {
+  const d = new Date(iso);
+  const day = d
+    .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    .toUpperCase();
+  return `${day} ${d.toLocaleTimeString('en-GB', { hour12: false })}`;
+}
+
 export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
