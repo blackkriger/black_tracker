@@ -737,9 +737,40 @@ async function removeIssue(): Promise<void> {
           </button>
         </header>
 
-        <div v-if="loading && !creating" class="iv__loading">
-          <span class="sk sk--line" style="width: 320px; height: 24px"></span>
-          <span class="sk sk--line" style="width: 100%; height: 64px"></span>
+        <!-- The same two columns, with a placeholder the size of every control that is coming. -->
+        <div v-if="loading && !creating" class="iv">
+          <div class="iv__main">
+            <span class="sk sk--line" style="width: 46%; height: 29px"></span>
+            <div>
+              <span class="sk sk--line" style="width: 94%"></span>
+              <span class="sk sk--line iv__sk-line" style="width: 82%"></span>
+              <span class="sk sk--line iv__sk-line" style="width: 64%"></span>
+            </div>
+            <div class="sec-h links">
+              <span class="sk sk--line" style="width: 14px; height: 14px"></span>
+              <span class="sk sk--line" style="width: 74px; height: 24px"></span>
+            </div>
+            <span class="sk sk--line" style="height: 56px"></span>
+            <div class="itabs">
+              <span class="sk sk--line iv__sk-tab" style="width: 92px"></span>
+              <span class="sk sk--line iv__sk-tab" style="width: 70px"></span>
+            </div>
+            <div class="iv__list">
+              <div v-for="w in [190, 150]" :key="w" class="cm">
+                <span class="sk sk--av"></span>
+                <div>
+                  <span class="sk sk--line" :style="{ width: `${w}px` }"></span>
+                  <span class="sk sk--line iv__sk-line" style="width: 88%"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <aside class="props">
+            <div v-for="n in 6" :key="n" class="prop">
+              <span class="sk sk--line" style="width: 54px"></span>
+              <span class="sk sk--line" style="height: 30px"></span>
+            </div>
+          </aside>
         </div>
         <div v-else-if="!issue && !creating" class="empty">
           <span class="empty__g">✕</span>{{ error }}
@@ -1219,11 +1250,11 @@ async function removeIssue(): Promise<void> {
 .iv__state {
   font-size: 12.5px;
 }
-.iv__loading {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px 24px;
+.iv__sk-line {
+  margin-top: 8px;
+}
+.iv__sk-tab {
+  margin: 11px 12px;
 }
 .iv__title-edit {
   height: 38px;
