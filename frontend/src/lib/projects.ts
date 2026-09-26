@@ -7,6 +7,7 @@ export interface ProjectMini {
   shortName: string;
   name: string;
   archived: boolean;
+  boardCount: number;
 }
 
 const projects = ref<ProjectMini[]>([]);

@@ -113,6 +113,7 @@ async function addBoard(): Promise<void> {
     );
     boards.value = [...boards.value, created];
     newBoard.value = '';
+    await projectsStore.load(true);
   } catch (err) {
     report(err);
   }
@@ -134,6 +135,7 @@ async function deleteBoard(): Promise<void> {
     await api(`/boards/${b.id}`, { method: 'DELETE' });
     boards.value = boards.value.filter((row) => row.id !== b.id);
     deletingBoard.value = null;
+    await projectsStore.load(true);
   } catch (err) {
     report(err);
     deletingBoard.value = null;

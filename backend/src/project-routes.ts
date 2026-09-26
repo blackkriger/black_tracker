@@ -85,8 +85,14 @@ export async function boardsOfProject(projectId: string) {
 export function registerProjectRoutes(app: FastifyInstance): void {
   app.get('/projects', async (req, reply) => {
     if (!(await requireAuth(req, reply))) return;
-    const res = await pool.query<ProjectRow>('select * from projects order by position, short_name');
-    return reply.send({ data: res.rows.map(publicProject) });
+    // The board count rides along so the top bar knows whether a project has a choice of boards to offer.
+    const res = await pool.query<ProjectRow & { board_count: number }>(
+      `select p.*, (select count(*) from boards b where b.project_id = p.id)::int as board_count
+         from projects p order by p.position, p.short_name`
+    );
+    return reply.send({
+      data: res.rows.map((r) => ({ ...publicProject(r), boardCount: r.board_count })),
+    });
   });
 
   app.get('/projects/:short', async (req, reply) => {

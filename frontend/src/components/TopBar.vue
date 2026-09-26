@@ -85,6 +85,7 @@ async function signOut(): Promise<void> {
         </RouterLink>
 
         <button
+          v-if="p.boardCount > 1"
           class="topitem topitem--caret"
           type="button"
           :aria-expanded="openShort === p.shortName"
@@ -102,7 +103,6 @@ async function signOut(): Promise<void> {
             role="menuitem"
             @click="pickBoard(p.shortName, b.slug)"
           >{{ b.name }}</button>
-          <div v-if="!(boardsByProject[p.shortName] ?? []).length" class="menu__h">No boards yet.</div>
         </div>
       </span>
     </nav>
