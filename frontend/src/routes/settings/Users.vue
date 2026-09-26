@@ -5,7 +5,7 @@ import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
-import { stamp } from '../../lib/issues';
+import { stamp, stampAt } from '../../lib/issues';
 import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
@@ -465,9 +465,9 @@ async function saveAccess(): Promise<void> {
               <td>
                 <template v-if="i.status === 'used'">Used by {{ i.usedBy }}</template>
                 <template v-else-if="i.status === 'expired'">Expired</template>
-                <template v-else>Good until {{ stamp(i.expiresAt) }}</template>
+                <template v-else>Good until {{ stampAt(i.expiresAt) }}</template>
               </td>
-              <td class="stamp">{{ stamp(i.createdAt) }}, {{ i.createdBy }}</td>
+              <td class="stamp">{{ stampAt(i.createdAt) }}, {{ i.createdBy }}</td>
               <td class="c-act">
                 <!-- A used link is the record of how an account came to be, so only an unused one can go. -->
                 <button
