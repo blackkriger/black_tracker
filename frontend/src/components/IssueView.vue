@@ -695,12 +695,6 @@ async function removeIssue(): Promise<void> {
                 :title="`${l.summary} — ${l.stateName}`"
               >
                 <span class="key lk__key" :style="{ color: l.stateColor }">{{ l.key }}</span>
-                <button
-                  class="lk__x"
-                  type="button"
-                  :aria-label="`Unlink ${l.key}`"
-                  @click.prevent="removeLink(l)"
-                >✕</button>
               </RouterLink>
             </div>
 
@@ -1034,6 +1028,15 @@ async function removeIssue(): Promise<void> {
       </section>
 
       <Dialog v-if="picking" title="Link an issue" :width="460" @close="picking = false">
+        <div v-if="shownLinks.length" class="pick">
+          <div v-for="l in shownLinks" :key="l.id" class="pick__line">
+            <span class="key">{{ l.key }}</span>
+            <span class="pick__sum">{{ l.summary }}</span>
+            <button class="btn btn--sm btn--ghost" type="button" @click="removeLink(l)">Unlink</button>
+          </div>
+        </div>
+        <div v-if="shownLinks.length" class="hr"></div>
+
         <input
           v-model="linkQuery"
           class="input"
@@ -1200,9 +1203,8 @@ async function removeIssue(): Promise<void> {
 .lk {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   height: 24px;
-  padding: 0 2px 0 8px;
+  padding: 0 8px;
   border: 1px solid var(--line-2);
   text-decoration: none;
 }
@@ -1212,21 +1214,12 @@ async function removeIssue(): Promise<void> {
 .lk__key {
   font-size: 11.5px;
 }
-.lk__x {
-  display: inline-flex;
+.pick__line {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text-muted);
-  font-size: 11px;
-  cursor: pointer;
-}
-.lk__x:hover {
-  color: var(--danger-text);
+  gap: 10px;
+  height: 32px;
+  padding: 0 8px;
 }
 /* The search answers in rows that look like what they will become. */
 .pick {
