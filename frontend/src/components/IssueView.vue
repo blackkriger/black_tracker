@@ -256,11 +256,17 @@ const commentFiles = ref<File[]>([]);
 
 // Every picture on the issue, in the order they are shown, and which one the viewer has open.
 const shown = ref<number | null>(null);
-const gallery = computed(() =>
-  (issue.value?.attachments ?? [])
+const gallery = computed(() => [
+  ...(issue.value?.attachments ?? [])
     .filter((a) => a.mime.startsWith('image/'))
-    .map((a) => ({ src: `/api/attachments/${a.id}`, name: a.filename }))
-);
+    .map((a) => ({ src: `/api/attachments/${a.id}`, name: a.filename })),
+  ...[...pending.value, ...commentFiles.value]
+    .filter((f) => f.type.startsWith('image/'))
+    .map((f) => ({ src: previewOf(f) ?? '', name: f.name })),
+]);
+
+const galleryOfFile = (file: File): number =>
+  gallery.value.findIndex((g) => g.src === previewOf(file));
 const galleryIndex = (id: string): number =>
   gallery.value.findIndex((g) => g.src === `/api/attachments/${id}`);
 const deleting = ref(false);
@@ -885,9 +891,9 @@ async function removeIssue(): Promise<void> {
               <!-- Chosen, not yet uploaded: a picture shows itself, anything else says its name. -->
               <div v-if="pending.some((f) => previewOf(f))" class="atts">
                 <figure v-for="f in pending.filter((x) => previewOf(x))" :key="f.name" class="att">
-                  <span class="att__img att__img--wait">
+                  <button class="att__img att__img--wait" type="button" @click="shown = galleryOfFile(f)">
                     <img :src="previewOf(f) ?? ''" :alt="f.name" class="att__pic" />
-                  </span>
+                  </button>
                   <figcaption class="att__cap">
                     <span>{{ f.name }}</span>
                     <button
@@ -1053,9 +1059,9 @@ async function removeIssue(): Promise<void> {
                   <div v-if="commentFiles.length" class="cm__waiting">
                     <template v-for="f in commentFiles" :key="f.name">
                       <figure v-if="previewOf(f)" class="att att--sm">
-                        <span class="att__img att__img--wait">
+                        <button class="att__img att__img--wait" type="button" @click="shown = galleryOfFile(f)">
                           <img :src="previewOf(f) ?? ''" :alt="f.name" class="att__pic" />
-                        </span>
+                        </button>
                         <figcaption class="att__cap">
                           <span>{{ f.name }}</span>
                           <button
@@ -1545,6 +1551,11 @@ async function removeIssue(): Promise<void> {
 /* Waiting, not yet uploaded: the dashed edge says so without a word. */
 .att__img--wait {
   display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
   position: relative;
   aspect-ratio: 16 / 10;
   overflow: hidden;
