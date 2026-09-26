@@ -175,19 +175,11 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     });
   });
 
-  // The last board of a project cannot go: its issues would have nowhere to live.
   app.delete('/boards/:id', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
     const board = await boardById(id);
     if (!board) return reply.code(404).send({ error: 'No such board.' });
-    const siblings = await pool.query<{ n: number }>(
-      'select count(*)::int as n from boards where project_id = $1',
-      [board.project_id]
-    );
-    if (siblings.rows[0].n <= 1) {
-      return reply.code(409).send({ error: 'A project keeps at least one board.' });
-    }
     // The board's statuses and issues go with it, which is what the confirmation on the screen spells out.
     const used = await pool.query<{ n: number }>(
       'select count(*)::int as n from issues where board_id = $1',
