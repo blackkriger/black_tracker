@@ -21,8 +21,6 @@ interface Board {
   name: string;
   defaultStateId: string | null;
   position: number;
-  /** How many issues live on it, so a delete can say what it takes with it. */
-  issues: number;
   states: State[];
 }
 interface Project {
@@ -342,11 +340,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
       @close="deletingBoard = null"
     >
       <p class="dialog__lede">
-        This takes the board's statuses
-        <template v-if="deletingBoard.issues">
-          and its {{ deletingBoard.issues }} issue{{ deletingBoard.issues === 1 ? '' : 's' }}
-        </template>
-        with it. This cannot be undone.
+        This takes the board's statuses and issues with it. This cannot be undone.
       </p>
       <template #footer>
         <button class="btn" type="button" @click="deletingBoard = null">Cancel</button>

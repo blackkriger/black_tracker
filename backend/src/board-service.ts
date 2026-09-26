@@ -77,18 +77,12 @@ export const publicState = (r: StateRow) => ({
   color: r.color,
 });
 
-export const publicBoard = (
-  r: BoardRow,
-  states: StateRow[] = [],
-  deniedTo: string[] = [],
-  issues = 0
-) => ({
+export const publicBoard = (r: BoardRow, states: StateRow[] = [], deniedTo: string[] = []) => ({
   id: r.id,
   projectId: r.project_id,
   name: r.name,
   defaultStateId: r.default_state_id,
   position: r.position,
-  issues,
   states: states.map(publicState),
   /** Who cannot see it. Settings screens read this; everyone else only ever gets boards they may open. */
   deniedTo,
