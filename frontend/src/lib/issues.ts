@@ -82,6 +82,27 @@ export interface IssueFull extends Issue {
 
 export const PRIORITIES: Priority[] = ['Critical', 'Major', 'Normal', 'Minor'];
 
+// Which way a thread reads is a habit, not a property of the issue: it is remembered per browser.
+const ORDER_KEY = 'tracker:comment-order';
+export type CommentOrder = 'oldest' | 'newest';
+
+export const commentOrder = {
+  get(): CommentOrder {
+    try {
+      return localStorage.getItem(ORDER_KEY) === 'newest' ? 'newest' : 'oldest';
+    } catch {
+      return 'oldest';
+    }
+  },
+  set(order: CommentOrder): void {
+    try {
+      localStorage.setItem(ORDER_KEY, order);
+    } catch {
+      /* private mode — the thread just reads oldest first next time */
+    }
+  },
+};
+
 /** The colour a priority speaks in, from loudest to quietest. */
 export const priorityColor = (p: Priority): string =>
   ({

@@ -13,9 +13,9 @@ import {
   PRIORITIES,
   dueLabel,
   MAX_FILE_BYTES,
+  commentOrder,
   fileSize,
   priorityColor,
-  stamp,
   stampAt,
   type Attachment,
   type Comment,
@@ -23,6 +23,7 @@ import {
   type IssueFull,
   type IssueLink,
   type IssueTag,
+  type CommentOrder,
   type Priority,
 } from '../lib/issues';
 
@@ -68,6 +69,23 @@ const error = ref<string | null>(null);
 const people = ref<{ id: string; login: string; fullName: string }[]>([]);
 
 const tab = ref<'comments' | 'history'>('comments');
+const order = ref<CommentOrder>(commentOrder.get());
+
+// Pinned first whichever way the rest reads.
+const thread = computed(() =>
+  [...(issue.value?.comments ?? [])].sort(
+    (a, b) =>
+      Number(!!b.pinnedAt) - Number(!!a.pinnedAt) ||
+      (order.value === 'oldest'
+        ? a.createdAt.localeCompare(b.createdAt)
+        : b.createdAt.localeCompare(a.createdAt))
+  )
+);
+
+function flipOrder(): void {
+  order.value = order.value === 'oldest' ? 'newest' : 'oldest';
+  commentOrder.set(order.value);
+}
 
 // The title and the description are the issue's text: they are edited together, deliberately, and saved in one write.
 const editing = ref(false);
@@ -551,15 +569,10 @@ async function togglePin(c: Comment): Promise<void> {
       { method: 'PUT', body: { pinned: !c.pinnedAt } }
     );
     const now = issue.value ?? current;
-    const comments = now.comments.map((row) =>
-      row.id === c.id ? { ...row, pinnedAt: updated.pinnedAt, pinnedBy: updated.pinnedBy } : row
-    );
-    // Pinned ones lead the thread, and the rest keep their order.
     issue.value = {
       ...now,
-      comments: [...comments].sort(
-        (a, b) =>
-          Number(!!b.pinnedAt) - Number(!!a.pinnedAt) || a.createdAt.localeCompare(b.createdAt)
+      comments: now.comments.map((row) =>
+        row.id === c.id ? { ...row, pinnedAt: updated.pinnedAt, pinnedBy: updated.pinnedBy } : row
       ),
     };
   } catch (err) {
@@ -759,7 +772,7 @@ async function removeIssue(): Promise<void> {
                 :class="{ 'is-fresh': fresh.has('description') }"
                 v-html="asHtml(issue.description)"
               ></div>
-              <div v-else class="iv__body hint">Nothing written yet.</div>
+              <div v-else class="iv__body faint">Nothing written yet.</div>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
@@ -866,6 +879,16 @@ async function removeIssue(): Promise<void> {
               >
                 History<span class="n">{{ issue.history.length }}</span>
               </button>
+              <div class="sp"></div>
+              <button
+                v-if="tab === 'comments'"
+                class="itab itab--order"
+                type="button"
+                :title="order === 'oldest' ? 'Oldest first' : 'Newest first'"
+                @click="flipOrder"
+              >
+                {{ order === 'oldest' ? '↑' : '↓' }}
+              </button>
             </nav>
 
             <div
@@ -874,7 +897,7 @@ async function removeIssue(): Promise<void> {
               :class="{ 'is-fresh': fresh.has('comments') }"
             >
               <article
-                v-for="c in issue.comments"
+                v-for="c in thread"
                 :id="`comment-${c.id}`"
                 :key="c.id"
                 class="cm"
@@ -947,7 +970,7 @@ async function removeIssue(): Promise<void> {
                 </div>
               </article>
 
-              <form class="cm" @submit.prevent="postComment">
+              <form class="cm" :class="{ 'cm--lead': order === 'newest' }" @submit.prevent="postComment">
                 <span class="av av--lg" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
                 <div>
                   <RichText
@@ -1113,7 +1136,7 @@ async function removeIssue(): Promise<void> {
               </div>
               <div class="prop">
                 <span class="prop__k">Created</span>
-                <span class="pv pv--ro stamp">{{ stamp(issue.createdAt) }}</span>
+                <span class="pv pv--ro stamp">{{ stampAt(issue.createdAt) }}</span>
               </div>
             </template>
           </aside>
@@ -1240,6 +1263,10 @@ async function removeIssue(): Promise<void> {
 /* The day and the clock ride together in the first column, so it is wider than the theme's default. */
 .hi {
   grid-template-columns: 152px 96px minmax(0, 1fr);
+}
+/* The one control in the tab row that is not a tab: it never carries the selected underline. */
+.itab--order {
+  font-size: 14px;
 }
 .iv__list {
   display: flex;
