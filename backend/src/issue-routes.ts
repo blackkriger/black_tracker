@@ -762,6 +762,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const { id } = req.params as { id: string };
     const found = await loadIssueFor(req, reply, id);
     if (!found) return;
+    const { comment } = req.query as { comment?: string };
+    if (comment) {
+      const owns = await pool.query('select 1 from issue_comments where id = $1 and issue_id = $2', [
+        comment,
+        id,
+      ]);
+      if (!owns.rowCount) return reply.code(400).send({ error: 'That comment is on another issue.' });
+    }
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: 'Send a file.' });
 
@@ -784,7 +792,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         `insert into issue_attachments (issue_id, comment_id, filename, mime, size, storage_path, uploaded_by)
          values ($1, $2, $3, $4, $5, $6, $7)
          returning id, created_at`,
-        [id, null, filename, file.mimetype, size, stored, found.auth.userId]
+        [id, comment ?? null, filename, file.mimetype, size, stored, found.auth.userId]
       );
     } catch (err) {
       // The issue went away while the bytes were landing: take the bytes with it.
@@ -807,7 +815,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         filename,
         mime: file.mimetype,
         size,
-        commentId: null,
+        commentId: comment ?? null,
         uploadedBy: found.auth.login,
         createdAt: res.rows[0].created_at.toISOString(),
       },

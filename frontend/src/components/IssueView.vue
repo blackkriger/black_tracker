@@ -105,6 +105,9 @@ function flash(names: string[]): void {
 
 const uploading = ref(false);
 const dragOver = ref(false);
+// Files chosen before there is anything to attach them to: a new issue, or a comment that has not been posted. They are uploaded the moment their owner exists.
+const pending = ref<File[]>([]);
+const commentFiles = ref<File[]>([]);
 const deleting = ref(false);
 
 const shownStateId = computed(() => (creating.value ? draft.value.stateId : issue.value?.stateId));
@@ -124,12 +127,12 @@ const wornTags = computed(() =>
 const freeTags = computed(() =>
   props.tags.filter((t) => !wornTags.value.some((w) => w.id === t.id))
 );
-const images = computed(() =>
-  (issue.value?.attachments ?? []).filter((a) => a.mime.startsWith('image/'))
-);
-const files = computed(() =>
-  (issue.value?.attachments ?? []).filter((a) => !a.mime.startsWith('image/'))
-);
+// The issue's own files; anything hanging off a comment is shown under that comment instead.
+const own = computed(() => (issue.value?.attachments ?? []).filter((a) => !a.commentId));
+const images = computed(() => own.value.filter((a) => a.mime.startsWith('image/')));
+const files = computed(() => own.value.filter((a) => !a.mime.startsWith('image/')));
+const filesOf = (commentId: string) =>
+  (issue.value?.attachments ?? []).filter((a) => a.commentId === commentId);
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
@@ -245,6 +248,15 @@ async function create(): Promise<void> {
         tagIds: draft.value.tagIds,
       },
     });
+    if (pending.value.length) {
+      try {
+        await sendFiles(made.id, pending.value);
+      } catch (err) {
+        // The issue is made; only the files failed, and saying so is better than losing the issue with them.
+        error.value = err instanceof Error ? err.message : 'The issue was created without the files.';
+      }
+      pending.value = [];
+    }
     emit('created', made);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not create the issue.';
@@ -297,6 +309,10 @@ async function postComment(): Promise<void> {
     const now = issue.value ?? current;
     issue.value = { ...now, comments: [...now.comments, created] };
     commentDraft.value = '';
+    if (commentFiles.value.length) {
+      await sendFiles(current.id, commentFiles.value, created.id);
+      commentFiles.value = [];
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not post the comment.';
   } finally {
@@ -364,36 +380,56 @@ async function removeComment(c: Comment): Promise<void> {
   }
 }
 
+async function sendFiles(issueId: string, list: File[], commentId?: string): Promise<void> {
+  for (const file of list) {
+    const form = new FormData();
+    form.append('file', file);
+    const where = commentId ? `?comment=${commentId}` : '';
+    const res = await fetch(`/api/issues/${issueId}/attachments${where}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Tab-Id': TAB_ID },
+      body: form,
+    });
+    const payload = (await res.json().catch(() => null)) as
+      | { data?: Attachment; error?: string }
+      | null;
+    if (!res.ok || !payload?.data) throw new Error(payload?.error ?? 'Could not upload the file.');
+    if (issue.value) {
+      issue.value = { ...issue.value, attachments: [...issue.value.attachments, payload.data] };
+    }
+  }
+}
+
+// On an issue that exists the file goes straight up; on one being written it waits in the list until there is an issue to hang it on.
 async function upload(list: FileList | null): Promise<void> {
-  const current = issue.value;
-  if (!list?.length || !current) return;
+  const chosen = list ? Array.from(list) : [];
+  if (!chosen.length) return;
+  dragOver.value = false;
+  if (creating.value || !issue.value) {
+    pending.value = [...pending.value, ...chosen];
+    return;
+  }
   uploading.value = true;
   error.value = null;
   try {
-    for (const file of Array.from(list)) {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch(`/api/issues/${current.id}/attachments`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'X-Tab-Id': TAB_ID },
-        body: form,
-      });
-      const payload = (await res.json().catch(() => null)) as
-        | { data?: Attachment; error?: string }
-        | null;
-      if (!res.ok || !payload?.data) throw new Error(payload?.error ?? 'Could not upload the file.');
-      issue.value = {
-        ...(issue.value as IssueFull),
-        attachments: [...(issue.value as IssueFull).attachments, payload.data],
-      };
-    }
+    await sendFiles(issue.value.id, chosen);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not upload the file.';
   } finally {
     uploading.value = false;
-    dragOver.value = false;
   }
+}
+
+function dropPending(name: string, from: 'issue' | 'comment'): void {
+  const list = from === 'issue' ? pending : commentFiles;
+  const at = list.value.findIndex((f) => f.name === name);
+  if (at >= 0) list.value = list.value.filter((_, i) => i !== at);
+}
+
+function pickCommentFiles(list: FileList | null): void {
+  if (!list?.length) return;
+  commentFiles.value = [...commentFiles.value, ...Array.from(list)];
 }
 
 async function removeAttachment(a: Attachment): Promise<void> {
@@ -512,8 +548,10 @@ async function removeIssue(): Promise<void> {
               <div v-else class="md iv__body hint">Nothing written yet.</div>
             </div>
 
-            <div v-if="issue" :class="{ 'is-fresh': fresh.has('files') }">
-              <div class="sec-h">Files<span class="n">{{ issue.attachments.length }}</span></div>
+            <div :class="{ 'is-fresh': fresh.has('files') }">
+              <div class="sec-h">
+                Files<span class="n">{{ own.length + pending.length }}</span>
+              </div>
               <div v-if="images.length" class="atts">
                 <figure v-for="a in images" :key="a.id" class="att">
                   <a class="att__img" :href="`/api/attachments/${a.id}`" target="_blank">
@@ -538,6 +576,18 @@ async function removeIssue(): Promise<void> {
                   type="button"
                   :aria-label="`Delete ${a.filename}`"
                   @click="removeAttachment(a)"
+                >✕</button>
+              </div>
+
+              <!-- Chosen, not yet uploaded: they go up the moment the issue exists. -->
+              <div v-for="f in pending" :key="f.name" class="att__cap att__row att__row--wait">
+                <span class="att__name">{{ f.name }}</span>
+                <span class="stamp">{{ fileSize(f.size) }}</span>
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  :aria-label="`Remove ${f.name}`"
+                  @click="dropPending(f.name, 'issue')"
                 >✕</button>
               </div>
               <label
@@ -634,6 +684,23 @@ async function removeIssue(): Promise<void> {
                     </div>
                   </template>
                   <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
+
+                  <div v-if="filesOf(c.id).length" class="cm__files">
+                    <template v-for="a in filesOf(c.id)" :key="a.id">
+                      <a
+                        v-if="a.mime.startsWith('image/')"
+                        class="cm__shot"
+                        :href="`/api/attachments/${a.id}`"
+                        target="_blank"
+                      >
+                        <img :src="`/api/attachments/${a.id}`" :alt="a.filename" />
+                      </a>
+                      <span v-else class="att__cap att__row">
+                        <a :href="`/api/attachments/${a.id}`" target="_blank">{{ a.filename }}</a>
+                        <span class="stamp">{{ fileSize(a.size) }}</span>
+                      </span>
+                    </template>
+                  </div>
                 </div>
               </article>
 
@@ -641,7 +708,28 @@ async function removeIssue(): Promise<void> {
                 <span class="av av--lg" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
                 <div>
                   <RichText v-model="commentDraft" min-height="90px" placeholder="Write a comment…" />
+                  <div v-if="commentFiles.length" class="cm__waiting">
+                    <span v-for="f in commentFiles" :key="f.name" class="att__cap att__row">
+                      <span class="att__name">{{ f.name }}</span>
+                      <span class="stamp">{{ fileSize(f.size) }}</span>
+                      <button
+                        class="btn btn--sm btn--icon btn--ghost"
+                        type="button"
+                        :aria-label="`Remove ${f.name}`"
+                        @click="dropPending(f.name, 'comment')"
+                      >✕</button>
+                    </span>
+                  </div>
                   <div class="composer__row">
+                    <label class="btn btn--sm">
+                      <input
+                        type="file"
+                        multiple
+                        class="sr"
+                        @change="pickCommentFiles(($event.target as HTMLInputElement).files)"
+                      />
+                      Attach files
+                    </label>
                     <div class="sp"></div>
                     <button
                       class="btn btn--sm btn--primary"
@@ -869,10 +957,38 @@ async function removeIssue(): Promise<void> {
   border: 1px solid var(--line);
   margin-top: 8px;
 }
-.att__row a {
+.att__row a,
+.att__name {
   flex: 1;
   color: var(--text);
   text-decoration: none;
+}
+.att__row--wait {
+  border-style: dashed;
+}
+.cm__files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cm__shot {
+  display: block;
+  width: 160px;
+  border: 1px solid var(--line);
+}
+.cm__shot img {
+  display: block;
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+}
+.cm__waiting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
 }
 .drop {
   height: 56px;
