@@ -128,6 +128,24 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     return reply.code(201).send({ data: publicProject(project) });
   });
 
+  // Deleting a project takes its boards, statuses, issues and its own tags with it — the database cascades — so the caller has to name the project to prove it meant this one.
+  app.delete('/projects/:short', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const { short } = req.params as { short: string };
+    const parsed = z.object({ confirm: z.string().trim() }).safeParse(req.body);
+    const project = await projectByShort(short);
+    if (!project) return reply.code(404).send({ error: 'No such project.' });
+    if (!parsed.success || parsed.data.confirm.toUpperCase() !== project.short_name) {
+      return reply.code(400).send({ error: `Type ${project.short_name} to confirm.` });
+    }
+    const counts = await pool.query<{ issues: number }>(
+      'select count(*)::int as issues from issues where project_id = $1',
+      [project.id]
+    );
+    await pool.query('delete from projects where id = $1', [project.id]);
+    return reply.send({ data: { ok: true, issues: counts.rows[0].issues } });
+  });
+
   app.patch('/projects/:short', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { short } = req.params as { short: string };

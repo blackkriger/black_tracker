@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One project's setup. Each board owns its columns, so the statuses live inside the board's panel rather than in one list for the whole project.
 import { onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import { api } from '../../lib/api';
 import { useProjects } from '../../lib/projects';
@@ -31,6 +31,7 @@ interface Project {
 }
 
 const route = useRoute();
+const router = useRouter();
 const projectsStore = useProjects();
 
 const project = ref<Project | null>(null);
@@ -38,6 +39,9 @@ const boards = ref<Board[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const newBoard = ref('');
+// Deleting a project is the one action here nothing can undo, so the key has to be typed before the button appears.
+const deleting = ref(false);
+const confirmKey = ref('');
 const newStatus = ref<Record<string, string>>({});
 
 async function load(): Promise<void> {
@@ -76,6 +80,20 @@ async function toggleArchived(): Promise<void> {
     });
     project.value = { ...project.value, archived: updated.archived };
     await projectsStore.load(true);
+  } catch (err) {
+    report(err);
+  }
+}
+
+async function deleteProject(): Promise<void> {
+  if (!project.value) return;
+  try {
+    await api(`/projects/${encodeURIComponent(project.value.shortName)}`, {
+      method: 'DELETE',
+      body: { confirm: confirmKey.value },
+    });
+    await projectsStore.load(true);
+    await router.push('/settings');
   } catch (err) {
     report(err);
   }
@@ -201,6 +219,24 @@ async function onDrop(b: Board, target: State): Promise<void> {
           <button class="btn p-btn" type="button" @click="toggleArchived">
             {{ project.archived ? 'Restore project' : 'Archive project' }}
           </button>
+          <button v-if="!deleting" class="btn btn--danger p-btn" type="button" @click="deleting = true">
+            Delete
+          </button>
+          <template v-else>
+            <div class="field p-confirm">
+              <label class="label" for="p-confirm">Type {{ project.shortName }} to delete</label>
+              <input id="p-confirm" v-model="confirmKey" class="input" autofocus />
+            </div>
+            <button
+              class="btn btn--danger p-btn"
+              type="button"
+              :disabled="confirmKey.trim().toUpperCase() !== project.shortName"
+              @click="deleteProject"
+            >
+              Delete project
+            </button>
+            <button class="btn p-btn" type="button" @click="deleting = false; confirmKey = ''">Cancel</button>
+          </template>
         </div>
       </section>
 
@@ -322,6 +358,9 @@ async function onDrop(b: Board, target: State): Promise<void> {
 }
 .p-name {
   flex: 1 1 220px;
+}
+.p-confirm {
+  width: 200px;
 }
 .p-btn {
   height: 34px;
