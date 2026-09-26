@@ -1590,10 +1590,13 @@ async function removeIssue(): Promise<void> {
   padding: 0 4px 0 8px;
   border-top: 1px dashed var(--line-2);
 }
+/* The size belongs to the name, so it follows it; the cross keeps the right edge. */
 .wait__name {
-  flex: 1;
   overflow-wrap: anywhere;
   font-size: 12.5px;
+}
+.wait__row .stamp {
+  margin-right: auto;
 }
 .drop {
   height: 56px;
