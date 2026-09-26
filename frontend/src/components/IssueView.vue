@@ -538,7 +538,12 @@ async function removeIssue(): Promise<void> {
 
             <div>
               <div class="sec-h">Description</div>
-              <RichText v-if="editing" v-model="bodyDraft" placeholder="What is this about?" />
+              <RichText
+                v-if="editing"
+                v-model="bodyDraft"
+                placeholder="What is this about?"
+                @files="upload"
+              />
               <div
                 v-else-if="issue?.description && !isBlank(issue.description)"
                 class="md iv__body"
@@ -707,7 +712,33 @@ async function removeIssue(): Promise<void> {
               <form class="cm" @submit.prevent="postComment">
                 <span class="av av--lg" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
                 <div>
-                  <RichText v-model="commentDraft" min-height="90px" placeholder="Write a comment…" />
+                  <RichText
+                    v-model="commentDraft"
+                    min-height="90px"
+                    placeholder="Write a comment…"
+                    @files="pickCommentFiles"
+                  >
+                    <template #tools>
+                      <label class="rt__clip" title="Attach files">
+                        <input
+                          type="file"
+                          multiple
+                          class="sr"
+                          @change="pickCommentFiles(($event.target as HTMLInputElement).files)"
+                        />
+                        <svg viewBox="0 0 16 16" width="13" height="13" role="img" aria-label="Attach files">
+                          <path
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.3"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M12.4 7.3 7 12.7a3 3 0 0 1-4.2-4.2l5.8-5.8a2 2 0 0 1 2.8 2.8l-5.7 5.7a1 1 0 0 1-1.4-1.4l5.1-5.1"
+                          />
+                        </svg>
+                      </label>
+                    </template>
+                  </RichText>
                   <div v-if="commentFiles.length" class="cm__waiting">
                     <span v-for="f in commentFiles" :key="f.name" class="att__cap att__row">
                       <span class="att__name">{{ f.name }}</span>
@@ -721,15 +752,6 @@ async function removeIssue(): Promise<void> {
                     </span>
                   </div>
                   <div class="composer__row">
-                    <label class="btn btn--sm">
-                      <input
-                        type="file"
-                        multiple
-                        class="sr"
-                        @change="pickCommentFiles(($event.target as HTMLInputElement).files)"
-                      />
-                      Attach files
-                    </label>
                     <div class="sp"></div>
                     <button
                       class="btn btn--sm btn--primary"
@@ -983,6 +1005,20 @@ async function removeIssue(): Promise<void> {
   width: 100%;
   height: 100px;
   object-fit: cover;
+}
+/* The clip sits among the toolbar's own buttons and behaves like one. */
+.rt__clip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  min-width: 26px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.rt__clip:hover {
+  color: var(--text);
+  background: var(--surface);
 }
 .cm__waiting {
   display: flex;

@@ -7,6 +7,7 @@ import { clean } from '../lib/richtext';
 
 const body = defineModel<string>({ required: true });
 const props = defineProps<{ placeholder?: string; minHeight?: string }>();
+const emit = defineEmits<{ (e: 'files', list: FileList): void }>();
 
 const wrap = ref<HTMLDivElement | null>(null);
 const host = ref<HTMLDivElement | null>(null);
@@ -16,6 +17,26 @@ let fromEditor = false;
 
 // Quill says when it has the caret and when it has lost it; :focus-within would keep the ring after a click that focuses nothing.
 const focused = ref(false);
+// A file dragged over the text: Quill would try to paste it into the document, so it is caught here and handed to whoever owns the editor.
+const overWithFiles = ref(false);
+
+const carriesFiles = (ev: DragEvent): boolean =>
+  Array.from(ev.dataTransfer?.types ?? []).includes('Files');
+
+function onDragOver(ev: DragEvent): void {
+  if (!carriesFiles(ev)) return;
+  ev.preventDefault();
+  overWithFiles.value = true;
+}
+
+function onDrop(ev: DragEvent): void {
+  if (!carriesFiles(ev)) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  overWithFiles.value = false;
+  const list = ev.dataTransfer?.files;
+  if (list?.length) emit('files', list);
+}
 
 const marks = ref({
   bold: false,
@@ -116,12 +137,16 @@ function addLink(): void {
       <button type="button" :aria-pressed="marks.ordered" title="Numbered list" @click="toggle('list', 'ordered')">1.</button>
       <button type="button" :aria-pressed="marks.blockquote" title="Quote" @click="toggle('blockquote')">"</button>
       <button type="button" title="Link" @click="addLink">↗</button>
+      <slot name="tools" />
     </div>
     <div
       ref="host"
       class="rt__editor"
-      :class="{ 'is-focus': focused }"
+      :class="{ 'is-focus': focused, 'is-drop': overWithFiles }"
       :style="{ minHeight: minHeight ?? '120px' }"
+      @dragover="onDragOver"
+      @dragleave="overWithFiles = false"
+      @drop.capture="onDrop"
     ></div>
   </div>
 </template>
@@ -142,6 +167,11 @@ function addLink(): void {
 .rt__editor.is-focus {
   border-color: var(--focus);
   box-shadow: 0 0 0 1px var(--focus);
+}
+.rt__editor.is-drop {
+  border-style: dashed;
+  border-color: var(--focus);
+  background: color-mix(in srgb, var(--focus) 6%, var(--bg));
 }
 .rt__editor :deep(.ql-editor) {
   flex: 1 1 auto;
