@@ -2,6 +2,7 @@
 // The editor behind a description and a comment: Quill with a short toolbar and nothing else — no images (files hang off the issue), no fonts, no colours. It speaks the same v-model contract as a textarea, handing back HTML that is sanitised before it is ever shown again.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { usePeople } from '../lib/people';
+import { useRoles } from '../lib/roles';
 import Quill from 'quill';
 import 'quill/dist/quill.core.css';
 import { clean } from '../lib/richtext';
@@ -9,9 +10,10 @@ import { Bold, Code, Heading3, Italic, Link, List, ListOrdered, Quote, Strikethr
 
 const body = defineModel<string>({ required: true });
 const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?: boolean }>();
-const emit = defineEmits<{ (e: 'files', list: FileList): void }>();
+const emit = defineEmits<{ (e: 'files', list: FileList): void; (e: 'blur'): void }>();
 
 const { people, load: loadPeople } = usePeople();
+const { roles, load: loadRoles } = useRoles();
 
 const wrap = ref<HTMLDivElement | null>(null);
 const host = ref<HTMLDivElement | null>(null);
@@ -83,12 +85,24 @@ const naming = ref<{ from: number; query: string } | null>(null);
 const chosen = ref(0);
 const at = ref({ left: 0, top: 0 });
 
-const matches = computed(() => {
+// A name can be a person or a role: naming a role names everyone wearing it.
+interface Named {
+  id: string;
+  label: string;
+  color: string | null;
+  hint: string;
+}
+
+const matches = computed<Named[]>(() => {
   if (!naming.value) return [];
   const q = naming.value.query.toLowerCase();
-  return people.value
+  const who = people.value
     .filter((p) => p.login.toLowerCase().includes(q) || p.fullName.toLowerCase().includes(q))
-    .slice(0, 6);
+    .map((p) => ({ id: p.id, label: p.login, color: p.roleColor, hint: p.fullName }));
+  const what = roles.value
+    .filter((r) => r.name.toLowerCase().includes(q))
+    .map((r) => ({ id: r.id, label: r.name, color: r.color, hint: '' }));
+  return [...who, ...what].slice(0, 8);
 });
 
 function lookForName(): void {
@@ -136,7 +150,7 @@ function onNameKey(ev: KeyboardEvent): void {
     chosen.value = (chosen.value - 1 + matches.value.length) % matches.value.length;
     stop();
   } else if (ev.key === 'Enter' || ev.key === 'Tab') {
-    pickName(matches.value[chosen.value].login);
+    pickName(matches.value[chosen.value].label);
     stop();
   } else if (ev.key === 'Escape') {
     naming.value = null;
@@ -146,6 +160,7 @@ function onNameKey(ev: KeyboardEvent): void {
 
 onMounted(() => {
   void loadPeople();
+  void loadRoles();
   if (!host.value) return;
   quill = new Quill(host.value, {
     theme: undefined,
@@ -166,7 +181,10 @@ onMounted(() => {
   quill.root.addEventListener('keydown', onNameKey, true);
   quill.enable(!props.disabled);
   quill.root.addEventListener('focus', () => (focused.value = true));
-  quill.root.addEventListener('blur', () => (focused.value = false));
+  quill.root.addEventListener('blur', () => {
+    focused.value = false;
+    emit('blur');
+  });
 });
 
 // Clicking empty space in a dialog leaves a contenteditable focused — the browser has nothing there to put a caret in, so it keeps the one it has. A press anywhere outside this editor lets it go.
@@ -259,15 +277,17 @@ function addLink(): void {
       :style="{ left: `${at.left}px`, top: `${at.top}px` }"
     >
       <button
-        v-for="(p, i) in matches"
-        :key="p.id"
+        v-for="(n, i) in matches"
+        :key="n.id"
         class="menu__i"
         :class="{ 'is-hover': i === chosen }"
         type="button"
-        @mousedown.prevent="pickName(p.login)"
+        @mousedown.prevent="pickName(n.label)"
       >
-        <span :style="{ color: p.roleColor ?? undefined }">{{ p.login }}</span>
-        <span v-if="p.fullName" class="rt__full">{{ p.fullName }}</span>
+        <span :style="{ color: i === chosen ? undefined : (n.color ?? undefined) }">
+          {{ n.label }}
+        </span>
+        <span v-if="n.hint" class="rt__full">{{ n.hint }}</span>
       </button>
     </div>
   </div>
@@ -282,6 +302,28 @@ function addLink(): void {
   position: absolute;
   z-index: 40;
   min-width: 180px;
+}
+/* The pointer every popup here has, drawn twice: the border's triangle, then the surface's one pixel lower to cover the line under it. */
+.rt__names::before,
+.rt__names::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 11px;
+  border: 6px solid transparent;
+}
+.rt__names::before {
+  border-bottom-color: var(--line-2);
+}
+.rt__names::after {
+  margin-bottom: -1px;
+  border-bottom-color: var(--card);
+}
+/* The one in hand says so in gold, the way the bar above does. Nothing fills. */
+.rt__names .menu__i:hover,
+.rt__names .menu__i.is-hover {
+  background: none;
+  color: var(--accent);
 }
 .rt__full {
   margin-left: auto;

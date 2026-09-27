@@ -3,6 +3,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjects, type ProjectMini } from '../lib/projects';
+import { usePeople } from '../lib/people';
+import { useRoles } from '../lib/roles';
 import { lastBoard } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
@@ -33,6 +35,9 @@ const props = defineProps<{
 const session = useSession();
 const router = useRouter();
 const { projects, load } = useProjects();
+// Kept fresh from here because this bar is on every screen; the lists themselves are shared.
+const { load: loadPeople } = usePeople();
+const { load: loadRoles } = useRoles();
 
 // No role is no access, so the one screen such a person has is not worth pointing at.
 const hasRole = computed(() => session.me.value?.isAdmin === true || !!session.me.value?.role);
@@ -208,7 +213,12 @@ function onKeydown(ev: KeyboardEvent): void {
 useLive((ev) => {
   if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
   if (ev.type === 'key-date.changed') void readNext();
-  if (ev.type.startsWith('comment.')) void readMentions();
+  // A name is written in the colour of a role, so both lists follow whoever edits either.
+  if (['role.changed', 'user.changed'].includes(ev.type)) {
+    void loadPeople(true);
+    void loadRoles(true);
+  }
+  if (ev.type.startsWith('comment.') || ev.type.startsWith('mention.')) void readMentions();
 });
 
 async function pickBoard(short: string, slug: string): Promise<void> {

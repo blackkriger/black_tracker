@@ -147,6 +147,47 @@ function openPicker(): void {
 }
 
 const commentDraft = ref('');
+// What was typed and not posted, kept per issue in this browser. It is a draft, not a
+// record: nobody else needs it and it never reaches the server.
+const DRAFTS = 'tracker:draft:';
+let keptDraft = '';
+const draftSaved = ref(false);
+let draftNote: ReturnType<typeof setTimeout> | null = null;
+
+function readDraft(): string {
+  if (!props.issueKey) return '';
+  try {
+    return localStorage.getItem(DRAFTS + props.issueKey) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function writeDraft(text: string): void {
+  if (!props.issueKey) return;
+  try {
+    if (text) localStorage.setItem(DRAFTS + props.issueKey, text);
+    else localStorage.removeItem(DRAFTS + props.issueKey);
+  } catch {
+    /* a browser that refuses storage simply keeps no draft */
+  }
+}
+
+// On the way out of the field, and only when there is something new to keep.
+function keepDraft(): void {
+  if (!props.issueKey) return;
+  const text = isBlank(commentDraft.value) ? '' : commentDraft.value;
+  if (text === keptDraft) return;
+  keptDraft = text;
+  writeDraft(text);
+  if (!text) return;
+  draftSaved.value = false;
+  if (draftNote) clearTimeout(draftNote);
+  void nextTick(() => {
+    draftSaved.value = true;
+    draftNote = setTimeout(() => (draftSaved.value = false), 2400);
+  });
+}
 const composer = ref<InstanceType<typeof RichText> | null>(null);
 
 // Selecting text inside a comment raises a small bar over it: copy what is highlighted, or answer it with a quote. It fades when the cursor wanders off and is gone once the selection is.
@@ -445,6 +486,8 @@ async function load(): Promise<void> {
   error.value = null;
   try {
     issue.value = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
+    keptDraft = readDraft();
+    if (keptDraft) commentDraft.value = keptDraft;
   } catch (err) {
     issue.value = null;
     error.value = err instanceof Error ? err.message : 'Could not load the issue.';
@@ -646,6 +689,8 @@ async function postComment(): Promise<void> {
       issue.value = { ...now, comments: [...now.comments, created] };
     }
     commentDraft.value = '';
+    keptDraft = '';
+    writeDraft('');
     // The record gained a line; the history tab is looking at the old one until it is read again.
     await reload();
   } catch (err) {
@@ -1260,6 +1305,7 @@ async function removeIssue(): Promise<void> {
                     placeholder="Write a comment…"
                     :disabled="posting"
                     @files="pickCommentFiles"
+                    @blur="keepDraft"
                   >
                     <template #tools>
                       <label class="rt__clip" title="Attach files">
@@ -1296,6 +1342,7 @@ async function removeIssue(): Promise<void> {
                     @remove="dropPendingKey($event, 'comment')"
                   />
                   <div class="composer__row">
+                    <span v-if="draftSaved" class="composer__kept">Draft saved</span>
                     <div class="sp"></div>
                     <button
                       class="btn btn--sm btn--primary"
@@ -1747,6 +1794,21 @@ async function removeIssue(): Promise<void> {
 .cm__files {
   display: flex;
   flex-direction: column;
+}
+/* Said once, quietly, and gone: it is a reassurance, not a state. */
+.composer__kept {
+  color: var(--text-muted);
+  font-size: 12px;
+  animation: draft-fade 2.4s ease-in forwards;
+}
+@keyframes draft-fade {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 /* Open for editing, the box stands off the name and the time above it. */
 .cm__edit {

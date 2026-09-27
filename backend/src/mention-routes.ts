@@ -10,7 +10,7 @@ import { requireAuth, requireSession } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 
 /** The same shape a login may take, so `@PROJ-1` and an e-mail do not become mentions. */
-const NAME = /@([a-zA-Z0-9_.-]{2,32})/g;
+const NAME = /(?:^|\s)@([a-zA-Z0-9_.-]{2,32})/g;
 
 const plain = (html: string): string =>
   html
@@ -22,9 +22,12 @@ const plain = (html: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Brings a comment's mentions in line with what it now says. Names that are still there
  * keep whatever they had, including having been read; names that are gone go with it.
+ * A name is either a login or a role — naming a role names everyone wearing it.
  */
 export async function syncMentions(
   client: PoolClient,
@@ -32,26 +35,42 @@ export async function syncMentions(
   text: string,
   authorId: string
 ): Promise<void> {
-  const named = [...plain(text).matchAll(NAME)].map((m) => m[1].toLowerCase());
-  const unique = [...new Set(named)];
-  const found = unique.length
-    ? await client.query<{ id: string }>(
-        'select id from users where lower(login) = any($1::text[]) and active and id <> $2',
-        [unique, authorId]
-      )
-    : { rows: [] as { id: string }[] };
-  const ids = found.rows.map((r) => r.id);
+  const said = plain(text);
+  const ids = new Set<string>();
 
+  const logins = [...new Set([...said.matchAll(NAME)].map((m) => m[1].toLowerCase()))];
+  if (logins.length) {
+    const found = await client.query<{ id: string }>(
+      'select id from users where lower(login) = any($1::text[]) and active and id <> $2',
+      [logins, authorId]
+    );
+    for (const row of found.rows) ids.add(row.id);
+  }
+
+  // A role's name may hold spaces, so it is looked for whole rather than tokenised.
+  const roles = await client.query<{ id: string; name: string }>('select id, name from roles');
+  const named = roles.rows.filter((r) =>
+    new RegExp(`(^|\\s)@${escape(r.name)}(?![a-zA-Z0-9_.-])`, 'i').test(said)
+  );
+  if (named.length) {
+    const wearers = await client.query<{ id: string }>(
+      'select id from users where role_id = any($1::uuid[]) and active and id <> $2',
+      [named.map((r) => r.id), authorId]
+    );
+    for (const row of wearers.rows) ids.add(row.id);
+  }
+
+  const all = [...ids];
   await client.query('delete from mentions where comment_id = $1 and user_id <> all($2::uuid[])', [
     commentId,
-    ids,
+    all,
   ]);
-  if (ids.length) {
+  if (all.length) {
     await client.query(
       `insert into mentions (comment_id, user_id)
        select $1, u from unnest($2::uuid[]) as u
        on conflict do nothing`,
-      [commentId, ids]
+      [commentId, all]
     );
   }
 }

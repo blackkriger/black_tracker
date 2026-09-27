@@ -98,8 +98,14 @@ onMounted(() => {
 });
 watch(() => route.query.day, fromAddress);
 watch([year, who], () => void load());
+// The whole screen is made of what other people are doing, so almost everything redraws it.
 useLive((ev) => {
-  if (['key-date.changed', 'issue.updated', 'issue.created', 'issue.deleted'].includes(ev.type)) {
+  if (
+    ev.type.startsWith('issue.') ||
+    ev.type.startsWith('comment.') ||
+    ev.type.startsWith('mention.') ||
+    ev.type === 'key-date.changed'
+  ) {
     void load();
   }
 });
@@ -209,6 +215,18 @@ function closeIssue(): void {
           <section class="panel">
             <header class="panel__h">
               <span class="key year">{{ year }}</span>
+              <button
+                class="btn btn--sm btn--icon btn--ghost"
+                type="button"
+                aria-label="Previous year"
+                @click="step(-1)"
+              ><ChevronLeft class="ic" /></button>
+              <button
+                class="btn btn--sm btn--icon btn--ghost"
+                type="button"
+                aria-label="Next year"
+                @click="step(1)"
+              ><ChevronRight class="ic" /></button>
               <span class="panel__end">
                 <Select
                   v-model="who"
@@ -218,18 +236,6 @@ function closeIssue(): void {
                   small
                   label="Whose work to shade"
                 />
-                <button
-                  class="btn btn--sm btn--icon btn--ghost"
-                  type="button"
-                  aria-label="Previous year"
-                  @click="step(-1)"
-                ><ChevronLeft class="ic" /></button>
-                <button
-                  class="btn btn--sm btn--icon btn--ghost"
-                  type="button"
-                  aria-label="Next year"
-                  @click="step(1)"
-                ><ChevronRight class="ic" /></button>
               </span>
             </header>
             <div class="panel__b year-grid">
