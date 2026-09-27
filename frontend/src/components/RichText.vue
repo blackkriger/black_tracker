@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The editor behind a description and a comment: Quill with a short toolbar and nothing else — no images (files hang off the issue), no fonts, no colours. It speaks the same v-model contract as a textarea, handing back HTML that is sanitised before it is ever shown again.
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { usePeople } from '../lib/people';
 import Quill from 'quill';
 import 'quill/dist/quill.core.css';
 import { clean } from '../lib/richtext';
@@ -9,6 +10,8 @@ import { Bold, Code, Heading3, Italic, Link, List, ListOrdered, Quote, Strikethr
 const body = defineModel<string>({ required: true });
 const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?: boolean }>();
 const emit = defineEmits<{ (e: 'files', list: FileList): void }>();
+
+const { people, load: loadPeople } = usePeople();
 
 const wrap = ref<HTMLDivElement | null>(null);
 const host = ref<HTMLDivElement | null>(null);
@@ -75,7 +78,74 @@ function readMarks(): void {
   };
 }
 
+// An `@` and what has been typed after it, while the caret is still on the end of it.
+const naming = ref<{ from: number; query: string } | null>(null);
+const chosen = ref(0);
+const at = ref({ left: 0, top: 0 });
+
+const matches = computed(() => {
+  if (!naming.value) return [];
+  const q = naming.value.query.toLowerCase();
+  return people.value
+    .filter((p) => p.login.toLowerCase().includes(q) || p.fullName.toLowerCase().includes(q))
+    .slice(0, 6);
+});
+
+function lookForName(): void {
+  if (!quill) return;
+  const sel = quill.getSelection();
+  if (!sel || sel.length) {
+    naming.value = null;
+    return;
+  }
+  const back = Math.min(40, sel.index);
+  const before = quill.getText(sel.index - back, back);
+  // A name starts a word: an e-mail address in the middle of one is not a mention.
+  const found = /(?:^|\s)@([a-zA-Z0-9_.-]*)$/.exec(before);
+  if (!found) {
+    naming.value = null;
+    return;
+  }
+  naming.value = { from: sel.index - found[1].length - 1, query: found[1] };
+  chosen.value = 0;
+  const box = quill.getBounds(sel.index);
+  if (box) at.value = { left: box.left, top: box.bottom + 4 };
+}
+
+function pickName(login: string): void {
+  if (!quill || !naming.value) return;
+  const { from, query } = naming.value;
+  naming.value = null;
+  quill.deleteText(from, query.length + 1, 'user');
+  quill.insertText(from, `@${login} `, 'user');
+  quill.setSelection(from + login.length + 2, 0, 'silent');
+}
+
+// The list answers the keys first: Quill would otherwise break the line on Enter, and the
+// window above would close on Escape.
+function onNameKey(ev: KeyboardEvent): void {
+  if (!naming.value || !matches.value.length) return;
+  const stop = () => {
+    ev.preventDefault();
+    ev.stopPropagation();
+  };
+  if (ev.key === 'ArrowDown') {
+    chosen.value = (chosen.value + 1) % matches.value.length;
+    stop();
+  } else if (ev.key === 'ArrowUp') {
+    chosen.value = (chosen.value - 1 + matches.value.length) % matches.value.length;
+    stop();
+  } else if (ev.key === 'Enter' || ev.key === 'Tab') {
+    pickName(matches.value[chosen.value].login);
+    stop();
+  } else if (ev.key === 'Escape') {
+    naming.value = null;
+    stop();
+  }
+}
+
 onMounted(() => {
+  void loadPeople();
   if (!host.value) return;
   quill = new Quill(host.value, {
     theme: undefined,
@@ -87,8 +157,13 @@ onMounted(() => {
     fromEditor = true;
     body.value = clean(quill?.root.innerHTML ?? '');
     readMarks();
+    lookForName();
   });
-  quill.on('selection-change', readMarks);
+  quill.on('selection-change', () => {
+    readMarks();
+    lookForName();
+  });
+  quill.root.addEventListener('keydown', onNameKey, true);
   quill.enable(!props.disabled);
   quill.root.addEventListener('focus', () => (focused.value = true));
   quill.root.addEventListener('blur', () => (focused.value = false));
@@ -106,6 +181,7 @@ onMounted(() => document.addEventListener('pointerdown', onPointerDown, true));
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onPointerDown, true);
+  quill?.root.removeEventListener('keydown', onNameKey, true);
   quill = null;
 });
 
@@ -176,10 +252,42 @@ function addLink(): void {
       @drop.capture="onDrop"
       @paste.capture="onPaste"
     ></div>
+
+    <div
+      v-if="matches.length"
+      class="menu rt__names"
+      :style="{ left: `${at.left}px`, top: `${at.top}px` }"
+    >
+      <button
+        v-for="(p, i) in matches"
+        :key="p.id"
+        class="menu__i"
+        :class="{ 'is-hover': i === chosen }"
+        type="button"
+        @mousedown.prevent="pickName(p.login)"
+      >
+        <span :style="{ color: p.roleColor ?? undefined }">{{ p.login }}</span>
+        <span v-if="p.fullName" class="rt__full">{{ p.fullName }}</span>
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* The list of names stands where the caret is, inside the box it is being typed in. */
+.rt {
+  position: relative;
+}
+.rt__names {
+  position: absolute;
+  z-index: 40;
+  min-width: 180px;
+}
+.rt__full {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
 /* Nothing in here answers while it is off — the toolbar, the text and whatever the owner put in the toolbar alike. */
 .rt.is-off {
   pointer-events: none;
