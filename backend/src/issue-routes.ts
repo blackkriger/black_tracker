@@ -214,7 +214,17 @@ const issueCreate = z.object({
 });
 
 /** The reactions a comment may carry, in the order they are offered. */
-export const REACTIONS = ['\u{1F44D}', '\u{1F389}', '\u{2764}\u{FE0F}', '\u{1F604}', '\u{1F440}', '\u{1F680}'] as const;
+export const REACTIONS = [
+  '\u{1F44D}',
+  '\u{1F44C}',
+  '\u{1F64F}',
+  '\u{1F440}',
+  '\u{2764}\u{FE0F}',
+  '\u{1F389}',
+  '\u{1F608}',
+  '\u{1F921}',
+  '\u{1F4A9}',
+] as const;
 
 const issuePatch = z.object({
   summary: z.string().trim().min(1).max(300).optional(),

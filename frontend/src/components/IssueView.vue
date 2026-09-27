@@ -1947,6 +1947,21 @@ async function removeIssue(): Promise<void> {
   min-width: 0;
   padding: 4px;
 }
+.react__menu::before,
+.react__menu::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 11px;
+  border: 6px solid transparent;
+}
+.react__menu::before {
+  border-top-color: var(--line-2);
+}
+.react__menu::after {
+  margin-top: -1px;
+  border-top-color: var(--card);
+}
 .react__menu .react {
   border-color: transparent;
 }
