@@ -349,16 +349,39 @@ const litComment = ref<string | null>(null);
 
 watch(() => props.focusComment, lookAtComment);
 
-function lookAtComment(id?: string): void {
+/** Waits for the pictures in the window, which land after the text and push it about. */
+function settled(): Promise<void> {
+  const shots = [...document.querySelectorAll<HTMLImageElement>('.iv img')].filter(
+    (img) => !img.complete
+  );
+  if (!shots.length) return Promise.resolve();
+  return new Promise((done) => {
+    let left = shots.length;
+    const tick = (): void => {
+      if (--left <= 0) done();
+    };
+    for (const img of shots) {
+      img.addEventListener('load', tick, { once: true });
+      img.addEventListener('error', tick, { once: true });
+    }
+    // However slow they are, the comment is reached in the end.
+    setTimeout(done, 1500);
+  });
+}
+
+async function lookAtComment(id?: string): Promise<void> {
   if (!id) return;
   tab.value = 'comments';
-  void nextTick(() => {
-    document.getElementById(`comment-${id}`)?.scrollIntoView({ block: 'center' });
-    litComment.value = id;
-    setTimeout(() => {
-      if (litComment.value === id) litComment.value = null;
-    }, 2000);
-  });
+  await nextTick();
+  await settled();
+  await nextTick();
+  const el = document.getElementById(`comment-${id}`);
+  if (!el) return;
+  el.scrollIntoView({ block: 'center' });
+  litComment.value = id;
+  setTimeout(() => {
+    if (litComment.value === id) litComment.value = null;
+  }, 2000);
 }
 
 // The names the server sends for what changed, in the names this screen knows them by.
