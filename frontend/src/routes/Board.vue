@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // A board, its columns and the cards in them. Dragging a card is the whole editing surface here: everything else about an issue happens in the view that opens on it.
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
@@ -66,6 +66,7 @@ const creatingIn = ref<string | null>(null);
 
 // What the board is narrowed to. Nothing is remembered between visits — a filter is a way of looking at the board right now, not a setting.
 const q = ref('');
+const search = ref<HTMLInputElement | null>(null);
 const byAssignee = ref('');
 const byAuthor = ref('');
 const byPriority = ref('');
@@ -326,10 +327,20 @@ async function load(short: string, quiet = false): Promise<void> {
   }
 }
 
+// Alt+Enter is the way back to the search box from anywhere on the board.
+function onKeydown(ev: KeyboardEvent): void {
+  if (!ev.altKey || ev.key !== 'Enter') return;
+  ev.preventDefault();
+  search.value?.focus();
+  search.value?.select();
+}
+
 onMounted(() => {
   void load(String(route.params.short));
   void loadPeople();
+  window.addEventListener('keydown', onKeydown);
 });
+onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 watch(
   () => route.params.short,
   (short) => {
@@ -346,6 +357,7 @@ watch(
       <span class="search">
         <Search class="ic ic--sm search__i" />
         <input
+          ref="search"
           v-model="q"
           class="input input--sm filter search__f"
           placeholder="Search by summary…"

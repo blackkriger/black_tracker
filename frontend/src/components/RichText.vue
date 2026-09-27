@@ -21,6 +21,16 @@ const focused = ref(false);
 // A file dragged over the text: Quill would try to paste it into the document, so it is caught here and handed to whoever owns the editor.
 const overWithFiles = ref(false);
 
+// The same for a screenshot in the clipboard: Quill would inline it as base64, which the
+// sanitiser throws away on the way out. Caught before Quill sees it and sent up as a file.
+function onPaste(ev: ClipboardEvent): void {
+  const files = ev.clipboardData?.files;
+  if (!files?.length) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  emit('files', files);
+}
+
 const carriesFiles = (ev: DragEvent): boolean =>
   Array.from(ev.dataTransfer?.types ?? []).includes('Files');
 
@@ -164,6 +174,7 @@ function addLink(): void {
       @dragover="onDragOver"
       @dragleave="overWithFiles = false"
       @drop.capture="onDrop"
+      @paste.capture="onPaste"
     ></div>
   </div>
 </template>
