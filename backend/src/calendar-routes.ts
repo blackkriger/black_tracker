@@ -86,11 +86,12 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
         summary: string;
         due_date: Date | string;
         short_name: string;
+        board_id: string;
         slug: string;
         state_color: string;
         resolved_at: Date | null;
       }>(
-        `select i.id, i.readable_id, i.summary, i.due_date, p.short_name, b.slug,
+        `select i.id, i.readable_id, i.summary, i.due_date, p.short_name, b.id as board_id, b.slug,
                 s.color as state_color, i.resolved_at
            from issues i
            join projects p on p.id = i.project_id
@@ -134,7 +135,18 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
       ),
     ]);
 
-    const byDay = new Map<string, { key: string; summary: string; projectShort: string; boardSlug: string; color: string; done: boolean }[]>();
+    const byDay = new Map<
+      string,
+      {
+        key: string;
+        summary: string;
+        projectShort: string;
+        boardId: string;
+        boardSlug: string;
+        color: string;
+        done: boolean;
+      }[]
+    >();
     for (const d of dues.rows) {
       const day = iso(d.due_date);
       const list = byDay.get(day) ?? [];
@@ -142,6 +154,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
         key: d.readable_id,
         summary: d.summary,
         projectShort: d.short_name,
+        boardId: d.board_id,
         boardSlug: d.slug,
         color: d.state_color,
         done: d.resolved_at !== null,

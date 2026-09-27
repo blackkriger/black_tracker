@@ -2,9 +2,9 @@
 // The year at a glance: the days somebody marked, the deadlines the issues carry, and
 // how much work went through each day — for the whole team or for one person.
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
+import IssueView from '../components/IssueView.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import Select from '../components/Select.vue';
 import Dialog from '../components/Dialog.vue';
@@ -19,13 +19,13 @@ import {
   type Due,
   type Mark,
 } from '../lib/calendar';
+import type { IssueTag } from '../lib/issues';
 import { usePeople } from '../lib/people';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
 import { useLive } from '../lib/live';
 
-const router = useRouter();
 const session = useSession();
 const { people, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
@@ -133,8 +133,37 @@ async function removeMark(m: Mark): Promise<void> {
   }
 }
 
-function openIssue(d: Due): void {
-  void router.push(`/${d.projectShort}/${d.boardSlug}/${d.key}`);
+// The window wants the board it sits on and the tags its project can wear; neither is
+// on this screen, so both are read when a deadline is opened.
+interface OpenIssue {
+  key: string;
+  project: string;
+  board: { id: string; name: string; states: { id: string; name: string; color: string }[] };
+}
+const open = ref<OpenIssue | null>(null);
+const openTags = ref<IssueTag[]>([]);
+const openBoards = computed(
+  () => projects.value.find((p) => p.shortName === open.value?.project)?.boards ?? []
+);
+
+async function openIssue(d: Due): Promise<void> {
+  clear('day');
+  try {
+    const [board, tags] = await Promise.all([
+      api<OpenIssue['board']>(`/boards/${d.boardId}`),
+      api<IssueTag[]>(`/tags?project=${encodeURIComponent(d.projectShort)}`),
+    ]);
+    openTags.value = tags;
+    open.value = { key: d.key, project: d.projectShort, board };
+    picked.value = null;
+  } catch (err) {
+    fail('day', err, 'Could not open the issue.');
+  }
+}
+
+function closeIssue(): void {
+  open.value = null;
+  void load();
 }
 </script>
 
@@ -260,6 +289,21 @@ function openIssue(d: Due): void {
       </div>
       <div v-if="errors.day" class="err">{{ errors.day }}</div>
     </Dialog>
+
+    <IssueView
+      v-if="open"
+      :key="open.key"
+      :issue-key="open.key"
+      :board="open.board"
+      :boards="openBoards"
+      :tags="openTags"
+      :project="open.project"
+      @close="open = null"
+      @changed="load"
+      @deleted="closeIssue"
+      @moved="closeIssue"
+      @tag-created="openTags = [...openTags, $event]"
+    />
   </div>
 </template>
 

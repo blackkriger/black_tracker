@@ -19,6 +19,7 @@ export interface Due {
   key: string;
   summary: string;
   projectShort: string;
+  boardId: string;
   boardSlug: string;
   color: string;
   done: boolean;

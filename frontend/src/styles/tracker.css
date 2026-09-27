@@ -64,7 +64,7 @@ a { color: var(--accent); } a:hover { color: var(--accent-bright); }
 svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
 button { font-family: var(--font-ui); }
 
-/* ---------- top bar: project · boards · view · actions ---------- */
+/* ---------- top bar: project, boards, view, actions ---------- */
 .top { position: relative; z-index: 3; flex: none; display: flex; align-items: center; gap: 16px; height: var(--top-h); padding: 0 24px; border-bottom: 1px solid var(--line); }
 .proj { display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px 0 0; border: 0; background: none; color: var(--text); font: 600 14px var(--font-ui); cursor: pointer; }
 .proj:hover .proj__name { color: var(--accent-bright); }

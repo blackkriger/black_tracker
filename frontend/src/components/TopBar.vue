@@ -341,4 +341,12 @@ async function signOut(): Promise<void> {
 .datemenu__grid {
   padding: 0 10px 6px;
 }
+/* The one line under the month reads like the bar above it: the text brightens, nothing fills. */
+.datemenu .menu__i {
+  color: var(--text-dim);
+}
+.datemenu .menu__i:hover {
+  background: none;
+  color: var(--text);
+}
 </style>
