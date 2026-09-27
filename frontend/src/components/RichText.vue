@@ -16,7 +16,7 @@ let quill: Quill | null = null;
 // Set while the editor itself is the source of a change, so the watcher below does not reset the caret on every keystroke.
 let fromEditor = false;
 
-// Quill says when it has the caret and when it has lost it; :focus-within would keep the ring after a click that focuses nothing.
+// Quill says when it has the caret and when it has lost it: the box draws nothing for it, but a press outside still has to let the caret go.
 const focused = ref(false);
 // A file dragged over the text: Quill would try to paste it into the document, so it is caught here and handed to whoever owns the editor.
 const overWithFiles = ref(false);
@@ -159,7 +159,7 @@ function addLink(): void {
     <div
       ref="host"
       class="rt__editor"
-      :class="{ 'is-focus': focused, 'is-drop': overWithFiles }"
+      :class="{ 'is-drop': overWithFiles }"
       :style="{ minHeight: minHeight ?? '120px' }"
       @dragover="onDragOver"
       @dragleave="overWithFiles = false"
@@ -185,10 +185,6 @@ function addLink(): void {
   font: 13.5px/1.6 var(--font-ui);
   overflow-y: auto;
   max-height: 340px;
-}
-.rt__editor.is-focus {
-  border-color: var(--focus);
-  box-shadow: 0 0 0 1px var(--focus);
 }
 .rt__editor.is-drop {
   border-style: dashed;
