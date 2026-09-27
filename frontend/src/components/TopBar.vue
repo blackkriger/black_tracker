@@ -262,18 +262,19 @@ async function signOut(): Promise<void> {
                 rel="noopener noreferrer"
               ><img :src="soon.banner" :alt="soon.title" /></a>
               <div class="soon__line">
-                <a
-                  v-if="soon.url"
-                  class="soon__title"
-                  :href="soon.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >{{ soon.title }}</a>
-                <span v-else class="soon__title">{{ soon.title }}</span>
-              </div>
-              <div class="soon__line">
+                <span class="soon__text">
+                  <a
+                    v-if="soon.url"
+                    class="soon__title"
+                    :href="soon.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >{{ soon.title }}</a>
+                  <span v-else class="soon__title">{{ soon.title }}</span>
+                  <span class="stamp">{{ longDate(soon.day) }}</span>
+                </span>
+                <!-- A day that belongs to one project says which, against both lines. -->
                 <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
-                <span class="stamp">{{ longDate(soon.day) }}</span>
               </div>
             </div>
           </template>
@@ -433,8 +434,15 @@ async function signOut(): Promise<void> {
 .soon__line {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 0 10px;
+}
+.soon__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 .soon__title {
   overflow: hidden;
