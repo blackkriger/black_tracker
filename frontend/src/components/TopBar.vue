@@ -1,13 +1,12 @@
 <script setup lang="ts">
-// The bar every screen but sign-in carries: the projects side by side, each naming the board it would open, and who you are.
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+// The bar every screen but sign-in carries: the projects side by side with their boards beside them, and who you are.
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useProjects, type ProjectMini } from '../lib/projects';
+import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
 import { useNotices, type Notice } from '../lib/notices';
 import { useRoles } from '../lib/roles';
-import { lastBoard } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
 import MonthGrid from './MonthGrid.vue';
@@ -25,7 +24,7 @@ import {
   type Mark,
 } from '../lib/calendar';
 import { stamp } from '../lib/issues';
-import { ArrowRight, AtSign, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ArrowRight, AtSign, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const props = defineProps<{
   /** The project this screen belongs to, when it belongs to one. */
@@ -48,9 +47,6 @@ const hasRole = computed(() => session.me.value?.isAdmin === true || !!session.m
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const currentShort = computed(() => props.project?.shortName ?? null);
-
-// Which project's menu is open.
-const openShort = ref<string | null>(null);
 
 // Today, and the month behind it. The month is read the first time the chip is opened —
 // no screen needs it until then.
@@ -120,7 +116,6 @@ async function readNext(): Promise<void> {
 
 function toggleDate(): void {
   dateOpen.value = !dateOpen.value;
-  openShort.value = null;
   // Read again on every open: a day marked on the calendar screen is already old news here.
   if (dateOpen.value) void readMonth();
 }
@@ -143,35 +138,6 @@ async function toDay(key: string): Promise<void> {
   await router.push({ path: '/calendar', query: { day: key } });
 }
 
-// The board each project would open, read once from storage and kept in step as you move around, since localStorage itself is not reactive.
-const remembered = ref<Record<string, string>>({});
-watch(
-  live,
-  (rows) => {
-    const next: Record<string, string> = { ...remembered.value };
-    for (const p of rows) {
-      const slug = lastBoard.get(p.shortName);
-      if (slug) next[p.shortName] = slug;
-    }
-    remembered.value = next;
-  },
-  { immediate: true }
-);
-watch(
-  () => [currentShort.value, props.board?.slug] as const,
-  ([short, slug]) => {
-    if (short && slug) remembered.value = { ...remembered.value, [short]: slug };
-  },
-  { immediate: true }
-);
-
-// The screen knows better than storage which board it settled on, so it wins for the project you are on.
-function shownBoard(p: ProjectMini): { name: string; slug: string } | null {
-  if (p.shortName === currentShort.value && props.board) return props.board;
-  if (!p.boards.length) return null;
-  return p.boards.find((b) => b.slug === remembered.value[p.shortName]) ?? p.boards[0];
-}
-
 onMounted(() => {
   void load();
   void readNext();
@@ -185,13 +151,10 @@ onUnmounted(() => {
 });
 
 function closeMenu(): void {
-  openShort.value = null;
   dateOpen.value = false;
 }
 function onKeydown(ev: KeyboardEvent): void {
-  if (ev.key !== 'Escape') return;
-  openShort.value = null;
-  dateOpen.value = false;
+  if (ev.key === 'Escape') dateOpen.value = false;
 }
 
 // Someone added a project or a board while this bar was on screen.
@@ -206,13 +169,6 @@ useLive((ev) => {
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void readNotices();
 });
 
-async function pickBoard(short: string, slug: string): Promise<void> {
-  openShort.value = null;
-  lastBoard.set(short, slug);
-  remembered.value = { ...remembered.value, [short]: slug };
-  await router.push(`/${short}/${slug}`);
-}
-
 async function signOut(): Promise<void> {
   await session.signOut();
   await router.push({ name: 'login' });
@@ -222,7 +178,7 @@ async function signOut(): Promise<void> {
 <template>
   <header class="top">
     <nav v-if="live.length" class="topitems" aria-label="Projects">
-      <span v-for="p in live" :key="p.id" class="topproj" @click.stop>
+      <span v-for="p in live" :key="p.id" class="topproj">
         <RouterLink
           class="topitem topitem--project"
           :to="`/${p.shortName}`"
@@ -232,35 +188,13 @@ async function signOut(): Promise<void> {
           <span class="topitem__name">{{ p.name }}</span>
         </RouterLink>
 
-        <span v-if="p.boards.length > 1" class="boardpick">
-          <button
-            class="topitem topitem--caret"
-            type="button"
-            :aria-expanded="openShort === p.shortName"
-            :aria-label="`Boards of ${p.name}`"
-            @click="openShort = openShort === p.shortName ? null : p.shortName"
-          >
-            <span class="topitem__board">{{ shownBoard(p)?.name }}</span>
-            <ChevronDown class="ic ic--sm" />
-          </button>
-
-          <div v-if="openShort === p.shortName" class="menu boardmenu" role="menu">
-            <button
-              v-for="b in p.boards"
-              :key="b.id"
-              class="menu__i"
-              :class="{ 'is-cur': b.slug === shownBoard(p)?.slug }"
-              type="button"
-              role="menuitem"
-              @click="pickBoard(p.shortName, b.slug)"
-            >{{ b.name }}</button>
-          </div>
-        </span>
         <RouterLink
-          v-else-if="p.boards.length === 1"
-          class="topitem topitem--caret topitem__board"
-          :to="`/${p.shortName}/${p.boards[0].slug}`"
-        >{{ p.boards[0].name }}</RouterLink>
+          v-for="b in p.boards"
+          :key="b.id"
+          class="topitem topitem__board"
+          :class="{ 'is-here': p.shortName === currentShort && b.slug === board?.slug }"
+          :to="`/${p.shortName}/${b.slug}`"
+        >{{ b.name }}</RouterLink>
       </span>
     </nav>
 
@@ -410,43 +344,20 @@ async function signOut(): Promise<void> {
   display: inline-flex;
   align-items: center;
 }
+/* One project's boards must not run into the next project's key. */
+.topproj + .topproj {
+  margin-left: 10px;
+}
 .topitem--caret {
   gap: 6px;
   padding: 0 6px;
 }
 .topitem__board {
-  color: var(--text);
+  padding: 0 6px;
   font-size: 13px;
 }
-.topitem__caret {
-  font-size: 10px;
-}
-.boardpick {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.boardmenu {
-  position: absolute;
-  top: calc(100% + 7px);
-  left: 0;
-  z-index: 20;
-}
-/* The pointer above the menu, drawn twice: the border's triangle, then the surface's one pixel lower to cover the line under it. */
-.boardmenu::before,
-.boardmenu::after {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  left: 11px;
-  border: 6px solid transparent;
-}
-.boardmenu::before {
-  border-bottom-color: var(--line-2);
-}
-.boardmenu::after {
-  margin-bottom: -1px;
-  border-bottom-color: var(--card);
+.topitem__board.is-here {
+  color: var(--accent-bright);
 }
 .topitem--danger:hover {
   color: var(--danger-text);
