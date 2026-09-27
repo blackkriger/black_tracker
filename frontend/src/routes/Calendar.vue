@@ -301,23 +301,20 @@ function closeIssue(): void {
         <div class="stack">
           <section class="panel">
             <header class="panel__h">
-              Activity
-              <span class="panel__end">
-                <button
-                  class="btn btn--sm btn--icon btn--ghost kind"
-                  :class="{ 'is-off': off.includes('mention') }"
-                  type="button"
-                  aria-label="Mentions"
-                  @click="toggleKind('mention')"
-                ><AtSign class="ic" /></button>
-                <button
-                  class="btn btn--sm btn--icon btn--ghost kind"
-                  :class="{ 'is-off': off.includes('reaction') }"
-                  type="button"
-                  aria-label="Reactions"
-                  @click="toggleKind('reaction')"
-                ><Smile class="ic" /></button>
-              </span>
+              <button
+                class="btn btn--sm btn--icon btn--ghost kind"
+                :class="{ 'is-off': off.includes('mention') }"
+                type="button"
+                aria-label="Mentions"
+                @click="toggleKind('mention')"
+              ><AtSign class="ic" /></button>
+              <button
+                class="btn btn--sm btn--icon btn--ghost kind"
+                :class="{ 'is-off': off.includes('reaction') }"
+                type="button"
+                aria-label="Reactions"
+                @click="toggleKind('reaction')"
+              ><Smile class="ic" /></button>
             </header>
             <div class="panel__b days">
               <button
