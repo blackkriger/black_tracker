@@ -596,6 +596,8 @@ async function postComment(): Promise<void> {
       issue.value = { ...now, comments: [...now.comments, created] };
     }
     commentDraft.value = '';
+    // The record gained a line; the history tab is looking at the old one until it is read again.
+    await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not post the comment.';
   } finally {
@@ -624,6 +626,7 @@ async function saveComment(c: Comment): Promise<void> {
       ),
     };
     editingComment.value = null;
+    await reload();
   } catch (err) {
     // The editor stays open with the text still in it; closing it would throw the words away.
     error.value = err instanceof Error ? err.message : 'Could not save the comment.';
@@ -691,6 +694,7 @@ async function togglePin(c: Comment): Promise<void> {
         row.id === c.id ? { ...row, pinnedAt: updated.pinnedAt, pinnedBy: updated.pinnedBy } : row
       ),
     };
+    await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not pin the comment.';
   }
@@ -703,6 +707,7 @@ async function removeComment(c: Comment): Promise<void> {
     await api(`/comments/${c.id}`, { method: 'DELETE' });
     const now = issue.value ?? current;
     issue.value = { ...now, comments: now.comments.filter((row) => row.id !== c.id) };
+    await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not delete the comment.';
   }
@@ -751,6 +756,7 @@ async function upload(list: FileList | null): Promise<void> {
   uploading.value = true;
   try {
     await sendFiles(issue.value.id, chosen);
+    await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not upload the file.';
   } finally {
@@ -803,6 +809,21 @@ function pickCommentFiles(list: FileList | null): void {
   if (chosen.length) commentFiles.value = [...commentFiles.value, ...chosen];
 }
 
+// A comment being edited can be given more files; they belong to a comment that already exists, so they go straight up.
+async function addToComment(commentId: string, list: FileList | null): Promise<void> {
+  const chosen = accept(list);
+  if (!chosen.length || !issue.value) return;
+  uploading.value = true;
+  try {
+    await sendFiles(issue.value.id, chosen, commentId);
+    await reload();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Could not upload the file.';
+  } finally {
+    uploading.value = false;
+  }
+}
+
 async function removeAttachment(a: Attachment): Promise<void> {
   const current = issue.value;
   if (!current) return;
@@ -810,6 +831,7 @@ async function removeAttachment(a: Attachment): Promise<void> {
     await api(`/attachments/${a.id}`, { method: 'DELETE' });
     const now = issue.value ?? current;
     issue.value = { ...now, attachments: now.attachments.filter((row) => row.id !== a.id) };
+    await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not delete the file.';
   }
@@ -833,7 +855,13 @@ async function removeIssue(): Promise<void> {
     <div class="iv__scrim" @click.self="emit('close')">
       <section class="dlg iv__win" role="dialog" aria-modal="true">
         <header class="dlg__h">
-          <span class="key iv__key">{{ issueKey ?? 'NEW ISSUE' }}</span>
+          <span class="iv__path">
+            <span class="key iv__where">{{ project }}</span>
+            <span class="iv__sep">/</span>
+            <span class="iv__where">{{ board.name }}</span>
+            <span class="iv__sep">/</span>
+            <span class="key iv__key">{{ issueKey ?? 'NEW ISSUE' }}</span>
+          </span>
           <span v-if="state" class="iv__state" :style="{ color: state.color }">{{ state.name }}</span>
           <div class="sp"></div>
           <template v-if="creating">
@@ -988,6 +1016,16 @@ async function removeIssue(): Promise<void> {
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('files') }">
+              <div v-for="a in files" :key="a.id" class="att__cap att__row">
+                <a :href="`/api/attachments/${a.id}`" target="_blank">{{ a.filename }}</a>
+                <span class="stamp">{{ fileSize(a.size) }}</span>
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  :aria-label="`Delete ${a.filename}`"
+                  @click="removeAttachment(a)"
+                ><X class="ic ic--sm" /></button>
+              </div>
               <div v-if="images.length" class="atts">
                 <figure v-for="a in images" :key="a.id" class="att">
                   <button class="att__img" type="button" @click="shown = galleryIndex(a.id)">
@@ -1003,16 +1041,6 @@ async function removeIssue(): Promise<void> {
                     ><X class="ic ic--sm" /></button>
                   </figcaption>
                 </figure>
-              </div>
-              <div v-for="a in files" :key="a.id" class="att__cap att__row">
-                <a :href="`/api/attachments/${a.id}`" target="_blank">{{ a.filename }}</a>
-                <span class="stamp">{{ fileSize(a.size) }}</span>
-                <button
-                  class="btn btn--sm btn--icon btn--ghost"
-                  type="button"
-                  :aria-label="`Delete ${a.filename}`"
-                  @click="removeAttachment(a)"
-                ><X class="ic ic--sm" /></button>
               </div>
 
               <!-- Chosen, not yet uploaded: anything that takes the whole row is listed first, and the pictures pack themselves underneath. -->
@@ -1138,7 +1166,23 @@ async function removeIssue(): Promise<void> {
                     </span>
                   </div>
                   <template v-if="editingComment === c.id">
-                    <RichText v-model="commentEdit" min-height="90px" />
+                    <RichText
+                      v-model="commentEdit"
+                      min-height="90px"
+                      @files="(list) => addToComment(c.id, list)"
+                    >
+                      <template #tools>
+                        <label class="rt__clip" title="Attach files">
+                          <input
+                            type="file"
+                            multiple
+                            class="sr"
+                            @change="addToComment(c.id, ($event.target as HTMLInputElement).files)"
+                          />
+                          <Paperclip class="ic" />
+                        </label>
+                      </template>
+                    </RichText>
                     <div class="composer__row">
                       <div class="sp"></div>
                       <button class="btn btn--sm" type="button" @click="editingComment = null">Cancel</button>
@@ -1148,20 +1192,42 @@ async function removeIssue(): Promise<void> {
                   <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
 
                   <div v-if="filesOf(c.id).length" class="cm__files">
-                    <template v-for="a in filesOf(c.id)" :key="a.id">
+                    <span
+                      v-for="a in filesOf(c.id).filter((x) => !x.mime.startsWith('image/'))"
+                      :key="a.id"
+                      class="att__cap att__row"
+                    >
+                      <a :href="`/api/attachments/${a.id}`" target="_blank">{{ a.filename }}</a>
+                      <span class="stamp">{{ fileSize(a.size) }}</span>
                       <button
-                        v-if="a.mime.startsWith('image/')"
-                        class="cm__shot"
+                        v-if="editingComment === c.id"
+                        class="btn btn--sm btn--icon btn--ghost"
                         type="button"
-                        @click="shown = galleryIndex(a.id)"
+                        :aria-label="`Delete ${a.filename}`"
+                        @click="removeAttachment(a)"
+                      ><X class="ic ic--sm" /></button>
+                    </span>
+                    <div
+                      v-if="filesOf(c.id).some((a) => a.mime.startsWith('image/'))"
+                      class="cm__shots"
+                    >
+                      <span
+                        v-for="a in filesOf(c.id).filter((x) => x.mime.startsWith('image/'))"
+                        :key="a.id"
+                        class="cm__pic"
                       >
-                        <img :src="`/api/attachments/${a.id}`" :alt="a.filename" />
-                      </button>
-                      <span v-else class="att__cap att__row">
-                        <a :href="`/api/attachments/${a.id}`" target="_blank">{{ a.filename }}</a>
-                        <span class="stamp">{{ fileSize(a.size) }}</span>
+                        <button class="cm__shot" type="button" @click="shown = galleryIndex(a.id)">
+                          <img :src="`/api/attachments/${a.id}`" :alt="a.filename" />
+                        </button>
+                        <button
+                          v-if="editingComment === c.id"
+                          class="btn btn--sm btn--icon btn--ghost cm__pic-x"
+                          type="button"
+                          :aria-label="`Delete ${a.filename}`"
+                          @click="removeAttachment(a)"
+                        ><X class="ic ic--sm" /></button>
                       </span>
-                    </template>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -1174,6 +1240,7 @@ async function removeIssue(): Promise<void> {
                     v-model="commentDraft"
                     min-height="90px"
                     placeholder="Write a comment…"
+                    :disabled="posting"
                     @files="pickCommentFiles"
                   >
                     <template #tools>
@@ -1199,6 +1266,7 @@ async function removeIssue(): Promise<void> {
                       class="btn btn--sm btn--icon btn--ghost"
                       type="button"
                       :aria-label="`Remove ${f.name}`"
+                      :disabled="posting"
                       @click="dropPending(f, 'comment')"
                     ><X class="ic ic--sm" /></button>
                   </div>
@@ -1222,6 +1290,7 @@ async function removeIssue(): Promise<void> {
                           class="btn btn--sm btn--icon btn--ghost"
                           type="button"
                           :aria-label="`Remove ${f.name}`"
+                          :disabled="posting"
                           @click="dropPending(f, 'comment')"
                         ><X class="ic ic--sm" /></button>
                       </div>
@@ -1285,9 +1354,15 @@ async function removeIssue(): Promise<void> {
               <select
                 class="input input--sm"
                 :value="shownStateId"
+                :style="{ color: state?.color }"
                 @change="setProp({ stateId: ($event.target as HTMLSelectElement).value })"
               >
-                <option v-for="s in board.states" :key="s.id" :value="s.id">{{ s.name }}</option>
+                <option
+                  v-for="s in board.states"
+                  :key="s.id"
+                  :value="s.id"
+                  :style="{ color: s.color }"
+                >{{ s.name }}</option>
               </select>
             </div>
             <div class="prop" :class="{ 'is-fresh': fresh.has('priority') }">
@@ -1505,8 +1580,24 @@ async function removeIssue(): Promise<void> {
   color: var(--danger-text);
 }
 .iv__key,
-.iv__state {
+.iv__state,
+.iv__path {
   flex: 0 0 auto;
+}
+/* Where the issue lives, ahead of its key: the project, the board, then the card itself — one reading, so it keeps its own spacing rather than the header's. */
+.iv__path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.iv__where {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.iv__sep {
+  font-size: 13px;
+  color: var(--text-faint);
 }
 .iv__key {
   font-size: 13px;
@@ -1722,10 +1813,26 @@ async function removeIssue(): Promise<void> {
 }
 .cm__files {
   display: flex;
+  flex-direction: column;
+}
+/* The pictures keep to themselves under the rows, each at thumbnail size. */
+.cm__shots {
+  display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 8px;
   margin-top: 8px;
+}
+.cm__pic {
+  position: relative;
+  display: block;
+}
+/* Only while the comment is open for editing, and over the corner of the picture so the row keeps its shape. */
+.cm__pic-x {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: var(--card);
 }
 .cm__shot {
   display: block;
