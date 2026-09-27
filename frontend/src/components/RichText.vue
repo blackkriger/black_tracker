@@ -133,8 +133,15 @@ function lookForName(): void {
   }
   naming.value = { from: sel.index - found[1].length - 1, query: found[1] };
   chosen.value = 0;
+  // The bounds are the editor's own, the list is placed against the whole box: the
+  // toolbar stands between the two, and without it the pointer lands above the line.
   const box = quill.getBounds(sel.index);
-  if (box) at.value = { left: box.left, top: box.bottom + 4 };
+  if (box) {
+    at.value = {
+      left: box.left + (host.value?.offsetLeft ?? 0),
+      top: box.bottom + 6 + (host.value?.offsetTop ?? 0),
+    };
+  }
 }
 
 function pickName(login: string): void {
