@@ -214,6 +214,8 @@ const issueCreate = z.object({
 
 const issuePatch = z.object({
   summary: z.string().trim().min(1).max(300).optional(),
+  /** Another board of the same project. The key is the project's, so moving never changes it. */
+  boardId: z.string().uuid().optional(),
   description: z.string().max(20000).optional(),
   stateId: z.string().uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
@@ -516,15 +518,43 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     }
     const p = parsed.data;
 
+    // Where it is going, if it is going anywhere: a board of the same project, open to whoever is moving it, and with a column for the card to land in.
+    let landing: { boardId: string; stateId: string; name: string } | null = null;
+    if (p.boardId && p.boardId !== issue.board_id) {
+      const dest = await pool.query<{
+        id: string;
+        name: string;
+        project_id: string;
+        default_state_id: string | null;
+      }>('select id, name, project_id, default_state_id from boards where id = $1', [p.boardId]);
+      const to = dest.rows[0];
+      if (!to || to.project_id !== issue.project_id) {
+        return reply.code(400).send({ error: 'That board belongs to another project.' });
+      }
+      if (!(await mayOpenBoard(auth, to.id, to.project_id))) {
+        return reply.code(403).send({ error: 'That board is not open to you.' });
+      }
+      const first = await pool.query<{ id: string }>(
+        'select id from states where board_id = $1 order by position, name limit 1',
+        [to.id]
+      );
+      const stateId = to.default_state_id ?? first.rows[0]?.id;
+      if (!stateId) return reply.code(400).send({ error: 'That board has no statuses yet.' });
+      landing = { boardId: to.id, stateId, name: to.name };
+    }
+
+    // A status is a column of one board, so which board it has to belong to depends on whether this is a move.
+    const home = landing?.boardId ?? issue.board_id;
     if (p.stateId) {
       const state = await pool.query('select 1 from states where id = $1 and board_id = $2', [
         p.stateId,
-        issue.board_id,
+        home,
       ]);
       if (!state.rowCount) {
         return reply.code(400).send({ error: 'That status is on another board.' });
       }
     }
+    const nextState = landing ? (p.stateId ?? landing.stateId) : p.stateId;
 
     await inTransaction(async (client) => {
       if (p.summary !== undefined && p.summary !== issue.summary) {
@@ -555,10 +585,24 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           login(p.assigneeId ?? null)
         );
       }
-      if (p.stateId !== undefined && p.stateId !== issue.state_id) {
+      if (landing) {
+        const was = await client.query<{ name: string }>('select name from boards where id = $1', [
+          issue.board_id,
+        ]);
+        await writeHistory(
+          client,
+          id,
+          auth.userId,
+          'board',
+          was.rows[0]?.name ?? null,
+          landing.name
+        );
+        await client.query('update issues set board_id = $2 where id = $1', [id, landing.boardId]);
+      }
+      if (nextState !== undefined && nextState !== issue.state_id) {
         const names = await client.query<{ id: string; name: string; is_resolved: boolean }>(
           'select id, name, is_resolved from states where id = any($1::uuid[])',
-          [[issue.state_id, p.stateId]]
+          [[issue.state_id, nextState]]
         );
         const byId = (sid: string) => names.rows.find((r) => r.id === sid);
         await writeHistory(
@@ -567,17 +611,17 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           auth.userId,
           'status',
           byId(issue.state_id)?.name ?? null,
-          byId(p.stateId)?.name ?? null
+          byId(nextState)?.name ?? null
         );
         await client.query(
           `update issues set resolved_at = case when $2 then coalesce(resolved_at, now()) else null end
             where id = $1`,
-          [id, byId(p.stateId)?.is_resolved === true]
+          [id, byId(nextState)?.is_resolved === true]
         );
         // A card arriving in a column by the side door still lands at its head.
         const top = await client.query<{ pos: number }>(
           'select coalesce(min(position), 0) - 1 as pos from issues where board_id = $1 and state_id = $2',
-          [issue.board_id, p.stateId]
+          [home, nextState]
         );
         await client.query('update issues set position = $2 where id = $1', [
           id,
@@ -599,7 +643,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           id,
           p.summary ?? null,
           p.description ?? null,
-          p.stateId ?? null,
+          nextState ?? null,
           p.priority ?? null,
           p.assigneeId !== undefined,
           p.assigneeId ?? null,
@@ -643,7 +687,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const [tags, stars] = await Promise.all([tagsFor([id]), starredBy(auth.userId, [id])]);
     void publish({
       type: 'issue.updated',
-      boardId: issue.board_id,
+      boardId: home,
       projectId: issue.project_id,
       issueId: id,
       issueKey: issue.readable_id,
@@ -651,6 +695,19 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       by: auth.login,
       origin: tabOf(req),
     });
+    // The board it left has to hear about it too, or the card sits there until something else happens.
+    if (landing) {
+      void publish({
+        type: 'issue.moved',
+        boardId: issue.board_id,
+        projectId: issue.project_id,
+        issueId: id,
+        issueKey: issue.readable_id,
+        fields: ['board'],
+        by: auth.login,
+        origin: tabOf(req),
+      });
+    }
     return reply.send({ data: publicIssue(row as IssueRow, tags.get(id) ?? [], stars.has(id)) });
   });
 
