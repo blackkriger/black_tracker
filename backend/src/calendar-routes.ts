@@ -25,7 +25,7 @@ const markPatch = markBody.partial();
 
 interface MarkRow {
   id: string;
-  day: Date;
+  day: Date | string;
   title: string;
   short_name: string | null;
   project_name: string | null;
@@ -40,8 +40,9 @@ const publicMark = (r: MarkRow) => ({
   by: r.by_login,
 });
 
-/** A date column comes back as a Date at local midnight; only the day part is ever meant. */
-function iso(d: Date): string {
+/** A date column arrives as 'YYYY-MM-DD' already; a timestamp arrives as a Date. Both are wanted as the day alone. */
+function iso(d: Date | string): string {
+  if (typeof d === 'string') return d.slice(0, 10);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
     d.getDate()
   ).padStart(2, '0')}`;
@@ -83,7 +84,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
         id: string;
         readable_id: string;
         summary: string;
-        due_date: Date;
+        due_date: Date | string;
         short_name: string;
         slug: string;
         state_color: string;
@@ -104,7 +105,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
       // What a day of work looks like: the issues someone touched, opened, closed and
       // commented on. The history is the only record of who did what and when.
       pool.query<{
-        day: Date;
+        day: Date | string;
         login: string;
         worked: number;
         created: number;
