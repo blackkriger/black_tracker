@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjects, type ProjectMini } from '../lib/projects';
 import { usePeople } from '../lib/people';
+import { useFocus } from '../lib/focus';
 import { useNotices, type Notice } from '../lib/notices';
 import { useRoles } from '../lib/roles';
 import { lastBoard } from '../lib/lastProject';
@@ -97,10 +98,12 @@ const countdown = computed(() => {
 // Being named somewhere. The feed lives behind the same chip: what is waiting for you,
 // and which day it landed on, are the same question asked twice.
 const { shown: notices, unread, load: readNotices, markRead } = useNotices();
+const { ask } = useFocus();
 
 async function openNotice(n: Notice): Promise<void> {
   dateOpen.value = false;
   if (!n.read) await markRead(n.id);
+  ask(n.commentId);
   await router.push({
     path: `/${n.projectShort}/${n.boardSlug}/${n.key}`,
     query: n.commentId ? { c: n.commentId } : {},

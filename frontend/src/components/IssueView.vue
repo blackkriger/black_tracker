@@ -11,6 +11,7 @@ import { useLive } from '../lib/live';
 import FileWall from './FileWall.vue';
 import Select from './Select.vue';
 import { usePeople } from '../lib/people';
+import { useFocus } from '../lib/focus';
 import { useNotices } from '../lib/notices';
 import { useSession } from '../lib/session';
 import {
@@ -96,6 +97,7 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const { people, colorOf, colorOfId, load: loadPeople } = usePeople();
 const { load: readNotices } = useNotices();
+const { wanted, pending: askedFor } = useFocus();
 
 const tab = ref<'comments' | 'history'>('comments');
 const order = ref<CommentOrder>(commentOrder.get());
@@ -348,6 +350,10 @@ const fresh = ref<Set<string>>(new Set());
 const litComment = ref<string | null>(null);
 
 watch(() => props.focusComment, lookAtComment);
+// Asked for again while the window is already open: the same comment, a new asking.
+watch(wanted, (w) => {
+  if (w) void lookAtComment(w.comment);
+});
 
 /** Waits for the pictures in the window, which land after the text and push it about. */
 function settled(): Promise<void> {
@@ -377,7 +383,7 @@ async function lookAtComment(id?: string): Promise<void> {
   await nextTick();
   const el = document.getElementById(`comment-${id}`);
   if (!el) return;
-  el.scrollIntoView({ block: 'center' });
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   litComment.value = id;
   setTimeout(() => {
     if (litComment.value === id) litComment.value = null;
@@ -591,7 +597,7 @@ async function load(): Promise<void> {
     issue.value = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
     keptDraft = readDraft();
     if (keptDraft) commentDraft.value = keptDraft;
-    lookAtComment(props.focusComment);
+    void lookAtComment(askedFor() ?? props.focusComment);
   } catch (err) {
     issue.value = null;
     error.value = err instanceof Error ? err.message : 'Could not load the issue.';

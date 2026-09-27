@@ -24,6 +24,7 @@ import {
 import type { IssueTag } from '../lib/issues';
 import { stampAt } from '../lib/issues';
 import { usePeople } from '../lib/people';
+import { useFocus } from '../lib/focus';
 import { dayOf, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
@@ -35,6 +36,7 @@ const session = useSession();
 const { people, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
+const { ask } = useFocus();
 const {
   shown: notices,
   off,
@@ -210,6 +212,7 @@ async function openNotice(n: Notice): Promise<void> {
     ?.boards.find((b) => b.slug === n.boardSlug);
   if (!board) return;
   lookAt.value = n.commentId ?? undefined;
+  ask(n.commentId);
   await openIssue({
     key: n.key,
     summary: '',
