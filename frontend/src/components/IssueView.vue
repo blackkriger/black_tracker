@@ -842,6 +842,23 @@ async function removeLink(link: IssueLink): Promise<void> {
 // A nod at what somebody wrote. Clicking one that is already yours takes it back.
 const reacting = ref<string | null>(null);
 const reactNear = ref(true);
+// Held over the whole page rather than inside the comment: the list of comments scrolls,
+// and anything hanging out of it would be cut off at the edge.
+const reactAt = ref({ x: 0, y: 0 });
+const reactingOn = computed(
+  () => issue.value?.comments.find((c) => c.id === reacting.value) ?? null
+);
+
+function openReactions(c: Comment, ev: MouseEvent): void {
+  if (reacting.value === c.id) {
+    reacting.value = null;
+    return;
+  }
+  const box = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+  reactAt.value = { x: box.left + box.width / 2, y: box.top };
+  reactNear.value = true;
+  reacting.value = c.id;
+}
 
 interface Nod {
   emoji: string;
@@ -1340,28 +1357,12 @@ async function removeIssue(): Promise<void> {
                         >{{ r.emoji }}<span class="react__n">{{ r.n }}</span></button>
                         <span class="selbar react__who">{{ r.who }}</span>
                       </span>
-                      <span class="react__hold">
                         <button
-                          class="btn btn--sm btn--icon btn--ghost"
+                          class="btn btn--sm btn--icon btn--ghost react__hold"
                           type="button"
                           aria-label="React"
-                          @click="reacting = reacting === c.id ? null : c.id; reactNear = true"
+                          @click="openReactions(c, $event)"
                         ><SmilePlus class="ic ic--sm" /></button>
-                        <div
-                          v-if="reacting === c.id"
-                          id="react-set"
-                          class="menu react__menu"
-                          :class="{ 'is-far': !reactNear }"
-                        >
-                          <button
-                            v-for="e in REACTIONS"
-                            :key="e"
-                            class="react"
-                            type="button"
-                            @click="react(c, e)"
-                          >{{ e }}</button>
-                        </div>
-                        </span>
                       </span>
                       <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
                         {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
@@ -1696,6 +1697,22 @@ async function removeIssue(): Promise<void> {
       </Dialog>
 
       <div
+        v-if="reactingOn"
+        id="react-set"
+        class="selbar react__menu"
+        :class="{ 'is-far': !reactNear }"
+        :style="{ left: `${reactAt.x}px`, top: `${reactAt.y}px` }"
+      >
+        <button
+          v-for="e in REACTIONS"
+          :key="e"
+          class="react"
+          type="button"
+          @click="react(reactingOn, e)"
+        >{{ e }}</button>
+      </div>
+
+      <div
         v-if="popup"
         id="sel-bar"
         class="selbar"
@@ -1982,40 +1999,9 @@ async function removeIssue(): Promise<void> {
 .react__n {
   font: 11px var(--font-num);
 }
-.react__hold {
-  position: relative;
-  display: inline-flex;
-}
 .react__menu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  z-index: 30;
-  display: flex;
   gap: 4px;
-  min-width: 0;
   padding: 4px;
-}
-.react__menu::before,
-.react__menu::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 11px;
-  border: 6px solid transparent;
-}
-.react__menu::before {
-  border-top-color: var(--line-2);
-}
-.react__menu::after {
-  margin-top: -1px;
-  border-top-color: var(--card);
-}
-.react__menu .react {
-  border-color: transparent;
-}
-.react__menu.is-far {
-  opacity: 0.25;
 }
 /* Said once, quietly, and gone: it is a reassurance, not a state. */
 .composer__kept {
