@@ -9,6 +9,10 @@ import { requireAuth, requireDeleter, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor, mayOpenProject } from './board-service.js';
 import { projectByShort } from './project-routes.js';
 
+// The team's day, not the server's: Berlin midnight would put an hour of the evening's
+// work on the day before. Nothing else here is a moment in time — the rest are dates.
+const ZONE = 'Europe/Moscow';
+
 const range = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -120,29 +124,29 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
           order by i.due_date, i.readable_id`,
         [from, to, denied.projects, denied.boards]
       ),
-      // What a day of work looks like: the issues someone touched, opened, closed and
-      // commented on. The history is the only record of who did what and when.
+      // What a day of work looks like: the issues someone touched, opened and closed.
+      // The history is the only record of who did what and when, and time is not tracked
+      // here — an issue somebody touched at all is an issue they worked on.
       pool.query<{
         day: Date | string;
         login: string;
         worked: number;
         created: number;
         resolved: number;
-        comments: number;
       }>(
-        `select h.created_at::date as day,
+        `select (h.created_at at time zone '${ZONE}')::date as day,
                 u.login,
                 count(distinct h.issue_id)::int as worked,
                 count(distinct h.issue_id) filter (where h.field = 'created')::int as created,
                 count(distinct h.issue_id) filter (
-                  where h.field = 'status' and i.resolved_at::date = h.created_at::date
-                )::int as resolved,
-                count(*) filter (where h.field = 'comment added')::int as comments
+                  where h.field = 'status'
+                    and (i.resolved_at at time zone '${ZONE}')::date
+                      = (h.created_at at time zone '${ZONE}')::date
+                )::int as resolved
            from issue_history h
            join issues i on i.id = h.issue_id
            join users u on u.id = h.user_id
-          where h.created_at >= $1::date
-            and h.created_at < ($2::date + 1)
+          where (h.created_at at time zone '${ZONE}')::date between $1::date and $2::date
             and ($3::text is null or u.login = $3)
             and i.project_id <> all($4::uuid[])
             and i.board_id <> all($5::uuid[])
@@ -189,7 +193,6 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
           worked: a.worked,
           created: a.created,
           resolved: a.resolved,
-          comments: a.comments,
         })),
       },
     });
@@ -207,7 +210,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
          from key_dates k
          left join projects p on p.id = k.project_id
          left join users u on u.id = k.created_by
-        where k.day >= current_date
+        where k.day >= (now() at time zone '${ZONE}')::date
           and (k.project_id is null or k.project_id <> all($1::uuid[]))
         order by k.day, lower(k.title)
         limit 1`,

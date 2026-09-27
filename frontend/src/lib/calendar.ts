@@ -34,7 +34,6 @@ export interface Activity {
   worked: number;
   created: number;
   resolved: number;
-  comments: number;
 }
 
 export interface DayInfo {
@@ -43,7 +42,6 @@ export interface DayInfo {
   worked: number;
   created: number;
   resolved: number;
-  comments: number;
 }
 
 export const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -99,7 +97,7 @@ export function monthRange(year: number, month: number): { from: string; to: str
 }
 
 export function emptyDay(): DayInfo {
-  return { marks: [], dues: [], worked: 0, created: 0, resolved: 0, comments: 0 };
+  return { marks: [], dues: [], worked: 0, created: 0, resolved: 0 };
 }
 
 /** Everything the server said about a stretch of days, gathered per day. */
@@ -121,7 +119,6 @@ export function byDay(
     day.worked += a.worked;
     day.created += a.created;
     day.resolved += a.resolved;
-    day.comments += a.comments;
   }
   return map;
 }

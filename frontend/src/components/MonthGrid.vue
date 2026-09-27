@@ -95,7 +95,7 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       </span>
       <span v-if="hovered.worked" class="cal__pop-work">
         {{ hovered.worked }} worked, {{ hovered.created }} opened,
-        {{ hovered.resolved }} closed, {{ hovered.comments }} said
+        {{ hovered.resolved }} closed
       </span>
       <span
         v-if="!hovered.marks.length && !hovered.dues.length && !hovered.worked"
