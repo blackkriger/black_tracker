@@ -114,7 +114,7 @@ const TOPICS: [RegExp, string][] = [
   [/^\/users/, 'user'],
   [/^\/invites/, 'invite'],
   [/^\/key-dates/, 'key-date'],
-  [/^\/mentions/, 'mention'],
+  [/^\/notices/, 'notice'],
 ];
 
 // These say enough about themselves already.

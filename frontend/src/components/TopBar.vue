@@ -4,7 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjects, type ProjectMini } from '../lib/projects';
 import { usePeople } from '../lib/people';
-import { useMentions, type Mention } from '../lib/mentionFeed';
+import { useNotices, type Notice } from '../lib/notices';
 import { useRoles } from '../lib/roles';
 import { lastBoard } from '../lib/lastProject';
 import { useLive } from '../lib/live';
@@ -96,12 +96,12 @@ const countdown = computed(() => {
 
 // Being named somewhere. The feed lives behind the same chip: what is waiting for you,
 // and which day it landed on, are the same question asked twice.
-const { mentions, unread, load: readMentions, markRead } = useMentions();
+const { shown: notices, unread, load: readNotices, markRead } = useNotices();
 
-async function openMention(m: Mention): Promise<void> {
+async function openNotice(n: Notice): Promise<void> {
   dateOpen.value = false;
-  if (!m.read) await markRead(m.commentId);
-  await router.push(`/${m.projectShort}/${m.boardSlug}/${m.key}`);
+  if (!n.read) await markRead(n.id);
+  await router.push(`/${n.projectShort}/${n.boardSlug}/${n.key}`);
 }
 
 async function readNext(): Promise<void> {
@@ -169,7 +169,7 @@ function shownBoard(p: ProjectMini): { name: string; slug: string } | null {
 onMounted(() => {
   void load();
   void readNext();
-  void readMentions();
+  void readNotices();
   window.addEventListener('click', closeMenu);
   window.addEventListener('keydown', onKeydown);
 });
@@ -197,7 +197,7 @@ useLive((ev) => {
     void loadPeople(true);
     void loadRoles(true);
   }
-  if (ev.type.startsWith('comment.') || ev.type.startsWith('mention.')) void readMentions();
+  if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void readNotices();
 });
 
 async function pickBoard(short: string, slug: string): Promise<void> {
@@ -330,18 +330,19 @@ async function signOut(): Promise<void> {
               </div>
             </div>
           </template>
-          <template v-if="mentions.length">
+          <template v-if="notices.length">
             <hr />
             <button
-              v-for="m in mentions.slice(0, 5)"
-              :key="m.commentId"
+              v-for="n in notices.slice(0, 5)"
+              :key="n.id"
               class="menu__i men"
-              :class="{ 'men--new': !m.read }"
+              :class="{ 'men--new': !n.read }"
               type="button"
-              @click="openMention(m)"
+              @click="openNotice(n)"
             >
-              <span class="key">{{ m.key }}</span>
-              <span class="men__said">{{ m.by }}: {{ m.said }}</span>
+              <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
+              <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
+              <span class="men__said">{{ n.by }}: {{ n.said }}</span>
             </button>
           </template>
           <hr />
@@ -445,6 +446,9 @@ async function signOut(): Promise<void> {
   align-items: center;
   gap: 2px;
   color: var(--text);
+}
+.men__emoji {
+  font-size: 12px;
 }
 /* Who said it and what, cut where the menu ends. */
 .men__said {

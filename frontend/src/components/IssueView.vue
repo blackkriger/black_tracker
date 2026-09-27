@@ -11,13 +11,25 @@ import { useLive } from '../lib/live';
 import FileWall from './FileWall.vue';
 import Select from './Select.vue';
 import { usePeople } from '../lib/people';
-import { useMentions } from '../lib/mentionFeed';
+import { useNotices } from '../lib/notices';
 import { useSession } from '../lib/session';
-import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Star, Trash2, X } from 'lucide-vue-next';
+import {
+  ArrowDown,
+  ArrowUp,
+  Link2,
+  Paperclip,
+  Pencil,
+  Pin,
+  SmilePlus,
+  Star,
+  Trash2,
+  X,
+} from 'lucide-vue-next';
 import {
   PRIORITIES,
   dueLabel,
   MAX_FILE_BYTES,
+  REACTIONS,
   commentOrder,
   fileSize,
   priorityColor,
@@ -79,7 +91,7 @@ const issue = ref<IssueFull | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const { people, colorOf, colorOfId, load: loadPeople } = usePeople();
-const { load: readMentions } = useMentions();
+const { load: readNotices } = useNotices();
 
 const tab = ref<'comments' | 'history'>('comments');
 const order = ref<CommentOrder>(commentOrder.get());
@@ -694,7 +706,7 @@ async function postComment(): Promise<void> {
     keptDraft = '';
     writeDraft('');
     // A name in what was just posted is waiting for somebody, this tab's own reader included.
-    void readMentions();
+    void readNotices();
     // The record gained a line; the history tab is looking at the old one until it is read again.
     await reload();
   } catch (err) {
@@ -725,7 +737,7 @@ async function saveComment(c: Comment): Promise<void> {
       ),
     };
     editingComment.value = null;
-    void readMentions();
+    void readNotices();
     await reload();
   } catch (err) {
     // The editor stays open with the text still in it; closing it would throw the words away.
@@ -778,6 +790,33 @@ async function removeLink(link: IssueLink): Promise<void> {
   }
 }
 
+// A nod at what somebody wrote. Clicking one that is already yours takes it back.
+const reacting = ref<string | null>(null);
+
+function reactionsOf(c: Comment): { emoji: string; n: number; mine: boolean }[] {
+  const me = session.me.value?.login;
+  const byEmoji = new Map<string, { emoji: string; n: number; mine: boolean }>();
+  for (const r of c.reactions ?? []) {
+    const found = byEmoji.get(r.emoji) ?? { emoji: r.emoji, n: 0, mine: false };
+    found.n += 1;
+    if (r.by === me) found.mine = true;
+    byEmoji.set(r.emoji, found);
+  }
+  return [...byEmoji.values()];
+}
+
+async function react(c: Comment, emoji: string): Promise<void> {
+  reacting.value = null;
+  error.value = null;
+  try {
+    await api(`/comments/${c.id}/reactions`, { method: 'PUT', body: { emoji } });
+    void readNotices();
+    await reload();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Could not react.';
+  }
+}
+
 async function togglePin(c: Comment): Promise<void> {
   const current = issue.value;
   if (!current) return;
@@ -807,7 +846,7 @@ async function removeComment(c: Comment): Promise<void> {
     await api(`/comments/${c.id}`, { method: 'DELETE' });
     const now = issue.value ?? current;
     issue.value = { ...now, comments: now.comments.filter((row) => row.id !== c.id) };
-    void readMentions();
+    void readNotices();
     await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not delete the comment.';
@@ -1275,6 +1314,34 @@ async function removeIssue(): Promise<void> {
                     </div>
                   </template>
                   <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
+
+                  <div class="cm__react">
+                    <button
+                      v-for="r in reactionsOf(c)"
+                      :key="r.emoji"
+                      class="react"
+                      :class="{ 'is-mine': r.mine }"
+                      type="button"
+                      @click="react(c, r.emoji)"
+                    >{{ r.emoji }}<span class="react__n">{{ r.n }}</span></button>
+                    <span class="react__hold">
+                      <button
+                        class="btn btn--sm btn--icon btn--ghost"
+                        type="button"
+                        aria-label="React"
+                        @click="reacting = reacting === c.id ? null : c.id"
+                      ><SmilePlus class="ic ic--sm" /></button>
+                      <div v-if="reacting === c.id" class="menu react__menu">
+                        <button
+                          v-for="e in REACTIONS"
+                          :key="e"
+                          class="react"
+                          type="button"
+                          @click="react(c, e)"
+                        >{{ e }}</button>
+                      </div>
+                    </span>
+                  </div>
 
                   <div v-if="filesOf(c.id).length" class="cm__files">
                     <span
@@ -1801,6 +1868,52 @@ async function removeIssue(): Promise<void> {
 .cm__files {
   display: flex;
   flex-direction: column;
+}
+/* A row of nods under what was said, and the way to add one. */
+.cm__react {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.react {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+}
+.react:hover {
+  border-color: var(--line-2);
+}
+.react.is-mine {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.react__n {
+  font: 11px var(--font-num);
+}
+.react__hold {
+  position: relative;
+  display: inline-flex;
+}
+.react__menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+}
+.react__menu .react {
+  border-color: transparent;
 }
 /* Said once, quietly, and gone: it is a reassurance, not a state. */
 .composer__kept {

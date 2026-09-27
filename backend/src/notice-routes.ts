@@ -1,5 +1,6 @@
-// Being named in a comment. `@login` in the text is the whole mechanism: the names are
-// read out of what was written, matched against real accounts, and kept until the person
+// What a person is told about: being named in a comment, and someone reacting to one they
+// wrote. `@login` in the text is the whole of the first mechanism — the names are read out
+// of what was written, matched against real accounts and roles, and kept until the person
 // they belong to has looked at them.
 
 import type { FastifyInstance } from 'fastify';
@@ -67,82 +68,97 @@ export async function syncMentions(
   }
 
   const all = [...ids];
-  await client.query('delete from mentions where comment_id = $1 and user_id <> all($2::uuid[])', [
-    commentId,
-    all,
-  ]);
+  await client.query(
+    `delete from notices
+      where kind = 'mention' and comment_id = $1 and user_id <> all($2::uuid[])`,
+    [commentId, all]
+  );
   if (all.length) {
     await client.query(
-      `insert into mentions (comment_id, user_id)
-       select $1, u from unnest($2::uuid[]) as u
+      `insert into notices (user_id, kind, comment_id, by_id)
+       select u, 'mention', $1, $2 from unnest($3::uuid[]) as u
        on conflict do nothing`,
-      [commentId, all]
+      [commentId, authorId, all]
     );
   }
 }
 
-export function registerMentionRoutes(app: FastifyInstance): void {
+interface NoticeRow {
+  id: string;
+  kind: string;
+  detail: string | null;
+  comment_id: string | null;
+  text: string | null;
+  created_at: Date;
+  read_at: Date | null;
+  by_login: string | null;
+  readable_id: string | null;
+  short_name: string | null;
+  slug: string | null;
+  state_color: string | null;
+}
+
+export function registerNoticeRoutes(app: FastifyInstance): void {
   // What is waiting for me, newest first: the unread ones matter, the read ones are context.
-  app.get('/mentions', async (req, reply) => {
+  app.get('/notices', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
     if (denied.everything) return reply.send({ data: [] });
 
-    const res = await pool.query<{
-      comment_id: string;
-      text: string;
-      created_at: Date;
-      read_at: Date | null;
-      by_login: string;
-      readable_id: string;
-      short_name: string;
-      slug: string;
-    }>(
-      `select m.comment_id, c.text, m.created_at, m.read_at, u.login as by_login,
-              i.readable_id, p.short_name, b.slug
-         from mentions m
-         join issue_comments c on c.id = m.comment_id
-         join users u on u.id = c.author_id
+    const res = await pool.query<NoticeRow>(
+      `select n.id, n.kind, n.detail, n.comment_id, c.text, n.created_at, n.read_at,
+              u.login as by_login, i.readable_id, p.short_name, b.slug, st.color as state_color
+         from notices n
+         join issue_comments c on c.id = n.comment_id
+         left join users u on u.id = n.by_id
          join issues i on i.id = c.issue_id
          join projects p on p.id = i.project_id
          join boards b on b.id = i.board_id
-        where m.user_id = $1
+         join states st on st.id = i.state_id
+        where n.user_id = $1
           and i.project_id <> all($2::uuid[])
           and i.board_id <> all($3::uuid[])
-        order by m.read_at is not null, m.created_at desc
-        limit 20`,
+        order by n.read_at is not null, n.created_at desc
+        limit 40`,
       [auth.userId, [...denied.projects], [...denied.boards]]
     );
 
-    return reply.send({
-      data: res.rows.map((r) => ({
-        commentId: r.comment_id,
-        said: plain(r.text).slice(0, 140),
-        by: r.by_login,
-        key: r.readable_id,
-        projectShort: r.short_name,
-        boardSlug: r.slug,
-        at: r.created_at.toISOString(),
-        read: r.read_at !== null,
-      })),
-    });
+    return reply.send({ data: res.rows.map((r) => publicNotice(r, auth.login)) });
   });
 
   // Seen: one of them, or all of them at once.
-  app.post('/mentions/read', async (req, reply) => {
+  app.post('/notices/read', async (req, reply) => {
     const session = await requireSession(req, reply);
     if (!session) return;
-    const parsed = z
-      .object({ commentId: z.string().uuid().optional() })
-      .safeParse(req.body ?? {});
-    if (!parsed.success) return reply.code(400).send({ error: 'Bad mention.' });
+    const parsed = z.object({ id: z.string().uuid().optional() }).safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: 'Bad notice.' });
     await pool.query(
-      `update mentions set read_at = now()
-        where user_id = $1 and read_at is null
-          and ($2::uuid is null or comment_id = $2)`,
-      [session.userId, parsed.data.commentId ?? null]
+      `update notices set read_at = now()
+        where user_id = $1 and read_at is null and ($2::uuid is null or id = $2)`,
+      [session.userId, parsed.data.id ?? null]
     );
     return reply.send({ data: { ok: true } });
   });
+}
+
+function publicNotice(r: NoticeRow, mine: string) {
+  // The name that is being answered is the reader's own, so it says nothing they do not know.
+  const said = plain(r.text ?? '')
+    .replace(new RegExp(`(^|\\s)@${escape(mine)}(?![a-zA-Z0-9_.-])`, 'gi'), '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return {
+    id: r.id,
+    kind: r.kind,
+    emoji: r.detail,
+    said: said.slice(0, 140),
+    by: r.by_login,
+    key: r.readable_id,
+    color: r.state_color,
+    projectShort: r.short_name,
+    boardSlug: r.slug,
+    at: r.created_at.toISOString(),
+    read: r.read_at !== null,
+  };
 }

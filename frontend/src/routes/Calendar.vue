@@ -3,7 +3,7 @@
 // how much work went through each day — for the whole team or for one person.
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
+import { AtSign, ChevronLeft, ChevronRight, Smile, X } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import MonthGrid from '../components/MonthGrid.vue';
@@ -22,7 +22,9 @@ import {
   type Mark,
 } from '../lib/calendar';
 import type { IssueTag } from '../lib/issues';
+import { stampAt } from '../lib/issues';
 import { usePeople } from '../lib/people';
+import { dayOf, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
@@ -33,6 +35,13 @@ const session = useSession();
 const { people, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
+const {
+  shown: notices,
+  off,
+  load: loadNotices,
+  markRead,
+  toggleKind,
+} = useNotices();
 
 const now = new Date();
 const year = ref(now.getFullYear());
@@ -93,6 +102,7 @@ function fromAddress(): void {
 onMounted(() => {
   void loadPeople();
   void loadProjects();
+  void loadNotices();
   void load();
   fromAddress();
 });
@@ -108,6 +118,7 @@ useLive((ev) => {
   ) {
     void load();
   }
+  if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadNotices();
 });
 
 function step(by: number): void {
@@ -124,6 +135,9 @@ const banner = ref('');
 const adding = ref(false);
 const busy = ref(false);
 const pickedDay = computed(() => (picked.value ? days.value.get(picked.value) : null));
+const dayNotices = computed(() =>
+  picked.value ? notices.value.filter((n) => dayOf(n) === picked.value) : []
+);
 
 function openDay(key: string): void {
   picked.value = key;
@@ -185,6 +199,24 @@ const openTags = ref<IssueTag[]>([]);
 const openBoards = computed(
   () => projects.value.find((p) => p.shortName === open.value?.project)?.boards ?? []
 );
+
+// A notice points at an issue by its board's slug; the window wants the board itself.
+async function openNotice(n: Notice): Promise<void> {
+  if (!n.read) await markRead(n.id);
+  const board = projects.value
+    .find((p) => p.shortName === n.projectShort)
+    ?.boards.find((b) => b.slug === n.boardSlug);
+  if (!board) return;
+  await openIssue({
+    key: n.key,
+    summary: '',
+    projectShort: n.projectShort,
+    boardId: board.id,
+    boardSlug: n.boardSlug,
+    color: '',
+    done: false,
+  });
+}
 
 async function openIssue(d: Due): Promise<void> {
   clear('day');
@@ -259,6 +291,49 @@ function closeIssue(): void {
           </section>
           <div v-if="errors.month" class="err panel__err sheet__wide">{{ errors.month }}</div>
 
+        <div class="stack">
+          <section class="panel">
+            <header class="panel__h">
+              Activity
+              <span class="panel__end">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost kind"
+                  :class="{ 'is-off': off.includes('mention') }"
+                  type="button"
+                  aria-label="Mentions"
+                  @click="toggleKind('mention')"
+                ><AtSign class="ic" /></button>
+                <button
+                  class="btn btn--sm btn--icon btn--ghost kind"
+                  :class="{ 'is-off': off.includes('reaction') }"
+                  type="button"
+                  aria-label="Reactions"
+                  @click="toggleKind('reaction')"
+                ><Smile class="ic" /></button>
+              </span>
+            </header>
+            <div class="panel__b days">
+              <button
+                v-for="n in notices"
+                :key="n.id"
+                class="day note"
+                :class="{ 'is-new': !n.read }"
+                type="button"
+                @click="openNotice(n)"
+              >
+                <span class="stamp">{{ stampAt(n.at) }}</span>
+                <span class="day__what">
+                  <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
+                  <span v-if="n.emoji">{{ n.emoji }}</span>
+                  <span class="note__said">{{ n.by }}: {{ n.said }}</span>
+                </span>
+              </button>
+              <div v-if="!notices.length" class="empty empty--sm">
+                <span class="empty__g">◇</span>Nothing for you yet.
+              </div>
+            </div>
+          </section>
+
           <section class="panel">
             <header class="panel__h">Marked days</header>
             <div class="panel__b days">
@@ -285,10 +360,25 @@ function closeIssue(): void {
               </template>
             </div>
           </section>
+        </div>
       </div>
     </div>
 
     <Dialog v-if="picked" :title="longDate(picked)" :width="460" @close="picked = null">
+      <div v-if="dayNotices.length" class="marks">
+        <button
+          v-for="n in dayNotices"
+          :key="n.id"
+          class="mark mark--due"
+          type="button"
+          @click="openNotice(n)"
+        >
+          <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
+          <span v-if="n.emoji">{{ n.emoji }}</span>
+          <span class="mark__title">{{ n.by }}: {{ n.said }}</span>
+        </button>
+      </div>
+
       <div v-if="pickedDay?.marks.length" class="marks">
         <div v-for="m in pickedDay.marks" :key="m.id" class="mark mark--kept">
           <a
@@ -442,6 +532,20 @@ function closeIssue(): void {
 .day__what {
   display: flex;
   gap: 8px;
+  min-width: 0;
+}
+/* A line of the feed: who said what, cut where the column ends. */
+.note__said {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.note.is-new {
+  color: var(--text);
+}
+/* A kind switched off is still there, just not listened to. */
+.kind.is-off {
+  opacity: 0.35;
 }
 .day:hover {
   background: var(--card-hover);

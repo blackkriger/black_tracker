@@ -42,10 +42,14 @@ export interface Issue {
   tags: IssueTag[];
 }
 
+/** The reactions a comment may carry, in the order they are offered. The server keeps the same list. */
+export const REACTIONS = ['\u{1F44D}', '\u{1F389}', '\u{2764}\u{FE0F}', '\u{1F604}', '\u{1F440}', '\u{1F680}'];
+
 export interface Comment {
   id: string;
   text: string;
   author: Person;
+  reactions: { emoji: string; by: string }[];
   createdAt: string;
   editedAt: string | null;
   /** Pinned comments sit at the head of the thread. */

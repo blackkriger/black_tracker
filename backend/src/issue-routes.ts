@@ -11,7 +11,7 @@ import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { deniedFor, mayOpenBoard } from './board-service.js';
-import { syncMentions } from './mention-routes.js';
+import { syncMentions } from './notice-routes.js';
 import { publish, tabOf } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
@@ -212,6 +212,9 @@ const issueCreate = z.object({
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
+
+/** The reactions a comment may carry, in the order they are offered. */
+export const REACTIONS = ['\u{1F44D}', '\u{1F389}', '\u{2764}\u{FE0F}', '\u{1F604}', '\u{1F440}', '\u{1F680}'] as const;
 
 const issuePatch = z.object({
   summary: z.string().trim().min(1).max(300).optional(),
@@ -450,7 +453,15 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       tagsFor([issue.id]),
       pool.query(
         `select c.id, c.text, c.created_at, c.edited_at, c.author_id, c.pinned_at,
-                u.login as author_login, p.login as pinned_by_login
+                u.login as author_login, p.login as pinned_by_login,
+                coalesce(
+                  (select json_agg(json_build_object('emoji', r.emoji, 'by', ru.login)
+                                   order by r.created_at)
+                     from comment_reactions r
+                     join users ru on ru.id = r.user_id
+                    where r.comment_id = c.id),
+                  '[]'::json
+                ) as reactions
            from issue_comments c
            join users u on u.id = c.author_id
            left join users p on p.id = c.pinned_by
@@ -485,6 +496,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           editedAt: c.edited_at?.toISOString() ?? null,
           pinnedAt: c.pinned_at?.toISOString() ?? null,
           pinnedBy: c.pinned_by_login,
+          reactions: c.reactions as { emoji: string; by: string }[],
         })),
         history: history.rows.map((h) => ({
           id: h.id,
@@ -938,6 +950,67 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         pinnedBy: null,
       },
     });
+  });
+
+  // A short, fixed set: a reaction is a nod, not a conversation.
+  app.put('/comments/:id/reactions', async (req, reply) => {
+    const session = await requireSession(req, reply);
+    if (!session) return;
+    const { id } = req.params as { id: string };
+    const parsed = z.object({ emoji: z.enum(REACTIONS) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Not one of the reactions.' });
+    const owner = await pool.query<{ author_id: string; issue_id: string }>(
+      'select author_id, issue_id from issue_comments where id = $1',
+      [id]
+    );
+    if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
+    const { author_id: authorId, issue_id: issueId } = owner.rows[0];
+    if (!(await mayReachIssue(session, issueId))) {
+      return reply.code(403).send({ error: 'This issue is not open to you.' });
+    }
+
+    const emoji = parsed.data.emoji;
+    const on = await inTransaction(async (client) => {
+      const gone = await client.query(
+        'delete from comment_reactions where comment_id = $1 and user_id = $2 and emoji = $3',
+        [id, session.userId, emoji]
+      );
+      if (gone.rowCount) {
+        await client.query(
+          `delete from notices
+            where kind = 'reaction' and comment_id = $1 and by_id = $2 and detail = $3`,
+          [id, session.userId, emoji]
+        );
+        return false;
+      }
+      await client.query(
+        'insert into comment_reactions (comment_id, user_id, emoji) values ($1, $2, $3)',
+        [id, session.userId, emoji]
+      );
+      // Whoever wrote it is told, unless they are the one nodding at their own words.
+      if (authorId !== session.userId) {
+        await client.query(
+          `insert into notices (user_id, kind, comment_id, by_id, detail)
+           values ($1, 'reaction', $2, $3, $4)
+           on conflict do nothing`,
+          [authorId, id, session.userId, emoji]
+        );
+      }
+      return true;
+    });
+
+    const host = await issueById(issueId);
+    void publish({
+      type: 'comment.reacted',
+      boardId: host?.board_id,
+      projectId: host?.project_id,
+      issueId,
+      issueKey: host?.readable_id,
+      commentId: id,
+      by: session.login,
+      origin: tabOf(req),
+    });
+    return reply.send({ data: { on } });
   });
 
   // Pinning says "read this one first". It changes nobody's words, so it is not the author's alone — anyone who can open the issue can pin and unpin.
