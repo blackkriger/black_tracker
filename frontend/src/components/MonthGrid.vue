@@ -3,7 +3,16 @@
 // marked on it, what is due on it, and how much work went through it — the shading. The
 // same grid hangs in the top bar and fills the calendar screen.
 import { computed, ref } from 'vue';
-import { WEEKDAYS, emptyDay, longDate, monthGrid, type Cell, type DayInfo } from '../lib/calendar';
+import { Bell } from 'lucide-vue-next';
+import {
+  WEEKDAYS,
+  emptyDay,
+  longDate,
+  monthGrid,
+  todayKey,
+  type Cell,
+  type DayInfo,
+} from '../lib/calendar';
 
 const props = defineProps<{
   year: number;
@@ -26,6 +35,13 @@ function heat(key?: string): number {
   return Math.min(5, Math.ceil((worked / props.peak) * 5));
 }
 
+// A deadline colours the day itself; one that has gone by with work still open turns it red.
+function dueTone(key?: string): string {
+  const dues = key ? info(key).dues : [];
+  if (!dues.length) return '';
+  return key! < todayKey() && dues.some((d) => !d.done) ? 'is-late' : 'has-due';
+}
+
 const hover = ref<{ key: string; x: number; y: number } | null>(null);
 const hovered = computed(() => (hover.value ? info(hover.value.key) : null));
 
@@ -43,21 +59,24 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       v-for="(c, i) in cells"
       :key="i"
       class="cal__day"
-      :class="{
-        'is-blank': !c.day,
-        'is-weekend': c.weekend,
-        'is-today': c.today,
-        [`heat-${heat(c.key)}`]: heat(c.key) > 0,
-      }"
+      :class="[
+        dueTone(c.key),
+        {
+          'is-blank': !c.day,
+          'is-weekend': c.weekend,
+          'is-today': c.today,
+          [`heat-${heat(c.key)}`]: heat(c.key) > 0,
+        },
+      ]"
       type="button"
       :disabled="!c.day"
       @click="c.key && emit('pick', c.key)"
       @mouseenter="onEnter($event, c)"
       @mouseleave="hover = null"
     >
-      <span v-if="c.day">{{ c.day }}</span>
-      <span v-if="info(c.key).marks.length" class="cal__mark"></span>
-      <span v-if="info(c.key).dues.length" class="cal__due"></span>
+      <!-- A day somebody marked says so in place of its number; the number is in the popup. -->
+      <Bell v-if="c.day && info(c.key).marks.length" class="ic ic--sm cal__bell" />
+      <span v-else-if="c.day">{{ c.day }}</span>
     </button>
 
     <div
@@ -129,29 +148,34 @@ function onEnter(ev: MouseEvent, c: Cell): void {
   border-color: var(--accent);
   color: var(--accent);
 }
+/* Last word on the colour of a day: what is due on it. */
+.cal__day.has-due,
+.cal__day.has-due.is-weekend,
+.cal__day.has-due.is-today {
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+.cal__day.is-late,
+.cal__day.is-late.is-weekend,
+.cal__day.is-late.is-today {
+  color: var(--danger-text);
+  font-weight: 600;
+}
+.cal__bell {
+  color: var(--accent);
+}
+.cal__day.has-due .cal__bell {
+  color: var(--accent-bright);
+}
+.cal__day.is-late .cal__bell {
+  color: var(--danger-text);
+}
 /* The day's work, in five steps of the accent. */
 .cal__day.heat-1 { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .cal__day.heat-2 { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .cal__day.heat-3 { background: color-mix(in srgb, var(--accent) 32%, transparent); }
 .cal__day.heat-4 { background: color-mix(in srgb, var(--accent) 46%, transparent); }
 .cal__day.heat-5 { background: color-mix(in srgb, var(--accent) 62%, transparent); }
-/* A marked day wears a bar along its top; a deadline is the dot in the corner. */
-.cal__mark {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
-}
-.cal__due {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  width: 4px;
-  height: 4px;
-  background: var(--danger-text);
-}
 .cal__pop {
   flex-direction: column;
   gap: 3px;

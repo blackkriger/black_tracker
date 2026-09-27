@@ -11,6 +11,9 @@ export interface Mark {
   id: string;
   day: string;
   title: string;
+  /** The event's page, and the picture that links to it. */
+  url: string | null;
+  banner: string | null;
   project: { shortName: string; name: string } | null;
   by: string | null;
 }

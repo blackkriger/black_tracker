@@ -14,11 +14,23 @@ const range = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
+// Only http and https ever reach an href of ours: anything else is a way to run script.
+const address = z
+  .string()
+  .trim()
+  .max(500)
+  .regex(/^https?:\/\//i, 'A link starts with http:// or https://')
+  .nullable()
+  .optional();
+
 const markBody = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   title: z.string().trim().min(1).max(120),
   /** A project's key, or absent for a day that belongs to the whole workshop. */
   project: z.string().trim().max(20).nullable().optional(),
+  /** The event's own page, and the picture it shows itself with. */
+  url: address,
+  banner: address,
 });
 
 const markPatch = markBody.partial();
@@ -27,6 +39,8 @@ interface MarkRow {
   id: string;
   day: Date | string;
   title: string;
+  url: string | null;
+  banner: string | null;
   short_name: string | null;
   project_name: string | null;
   by_login: string | null;
@@ -36,6 +50,8 @@ const publicMark = (r: MarkRow) => ({
   id: r.id,
   day: iso(r.day),
   title: r.title,
+  url: r.url,
+  banner: r.banner,
   project: r.short_name ? { shortName: r.short_name, name: r.project_name ?? '' } : null,
   by: r.by_login,
 });
@@ -71,7 +87,8 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
 
     const [marks, dues, activity] = await Promise.all([
       pool.query<MarkRow>(
-        `select k.id, k.day, k.title, p.short_name, p.name as project_name, u.login as by_login
+        `select k.id, k.day, k.title, k.url, k.banner,
+                p.short_name, p.name as project_name, u.login as by_login
            from key_dates k
            left join projects p on p.id = k.project_id
            left join users u on u.id = k.created_by
@@ -188,9 +205,16 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
     const projectId = await scopeOf(auth, reply, parsed.data.project);
     if (projectId === undefined) return;
     const res = await pool.query<{ id: string }>(
-      `insert into key_dates (project_id, day, title, created_by)
-       values ($1, $2, $3, $4) returning id`,
-      [projectId, parsed.data.day, parsed.data.title, auth.userId]
+      `insert into key_dates (project_id, day, title, url, banner, created_by)
+       values ($1, $2, $3, $4, $5, $6) returning id`,
+      [
+        projectId,
+        parsed.data.day,
+        parsed.data.title,
+        parsed.data.url ?? null,
+        parsed.data.banner ?? null,
+        auth.userId,
+      ]
     );
     return reply.code(201).send({ data: await markById(res.rows[0].id) });
   });
@@ -220,9 +244,21 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
       `update key_dates
           set day = coalesce($2, day),
               title = coalesce($3, title),
-              project_id = case when $4 then $5::uuid else project_id end
+              project_id = case when $4 then $5::uuid else project_id end,
+              url = case when $6 then $7 else url end,
+              banner = case when $8 then $9 else banner end
         where id = $1`,
-      [id, parsed.data.day ?? null, parsed.data.title ?? null, projectId !== undefined, projectId ?? null]
+      [
+        id,
+        parsed.data.day ?? null,
+        parsed.data.title ?? null,
+        projectId !== undefined,
+        projectId ?? null,
+        parsed.data.url !== undefined,
+        parsed.data.url ?? null,
+        parsed.data.banner !== undefined,
+        parsed.data.banner ?? null,
+      ]
     );
     return reply.send({ data: await markById(id) });
   });
@@ -246,7 +282,8 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
 
 async function markById(id: string) {
   const res = await pool.query<MarkRow>(
-    `select k.id, k.day, k.title, p.short_name, p.name as project_name, u.login as by_login
+    `select k.id, k.day, k.title, k.url, k.banner,
+            p.short_name, p.name as project_name, u.login as by_login
        from key_dates k
        left join projects p on p.id = k.project_id
        left join users u on u.id = k.created_by

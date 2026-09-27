@@ -94,6 +94,8 @@ function step(by: number): void {
 const picked = ref<string | null>(null);
 const title = ref('');
 const scope = ref('');
+const url = ref('');
+const banner = ref('');
 const busy = ref(false);
 const pickedDay = computed(() => (picked.value ? days.value.get(picked.value) : null));
 
@@ -101,6 +103,8 @@ function openDay(key: string): void {
   picked.value = key;
   title.value = '';
   scope.value = '';
+  url.value = '';
+  banner.value = '';
   clear('day');
 }
 
@@ -112,9 +116,17 @@ async function addMark(): Promise<void> {
   try {
     await api('/key-dates', {
       method: 'POST',
-      body: { day: picked.value, title: text, project: scope.value || null },
+      body: {
+        day: picked.value,
+        title: text,
+        project: scope.value || null,
+        url: url.value.trim() || null,
+        banner: banner.value.trim() || null,
+      },
     });
     title.value = '';
+    url.value = '';
+    banner.value = '';
     await load();
   } catch (err) {
     fail('day', err);
@@ -248,16 +260,32 @@ function closeIssue(): void {
 
     <Dialog v-if="picked" :title="longDate(picked)" :width="460" @close="picked = null">
       <div v-if="pickedDay?.marks.length" class="marks">
-        <div v-for="m in pickedDay.marks" :key="m.id" class="mark">
-          <span v-if="m.project" class="key">{{ m.project.shortName }}</span>
-          <span class="mark__title">{{ m.title }}</span>
-          <button
-            class="btn btn--sm btn--icon btn--ghost"
-            type="button"
-            :disabled="!session.canDelete.value"
-            :aria-label="`Delete ${m.title}`"
-            @click="removeMark(m)"
-          ><X class="ic ic--sm" /></button>
+        <div v-for="m in pickedDay.marks" :key="m.id" class="mark mark--kept">
+          <a
+            v-if="m.banner"
+            class="mark__banner"
+            :href="m.url ?? m.banner"
+            target="_blank"
+            rel="noopener noreferrer"
+          ><img :src="m.banner" :alt="m.title" /></a>
+          <div class="mark__line">
+            <span v-if="m.project" class="key">{{ m.project.shortName }}</span>
+            <a
+              v-if="m.url"
+              class="mark__title"
+              :href="m.url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >{{ m.title }}</a>
+            <span v-else class="mark__title">{{ m.title }}</span>
+            <button
+              class="btn btn--sm btn--icon btn--ghost"
+              type="button"
+              :disabled="!session.canDelete.value"
+              :aria-label="`Delete ${m.title}`"
+              @click="removeMark(m)"
+            ><X class="ic ic--sm" /></button>
+          </div>
         </div>
       </div>
 
@@ -274,15 +302,32 @@ function closeIssue(): void {
         </button>
       </div>
 
-      <div class="addrow">
+      <div class="field">
+        <label class="label" for="mark-title">Title</label>
         <input
+          id="mark-title"
           v-model="title"
           class="input"
-          placeholder="Mark this day…"
           maxlength="120"
           @keydown.enter.prevent="addMark"
         />
-        <Select v-model="scope" class="scope" :options="projectChoices" />
+      </div>
+      <div class="field">
+        <label class="label" for="mark-url">Link</label>
+        <input id="mark-url" v-model="url" class="input" maxlength="500" placeholder="https://" />
+      </div>
+      <div class="field">
+        <label class="label" for="mark-banner">Banner</label>
+        <input
+          id="mark-banner"
+          v-model="banner"
+          class="input"
+          maxlength="500"
+          placeholder="https://"
+        />
+      </div>
+      <div class="addrow">
+        <Select v-model="scope" :options="projectChoices" />
         <button class="btn" type="button" :disabled="busy || !title.trim()" @click="addMark">
           Add
         </button>
@@ -375,6 +420,37 @@ function closeIssue(): void {
   font-size: 13px;
   text-align: left;
 }
+/* A marked day can carry the event's picture, and the picture is the way to it. */
+.mark--kept {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+.mark__banner {
+  display: block;
+  border-bottom: 1px solid var(--line);
+}
+.mark__banner img {
+  display: block;
+  width: 100%;
+  max-height: 150px;
+  object-fit: cover;
+}
+.mark__line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 4px 0 8px;
+}
+a.mark__title {
+  color: var(--accent);
+  text-decoration: none;
+}
+a.mark__title:hover {
+  color: var(--accent-bright);
+}
 .mark--due {
   cursor: pointer;
 }
@@ -387,7 +463,5 @@ function closeIssue(): void {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.scope {
-  flex: 0 0 150px;
-}
+
 </style>
