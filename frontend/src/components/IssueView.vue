@@ -1031,8 +1031,9 @@ async function removeIssue(): Promise<void> {
                   <button class="att__img" type="button" @click="shown = galleryIndex(a.id)">
                     <img :src="`/api/attachments/${a.id}`" :alt="a.filename" class="att__pic" />
                   </button>
-                  <figcaption class="att__cap">
-                    <span>{{ a.filename }}</span>
+                  <figcaption class="att__cap att__cap--grid">
+                    <span class="att__name">{{ a.filename }}</span>
+                    <span class="stamp">{{ fileSize(a.size) }}</span>
                     <button
                       class="btn btn--sm btn--icon btn--ghost"
                       type="button"
@@ -1081,7 +1082,7 @@ async function removeIssue(): Promise<void> {
               </div>
               <label
                 class="drop"
-                :class="{ 'drop--idle': !dragOver }"
+                :class="{ 'drop--idle': !dragOver, 'is-off': uploading }"
                 @dragover.prevent="dragOver = true"
                 @dragleave="dragOver = false"
                 @drop.prevent="upload(($event as DragEvent).dataTransfer?.files ?? null)"
@@ -1090,6 +1091,7 @@ async function removeIssue(): Promise<void> {
                   type="file"
                   multiple
                   class="sr"
+                  :disabled="uploading"
                   @change="upload(($event.target as HTMLInputElement).files)"
                 />
                 {{ uploading ? 'Uploading…' : 'Drop files here, or click to choose' }}
@@ -1141,7 +1143,10 @@ async function removeIssue(): Promise<void> {
                   <div class="cm__head">
                     <span class="cm__who">{{ c.author.login }}</span>
                     <time class="stamp">{{ stampAt(c.createdAt) }}</time>
-                    <span v-if="c.editedAt" class="cm__edited">edited</span>
+                    <span v-if="c.editedAt" class="cm__edited">
+                      edited
+                      <span class="selbar cm__when">{{ stampAt(c.editedAt) }}</span>
+                    </span>
                     <Pin
                       v-if="c.pinnedAt"
                       class="ic ic--sm cm__pin"
@@ -1168,6 +1173,7 @@ async function removeIssue(): Promise<void> {
                   <template v-if="editingComment === c.id">
                     <RichText
                       v-model="commentEdit"
+                      class="cm__edit"
                       min-height="90px"
                       @files="(list) => addToComment(c.id, list)"
                     >
@@ -1177,6 +1183,7 @@ async function removeIssue(): Promise<void> {
                             type="file"
                             multiple
                             class="sr"
+                            :disabled="uploading"
                             @change="addToComment(c.id, ($event.target as HTMLInputElement).files)"
                           />
                           <Paperclip class="ic" />
@@ -1209,24 +1216,28 @@ async function removeIssue(): Promise<void> {
                     </span>
                     <div
                       v-if="filesOf(c.id).some((a) => a.mime.startsWith('image/'))"
-                      class="cm__shots"
+                      class="atts"
                     >
-                      <span
+                      <figure
                         v-for="a in filesOf(c.id).filter((x) => x.mime.startsWith('image/'))"
                         :key="a.id"
-                        class="cm__pic"
+                        class="att"
                       >
-                        <button class="cm__shot" type="button" @click="shown = galleryIndex(a.id)">
-                          <img :src="`/api/attachments/${a.id}`" :alt="a.filename" />
+                        <button class="att__img" type="button" @click="shown = galleryIndex(a.id)">
+                          <img :src="`/api/attachments/${a.id}`" :alt="a.filename" class="att__pic" />
                         </button>
-                        <button
-                          v-if="editingComment === c.id"
-                          class="btn btn--sm btn--icon btn--ghost cm__pic-x"
-                          type="button"
-                          :aria-label="`Delete ${a.filename}`"
-                          @click="removeAttachment(a)"
-                        ><X class="ic ic--sm" /></button>
-                      </span>
+                        <figcaption class="att__cap att__cap--grid">
+                          <span class="att__name">{{ a.filename }}</span>
+                          <span class="stamp">{{ fileSize(a.size) }}</span>
+                          <button
+                            v-if="editingComment === c.id"
+                            class="btn btn--sm btn--icon btn--ghost"
+                            type="button"
+                            :aria-label="`Delete ${a.filename}`"
+                            @click="removeAttachment(a)"
+                          ><X class="ic ic--sm" /></button>
+                        </figcaption>
+                      </figure>
                     </div>
                   </div>
                 </div>
@@ -1373,7 +1384,12 @@ async function removeIssue(): Promise<void> {
                 :style="{ color: priorityColor(shownPriority) }"
                 @change="setProp({ priority: ($event.target as HTMLSelectElement).value as Priority })"
               >
-                <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
+                <option
+                  v-for="p in PRIORITIES"
+                  :key="p"
+                  :value="p"
+                  :style="{ color: priorityColor(p) }"
+                >{{ p }}</option>
               </select>
             </div>
             <div class="prop" :class="{ 'is-fresh': fresh.has('assignee') }">
@@ -1720,11 +1736,12 @@ async function removeIssue(): Promise<void> {
   border: 0;
   background: none;
   cursor: zoom-in;
-  width: 100%;
 }
 .att__pic {
-  width: 100%;
-  height: 100%;
+  display: block;
+  width: auto;
+  height: 120px;
+  max-width: 320px;
   object-fit: cover;
 }
 .att__row {
@@ -1815,24 +1832,32 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-direction: column;
 }
-/* The pictures keep to themselves under the rows, each at thumbnail size. */
-.cm__shots {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px;
+/* Open for editing, the box stands off the name and the time above it. */
+.cm__edit {
   margin-top: 8px;
 }
-.cm__pic {
+/* The same box the selection puts up, held over the word until the pointer leaves it. */
+.cm__edited {
   position: relative;
+}
+.cm__when {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  display: none;
+  padding: 5px 10px;
+  transform: translate(-50%, -8px);
+  color: var(--text-dim);
+  font: 12px var(--font-num);
+  white-space: nowrap;
+}
+.cm__edited:hover .cm__when {
   display: block;
 }
-/* Only while the comment is open for editing, and over the corner of the picture so the row keeps its shape. */
-.cm__pic-x {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  background: var(--card);
+/* Nothing answers while a file is on its way up, so the same one cannot be sent twice. */
+.drop.is-off {
+  pointer-events: none;
+  opacity: 0.6;
 }
 .cm__shot {
   display: block;

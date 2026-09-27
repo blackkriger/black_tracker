@@ -368,13 +368,18 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .hr { height: 1px; background: var(--line); margin: 8px 0; }
 
 /* attachments */
-.atts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.att { position: relative; display: flex; flex-direction: column; border: 1px solid var(--line); background: var(--bg); }
+/* One height for every block, each as wide as the picture in it: the row wraps with no holes to pack, and a name has room to be read. */
+.atts { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 8px; }
+.att { position: relative; display: flex; flex-direction: column; width: min-content; min-width: 150px; max-width: 100%; border: 1px solid var(--line); background: var(--bg); }
 .att:hover, .att.is-hover { border-color: var(--line-2); }
-.att__img { display: block; position: relative; aspect-ratio: 16 / 10; overflow: hidden; }
+.att__img { display: flex; justify-content: center; position: relative; height: 120px; overflow: hidden; }
 .att__badge { position: absolute; top: 6px; left: 6px; font: 10px/1 var(--font-num); color: var(--on-accent); background: var(--text); padding: 1px 4px 0; }
 .att__cap { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 8px; font-size: 12px; color: var(--text-dim); }
 .att__cap span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Under a picture the whole name is worth more than one tidy line, so it wraps and the size follows it. */
+.att__cap--grid { height: auto; min-height: 28px; padding: 5px 4px 5px 8px; }
+.att__cap--grid .att__name { flex: 0 1 auto; overflow: visible; white-space: normal; overflow-wrap: anywhere; color: var(--text); }
+.att__cap--grid .stamp { flex: 0 0 auto; margin-right: auto; }
 .att__acts { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; }
 .att__acts .btn { background: rgba(15, 15, 18, .9); }
 .att__bar { height: 3px; background: var(--line); }
