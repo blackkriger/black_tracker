@@ -195,6 +195,27 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
     });
   });
 
+  // The next day worth knowing about, for the chip in the top bar.
+  app.get('/calendar/next', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const denied = await shutOut(auth);
+    if (denied.all) return reply.send({ data: null });
+    const res = await pool.query<MarkRow>(
+      `select k.id, k.day, k.title, k.url, k.banner,
+              p.short_name, p.name as project_name, u.login as by_login
+         from key_dates k
+         left join projects p on p.id = k.project_id
+         left join users u on u.id = k.created_by
+        where k.day >= current_date
+          and (k.project_id is null or k.project_id <> all($1::uuid[]))
+        order by k.day, lower(k.title)
+        limit 1`,
+      [denied.projects]
+    );
+    return reply.send({ data: res.rowCount ? publicMark(res.rows[0]) : null });
+  });
+
   app.post('/key-dates', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;

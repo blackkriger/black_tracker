@@ -12,6 +12,7 @@ import {
   byDay,
   monthName,
   monthRange,
+  todayKey,
   type Activity,
   type DayInfo,
   type Due,
@@ -65,6 +66,30 @@ async function readMonth(): Promise<void> {
   }
 }
 
+// How far off the next marked day is, read once and kept in step with the live channel.
+const soon = ref<Mark | null>(null);
+const daysOff = computed(() => {
+  if (!soon.value) return null;
+  const at = Date.parse(`${soon.value.day}T00:00:00Z`);
+  const now = Date.parse(`${todayKey()}T00:00:00Z`);
+  return Math.round((at - now) / 86400000);
+});
+const countdown = computed(() => {
+  const left = daysOff.value;
+  if (left === null || left < 0) return '';
+  if (left === 0) return 'TODAY';
+  if (left === 1) return 'TOMORROW';
+  return `${left} DAYS`;
+});
+
+async function readNext(): Promise<void> {
+  try {
+    soon.value = await api<Mark | null>('/calendar/next');
+  } catch {
+    /* the chip simply shows the date alone */
+  }
+}
+
 function toggleDate(): void {
   dateOpen.value = !dateOpen.value;
   openShort.value = null;
@@ -114,6 +139,7 @@ function shownBoard(p: ProjectMini): { name: string; slug: string } | null {
 
 onMounted(() => {
   void load();
+  void readNext();
   window.addEventListener('click', closeMenu);
   window.addEventListener('keydown', onKeydown);
 });
@@ -135,6 +161,7 @@ function onKeydown(ev: KeyboardEvent): void {
 // Someone added a project or a board while this bar was on screen.
 useLive((ev) => {
   if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
+  if (ev.type === 'key-date.changed') void readNext();
 });
 
 async function pickBoard(short: string, slug: string): Promise<void> {
@@ -206,6 +233,7 @@ async function signOut(): Promise<void> {
           aria-label="Calendar"
           @click="toggleDate"
         >
+          <span v-if="countdown" class="stamp topcount">{{ countdown }}</span>
           <span class="stamp">{{ today }}</span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
@@ -315,6 +343,10 @@ async function signOut(): Promise<void> {
   position: relative;
   display: inline-flex;
   align-items: center;
+}
+/* What the countdown counts to is in the menu under it; here it is only how far off it is. */
+.topcount {
+  color: var(--accent);
 }
 .datemenu {
   position: absolute;
