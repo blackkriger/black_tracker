@@ -351,9 +351,10 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .md code { font: 12.5px var(--font-mono); padding: 1px 5px; background: var(--bg); border: 1px solid var(--line); }
 .md a { color: var(--focus); }
 .itabs { display: flex; border-bottom: 1px solid var(--line); }
-.itab { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-dim); font-size: 13px; cursor: pointer; }
+.itab { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 0; background: none; color: var(--text-dim); font-size: 13px; cursor: pointer; }
 .itab:hover { color: var(--text); }
-.itab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+/* The tab you are on says so in gold, like everything else that is current here: no bar under it. */
+.itab[aria-selected="true"] { color: var(--accent); }
 .itab .n { font: 12px/1 var(--font-num); color: var(--text-muted); }
 .props { display: flex; flex-direction: column; padding: 14px 16px; gap: 2px; }
 .prop { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; }
