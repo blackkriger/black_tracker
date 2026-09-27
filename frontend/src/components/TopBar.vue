@@ -25,7 +25,7 @@ import {
   type Mark,
 } from '../lib/calendar';
 import { stamp } from '../lib/issues';
-import { AtSign, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ArrowRight, AtSign, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const props = defineProps<{
   /** The project this screen belongs to, when it belongs to one. */
@@ -360,7 +360,7 @@ async function signOut(): Promise<void> {
           <hr />
           <button class="menu__i" type="button" @click="toCalendar">
             Full calendar
-            <ChevronRight class="ic ic--sm menu__to" />
+            <ArrowRight class="ic ic--sm" />
           </button>
         </div>
       </span>
@@ -558,11 +558,6 @@ async function signOut(): Promise<void> {
 }
 a.soon__title:hover {
   color: var(--accent-bright);
-}
-/* It leads somewhere, and says so at the end of the line. */
-.menu__to {
-  margin-left: auto;
-  color: var(--text-muted);
 }
 /* The one line under the month reads like the bar above it: the text brightens, nothing fills. */
 .datemenu .menu__i {
