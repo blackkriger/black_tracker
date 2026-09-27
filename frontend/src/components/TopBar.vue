@@ -239,27 +239,6 @@ async function signOut(): Promise<void> {
           <span class="stamp">{{ today }}</span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
-          <!-- What the countdown counts to, shown before the month it sits in. -->
-          <div v-if="soon" class="soon">
-            <a
-              v-if="soon.banner"
-              class="soon__banner"
-              :href="soon.url ?? soon.banner"
-              target="_blank"
-              rel="noopener noreferrer"
-            ><img :src="soon.banner" :alt="soon.title" /></a>
-            <div class="soon__line">
-              <a
-                v-if="soon.url"
-                class="soon__title"
-                :href="soon.url"
-                target="_blank"
-                rel="noopener noreferrer"
-              >{{ soon.title }}</a>
-              <span v-else class="soon__title">{{ soon.title }}</span>
-            </div>
-          </div>
-          <hr v-if="soon" />
           <div class="datemenu__h">{{ monthName(calYear, calMonth) }}</div>
           <div class="datemenu__grid">
             <MonthGrid
@@ -271,10 +250,33 @@ async function signOut(): Promise<void> {
               @pick="toDay"
             />
           </div>
-          <div v-if="soon" class="soon__line soon__when">
-            <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
-            <span class="stamp">{{ longDate(soon.day) }}</span>
-          </div>
+          <!-- What the countdown counts to, under the month it falls in. -->
+          <template v-if="soon">
+            <hr />
+            <div class="soon">
+              <a
+                v-if="soon.banner"
+                class="soon__banner"
+                :href="soon.url ?? soon.banner"
+                target="_blank"
+                rel="noopener noreferrer"
+              ><img :src="soon.banner" :alt="soon.title" /></a>
+              <div class="soon__line">
+                <a
+                  v-if="soon.url"
+                  class="soon__title"
+                  :href="soon.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >{{ soon.title }}</a>
+                <span v-else class="soon__title">{{ soon.title }}</span>
+              </div>
+              <div class="soon__line">
+                <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
+                <span class="stamp">{{ longDate(soon.day) }}</span>
+              </div>
+            </div>
+          </template>
           <hr />
           <button class="menu__i" type="button" @click="toCalendar">Full calendar</button>
         </div>
@@ -414,7 +416,7 @@ async function signOut(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 0 0 6px;
+  padding: 2px 0 6px;
 }
 .soon__banner {
   display: block;
@@ -430,10 +432,6 @@ async function signOut(): Promise<void> {
   align-items: center;
   gap: 8px;
   padding: 0 10px;
-}
-/* When the event is, kept under the month rather than beside its name. */
-.soon__when {
-  padding-bottom: 6px;
 }
 .soon__title {
   overflow: hidden;
