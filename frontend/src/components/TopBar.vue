@@ -49,7 +49,6 @@ const calYear = ref(now.getFullYear());
 const calMonth = ref(now.getMonth());
 const calDays = ref(new Map<string, DayInfo>());
 const calPeak = ref(1);
-let calRead = false;
 
 async function readMonth(): Promise<void> {
   const { from, to } = monthRange(calYear.value, calMonth.value);
@@ -69,10 +68,8 @@ async function readMonth(): Promise<void> {
 function toggleDate(): void {
   dateOpen.value = !dateOpen.value;
   openShort.value = null;
-  if (dateOpen.value && !calRead) {
-    calRead = true;
-    void readMonth();
-  }
+  // Read again on every open: a day marked on the calendar screen is already old news here.
+  if (dateOpen.value) void readMonth();
 }
 
 async function toCalendar(): Promise<void> {
