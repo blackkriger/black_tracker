@@ -165,6 +165,10 @@ function paintNames(): void {
   painting = false;
 }
 
+// The lists arrive after the page does, and a draft put back before they land would stay
+// colourless: the names are only recognisable once there is something to recognise them by.
+watch([people, roles], () => paintNames());
+
 function pickName(login: string): void {
   if (!quill || !naming.value) return;
   const { from, query } = naming.value;
