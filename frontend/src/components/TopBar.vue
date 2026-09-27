@@ -258,10 +258,6 @@ async function signOut(): Promise<void> {
               >{{ soon.title }}</a>
               <span v-else class="soon__title">{{ soon.title }}</span>
             </div>
-            <div class="soon__line">
-              <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
-              <span class="stamp">{{ longDate(soon.day) }}</span>
-            </div>
           </div>
           <hr v-if="soon" />
           <div class="datemenu__h">{{ monthName(calYear, calMonth) }}</div>
@@ -274,6 +270,10 @@ async function signOut(): Promise<void> {
               compact
               @pick="toDay"
             />
+          </div>
+          <div v-if="soon" class="soon__line soon__when">
+            <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
+            <span class="stamp">{{ longDate(soon.day) }}</span>
           </div>
           <hr />
           <button class="menu__i" type="button" @click="toCalendar">Full calendar</button>
@@ -430,6 +430,10 @@ async function signOut(): Promise<void> {
   align-items: center;
   gap: 8px;
   padding: 0 10px;
+}
+/* When the event is, kept under the month rather than beside its name. */
+.soon__when {
+  padding-bottom: 6px;
 }
 .soon__title {
   overflow: hidden;
