@@ -1329,7 +1329,8 @@ async function removeIssue(): Promise<void> {
                       class="ic ic--sm cm__pin"
                       :aria-label="c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned'"
                     />
-                    <span class="cm__react">
+                    <span class="cm__acts">
+                      <span class="cm__react">
                       <span v-for="r in reactionsOf(c)" :key="r.emoji" class="react__one">
                         <button
                           class="react"
@@ -1360,9 +1361,8 @@ async function removeIssue(): Promise<void> {
                             @click="react(c, e)"
                           >{{ e }}</button>
                         </div>
+                        </span>
                       </span>
-                    </span>
-                    <span class="cm__acts">
                       <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
                         {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
                       </button>
@@ -1939,7 +1939,7 @@ async function removeIssue(): Promise<void> {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-left: 6px;
+  margin-right: 4px;
 }
 .react {
   display: inline-flex;
@@ -1966,6 +1966,7 @@ async function removeIssue(): Promise<void> {
   display: inline-flex;
 }
 .react__who {
+  position: absolute;
   left: 50%;
   bottom: 100%;
   display: none;
