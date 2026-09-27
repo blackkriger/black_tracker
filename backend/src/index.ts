@@ -13,6 +13,7 @@ import { registerInviteRoutes } from './invite-routes.js';
 import { registerRoleRoutes } from './role-routes.js';
 import { registerIssueRoutes } from './issue-routes.js';
 import { registerCalendarRoutes } from './calendar-routes.js';
+import { registerMentionRoutes } from './mention-routes.js';
 import { registerChangeFeed, registerEventRoutes } from './events.js';
 
 const app = Fastify({
@@ -37,6 +38,7 @@ registerInviteRoutes(app);
 registerRoleRoutes(app);
 registerIssueRoutes(app);
 registerCalendarRoutes(app);
+registerMentionRoutes(app);
 registerEventRoutes(app);
 // After the routes, so it sees the pattern each one matched.
 registerChangeFeed(app);

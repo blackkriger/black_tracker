@@ -11,6 +11,7 @@ import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { deniedFor, mayOpenBoard } from './board-service.js';
+import { syncMentions } from './mention-routes.js';
 import { publish, tabOf } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
@@ -905,12 +906,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!found) return;
     const parsed = z.object({ text: z.string().trim().min(1).max(20000) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'A comment needs some text.' });
-    const res = await pool.query(
-      `insert into issue_comments (issue_id, author_id, text) values ($1, $2, $3)
-       returning id, text, created_at, edited_at`,
-      [id, session.userId, parsed.data.text]
-    );
-    const row = res.rows[0];
+    const row = await inTransaction(async (client) => {
+      const res = await client.query(
+        `insert into issue_comments (issue_id, author_id, text) values ($1, $2, $3)
+         returning id, text, created_at, edited_at`,
+        [id, session.userId, parsed.data.text]
+      );
+      // Who was named in it is read out of the words themselves.
+      await syncMentions(client, res.rows[0].id, parsed.data.text, session.userId);
+      return res.rows[0];
+    });
     await writeHistory(pool, id, session.userId, 'comment added', null, null);
     void publish({
       type: 'comment.added',
@@ -1004,10 +1009,15 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (owner.rows[0].author_id !== session.userId) {
       return reply.code(403).send({ error: 'Only the author can edit a comment.' });
     }
-    const res = await pool.query(
-      'update issue_comments set text = $2, edited_at = now() where id = $1 returning edited_at',
-      [id, parsed.data.text]
-    );
+    const res = await inTransaction(async (client) => {
+      const updated = await client.query(
+        'update issue_comments set text = $2, edited_at = now() where id = $1 returning edited_at',
+        [id, parsed.data.text]
+      );
+      // A name taken out of a comment stops being a mention; one left alone keeps its place.
+      await syncMentions(client, id, parsed.data.text, session.userId);
+      return updated;
+    });
     const host = await issueById(owner.rows[0].issue_id);
     await writeHistory(pool, owner.rows[0].issue_id, session.userId, 'comment edited', null, null);
     void publish({

@@ -17,6 +17,7 @@ import {
   monthName,
   type Activity,
   type DayInfo,
+  type DayMentions,
   type Due,
   type Mark,
 } from '../lib/calendar';
@@ -42,8 +43,11 @@ const loading = ref(true);
 const marks = ref<Mark[]>([]);
 const dues = ref<{ day: string; issues: Due[] }[]>([]);
 const activity = ref<Activity[]>([]);
+const mentions = ref<DayMentions[]>([]);
 
-const days = computed<Map<string, DayInfo>>(() => byDay(marks.value, dues.value, activity.value));
+const days = computed<Map<string, DayInfo>>(() =>
+  byDay(marks.value, dues.value, activity.value, mentions.value)
+);
 const peak = computed(() => Math.max(1, ...[...days.value.values()].map((d) => d.worked)));
 const yearMarks = computed(() => [...marks.value].sort((a, b) => a.day.localeCompare(b.day)));
 
@@ -65,10 +69,12 @@ async function load(): Promise<void> {
       marks: Mark[];
       dues: { day: string; issues: Due[] }[];
       activity: Activity[];
+      mentions: DayMentions[];
     }>(`/calendar?from=${from}&to=${to}${user}`);
     marks.value = got.marks;
     dues.value = got.dues;
     activity.value = got.activity;
+    mentions.value = got.mentions;
   } catch (err) {
     fail('month', err, 'Could not read the month.');
   } finally {

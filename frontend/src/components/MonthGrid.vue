@@ -3,7 +3,7 @@
 // marked on it, what is due on it, and how much work went through it — the shading. The
 // same grid hangs in the top bar and fills the calendar screen.
 import { computed, ref } from 'vue';
-import { Bell } from 'lucide-vue-next';
+import { AtSign, Bell } from 'lucide-vue-next';
 import {
   WEEKDAYS,
   emptyDay,
@@ -74,8 +74,9 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       @mouseenter="onEnter($event, c)"
       @mouseleave="hover = null"
     >
-      <!-- A day somebody marked says so in place of its number; the number is in the popup. -->
-      <Bell v-if="c.day && info(c.key).marks.length" class="ic ic--sm cal__bell" />
+      <!-- What is waiting comes first, then what was marked; the number is in the popup. -->
+      <AtSign v-if="c.day && info(c.key).unread" class="ic ic--sm cal__at" />
+      <Bell v-else-if="c.day && info(c.key).marks.length" class="ic ic--sm cal__bell" />
       <span v-else-if="c.day">{{ c.day }}</span>
     </button>
 
@@ -93,12 +94,15 @@ function onEnter(ev: MouseEvent, c: Cell): void {
         <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
         {{ d.summary }}
       </span>
+      <span v-if="hovered.said" class="cal__pop-at">
+        {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
+      </span>
       <span v-if="hovered.worked" class="cal__pop-work">
         {{ hovered.worked }} worked, {{ hovered.created }} opened,
         {{ hovered.resolved }} closed
       </span>
       <span
-        v-if="!hovered.marks.length && !hovered.dues.length && !hovered.worked"
+        v-if="!hovered.marks.length && !hovered.dues.length && !hovered.worked && !hovered.said"
         class="cal__pop-work"
       >Nothing yet.</span>
     </div>
@@ -163,6 +167,12 @@ function onEnter(ev: MouseEvent, c: Cell): void {
 }
 .cal__bell {
   color: var(--accent);
+}
+.cal__at {
+  color: var(--focus);
+}
+.cal__pop-at {
+  color: var(--focus);
 }
 .cal__day.has-due .cal__bell {
   color: var(--accent-bright);

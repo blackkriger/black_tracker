@@ -36,12 +36,21 @@ export interface Activity {
   resolved: number;
 }
 
+/** How many times the reader was named that day, and how many they have not seen. */
+export interface DayMentions {
+  day: string;
+  said: number;
+  unread: number;
+}
+
 export interface DayInfo {
   marks: Mark[];
   dues: Due[];
   worked: number;
   created: number;
   resolved: number;
+  said: number;
+  unread: number;
 }
 
 export const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -97,14 +106,15 @@ export function monthRange(year: number, month: number): { from: string; to: str
 }
 
 export function emptyDay(): DayInfo {
-  return { marks: [], dues: [], worked: 0, created: 0, resolved: 0 };
+  return { marks: [], dues: [], worked: 0, created: 0, resolved: 0, said: 0, unread: 0 };
 }
 
 /** Everything the server said about a stretch of days, gathered per day. */
 export function byDay(
   marks: Mark[],
   dues: { day: string; issues: Due[] }[],
-  activity: Activity[]
+  activity: Activity[],
+  mentions: DayMentions[] = []
 ): Map<string, DayInfo> {
   const map = new Map<string, DayInfo>();
   const at = (key: string): DayInfo => {
@@ -119,6 +129,11 @@ export function byDay(
     day.worked += a.worked;
     day.created += a.created;
     day.resolved += a.resolved;
+  }
+  for (const m of mentions) {
+    const day = at(m.day);
+    day.said += m.said;
+    day.unread += m.unread;
   }
   return map;
 }

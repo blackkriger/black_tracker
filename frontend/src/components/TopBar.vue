@@ -16,11 +16,12 @@ import {
   todayKey,
   type Activity,
   type DayInfo,
+  type DayMentions,
   type Due,
   type Mark,
 } from '../lib/calendar';
 import { stamp } from '../lib/issues';
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { AtSign, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const props = defineProps<{
   /** The project this screen belongs to, when it belongs to one. */
@@ -59,8 +60,9 @@ async function readMonth(): Promise<void> {
       marks: Mark[];
       dues: { day: string; issues: Due[] }[];
       activity: Activity[];
+      mentions: DayMentions[];
     }>(`/calendar?from=${from}&to=${to}`);
-    calDays.value = byDay(got.marks, got.dues, got.activity);
+    calDays.value = byDay(got.marks, got.dues, got.activity, got.mentions);
     calPeak.value = Math.max(1, ...[...calDays.value.values()].map((d) => d.worked));
   } catch {
     /* the chip still opens; it simply has nothing to shade */
@@ -83,6 +85,40 @@ const countdown = computed(() => {
   if (left === 1) return `1 day till ${what}`;
   return `${left} days till ${what}`;
 });
+
+// Being named somewhere. The feed lives behind the same chip: what is waiting for you,
+// and which day it landed on, are the same question asked twice.
+interface Mention {
+  commentId: string;
+  said: string;
+  by: string;
+  key: string;
+  projectShort: string;
+  boardSlug: string;
+  at: string;
+  read: boolean;
+}
+const mentions = ref<Mention[]>([]);
+const unread = computed(() => mentions.value.filter((m) => !m.read).length);
+
+async function readMentions(): Promise<void> {
+  try {
+    mentions.value = await api<Mention[]>('/mentions');
+  } catch {
+    /* the chip simply shows no feed */
+  }
+}
+
+async function openMention(m: Mention): Promise<void> {
+  dateOpen.value = false;
+  if (!m.read) {
+    await api('/mentions/read', { method: 'POST', body: { commentId: m.commentId } }).catch(
+      () => {}
+    );
+    void readMentions();
+  }
+  await router.push(`/${m.projectShort}/${m.boardSlug}/${m.key}`);
+}
 
 async function readNext(): Promise<void> {
   try {
@@ -149,6 +185,7 @@ function shownBoard(p: ProjectMini): { name: string; slug: string } | null {
 onMounted(() => {
   void load();
   void readNext();
+  void readMentions();
   window.addEventListener('click', closeMenu);
   window.addEventListener('keydown', onKeydown);
 });
@@ -171,6 +208,7 @@ function onKeydown(ev: KeyboardEvent): void {
 useLive((ev) => {
   if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
   if (ev.type === 'key-date.changed') void readNext();
+  if (ev.type.startsWith('comment.')) void readMentions();
 });
 
 async function pickBoard(short: string, slug: string): Promise<void> {
@@ -242,10 +280,27 @@ async function signOut(): Promise<void> {
           aria-label="Calendar"
           @click="toggleDate"
         >
+          <span v-if="unread" class="stamp topat">
+            <AtSign class="ic ic--sm" />{{ unread }}
+          </span>
           <span v-if="countdown" class="stamp topcount">{{ countdown }}</span>
           <span class="stamp">{{ today }}</span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
+          <template v-if="mentions.length">
+            <button
+              v-for="m in mentions.slice(0, 5)"
+              :key="m.commentId"
+              class="menu__i men"
+              :class="{ 'men--new': !m.read }"
+              type="button"
+              @click="openMention(m)"
+            >
+              <span class="key">{{ m.key }}</span>
+              <span class="men__said">{{ m.by }}: {{ m.said }}</span>
+            </button>
+            <hr />
+          </template>
           <div class="datemenu__h">
             {{ monthName(calYear, calMonth) }}
             <div class="sp"></div>
@@ -395,6 +450,22 @@ async function signOut(): Promise<void> {
   position: relative;
   display: inline-flex;
   align-items: center;
+}
+.topat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--focus);
+}
+/* Who said it and what, cut where the menu ends. */
+.men__said {
+  overflow: hidden;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.men--new .men__said {
+  color: var(--text-dim);
 }
 /* A long name for an event cannot push the bar around, so it is cut where it runs out of room. */
 .topcount {

@@ -86,10 +86,10 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
     const denied = await shutOut(auth);
 
     if (denied.all) {
-      return reply.send({ data: { marks: [], dues: [], activity: [] } });
+      return reply.send({ data: { marks: [], dues: [], activity: [], mentions: [] } });
     }
 
-    const [marks, dues, activity] = await Promise.all([
+    const [marks, dues, activity, mentions] = await Promise.all([
       pool.query<MarkRow>(
         `select k.id, k.day, k.title, k.url, k.banner,
                 p.short_name, p.name as project_name, u.login as by_login
@@ -154,6 +154,21 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
           order by 1`,
         [from, to, who, denied.projects, denied.boards]
       ),
+      // Being named is the reader's own business, so this one is never about the person picked.
+      pool.query<{ day: Date | string; said: number; unread: number }>(
+        `select (m.created_at at time zone '${ZONE}')::date as day,
+                count(*)::int as said,
+                count(*) filter (where m.read_at is null)::int as unread
+           from mentions m
+           join issue_comments c on c.id = m.comment_id
+           join issues i on i.id = c.issue_id
+          where m.user_id = $1
+            and (m.created_at at time zone '${ZONE}')::date between $2::date and $3::date
+            and i.project_id <> all($4::uuid[])
+            and i.board_id <> all($5::uuid[])
+          group by 1`,
+        [auth.userId, from, to, denied.projects, denied.boards]
+      ),
     ]);
 
     const byDay = new Map<
@@ -193,6 +208,11 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
           worked: a.worked,
           created: a.created,
           resolved: a.resolved,
+        })),
+        mentions: mentions.rows.map((m) => ({
+          day: iso(m.day),
+          said: m.said,
+          unread: m.unread,
         })),
       },
     });
