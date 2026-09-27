@@ -26,11 +26,11 @@ export const router = createRouter({
     // The same board with one of its issues open over it, so a card can be linked to.
     { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
     { path: '/profile', name: 'profile', component: Profile },
-    { path: '/settings', name: 'settings', component: SettingsIndex, meta: { admin: true } },
-    { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject, meta: { admin: true } },
-    { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject, meta: { admin: true } },
-    { path: '/settings/tags', name: 'settings-tags', component: SettingsTags, meta: { admin: true } },
-    { path: '/settings/users', name: 'settings-users', component: SettingsUsers, meta: { admin: true } },
+    { path: '/settings', name: 'settings', component: SettingsIndex },
+    { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject },
+    { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject },
+    { path: '/settings/tags', name: 'settings-tags', component: SettingsTags },
+    { path: '/settings/users', name: 'settings-users', component: SettingsUsers },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },
   ],
 });
@@ -48,7 +48,5 @@ router.beforeEach(async (to) => {
       ? { name: 'login' }
       : { name: 'login', query: { next: to.fullPath } };
   }
-  // The settings screens are the only place someone is turned away rather than shown less; `meta.admin` is the right to change how the tracker is set up.
-  if (to.meta.admin && !session.me.value.isAdmin) return { name: 'home' };
   return true;
 });

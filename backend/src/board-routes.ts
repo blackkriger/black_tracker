@@ -12,6 +12,8 @@ import {
   deniedFor,
   denialsFor,
   freeSlug,
+  mayOpenBoard,
+  mayOpenProject,
   publicBoard,
   publicState,
   type BoardRow,
@@ -116,14 +118,17 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   });
 
   app.post('/projects/:short/boards', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { short } = req.params as { short: string };
     const parsed = boardCreate.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad board.' });
     }
     const project = await projectByShort(short);
-    if (!project) return reply.code(404).send({ error: 'No such project.' });
+    if (!project || !(await mayOpenProject(auth, project.id))) {
+      return reply.code(404).send({ error: 'No such project.' });
+    }
     // A new board arrives with the starting four columns; from there they are edited per board.
     const board = await inTransaction((client) =>
       createBoardWithDefaults(client, project.id, parsed.data.name)
@@ -132,7 +137,8 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   });
 
   app.patch('/boards/:id', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = boardPatch.safeParse(req.body);
     if (!parsed.success) {
@@ -140,7 +146,9 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     }
     const p = parsed.data;
     const board = await boardById(id);
-    if (!board) return reply.code(404).send({ error: 'No such board.' });
+    if (!board || !(await mayOpenBoard(auth, id, board.project_id))) {
+      return reply.code(404).send({ error: 'No such board.' });
+    }
     // Renaming moves the address with the name, so a board is never reachable under a word it no longer wears.
     const slug = p.name
       ? await inTransaction((client) => freeSlug(client, board.project_id, p.name as string, id))
@@ -168,12 +176,15 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   });
 
   app.post('/projects/:short/boards/order', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { short } = req.params as { short: string };
     const parsed = z.object({ ids: z.array(z.string().uuid()).min(1) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Send the ids in their new order.' });
     const project = await projectByShort(short);
-    if (!project) return reply.code(404).send({ error: 'No such project.' });
+    if (!project || !(await mayOpenProject(auth, project.id))) {
+      return reply.code(404).send({ error: 'No such project.' });
+    }
     await pool.query(
       `update boards b
           set position = o.pos
@@ -210,14 +221,17 @@ export function registerBoardRoutes(app: FastifyInstance): void {
 
   // ── the board's columns ────────────────────────────────────────
   app.post('/boards/:id/states', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = stateCreate.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad status.' });
     }
     const board = await boardById(id);
-    if (!board) return reply.code(404).send({ error: 'No such board.' });
+    if (!board || !(await mayOpenBoard(auth, id, board.project_id))) {
+      return reply.code(404).send({ error: 'No such board.' });
+    }
     const p = parsed.data;
     const flags = settleFlags(p, { is_open: true, is_resolved: false });
     try {
@@ -248,18 +262,23 @@ export function registerBoardRoutes(app: FastifyInstance): void {
   });
 
   app.patch('/states/:id', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = statePatch.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     const p = parsed.data;
-    const before = await pool.query<{ is_open: boolean; is_resolved: boolean }>(
-      'select is_open, is_resolved from states where id = $1',
+    const before = await pool.query<{ is_open: boolean; is_resolved: boolean; board_id: string }>(
+      'select is_open, is_resolved, board_id from states where id = $1',
       [id]
     );
     if (!before.rowCount) return reply.code(404).send({ error: 'No such status.' });
+    const host = await boardById(before.rows[0].board_id);
+    if (!host || !(await mayOpenBoard(auth, host.id, host.project_id))) {
+      return reply.code(404).send({ error: 'No such status.' });
+    }
     const flags = settleFlags(p, before.rows[0]);
     let res;
     try {
@@ -286,10 +305,15 @@ export function registerBoardRoutes(app: FastifyInstance): void {
 
   // Column order, sent as the whole list: dragging one column moves the others, and one statement keeps them consistent.
   app.post('/boards/:id/states/order', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = z.object({ ids: z.array(z.string().uuid()).min(1) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Send the ids in their new order.' });
+    const board = await boardById(id);
+    if (!board || !(await mayOpenBoard(auth, id, board.project_id))) {
+      return reply.code(404).send({ error: 'No such board.' });
+    }
     await pool.query(
       `update states s
           set position = o.pos

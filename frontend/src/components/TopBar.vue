@@ -138,7 +138,7 @@ async function signOut(): Promise<void> {
 
     <nav class="topitems" aria-label="Account">
       <RouterLink class="topitem" to="/profile">{{ session.me.value?.login }}</RouterLink>
-      <RouterLink v-if="session.me.value?.isAdmin" class="topitem" to="/settings">Settings</RouterLink>
+      <RouterLink class="topitem" to="/settings">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
   </header>

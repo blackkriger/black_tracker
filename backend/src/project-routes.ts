@@ -2,12 +2,11 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { inTransaction, pool } from './db.js';
+import { pool } from './db.js';
 import { filesOfIssues, sweepFiles } from './issue-routes.js';
-import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
+import { requireAuth, requireDeleter } from './auth.js';
 import {
   DENIES_NOTHING,
-  createBoardWithDefaults,
   deniedFor,
   publicBoard,
   type BoardRow,
@@ -136,7 +135,12 @@ export function registerProjectRoutes(app: FastifyInstance): void {
   });
 
   app.post('/projects', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    // Someone whose role opens nothing would not see what they made.
+    if (!auth.isAdmin && (await deniedFor(auth.roleId)).everything) {
+      return reply.code(403).send({ error: 'Making a project is not open to your role.' });
+    }
     const parsed = projectCreate.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad project.' });
@@ -145,19 +149,14 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     if (await projectByShort(shortName)) {
       return reply.code(409).send({ error: `Project ${shortName} already exists.` });
     }
-    // The project and its first board land together: a project with no board has nowhere to put an issue.
-    const project = await inTransaction(async (client) => {
-      const created = await client.query<ProjectRow>(
-        `insert into projects (short_name, name, description, position)
-         values ($1, $2, $3, (select coalesce(max(position), -1) + 1 from projects))
-         returning *`,
-        [shortName, name, description ?? '']
-      );
-      const row = created.rows[0];
-      await createBoardWithDefaults(client, row.id, 'Board');
-      return row;
-    });
-    return reply.code(201).send({ data: publicProject(project) });
+    // A project arrives empty: which boards it wants is the next decision, not one made for it here.
+    const created = await pool.query<ProjectRow>(
+      `insert into projects (short_name, name, description, position)
+       values ($1, $2, $3, (select coalesce(max(position), -1) + 1 from projects))
+       returning *`,
+      [shortName, name, description ?? '']
+    );
+    return reply.code(201).send({ data: publicProject(created.rows[0]) });
   });
 
   // Deleting a project takes its boards, statuses, issues and its own tags with it — the database cascades — so the caller types the project's full name to prove it meant this one.
@@ -191,7 +190,8 @@ export function registerProjectRoutes(app: FastifyInstance): void {
   });
 
   app.patch('/projects/:short', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { short } = req.params as { short: string };
     const parsed = projectPatch.safeParse(req.body);
     if (!parsed.success) {

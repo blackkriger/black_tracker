@@ -1,6 +1,7 @@
 // Making a board is never just a row: a board without columns cannot draw anything, so it comes with the starting four. Both the project and the board routes create boards, hence this sits apart from either.
 
 import type { PoolClient } from 'pg';
+import type { Auth } from './auth.js';
 import { pool } from './db.js';
 import { knownColor } from './colors.js';
 
@@ -130,6 +131,23 @@ export async function deniedFor(roleId: string | null): Promise<Denials> {
 }
 
 // Which roles are shut out of which board. Access is a denial list, so a board missing from the answer is open to everyone — including anyone wearing no role at all.
+// The question every route about a board asks before it does anything: an admin is held to no denial, and someone with no role is held to all of them.
+export async function mayOpenBoard(
+  auth: Auth,
+  boardId: string,
+  projectId: string
+): Promise<boolean> {
+  if (auth.isAdmin) return true;
+  const denied = await deniedFor(auth.roleId);
+  return !denied.everything && !denied.boards.has(boardId) && !denied.projects.has(projectId);
+}
+
+export async function mayOpenProject(auth: Auth, projectId: string): Promise<boolean> {
+  if (auth.isAdmin) return true;
+  const denied = await deniedFor(auth.roleId);
+  return !denied.everything && !denied.projects.has(projectId);
+}
+
 export async function denialsFor(boardIds: string[]): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
   if (!boardIds.length) return out;

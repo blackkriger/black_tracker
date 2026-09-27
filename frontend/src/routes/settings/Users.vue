@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Who can get in, and what they cannot open. Accounts are never deleted — an account carries authorship of issues, comments and history — so the switch here is on and off. Boards are taken away one at a time; everything else is open to everyone signed in.
+// Who can get in, and what they cannot open. Accounts are never deleted — an account carries authorship of issues, comments and history — so the switch here is on and off. The screen is open to everyone: handing out a role needs the right for it, and what a role itself may do stays with the creator.
 import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
@@ -18,6 +18,8 @@ interface Role {
   color: string;
   /** May delete projects, boards, statuses and tags. The creator's own key is elsewhere and is not a role. */
   canDelete: boolean;
+  /** May hand this role, or any other, to someone. */
+  canManageRoles: boolean;
 }
 
 interface User {
@@ -43,6 +45,7 @@ interface Invite {
 }
 
 const session = useSession();
+const { isAdmin, canManageRoles } = session;
 const { projects, load: loadProjects } = useProjects();
 
 const users = ref<User[]>([]);
@@ -61,6 +64,7 @@ const copied = ref(false);
 const newRole = ref('');
 const accessFor = ref<Role | null>(null);
 const accessCanDelete = ref(false);
+const accessCanManageRoles = ref(false);
 // Two kinds of denial: a whole project, or single boards inside one the role does have.
 const deniedProjects = ref<string[]>([]);
 const deniedBoards = ref<string[]>([]);
@@ -78,9 +82,11 @@ onMounted(async () => {
     api<User[]>('/users')
       .then((rows) => (users.value = rows))
       .catch((err) => fail('users', err, 'Could not load the accounts.')),
-    api<Invite[]>('/invites')
-      .then((rows) => (invites.value = rows))
-      .catch((err) => fail('invites', err, 'Could not load the invite links.')),
+    canManageRoles.value
+      ? api<Invite[]>('/invites')
+          .then((rows) => (invites.value = rows))
+          .catch((err) => fail('invites', err, 'Could not load the invite links.'))
+      : Promise.resolve(),
     api<Role[]>('/roles')
       .then((rows) => (roles.value = rows))
       .catch((err) => fail('roles', err, 'Could not load the roles.')),
@@ -95,7 +101,7 @@ useLive((ev) => {
   if (ev.type === 'role.changed') {
     void api<Role[]>('/roles').then((rows) => (roles.value = rows)).catch(() => {});
   }
-  if (ev.type === 'invite.changed') {
+  if (ev.type === 'invite.changed' && canManageRoles.value) {
     void api<Invite[]>('/invites').then((rows) => (invites.value = rows)).catch(() => {});
   }
 });
@@ -194,6 +200,7 @@ async function revokeInvite(i: Invite): Promise<void> {
 async function openAccess(role: Role): Promise<void> {
   accessFor.value = role;
   accessCanDelete.value = role.canDelete;
+  accessCanManageRoles.value = role.canManageRoles;
   deniedProjects.value = [];
   deniedBoards.value = [];
   clear('access');
@@ -227,8 +234,15 @@ async function saveAccess(): Promise<void> {
   accessBusy.value = true;
   clear('access');
   try {
-    if (accessCanDelete.value !== role.canDelete) {
-      await patchRole(role, { canDelete: accessCanDelete.value }, 'access');
+    if (
+      accessCanDelete.value !== role.canDelete ||
+      accessCanManageRoles.value !== role.canManageRoles
+    ) {
+      await patchRole(
+        role,
+        { canDelete: accessCanDelete.value, canManageRoles: accessCanManageRoles.value },
+        'access'
+      );
     }
     await api(`/roles/${role.id}/access`, {
       method: 'PUT',
@@ -288,6 +302,7 @@ async function saveAccess(): Promise<void> {
                   class="input input--sm"
                   :value="u.role?.id ?? ''"
                   :style="{ color: u.role?.color ?? 'var(--text-dim)' }"
+                  :disabled="!canManageRoles"
                   @change="patchUser(u, { roleId: ($event.target as HTMLSelectElement).value || null })"
                 >
                   <option value="">—</option>
@@ -299,7 +314,7 @@ async function saveAccess(): Promise<void> {
                   <input
                     type="checkbox"
                     :checked="u.active"
-                    :disabled="u.id === session.me.value?.id"
+                    :disabled="!isAdmin || u.id === session.me.value?.id"
                     @change="patchUser(u, { active: ($event.target as HTMLInputElement).checked })"
                   />
                 </label>
@@ -349,17 +364,22 @@ async function saveAccess(): Promise<void> {
                   :value="r.name"
                   :style="{ color: r.color }"
                   maxlength="40"
+                  :readonly="!isAdmin"
+                  :tabindex="isAdmin ? undefined : -1"
                   @change="renameRole(r, ($event.target as HTMLInputElement).value)"
                 />
               </td>
               <td class="c-act2">
-                <button class="btn btn--sm" type="button" @click="openAccess(r)">Access…</button>
+                <button class="btn btn--sm" type="button" :disabled="!isAdmin" @click="openAccess(r)">
+                  Access…
+                </button>
               </td>
               <td class="c-del">
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
                   aria-label="Delete role"
+                  :disabled="!isAdmin"
                   @click="removingRole = r"
                 >
                   <X class="ic ic--sm" />
@@ -377,14 +397,20 @@ async function saveAccess(): Promise<void> {
           <span class="sk sk--field" style="flex: 0 0 56px"></span>
         </div>
         <form v-else class="addrow" @submit.prevent="addRole">
-          <input v-model="newRole" class="input" placeholder="Add role…" maxlength="40" />
-          <button class="btn" type="submit" :disabled="!newRole.trim()">Add</button>
+          <input
+            v-model="newRole"
+            class="input"
+            placeholder="Add role…"
+            maxlength="40"
+            :disabled="!isAdmin"
+          />
+          <button class="btn" type="submit" :disabled="!isAdmin || !newRole.trim()">Add</button>
         </form>
       </div>
     </section>
     <div v-if="errors.roles" class="err sheet__wide panel__err">{{ errors.roles }}</div>
 
-    <section class="panel sheet__wide">
+    <section v-if="canManageRoles" class="panel sheet__wide">
       <header class="panel__h">Invite links</header>
       <div class="panel__b">
         <div v-if="freshLink" class="field">
@@ -485,7 +511,9 @@ async function saveAccess(): Promise<void> {
         </table>
       </div>
     </section>
-    <div v-if="errors.invites" class="err sheet__wide panel__err">{{ errors.invites }}</div>
+    <div v-if="canManageRoles && errors.invites" class="err sheet__wide panel__err">
+      {{ errors.invites }}
+    </div>
 
     <Dialog
       v-if="removingRole"
@@ -510,6 +538,10 @@ async function saveAccess(): Promise<void> {
       <label class="check access__right">
         <input v-model="accessCanDelete" type="checkbox" />
         May delete projects, boards, statuses and tags
+      </label>
+      <label class="check access__right">
+        <input v-model="accessCanManageRoles" type="checkbox" />
+        May give people a role and invite new ones
       </label>
       <div class="access__sep"></div>
 

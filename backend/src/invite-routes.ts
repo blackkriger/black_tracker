@@ -8,7 +8,7 @@ import {
   hashToken,
   newRawToken,
   publicUser,
-  requireAdmin,
+  requireRoleManager,
   startSession,
   userById,
 } from './auth.js';
@@ -57,13 +57,13 @@ const LIST_SQL = `
 
 export function registerInviteRoutes(app: FastifyInstance): void {
   app.get('/invites', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    if (!(await requireRoleManager(req, reply))) return;
     const res = await pool.query<InviteRow>(`${LIST_SQL} order by i.created_at desc`);
     return reply.send({ data: res.rows.map(publicInvite) });
   });
 
   app.post('/invites', async (req, reply) => {
-    const auth = await requireAdmin(req, reply);
+    const auth = await requireRoleManager(req, reply);
     if (!auth) return;
     const parsed = z
       .object({ isAdmin: z.boolean().optional(), roleId: z.string().uuid().nullable().optional() })
@@ -90,7 +90,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
 
   // A link nobody walked through is just a key left on the table — it can be thrown away. One that was used is the record of how an account came to exist, and that is kept.
   app.delete('/invites/:id', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    if (!(await requireRoleManager(req, reply))) return;
     const { id } = req.params as { id: string };
     const res = await pool.query('delete from invites where id = $1 and used_at is null', [id]);
     if (!res.rowCount) {

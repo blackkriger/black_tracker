@@ -1,4 +1,4 @@
-// Accounts, from the admin's side: there is no sign-up, so this is where people come from. Nobody is ever deleted — an account carries authorship of issues, comments and history — it is switched off instead.
+// Accounts: there is no sign-up, so this is where people come from. Nobody is ever deleted — an account carries authorship of issues, comments and history — it is switched off instead. Who someone is on the team is handed out by a role right; the account itself — its name, its switch, the creator's key — stays with the creator.
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -6,6 +6,7 @@ import { pool } from './db.js';
 import {
   USER_SELECT,
   hashPassword,
+  mayManageRoles,
   publicUser,
   requireAdmin,
   requireAuth,
@@ -35,14 +36,21 @@ const userPatch = z.object({
 });
 
 export function registerUserRoutes(app: FastifyInstance): void {
-  // The admin's own view of the accounts, with dates and the tail of each API token. The open list everyone else reads is /people below.
+  // The settings view of the accounts: who there is, what they wear and when they were last seen. A token's tail and the creator's key are the account's own business, so they only travel to the person they belong to.
   app.get('/users', async (req, reply) => {
-    const auth = await requireAdmin(req, reply);
+    const auth = await requireAuth(req, reply);
     if (!auth) return;
     const res = await pool.query(
       `${USER_SELECT} order by u.active desc, lower(coalesce(nullif(u.full_name, ''), u.login))`
     );
-    return reply.send({ data: res.rows.map(publicUser) });
+    return reply.send({
+      data: res.rows.map((row) => {
+        const person = publicUser(row);
+        if (auth.isAdmin || row.id === auth.userId) return person;
+        const { token, isAdmin, ...rest } = person;
+        return rest;
+      }),
+    });
   });
 
   // Everyone signed in needs the names: an assignee picker, a comment's author, a mention later. It carries no dates, no token and no flags — just who there is.
@@ -77,7 +85,7 @@ export function registerUserRoutes(app: FastifyInstance): void {
   });
 
   app.patch('/users/:id', async (req, reply) => {
-    const auth = await requireAdmin(req, reply);
+    const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = userPatch.safeParse(req.body);
@@ -85,6 +93,15 @@ export function registerUserRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     const p = parsed.data;
+    // Handing out a role is a right a role can carry; changing the account behind it is not.
+    const touchesAccount =
+      p.fullName !== undefined || p.isAdmin !== undefined || p.active !== undefined;
+    if (touchesAccount && !auth.isAdmin) {
+      return reply.code(403).send({ error: 'Admins only.' });
+    }
+    if (!touchesAccount && !(await mayManageRoles(auth))) {
+      return reply.code(403).send({ error: 'Handing out roles is not open to your role.' });
+    }
     // Locking yourself out is the one mistake this screen can make that nobody in the browser can undo, so both halves of it are refused.
     if (id === auth.userId && (p.isAdmin === false || p.active === false)) {
       return reply.code(409).send({ error: 'You cannot take your own access away.' });

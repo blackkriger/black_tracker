@@ -71,6 +71,7 @@ interface UserRow {
   role_name: string | null;
   role_color: string | null;
   role_can_delete: boolean | null;
+  role_can_manage_roles: boolean | null;
   api_token_hash: string | null;
   api_token_hint: string | null;
   api_token_created_at: Date | null;
@@ -81,7 +82,8 @@ interface UserRow {
 
 // Every route that hands back a person reads them through this, so the role always travels with them.
 export const USER_SELECT = `
-  select u.*, r.name as role_name, r.color as role_color, r.can_delete as role_can_delete
+  select u.*, r.name as role_name, r.color as role_color, r.can_delete as role_can_delete,
+         r.can_manage_roles as role_can_manage_roles
     from users u
     left join roles r on r.id = u.role_id`;
 
@@ -101,6 +103,8 @@ export function publicUser(row: UserRow) {
     lastSeenAt: row.last_seen_at?.toISOString() ?? null,
     /** Whether the delete buttons do anything for them: the creator always, everyone else through their role. */
     canDelete: row.is_admin || row.role_can_delete === true,
+    /** Whether they may hand a role to someone, their own account included. */
+    canManageRoles: row.is_admin || row.role_can_manage_roles === true,
     // What they are called on the team, and what it lets them do.
     role:
       row.role_id && row.role_name
@@ -218,7 +222,7 @@ export async function requireSession(
   return auth;
 }
 
-// Deleting is a right a role can be given: it takes away work someone else has done, so it is not simply part of being able to reach the thing. The creator holds it by virtue of is_admin; everyone else holds it only through their role. The access system itself — roles, invites, accounts — stays admin-only, or a role could be granted the power to dismantle the rules it lives under.
+// Deleting is a right a role can be given: it takes away work someone else has done, so it is not simply part of being able to reach the thing. The creator holds it by virtue of is_admin; everyone else holds it only through their role. What a role itself may do — its denials, its rights, whether it exists — stays admin-only, or a role could be granted the power to dismantle the rules it lives under.
 export async function requireDeleter(
   req: FastifyRequest,
   reply: FastifyReply
@@ -231,6 +235,27 @@ export async function requireDeleter(
     if (res.rowCount) return auth;
   }
   reply.code(403).send({ error: 'Deleting is not open to your role.' });
+  return null;
+}
+
+// Who someone is on the team: handing out roles, and minting the links that arrive wearing one. The settings screens are open to everyone signed in, so this is the right that separates reading how the tracker is set up from changing who stands where in it.
+export async function mayManageRoles(auth: Auth): Promise<boolean> {
+  if (auth.isAdmin) return true;
+  if (!auth.roleId) return false;
+  const res = await pool.query('select 1 from roles where id = $1 and can_manage_roles', [
+    auth.roleId,
+  ]);
+  return res.rowCount === 1;
+}
+
+export async function requireRoleManager(
+  req: FastifyRequest,
+  reply: FastifyReply
+): Promise<Auth | null> {
+  const auth = await requireAuth(req, reply);
+  if (!auth) return null;
+  if (await mayManageRoles(auth)) return auth;
+  reply.code(403).send({ error: 'Handing out roles is not open to your role.' });
   return null;
 }
 

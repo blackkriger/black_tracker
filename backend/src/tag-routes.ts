@@ -1,10 +1,10 @@
-// Tags are either global or a project's own. Reading them is open to everyone; making, renaming and deleting them is an admin's job, the same rule the statuses follow.
+// Tags are either global or a project's own. Reading and naming them is open to whoever can open the project they belong to; deleting one takes it off every issue that carries it, so that is its own right.
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
-import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
-import { deniedFor } from './board-service.js';
+import { requireAuth, requireDeleter } from './auth.js';
+import { deniedFor, mayOpenProject } from './board-service.js';
 import { pickColor } from './colors.js';
 import { projectByShort } from './project-routes.js';
 
@@ -101,7 +101,8 @@ export function registerTagRoutes(app: FastifyInstance): void {
   });
 
   app.post('/tags', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const parsed = tagCreate.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad tag.' });
@@ -110,8 +111,13 @@ export function registerTagRoutes(app: FastifyInstance): void {
     let projectId: string | null = null;
     if (project) {
       const row = await projectByShort(project);
-      if (!row) return reply.code(404).send({ error: 'No such project.' });
+      if (!row || !(await mayOpenProject(auth, row.id))) {
+        return reply.code(404).send({ error: 'No such project.' });
+      }
       projectId = row.id;
+    } else if (!auth.isAdmin && (await deniedFor(auth.roleId)).everything) {
+      // A global tag belongs to every project, so it takes being able to open at least one.
+      return reply.code(403).send({ error: 'Making a tag is not open to your role.' });
     }
 
     // What already carries this name decides what happens: nothing means a plain insert, the same scope is a duplicate, and anywhere else means the two are one tag and it becomes global.
@@ -149,7 +155,8 @@ export function registerTagRoutes(app: FastifyInstance): void {
   });
 
   app.patch('/tags/:id', async (req, reply) => {
-    if (!(await requireAdmin(req, reply))) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = tagPatch.safeParse(req.body);
     if (!parsed.success) {
@@ -160,6 +167,11 @@ export function registerTagRoutes(app: FastifyInstance): void {
       [id]
     );
     if (!current.rowCount) return reply.code(404).send({ error: 'No such tag.' });
+    const home = current.rows[0].project_id;
+    const reaches = home
+      ? await mayOpenProject(auth, home)
+      : auth.isAdmin || !(await deniedFor(auth.roleId)).everything;
+    if (!reaches) return reply.code(404).send({ error: 'No such tag.' });
 
     // Renaming onto a name someone else already uses follows the same rule as creating it: same scope is a duplicate, another scope means the two become one global tag.
     const twins = await pool.query<{ id: string; project_id: string | null }>(

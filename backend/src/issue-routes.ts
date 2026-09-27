@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
-import { deniedFor } from './board-service.js';
+import { deniedFor, mayOpenBoard } from './board-service.js';
 import { publish, tabOf } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
@@ -162,12 +162,6 @@ async function issueById(id: string): Promise<IssueRow | null> {
 }
 
 // The board decides who may see an issue, so every route about an issue asks the same question first.
-async function mayOpenBoard(auth: Auth, boardId: string, projectId: string): Promise<boolean> {
-  if (auth.isAdmin) return true;
-  const denied = await deniedFor(auth.roleId);
-  return !denied.everything && !denied.boards.has(boardId) && !denied.projects.has(projectId);
-}
-
 /** The same question `loadIssueFor` asks, for routes that start from a comment or a file rather than from the issue. */
 async function mayReachIssue(auth: Auth, issueId: string): Promise<boolean> {
   const host = await issueById(issueId);
