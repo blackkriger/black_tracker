@@ -356,8 +356,9 @@ async function signOut(): Promise<void> {
   padding: 0 6px;
   font-size: 13px;
 }
+/* A board is not a project: it stands out in plain bright, the way the account links do. */
 .topitem__board.is-here {
-  color: var(--accent-bright);
+  color: var(--text);
 }
 .topitem--danger:hover {
   color: var(--danger-text);
