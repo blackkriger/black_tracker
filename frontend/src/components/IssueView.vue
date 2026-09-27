@@ -42,6 +42,8 @@ const props = defineProps<{
   createIn?: string | null;
   board: { id: string; name: string; states: State[] };
   tags: IssueTag[];
+  /** The project's key, which is what a tag made here can be scoped to. */
+  project: string;
 }>();
 
 const emit = defineEmits<{
@@ -49,6 +51,7 @@ const emit = defineEmits<{
   (e: 'changed', issue: Issue): void;
   (e: 'created', issue: Issue): void;
   (e: 'deleted', id: string): void;
+  (e: 'tagCreated', tag: IssueTag): void;
 }>();
 
 const session = useSession();
@@ -312,7 +315,7 @@ const filesOf = (commentId: string) =>
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
   // Anything opened over this window answers Escape first; only when nothing is does it close the issue.
-  if (deleting.value || picking.value || shown.value !== null) return;
+  if (deleting.value || picking.value || makingTag.value || shown.value !== null) return;
   if (creating.value || !editing.value) emit('close');
   else editing.value = false;
 }
@@ -504,6 +507,48 @@ async function saveText(): Promise<void> {
     editing.value = false;
   } finally {
     saving.value = false;
+  }
+}
+
+const makingTag = ref(false);
+const newTagName = ref('');
+const newTagScope = ref<'project' | 'global'>('project');
+const tagBusy = ref(false);
+const tagError = ref<string | null>(null);
+
+// The select is a picker, so it never keeps what was picked: the tag it named is worn a moment later, or a dialog is open over it.
+function pickTag(el: HTMLSelectElement): void {
+  const chosen = el.value;
+  el.value = '';
+  if (!chosen) return;
+  if (chosen !== 'new') {
+    toggleTag(chosen, true);
+    return;
+  }
+  newTagName.value = '';
+  newTagScope.value = 'project';
+  tagError.value = null;
+  makingTag.value = true;
+}
+
+async function createTag(): Promise<void> {
+  const name = newTagName.value.trim();
+  if (!name || tagBusy.value) return;
+  tagBusy.value = true;
+  tagError.value = null;
+  try {
+    const created = await api<IssueTag>('/tags', {
+      method: 'POST',
+      body: newTagScope.value === 'global' ? { name } : { name, project: props.project },
+    });
+    // The board keeps the list this window reads from, so it hears about the new one before it is worn.
+    emit('tagCreated', created);
+    makingTag.value = false;
+    toggleTag(created.id, true);
+  } catch (err) {
+    tagError.value = err instanceof Error ? err.message : 'Could not create the tag.';
+  } finally {
+    tagBusy.value = false;
   }
 }
 
@@ -1243,14 +1288,10 @@ async function removeIssue(): Promise<void> {
               />
             </div>
 
-            <div v-if="wornTags.length || freeTags.length" class="hr"></div>
+            <div class="hr"></div>
 
             <!-- Nothing to wear and nothing to choose from: the row would only say the word Tags. -->
-            <div
-              v-if="wornTags.length || freeTags.length"
-              class="prop prop--tall"
-              :class="{ 'is-fresh': fresh.has('tags') }"
-            >
+            <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('tags') }">
               <span class="prop__k">Tags</span>
               <div class="prop__tags">
                 <span
@@ -1268,13 +1309,13 @@ async function removeIssue(): Promise<void> {
                   ><X class="ic ic--sm" /></button>
                 </span>
                 <select
-                  v-if="freeTags.length"
                   class="input input--sm"
                   value=""
-                  @change="toggleTag(($event.target as HTMLSelectElement).value, true)"
+                  @change="pickTag($event.target as HTMLSelectElement)"
                 >
                   <option value="">Add tag…</option>
                   <option v-for="t in freeTags" :key="t.id" :value="t.id">{{ t.name }}</option>
+                  <option value="new">New tag…</option>
                 </select>
               </div>
             </div>
@@ -1330,6 +1371,40 @@ async function removeIssue(): Promise<void> {
           <p v-if="searching" class="hint">Searching…</p>
           <p v-else-if="linkQuery.trim() && !linkResults.length" class="hint">Nothing found.</p>
         </div>
+      </Dialog>
+
+      <Dialog v-if="makingTag" title="New tag" :width="420" @close="makingTag = false">
+        <div class="field">
+          <label class="label" for="tag-name">Name</label>
+          <input
+            id="tag-name"
+            v-model="newTagName"
+            class="input"
+            maxlength="40"
+            autofocus
+            @keydown.enter.prevent="createTag"
+          />
+        </div>
+        <div class="field">
+          <label class="label" for="tag-scope">Scope</label>
+          <select id="tag-scope" v-model="newTagScope" class="input">
+            <option value="project">{{ project }} only</option>
+            <option value="global">Global</option>
+          </select>
+        </div>
+        <div v-if="tagError" class="err">{{ tagError }}</div>
+        <template #footer>
+          <div class="sp"></div>
+          <button class="btn" type="button" @click="makingTag = false">Cancel</button>
+          <button
+            class="btn btn--primary"
+            type="button"
+            :disabled="tagBusy || !newTagName.trim()"
+            @click="createTag"
+          >
+            Create
+          </button>
+        </template>
       </Dialog>
 
       <div

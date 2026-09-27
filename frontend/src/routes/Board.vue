@@ -36,6 +36,8 @@ interface Tag {
   id: string;
   name: string;
   color: string;
+  /** Null for a global tag; the server sorts those ahead of a project's own. */
+  projectId?: string | null;
 }
 interface Project {
   id: string;
@@ -62,6 +64,7 @@ const dropAt = ref<{ stateId: string; beforeId: string | null } | null>(null);
 const creatingIn = ref<string | null>(null);
 
 // What the board is narrowed to. Nothing is remembered between visits — a filter is a way of looking at the board right now, not a setting.
+const q = ref('');
 const byAssignee = ref('');
 const byAuthor = ref('');
 const byPriority = ref<Priority | ''>('');
@@ -72,6 +75,7 @@ const starred = ref(false);
 
 const filtering = computed(
   () =>
+    !!q.value.trim() ||
     !!byAssignee.value ||
     !!byAuthor.value ||
     !!byPriority.value ||
@@ -80,6 +84,7 @@ const filtering = computed(
 );
 
 function clearFilters(): void {
+  q.value = '';
   byAssignee.value = '';
   byAuthor.value = '';
   byPriority.value = '';
@@ -93,17 +98,32 @@ function toggleTag(id: string): void {
     : [...byTags.value, id];
 }
 
-const filtered = computed(() =>
-  issues.value.filter(
+const filtered = computed(() => {
+  // A card answers the search by its key or by its title, the two things the card itself shows.
+  const needle = q.value.trim().toLowerCase();
+  return issues.value.filter(
     (i) =>
+      (!needle ||
+        i.key.toLowerCase().includes(needle) ||
+        i.summary.toLowerCase().includes(needle)) &&
       (!byAssignee.value ||
         (byAssignee.value === 'none' ? !i.assignee : i.assignee?.id === byAssignee.value)) &&
       (!byAuthor.value || i.author?.id === byAuthor.value) &&
       (!byPriority.value || i.priority === byPriority.value) &&
       byTags.value.every((id) => i.tags.some((t) => t.id === id)) &&
       (!starred.value || i.favourite)
-  )
-);
+  );
+});
+
+// A tag made from inside an issue: our own tab does not hear its own change, so the list is grown here.
+function tagCreated(tag: Tag): void {
+  if (tags.value.some((t) => t.id === tag.id)) return;
+  tags.value = [...tags.value, tag].sort(
+    (a, b) =>
+      Number(!!a.projectId) - Number(!!b.projectId) ||
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+  );
+}
 
 // Cards that changed under us a moment ago, lit until the animation is done.
 const fresh = ref<Set<string>>(new Set());
@@ -306,6 +326,13 @@ watch(
     <TopBar :project="project" :board="current" />
 
     <div v-if="current" class="tagbar">
+      <input
+        v-model="q"
+        class="input input--sm filter search"
+        placeholder="Search"
+        maxlength="80"
+        aria-label="Search the board"
+      />
       <select v-model="byAssignee" class="input input--sm filter" aria-label="Filter by assignee">
         <option value="">Assignee</option>
         <option value="none">Nobody</option>
@@ -449,7 +476,9 @@ watch(
       :create-in="creatingIn"
       :board="current"
       :tags="tags"
+      :project="project?.shortName ?? ''"
       @close="closeIssue"
+      @tag-created="tagCreated"
       @changed="issueChanged"
       @created="issueCreated"
       @deleted="issueGone"
@@ -496,6 +525,12 @@ watch(
 }
 .filter:hover {
   color: var(--text);
+}
+.search {
+  width: 160px;
+}
+.search::placeholder {
+  color: var(--text-muted);
 }
 .card {
   user-select: none;
