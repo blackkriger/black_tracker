@@ -11,7 +11,7 @@ import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { deniedFor, mayOpenBoard } from './board-service.js';
-import { syncMentions } from './notice-routes.js';
+import { TELL_YOURSELF, syncMentions } from './notice-routes.js';
 import { publish, tabOf } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
@@ -998,7 +998,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [id, session.userId, emoji]
       );
       // Whoever wrote it is told, unless they are the one nodding at their own words.
-      if (authorId !== session.userId) {
+      if (authorId !== session.userId || TELL_YOURSELF) {
         await client.query(
           `insert into notices (user_id, kind, comment_id, by_id, detail)
            values ($1, 'reaction', $2, $3, $4)

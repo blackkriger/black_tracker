@@ -11,10 +11,11 @@ import { requireAuth, requireSession } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 
 /**
- * Naming yourself normally does nothing — you already know. It is on while the workshop
- * has one account and there is no other way to see the feed; take it out once there are two.
+ * Telling yourself about your own name or your own nod normally does nothing — you already
+ * know. It is on while the workshop has one account and there is no other way to see the
+ * feed at all; take it out once there are two.
  */
-const NAME_YOURSELF = true;
+export const TELL_YOURSELF = true;
 
 /** The same shape a login may take, so `@PROJ-1` and an e-mail do not become mentions. */
 const NAME = /(?:^|\s)@([a-zA-Z0-9_.-]{2,32})/g;
@@ -49,7 +50,7 @@ export async function syncMentions(
   if (logins.length) {
     const found = await client.query<{ id: string }>(
       'select id from users where lower(login) = any($1::text[]) and active and (id <> $2 or $3)',
-      [logins, authorId, NAME_YOURSELF]
+      [logins, authorId, TELL_YOURSELF]
     );
     for (const row of found.rows) ids.add(row.id);
   }
@@ -62,7 +63,7 @@ export async function syncMentions(
   if (named.length) {
     const wearers = await client.query<{ id: string }>(
       'select id from users where role_id = any($1::uuid[]) and active and (id <> $2 or $3)',
-      [named.map((r) => r.id), authorId, NAME_YOURSELF]
+      [named.map((r) => r.id), authorId, TELL_YOURSELF]
     );
     for (const row of wearers.rows) ids.add(row.id);
   }
