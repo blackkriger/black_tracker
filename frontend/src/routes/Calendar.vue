@@ -27,7 +27,7 @@ import { useSession } from '../lib/session';
 import { useLive } from '../lib/live';
 
 const session = useSession();
-const { people, load: loadPeople } = usePeople();
+const { people, colorOf, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 
@@ -271,6 +271,7 @@ function closeIssue(): void {
         >
           <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
           <span class="mark__title">{{ d.summary }}</span>
+          <span v-if="d.assignee" :style="{ color: colorOf(d.assignee) }">{{ d.assignee }}</span>
         </button>
       </div>
 
