@@ -15,7 +15,7 @@ import {
 } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
-import { Plus, Star } from 'lucide-vue-next';
+import { Plus, Search, Star } from 'lucide-vue-next';
 
 interface State {
   id: string;
@@ -326,13 +326,16 @@ watch(
     <TopBar :project="project" :board="current" />
 
     <div v-if="current" class="tagbar">
-      <input
-        v-model="q"
-        class="input input--sm filter search"
-        placeholder="Search"
-        maxlength="80"
-        aria-label="Search the board"
-      />
+      <span class="search">
+        <Search class="ic ic--sm search__i" />
+        <input
+          v-model="q"
+          class="input input--sm filter search__f"
+          placeholder="Search by summary…"
+          maxlength="80"
+          aria-label="Search the board"
+        />
+      </span>
       <select v-model="byAssignee" class="input input--sm filter" aria-label="Filter by assignee">
         <option value="">Assignee</option>
         <option value="none">Nobody</option>
@@ -527,9 +530,21 @@ watch(
   color: var(--text);
 }
 .search {
-  width: 160px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
-.search::placeholder {
+.search__i {
+  position: absolute;
+  left: 7px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.search__f {
+  width: 170px;
+  padding-left: 25px;
+}
+.search__f::placeholder {
   color: var(--text-muted);
 }
 .card {
