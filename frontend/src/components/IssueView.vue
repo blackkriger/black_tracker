@@ -10,7 +10,7 @@ import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
 import FileWall from './FileWall.vue';
 import { useSession } from '../lib/session';
-import { ArrowDown, ArrowUp, Link, Paperclip, Pencil, Pin, Star, Trash2, X } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Star, Trash2, X } from 'lucide-vue-next';
 import {
   PRIORITIES,
   dueLabel,
@@ -1034,7 +1034,7 @@ async function removeIssue(): Promise<void> {
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
               <div class="sec-h links">
-                <Link class="ic links__icon" aria-hidden="true" />
+                <Link2 class="ic links__icon" aria-hidden="true" />
                 <RouterLink
                   v-for="l in shownLinks"
                   :key="l.id"
