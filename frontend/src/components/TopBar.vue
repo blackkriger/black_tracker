@@ -342,7 +342,10 @@ async function signOut(): Promise<void> {
             >
               <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
               <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
-              <span class="men__said">{{ n.by }}: {{ n.said }}</span>
+              <span class="men__said">
+                <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
+                {{ n.said }}
+              </span>
             </button>
           </template>
           <hr />
