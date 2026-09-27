@@ -276,20 +276,6 @@ async function signOut(): Promise<void> {
           </span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
-          <template v-if="mentions.length">
-            <button
-              v-for="m in mentions.slice(0, 5)"
-              :key="m.commentId"
-              class="menu__i men"
-              :class="{ 'men--new': !m.read }"
-              type="button"
-              @click="openMention(m)"
-            >
-              <span class="key">{{ m.key }}</span>
-              <span class="men__said">{{ m.by }}: {{ m.said }}</span>
-            </button>
-            <hr />
-          </template>
           <div class="datemenu__h">
             {{ monthName(calYear, calMonth) }}
             <div class="sp"></div>
@@ -343,6 +329,20 @@ async function signOut(): Promise<void> {
                 <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
               </div>
             </div>
+          </template>
+          <template v-if="mentions.length">
+            <hr />
+            <button
+              v-for="m in mentions.slice(0, 5)"
+              :key="m.commentId"
+              class="menu__i men"
+              :class="{ 'men--new': !m.read }"
+              type="button"
+              @click="openMention(m)"
+            >
+              <span class="key">{{ m.key }}</span>
+              <span class="men__said">{{ m.by }}: {{ m.said }}</span>
+            </button>
           </template>
           <hr />
           <button class="menu__i" type="button" @click="toCalendar">Full calendar</button>
