@@ -396,7 +396,7 @@ function closeIssue(): void {
 }
 .year {
   font-size: 15px;
-  color: var(--accent);
+  color: var(--text);
 }
 .cal-sk {
   display: block;
