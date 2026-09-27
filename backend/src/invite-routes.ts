@@ -105,13 +105,22 @@ export function registerInviteRoutes(app: FastifyInstance): void {
   // Open to anyone holding the link: the join screen asks before drawing its form.
   app.get('/invites/:token/check', async (req, reply) => {
     const { token } = req.params as { token: string };
-    const res = await pool.query<{ is_admin: boolean }>(
-      `select is_admin from invites
-        where token_hash = $1 and used_at is null and expires_at > now()`,
+    const res = await pool.query<{ is_admin: boolean; role_name: string | null; role_color: string | null }>(
+      `select i.is_admin, r.name as role_name, r.color as role_color
+         from invites i
+         left join roles r on r.id = i.role_id
+        where i.token_hash = $1 and i.used_at is null and i.expires_at > now()`,
       [hashToken(token)]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'This invite link is no longer valid.' });
-    return reply.send({ data: { ok: true, isAdmin: res.rows[0].is_admin } });
+    const row = res.rows[0];
+    return reply.send({
+      data: {
+        ok: true,
+        isAdmin: row.is_admin,
+        role: row.role_name ? { name: row.role_name, color: row.role_color ?? '' } : null,
+      },
+    });
   });
 
   app.post('/invites/:token/accept', async (req, reply) => {

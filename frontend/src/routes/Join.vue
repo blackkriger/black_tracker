@@ -12,6 +12,8 @@ const session = useSession();
 const token = String(route.params.token ?? '');
 const checking = ref(true);
 const valid = ref(false);
+// The role the link carries, so whoever opens it knows what the account will be before making it.
+const role = ref<{ name: string; color: string } | null>(null);
 
 const login = ref('');
 const password = ref('');
@@ -29,7 +31,10 @@ const canSubmit = computed(
 
 onMounted(async () => {
   try {
-    await api(`/invites/${encodeURIComponent(token)}/check`);
+    const invite = await api<{ ok: true; role: { name: string; color: string } | null }>(
+      `/invites/${encodeURIComponent(token)}/check`
+    );
+    role.value = invite.role;
     valid.value = true;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'This invite link is no longer valid.';
@@ -72,7 +77,15 @@ async function onSubmit(): Promise<void> {
     </div>
 
     <section class="panel signin__panel" aria-labelledby="join-title">
-      <header id="join-title" class="panel__h">Create account</header>
+      <header id="join-title" class="panel__h">
+        Create account
+        <span v-if="checking || role" class="panel__end">
+          <span v-if="checking" class="sk sk--line join__role-sk"></span>
+          <span v-else-if="role" class="taglabel taglabel--plain" :style="{ '--c': role.color }">
+            {{ role.name }}
+          </span>
+        </span>
+      </header>
 
       <div v-if="checking" class="panel__b signin__form">
         <span class="sk field-sk"></span>
@@ -187,5 +200,9 @@ async function onSubmit(): Promise<void> {
 .field-sk {
   display: block;
   height: 52px;
+}
+.join__role-sk {
+  width: 72px;
+  height: 24px;
 }
 </style>
