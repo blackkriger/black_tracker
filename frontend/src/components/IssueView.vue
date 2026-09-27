@@ -11,6 +11,7 @@ import { useLive } from '../lib/live';
 import FileWall from './FileWall.vue';
 import Select from './Select.vue';
 import { usePeople } from '../lib/people';
+import { useMentions } from '../lib/mentionFeed';
 import { useSession } from '../lib/session';
 import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Star, Trash2, X } from 'lucide-vue-next';
 import {
@@ -78,6 +79,7 @@ const issue = ref<IssueFull | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const { people, colorOf, colorOfId, load: loadPeople } = usePeople();
+const { load: readMentions } = useMentions();
 
 const tab = ref<'comments' | 'history'>('comments');
 const order = ref<CommentOrder>(commentOrder.get());
@@ -691,6 +693,8 @@ async function postComment(): Promise<void> {
     commentDraft.value = '';
     keptDraft = '';
     writeDraft('');
+    // A name in what was just posted is waiting for somebody, this tab's own reader included.
+    void readMentions();
     // The record gained a line; the history tab is looking at the old one until it is read again.
     await reload();
   } catch (err) {
@@ -721,6 +725,7 @@ async function saveComment(c: Comment): Promise<void> {
       ),
     };
     editingComment.value = null;
+    void readMentions();
     await reload();
   } catch (err) {
     // The editor stays open with the text still in it; closing it would throw the words away.
@@ -802,6 +807,7 @@ async function removeComment(c: Comment): Promise<void> {
     await api(`/comments/${c.id}`, { method: 'DELETE' });
     const now = issue.value ?? current;
     issue.value = { ...now, comments: now.comments.filter((row) => row.id !== c.id) };
+    void readMentions();
     await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not delete the comment.';
@@ -950,6 +956,15 @@ async function removeIssue(): Promise<void> {
     <div class="iv__scrim" @click.self="emit('close')">
       <section class="dlg iv__win" role="dialog" aria-modal="true">
         <header class="dlg__h">
+          <button
+            class="btn btn--sm btn--icon btn--ghost"
+            type="button"
+            aria-label="Close"
+            @click="emit('close')"
+          >
+            <X class="ic" />
+          </button>
+          <div class="sp"></div>
           <span class="iv__path">
             <span class="key iv__where">{{ project }}</span>
             <span class="iv__sep">/</span>
@@ -1007,14 +1022,6 @@ async function removeIssue(): Promise<void> {
               <Trash2 class="ic" />
             </button>
           </template>
-          <button
-            class="btn btn--sm btn--icon btn--ghost"
-            type="button"
-            aria-label="Close"
-            @click="emit('close')"
-          >
-            <X class="ic" />
-          </button>
         </header>
 
         <!-- The same two columns, with a placeholder the size of every control that is coming. -->

@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjects, type ProjectMini } from '../lib/projects';
 import { usePeople } from '../lib/people';
+import { useMentions, type Mention } from '../lib/mentionFeed';
 import { useRoles } from '../lib/roles';
 import { lastBoard } from '../lib/lastProject';
 import { useLive } from '../lib/live';
@@ -37,6 +38,8 @@ const router = useRouter();
 const { projects, load } = useProjects();
 // Kept fresh from here because this bar is on every screen; the lists themselves are shared.
 const { load: loadPeople } = usePeople();
+// What is waiting for you is written in the colour of your own role.
+const mine = computed(() => session.me.value?.role?.color ?? undefined);
 const { load: loadRoles } = useRoles();
 
 // No role is no access, so the one screen such a person has is not worth pointing at.
@@ -93,35 +96,11 @@ const countdown = computed(() => {
 
 // Being named somewhere. The feed lives behind the same chip: what is waiting for you,
 // and which day it landed on, are the same question asked twice.
-interface Mention {
-  commentId: string;
-  said: string;
-  by: string;
-  key: string;
-  projectShort: string;
-  boardSlug: string;
-  at: string;
-  read: boolean;
-}
-const mentions = ref<Mention[]>([]);
-const unread = computed(() => mentions.value.filter((m) => !m.read).length);
-
-async function readMentions(): Promise<void> {
-  try {
-    mentions.value = await api<Mention[]>('/mentions');
-  } catch {
-    /* the chip simply shows no feed */
-  }
-}
+const { mentions, unread, load: readMentions, markRead } = useMentions();
 
 async function openMention(m: Mention): Promise<void> {
   dateOpen.value = false;
-  if (!m.read) {
-    await api('/mentions/read', { method: 'POST', body: { commentId: m.commentId } }).catch(
-      () => {}
-    );
-    void readMentions();
-  }
+  if (!m.read) await markRead(m.commentId);
   await router.push(`/${m.projectShort}/${m.boardSlug}/${m.key}`);
 }
 
@@ -290,11 +269,11 @@ async function signOut(): Promise<void> {
           aria-label="Calendar"
           @click="toggleDate"
         >
-          <span v-if="unread" class="stamp topat">
-            <AtSign class="ic ic--sm" />{{ unread }}
-          </span>
           <span v-if="countdown" class="stamp topcount">{{ countdown }}</span>
           <span class="stamp">{{ today }}</span>
+          <span v-if="unread" class="stamp topat" :style="{ color: mine }">
+            <AtSign class="ic ic--sm" />{{ unread }}
+          </span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
           <template v-if="mentions.length">

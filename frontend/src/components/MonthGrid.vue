@@ -4,6 +4,7 @@
 // same grid hangs in the top bar and fills the calendar screen.
 import { computed, ref } from 'vue';
 import { AtSign, Bell } from 'lucide-vue-next';
+import { useSession } from '../lib/session';
 import {
   WEEKDAYS,
   emptyDay,
@@ -24,6 +25,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ (e: 'pick', key: string): void }>();
+
+const session = useSession();
+const mine = computed(() => session.me.value?.role?.color ?? undefined);
 
 const cells = computed(() => monthGrid(props.year, props.month));
 const info = (key?: string): DayInfo => (key && props.days.get(key)) || emptyDay();
@@ -75,7 +79,11 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       @mouseleave="hover = null"
     >
       <!-- What is waiting comes first, then what was marked; the number is in the popup. -->
-      <AtSign v-if="c.day && info(c.key).unread" class="ic ic--sm cal__at" />
+      <AtSign
+        v-if="c.day && info(c.key).unread"
+        class="ic ic--sm cal__at"
+        :style="{ color: mine }"
+      />
       <Bell v-else-if="c.day && info(c.key).marks.length" class="ic ic--sm cal__bell" />
       <span v-else-if="c.day">{{ c.day }}</span>
     </button>
@@ -94,7 +102,7 @@ function onEnter(ev: MouseEvent, c: Cell): void {
         <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
         {{ d.summary }}
       </span>
-      <span v-if="hovered.said" class="cal__pop-at">
+      <span v-if="hovered.said" class="cal__pop-at" :style="{ color: mine }">
         {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
       </span>
       <span v-if="hovered.worked" class="cal__pop-work">
