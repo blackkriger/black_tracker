@@ -215,7 +215,7 @@ async function signOut(): Promise<void> {
             />
           </div>
           <hr />
-          <button class="menu__i" type="button" @click="toCalendar">Calendar</button>
+          <button class="menu__i" type="button" @click="toCalendar">Full calendar</button>
         </div>
       </span>
       <RouterLink class="topitem" to="/profile">{{ session.me.value?.login }}</RouterLink>
