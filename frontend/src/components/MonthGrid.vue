@@ -3,7 +3,7 @@
 // marked on it, what is due on it, and how much work went through it — the shading. The
 // same grid hangs in the top bar and fills the calendar screen.
 import { computed, ref } from 'vue';
-import { AtSign, Bell } from 'lucide-vue-next';
+import { AtSign, Bell, Smile } from 'lucide-vue-next';
 import { useSession } from '../lib/session';
 import {
   WEEKDAYS,
@@ -37,6 +37,17 @@ function heat(key?: string): number {
   const worked = info(key).worked;
   if (!worked || !props.peak) return 0;
   return Math.min(5, Math.ceil((worked / props.peak) * 5));
+}
+
+// What stands in place of the number, in the order it outranks: an unread name, an unread
+// reaction, then a day somebody marked. The number is the quietest thing a day says.
+const WAITING = ['mention', 'reaction'];
+
+function markOf(key?: string): string | null {
+  const day = info(key);
+  const waiting = WAITING.find((kind) => (day.unreadOf[kind] ?? 0) > 0);
+  if (waiting) return waiting;
+  return day.marks.length ? 'marked' : null;
 }
 
 // A deadline colours the day itself; one that has gone by with work still open turns it red.
@@ -79,13 +90,20 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       @mouseleave="hover = null"
     >
       <!-- What is waiting comes first, then what was marked; the number is in the popup. -->
-      <AtSign
-        v-if="c.day && info(c.key).unread"
-        class="ic ic--sm cal__at"
-        :style="{ color: mine }"
-      />
-      <Bell v-else-if="c.day && info(c.key).marks.length" class="ic ic--sm cal__bell" />
-      <span v-else-if="c.day">{{ c.day }}</span>
+      <template v-if="c.day">
+        <AtSign
+          v-if="markOf(c.key) === 'mention'"
+          class="ic ic--sm cal__at"
+          :style="{ color: mine }"
+        />
+        <Smile
+          v-else-if="markOf(c.key) === 'reaction'"
+          class="ic ic--sm cal__at"
+          :style="{ color: mine }"
+        />
+        <Bell v-else-if="markOf(c.key) === 'marked'" class="ic ic--sm cal__bell" />
+        <span v-else>{{ c.day }}</span>
+      </template>
     </button>
 
     <div

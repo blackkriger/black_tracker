@@ -156,8 +156,9 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
       ),
       // What was said to the reader is the reader's own business, so this one is never
       // about the person picked.
-      pool.query<{ day: Date | string; said: number; unread: number }>(
+      pool.query<{ day: Date | string; kind: string; said: number; unread: number }>(
         `select (n.created_at at time zone '${ZONE}')::date as day,
+                n.kind,
                 count(*)::int as said,
                 count(*) filter (where n.read_at is null)::int as unread
            from notices n
@@ -167,7 +168,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
             and (n.created_at at time zone '${ZONE}')::date between $2::date and $3::date
             and i.project_id <> all($4::uuid[])
             and i.board_id <> all($5::uuid[])
-          group by 1`,
+          group by 1, 2`,
         [auth.userId, from, to, denied.projects, denied.boards]
       ),
     ]);
@@ -212,6 +213,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
         })),
         mentions: mentions.rows.map((m) => ({
           day: iso(m.day),
+          kind: m.kind,
           said: m.said,
           unread: m.unread,
         })),

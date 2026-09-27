@@ -279,21 +279,37 @@ function onMouseUp(): void {
 }
 
 function onMouseDownAnywhere(ev: MouseEvent): void {
+  if (reacting.value) {
+    const set = document.getElementById('react-set');
+    const inside = set && ev.target instanceof Node && set.contains(ev.target);
+    // The button that opened it handles its own press, so only the rest of the page closes it.
+    if (!inside && !(ev.target instanceof Element && ev.target.closest('.react__hold'))) {
+      reacting.value = null;
+    }
+  }
   if (!popup.value) return;
   const bar = document.getElementById('sel-bar');
   if (bar && ev.target instanceof Node && bar.contains(ev.target)) return;
   popup.value = null;
 }
 
-// Walk away from it and it fades; come back and it returns. Distance to the bar's box, with room around it.
+/** How far the pointer is from a box, zero anywhere inside it. */
+function away(ev: MouseEvent, box: DOMRect): number {
+  const dx = ev.clientX < box.left ? box.left - ev.clientX : Math.max(0, ev.clientX - box.right);
+  const dy = ev.clientY < box.top ? box.top - ev.clientY : Math.max(0, ev.clientY - box.bottom);
+  return Math.max(dx, dy);
+}
+
+// Walk away from it and it fades; come back and it returns. Distance to the box, with room around it.
 function onMouseMove(ev: MouseEvent): void {
+  if (reacting.value) {
+    const set = document.getElementById('react-set');
+    if (set) reactNear.value = away(ev, set.getBoundingClientRect()) <= 80;
+  }
   if (!popup.value) return;
   const bar = document.getElementById('sel-bar');
   if (!bar) return;
-  const r = bar.getBoundingClientRect();
-  const dx = ev.clientX < r.left ? r.left - ev.clientX : Math.max(0, ev.clientX - r.right);
-  const dy = ev.clientY < r.top ? r.top - ev.clientY : Math.max(0, ev.clientY - r.bottom);
-  popupNear.value = dx <= 80 && dy <= 80;
+  popupNear.value = away(ev, bar.getBoundingClientRect()) <= 80;
 }
 
 function copySelection(): void {
@@ -825,17 +841,26 @@ async function removeLink(link: IssueLink): Promise<void> {
 
 // A nod at what somebody wrote. Clicking one that is already yours takes it back.
 const reacting = ref<string | null>(null);
+const reactNear = ref(true);
 
-function reactionsOf(c: Comment): { emoji: string; n: number; mine: boolean }[] {
+interface Nod {
+  emoji: string;
+  n: number;
+  mine: boolean;
+  who: string;
+}
+
+function reactionsOf(c: Comment): Nod[] {
   const me = session.me.value?.login;
-  const byEmoji = new Map<string, { emoji: string; n: number; mine: boolean }>();
+  const byEmoji = new Map<string, Nod & { names: string[] }>();
   for (const r of c.reactions ?? []) {
-    const found = byEmoji.get(r.emoji) ?? { emoji: r.emoji, n: 0, mine: false };
+    const found = byEmoji.get(r.emoji) ?? { emoji: r.emoji, n: 0, mine: false, who: '', names: [] };
     found.n += 1;
+    found.names.push(r.by);
     if (r.by === me) found.mine = true;
     byEmoji.set(r.emoji, found);
   }
-  return [...byEmoji.values()];
+  return [...byEmoji.values()].map((r) => ({ ...r, who: r.names.join(', ') }));
 }
 
 async function react(c: Comment, emoji: string): Promise<void> {
@@ -1304,6 +1329,39 @@ async function removeIssue(): Promise<void> {
                       class="ic ic--sm cm__pin"
                       :aria-label="c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned'"
                     />
+                    <span class="cm__react">
+                      <span v-for="r in reactionsOf(c)" :key="r.emoji" class="react__one">
+                        <button
+                          class="react"
+                          :class="{ 'is-mine': r.mine }"
+                          type="button"
+                          @click="react(c, r.emoji)"
+                        >{{ r.emoji }}<span class="react__n">{{ r.n }}</span></button>
+                        <span class="selbar react__who">{{ r.who }}</span>
+                      </span>
+                      <span class="react__hold">
+                        <button
+                          class="btn btn--sm btn--icon btn--ghost"
+                          type="button"
+                          aria-label="React"
+                          @click="reacting = reacting === c.id ? null : c.id; reactNear = true"
+                        ><SmilePlus class="ic ic--sm" /></button>
+                        <div
+                          v-if="reacting === c.id"
+                          id="react-set"
+                          class="menu react__menu"
+                          :class="{ 'is-far': !reactNear }"
+                        >
+                          <button
+                            v-for="e in REACTIONS"
+                            :key="e"
+                            class="react"
+                            type="button"
+                            @click="react(c, e)"
+                          >{{ e }}</button>
+                        </div>
+                      </span>
+                    </span>
                     <span class="cm__acts">
                       <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
                         {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
@@ -1349,34 +1407,6 @@ async function removeIssue(): Promise<void> {
                     </div>
                   </template>
                   <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
-
-                  <div class="cm__react">
-                    <button
-                      v-for="r in reactionsOf(c)"
-                      :key="r.emoji"
-                      class="react"
-                      :class="{ 'is-mine': r.mine }"
-                      type="button"
-                      @click="react(c, r.emoji)"
-                    >{{ r.emoji }}<span class="react__n">{{ r.n }}</span></button>
-                    <span class="react__hold">
-                      <button
-                        class="btn btn--sm btn--icon btn--ghost"
-                        type="button"
-                        aria-label="React"
-                        @click="reacting = reacting === c.id ? null : c.id"
-                      ><SmilePlus class="ic ic--sm" /></button>
-                      <div v-if="reacting === c.id" class="menu react__menu">
-                        <button
-                          v-for="e in REACTIONS"
-                          :key="e"
-                          class="react"
-                          type="button"
-                          @click="react(c, e)"
-                        >{{ e }}</button>
-                      </div>
-                    </span>
-                  </div>
 
                   <div v-if="filesOf(c.id).length" class="cm__files">
                     <span
@@ -1904,31 +1934,49 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-direction: column;
 }
-/* A row of nods under what was said, and the way to add one. */
+/* The nods stand in the line that names the author, before what can be done to the comment. */
 .cm__react {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-left: 6px;
 }
 .react {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 7px;
-  border: 1px solid var(--line);
+  gap: 4px;
+  height: 22px;
+  padding: 0 4px;
+  border: 0;
   background: none;
   color: var(--text-dim);
   font-size: 13px;
   cursor: pointer;
 }
 .react:hover {
-  border-color: var(--line-2);
-}
-.react.is-mine {
-  border-color: var(--accent);
   color: var(--text);
+}
+/* Yours is the one written in gold; nothing is framed. */
+.react.is-mine .react__n {
+  color: var(--accent);
+}
+/* Who nodded, held over the nod until the pointer leaves it. */
+.react__one {
+  position: relative;
+  display: inline-flex;
+}
+.react__who {
+  left: 50%;
+  bottom: 100%;
+  display: none;
+  padding: 5px 10px;
+  transform: translate(-50%, -8px);
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.react__one:hover .react__who {
+  display: block;
 }
 .react__n {
   font: 11px var(--font-num);
@@ -1964,6 +2012,9 @@ async function removeIssue(): Promise<void> {
 }
 .react__menu .react {
   border-color: transparent;
+}
+.react__menu.is-far {
+  opacity: 0.25;
 }
 /* Said once, quietly, and gone: it is a reassurance, not a state. */
 .composer__kept {

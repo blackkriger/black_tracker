@@ -36,9 +36,10 @@ export interface Activity {
   resolved: number;
 }
 
-/** How many times the reader was named that day, and how many they have not seen. */
+/** What was said to the reader that day, by kind, and how much of it is unseen. */
 export interface DayMentions {
   day: string;
+  kind: string;
   said: number;
   unread: number;
 }
@@ -51,6 +52,8 @@ export interface DayInfo {
   resolved: number;
   said: number;
   unread: number;
+  /** How many are unseen, per kind, so a day can say which kind is waiting. */
+  unreadOf: Record<string, number>;
 }
 
 export const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -106,7 +109,16 @@ export function monthRange(year: number, month: number): { from: string; to: str
 }
 
 export function emptyDay(): DayInfo {
-  return { marks: [], dues: [], worked: 0, created: 0, resolved: 0, said: 0, unread: 0 };
+  return {
+    marks: [],
+    dues: [],
+    worked: 0,
+    created: 0,
+    resolved: 0,
+    said: 0,
+    unread: 0,
+    unreadOf: {},
+  };
 }
 
 /** Everything the server said about a stretch of days, gathered per day. */
@@ -134,6 +146,7 @@ export function byDay(
     const day = at(m.day);
     day.said += m.said;
     day.unread += m.unread;
+    if (m.unread) day.unreadOf[m.kind] = (day.unreadOf[m.kind] ?? 0) + m.unread;
   }
   return map;
 }
