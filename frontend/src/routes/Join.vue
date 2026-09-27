@@ -67,6 +67,10 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <div class="signin">
+    <div class="signin__mark">
+      <span class="signin__brand">TRACKER<span class="signin__cursor">_</span></span>
+    </div>
+
     <section class="panel signin__panel" aria-labelledby="join-title">
       <header id="join-title" class="panel__h">Create account</header>
 
@@ -134,6 +138,30 @@ async function onSubmit(): Promise<void> {
   justify-content: center;
   gap: var(--space-6);
   padding: var(--space-5);
+}
+.signin__mark {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.signin__brand {
+  font: 700 34px/1 var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+.signin__cursor {
+  color: var(--text);
+  animation: cursor-blink 1.2s steps(2, end) infinite;
+}
+@keyframes cursor-blink {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  61%,
+  100% {
+    opacity: 0;
+  }
 }
 .signin__panel {
   width: 360px;
