@@ -203,16 +203,18 @@ async function signOut(): Promise<void> {
     <nav class="topitems" aria-label="Account">
       <span class="datepick" @click.stop>
         <button
-          class="topitem topitem--caret"
+          class="topitem topitem--caret datechip"
           type="button"
           :aria-expanded="dateOpen"
           aria-label="Calendar"
           @click="toggleDate"
         >
           <span v-if="countdown" class="stamp topcount">{{ countdown }}</span>
-          <span class="stamp">{{ today }}</span>
-          <span v-if="unread" class="stamp topat" :style="{ color: mine }">
-            <AtSign class="ic ic--sm" />{{ unread }}
+          <span class="datechip__now">
+            <span v-if="unread" class="stamp topat" :style="{ color: mine }">
+              <AtSign class="ic ic--sm" />{{ unread }}
+            </span>
+            <span class="stamp">{{ today }}</span>
           </span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
@@ -367,6 +369,17 @@ async function signOut(): Promise<void> {
   position: relative;
   display: inline-flex;
   align-items: center;
+}
+/* Two lines: what is coming above, and what today is with what is waiting on it below. */
+.datechip {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+.datechip__now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .topat {
   display: inline-flex;
