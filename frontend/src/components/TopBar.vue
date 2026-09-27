@@ -6,6 +6,18 @@ import { useProjects, type ProjectMini } from '../lib/projects';
 import { lastBoard } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
+import MonthGrid from './MonthGrid.vue';
+import { api } from '../lib/api';
+import {
+  byDay,
+  monthName,
+  monthRange,
+  type Activity,
+  type DayInfo,
+  type Due,
+  type Mark,
+} from '../lib/calendar';
+import { stamp } from '../lib/issues';
 import { ChevronDown } from 'lucide-vue-next';
 
 const props = defineProps<{
@@ -27,6 +39,46 @@ const currentShort = computed(() => props.project?.shortName ?? null);
 
 // Which project's menu is open.
 const openShort = ref<string | null>(null);
+
+// Today, and the month behind it. The month is read the first time the chip is opened —
+// no screen needs it until then.
+const now = new Date();
+const today = stamp(now.toISOString());
+const dateOpen = ref(false);
+const calYear = ref(now.getFullYear());
+const calMonth = ref(now.getMonth());
+const calDays = ref(new Map<string, DayInfo>());
+const calPeak = ref(1);
+let calRead = false;
+
+async function readMonth(): Promise<void> {
+  const { from, to } = monthRange(calYear.value, calMonth.value);
+  try {
+    const got = await api<{
+      marks: Mark[];
+      dues: { day: string; issues: Due[] }[];
+      activity: Activity[];
+    }>(`/calendar?from=${from}&to=${to}`);
+    calDays.value = byDay(got.marks, got.dues, got.activity);
+    calPeak.value = Math.max(1, ...[...calDays.value.values()].map((d) => d.worked));
+  } catch {
+    /* the chip still opens; it simply has nothing to shade */
+  }
+}
+
+function toggleDate(): void {
+  dateOpen.value = !dateOpen.value;
+  openShort.value = null;
+  if (dateOpen.value && !calRead) {
+    calRead = true;
+    void readMonth();
+  }
+}
+
+async function toCalendar(): Promise<void> {
+  dateOpen.value = false;
+  await router.push('/calendar');
+}
 
 // The board each project would open, read once from storage and kept in step as you move around, since localStorage itself is not reactive.
 const remembered = ref<Record<string, string>>({});
@@ -69,9 +121,12 @@ onUnmounted(() => {
 
 function closeMenu(): void {
   openShort.value = null;
+  dateOpen.value = false;
 }
 function onKeydown(ev: KeyboardEvent): void {
-  if (ev.key === 'Escape') openShort.value = null;
+  if (ev.key !== 'Escape') return;
+  openShort.value = null;
+  dateOpen.value = false;
 }
 
 // Someone added a project or a board while this bar was on screen.
@@ -140,6 +195,32 @@ async function signOut(): Promise<void> {
     <div class="sp"></div>
 
     <nav class="topitems" aria-label="Account">
+      <span class="datepick" @click.stop>
+        <button
+          class="topitem topitem--caret"
+          type="button"
+          :aria-expanded="dateOpen"
+          aria-label="Calendar"
+          @click="toggleDate"
+        >
+          <span class="stamp">{{ today }}</span>
+        </button>
+        <div v-if="dateOpen" class="menu datemenu">
+          <div class="datemenu__h">{{ monthName(calYear, calMonth) }}</div>
+          <div class="datemenu__grid">
+            <MonthGrid
+              :year="calYear"
+              :month="calMonth"
+              :days="calDays"
+              :peak="calPeak"
+              compact
+              @pick="toCalendar"
+            />
+          </div>
+          <hr />
+          <button class="menu__i" type="button" @click="toCalendar">Calendar</button>
+        </div>
+      </span>
       <RouterLink class="topitem" to="/profile">{{ session.me.value?.login }}</RouterLink>
       <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
@@ -226,5 +307,41 @@ async function signOut(): Promise<void> {
 }
 .topitem--danger:hover {
   color: var(--danger-text);
+}
+.datepick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.datemenu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 20;
+  width: 250px;
+}
+/* The same pointer the board menu has, kept over the chip on the right. */
+.datemenu::before,
+.datemenu::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  right: 14px;
+  border: 6px solid transparent;
+}
+.datemenu::before {
+  border-bottom-color: var(--line-2);
+}
+.datemenu::after {
+  margin-bottom: -1px;
+  border-bottom-color: var(--card);
+}
+.datemenu__h {
+  padding: 4px 10px 6px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.datemenu__grid {
+  padding: 0 10px 6px;
 }
 </style>

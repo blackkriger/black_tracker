@@ -11,6 +11,7 @@ import SettingsNewProject from './routes/settings/NewProject.vue';
 import SettingsTags from './routes/settings/Tags.vue';
 import SettingsUsers from './routes/settings/Users.vue';
 import Join from './routes/Join.vue';
+import Calendar from './routes/Calendar.vue';
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -26,6 +27,7 @@ export const router = createRouter({
     // The same board with one of its issues open over it, so a card can be linked to.
     { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
     { path: '/profile', name: 'profile', component: Profile },
+    { path: '/calendar', name: 'calendar', component: Calendar },
     { path: '/settings', name: 'settings', component: SettingsIndex },
     { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject },
     { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject },

@@ -285,6 +285,13 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .menu__i--danger { color: var(--danger-text); }
 .menu__i--danger:hover, .menu__i--danger.is-hover { background: rgba(255, 80, 102, .12); }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+/* A small box held over what it speaks about, with a pointer under it: the selection bar, the time a comment was edited, a day on the calendar. */
+.selbar { position: fixed; z-index: 50; display: flex; transform: translate(-50%, calc(-100% - 8px)); background: var(--card); border: 1px solid var(--line-2); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); transition: opacity .12s ease-out; }
+.selbar::before, .selbar::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px; border: 6px solid transparent; }
+.selbar::before { border-top-color: var(--line-2); }
+.selbar::after { margin-top: -1px; border-top-color: var(--card); }
+.selbar button { height: 28px; padding: 0 14px; border: 0; background: none; color: var(--text-dim); font: 13px var(--font-ui); cursor: pointer; }
+.selbar button:hover { color: var(--text); }
 
 /* ---------- dialog (forms & confirmations) ---------- */
 .dlg { background: var(--surface); border: 1px solid var(--line-2); box-shadow: 0 24px 64px rgba(0, 0, 0, .7); }

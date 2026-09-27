@@ -356,7 +356,6 @@ const shownAssignee = computed(() =>
   creating.value ? draft.value.assigneeId : (issue.value?.assignee?.id ?? null)
 );
 const shownDue = computed(() => (creating.value ? draft.value.dueDate : (issue.value?.dueDate ?? null)));
-const state = computed(() => props.board.states.find((s) => s.id === shownStateId.value) ?? null);
 const wornTags = computed(() =>
   creating.value
     ? props.tags.filter((t) => draft.value.tagIds.includes(t.id))
@@ -913,7 +912,6 @@ async function removeIssue(): Promise<void> {
             <span class="iv__sep">/</span>
             <span class="key iv__key">{{ issueKey ?? 'NEW ISSUE' }}</span>
           </span>
-          <span v-if="state" class="iv__state" :style="{ color: state.color }">{{ state.name }}</span>
           <div class="sp"></div>
           <template v-if="creating">
             <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
@@ -1571,7 +1569,6 @@ async function removeIssue(): Promise<void> {
   color: var(--danger-text);
 }
 .iv__key,
-.iv__state,
 .iv__path {
   flex: 0 0 auto;
 }
@@ -1592,9 +1589,6 @@ async function removeIssue(): Promise<void> {
 }
 .iv__key {
   font-size: 13px;
-}
-.iv__state {
-  font-size: 12.5px;
 }
 .iv__sk-line {
   margin-top: 8px;
@@ -1632,46 +1626,6 @@ async function removeIssue(): Promise<void> {
   gap: 20px;
 }
 /* Over the selection, out of the flow: it follows the highlight rather than the layout. One plate with two words on it — no buttons drawn inside a box drawn inside a box. */
-.selbar {
-  position: fixed;
-  z-index: 50;
-  display: flex;
-  transform: translate(-50%, calc(-100% - 8px));
-  background: var(--card);
-  border: 1px solid var(--line-2);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  transition: opacity 0.12s ease-out;
-}
-/* The same pointer the board menu has, upside down: the border's triangle, then the surface's a pixel over it, so the line runs around the tip instead of across it. */
-.selbar::before,
-.selbar::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-left: -6px;
-  border: 6px solid transparent;
-}
-.selbar::before {
-  border-top-color: var(--line-2);
-}
-.selbar::after {
-  margin-top: -1px;
-  border-top-color: var(--card);
-}
-.selbar button {
-  height: 28px;
-  padding: 0 14px;
-  border: 0;
-  background: none;
-  color: var(--text-dim);
-  font: 13px var(--font-ui);
-  cursor: pointer;
-}
-/* The words light up and nothing else, the way the top bar's do. */
-.selbar button:hover {
-  color: var(--text);
-}
 .selbar.is-far {
   opacity: 0.25;
 }
