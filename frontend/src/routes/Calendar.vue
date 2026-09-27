@@ -2,6 +2,7 @@
 // The year at a glance: the days somebody marked, the deadlines the issues carry, and
 // how much work went through each day — for the whole team or for one person.
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
@@ -26,6 +27,7 @@ import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
 import { useLive } from '../lib/live';
 
+const route = useRoute();
 const session = useSession();
 const { people, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
@@ -74,11 +76,21 @@ async function load(): Promise<void> {
   }
 }
 
+// The top bar hands a day over in the address; the screen opens on it.
+function fromAddress(): void {
+  const day = String(route.query.day ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  year.value = Number(day.slice(0, 4));
+  openDay(day);
+}
+
 onMounted(() => {
   void loadPeople();
   void loadProjects();
   void load();
+  fromAddress();
 });
+watch(() => route.query.day, fromAddress);
 watch([year, who], () => void load());
 useLive((ev) => {
   if (['key-date.changed', 'issue.updated', 'issue.created', 'issue.deleted'].includes(ev.type)) {

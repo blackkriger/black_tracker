@@ -77,6 +77,12 @@ async function toCalendar(): Promise<void> {
   await router.push('/calendar');
 }
 
+// A day picked here opens on the calendar screen, where there is room to say what is on it.
+async function toDay(key: string): Promise<void> {
+  dateOpen.value = false;
+  await router.push({ path: '/calendar', query: { day: key } });
+}
+
 // The board each project would open, read once from storage and kept in step as you move around, since localStorage itself is not reactive.
 const remembered = ref<Record<string, string>>({});
 watch(
@@ -211,7 +217,7 @@ async function signOut(): Promise<void> {
               :days="calDays"
               :peak="calPeak"
               compact
-              @pick="toCalendar"
+              @pick="toDay"
             />
           </div>
           <hr />
