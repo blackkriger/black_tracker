@@ -64,6 +64,8 @@ const props = defineProps<{
   project: string;
   /** What the issue being written will be called once it exists. */
   nextKey?: string;
+  /** A comment to scroll to and light up, when the window was opened by a notice. */
+  focusComment?: string;
 }>();
 
 const emit = defineEmits<{
@@ -342,6 +344,22 @@ const commentEdit = ref('');
 
 // Fields somebody else changed a moment ago, lit for as long as the animation runs.
 const fresh = ref<Set<string>>(new Set());
+// The comment a notice pointed at: shown, scrolled to and lit the same way a change is.
+const litComment = ref<string | null>(null);
+
+watch(() => props.focusComment, lookAtComment);
+
+function lookAtComment(id?: string): void {
+  if (!id) return;
+  tab.value = 'comments';
+  void nextTick(() => {
+    document.getElementById(`comment-${id}`)?.scrollIntoView({ block: 'center' });
+    litComment.value = id;
+    setTimeout(() => {
+      if (litComment.value === id) litComment.value = null;
+    }, 2000);
+  });
+}
 
 // The names the server sends for what changed, in the names this screen knows them by.
 const FIELD_OF: Record<string, string> = {
@@ -550,6 +568,7 @@ async function load(): Promise<void> {
     issue.value = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
     keptDraft = readDraft();
     if (keptDraft) commentDraft.value = keptDraft;
+    lookAtComment(props.focusComment);
   } catch (err) {
     issue.value = null;
     error.value = err instanceof Error ? err.message : 'Could not load the issue.';
@@ -1327,6 +1346,7 @@ async function removeIssue(): Promise<void> {
               <article
                 v-for="c in thread"
                 :id="`comment-${c.id}`"
+                :class="{ 'is-fresh': litComment === c.id }"
                 :key="c.id"
                 class="cm"
               >

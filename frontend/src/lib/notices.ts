@@ -10,6 +10,8 @@ export type NoticeKind = 'mention' | 'reaction';
 export interface Notice {
   id: string;
   kind: NoticeKind;
+  /** The comment it is about, which is what the window scrolls to. */
+  commentId: string | null;
   /** The reaction itself, when that is what this is. */
   emoji: string | null;
   said: string;

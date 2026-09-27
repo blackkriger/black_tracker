@@ -101,7 +101,10 @@ const { shown: notices, unread, load: readNotices, markRead } = useNotices();
 async function openNotice(n: Notice): Promise<void> {
   dateOpen.value = false;
   if (!n.read) await markRead(n.id);
-  await router.push(`/${n.projectShort}/${n.boardSlug}/${n.key}`);
+  await router.push({
+    path: `/${n.projectShort}/${n.boardSlug}/${n.key}`,
+    query: n.commentId ? { c: n.commentId } : {},
+  });
 }
 
 async function readNext(): Promise<void> {
@@ -343,8 +346,11 @@ async function signOut(): Promise<void> {
               <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
               <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
               <span class="men__said">
-                <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
-                {{ n.said }}
+                <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
+                <template v-else>
+                  <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
+                  {{ n.said }}
+                </template>
               </span>
             </button>
           </template>

@@ -192,9 +192,11 @@ async function removeMark(m: Mark): Promise<void> {
 interface OpenIssue {
   key: string;
   project: string;
+  comment?: string;
   board: { id: string; name: string; states: { id: string; name: string; color: string }[] };
 }
 const open = ref<OpenIssue | null>(null);
+const lookAt = ref<string | undefined>(undefined);
 const openTags = ref<IssueTag[]>([]);
 const openBoards = computed(
   () => projects.value.find((p) => p.shortName === open.value?.project)?.boards ?? []
@@ -207,6 +209,7 @@ async function openNotice(n: Notice): Promise<void> {
     .find((p) => p.shortName === n.projectShort)
     ?.boards.find((b) => b.slug === n.boardSlug);
   if (!board) return;
+  lookAt.value = n.commentId ?? undefined;
   await openIssue({
     key: n.key,
     summary: '',
@@ -226,7 +229,8 @@ async function openIssue(d: Due): Promise<void> {
       api<IssueTag[]>(`/tags?project=${encodeURIComponent(d.projectShort)}`),
     ]);
     openTags.value = tags;
-    open.value = { key: d.key, project: d.projectShort, board };
+    open.value = { key: d.key, project: d.projectShort, board, comment: lookAt.value };
+    lookAt.value = undefined;
     picked.value = null;
   } catch (err) {
     fail('day', err, 'Could not open the issue.');
@@ -326,10 +330,13 @@ function closeIssue(): void {
                   <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
                   <span v-if="n.emoji">{{ n.emoji }}</span>
                   <span class="note__said">
-                    <template v-if="n.by && n.by !== session.me.value?.login">
-                      {{ n.by }}:
+                    <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
+                    <template v-else>
+                      <template v-if="n.by && n.by !== session.me.value?.login">
+                        {{ n.by }}:
+                      </template>
+                      {{ n.said }}
                     </template>
-                    {{ n.said }}
                   </span>
                 </span>
               </button>
@@ -381,8 +388,11 @@ function closeIssue(): void {
           <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
           <span v-if="n.emoji">{{ n.emoji }}</span>
           <span class="mark__title">
-            <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
-            {{ n.said }}
+            <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
+            <template v-else>
+              <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
+              {{ n.said }}
+            </template>
           </span>
         </button>
       </div>
@@ -479,6 +489,7 @@ function closeIssue(): void {
       :boards="openBoards"
       :tags="openTags"
       :project="open.project"
+      :focus-comment="open.comment"
       @close="open = null"
       @changed="load"
       @deleted="closeIssue"

@@ -523,6 +523,7 @@ watch(
       :tags="tags"
       :project="project?.shortName ?? ''"
       :next-key="project?.nextKey ?? ''"
+      :focus-comment="String(route.query.c ?? '') || undefined"
       @close="closeIssue"
       @tag-created="tagCreated"
       @moved="issueMoved"

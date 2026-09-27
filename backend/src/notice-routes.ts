@@ -152,6 +152,7 @@ function publicNotice(r: NoticeRow, mine: string) {
   return {
     id: r.id,
     kind: r.kind,
+    commentId: r.comment_id,
     emoji: r.detail,
     said: said.slice(0, 140),
     by: r.by_login,
