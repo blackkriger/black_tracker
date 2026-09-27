@@ -1067,11 +1067,15 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!found) return;
     const { comment } = req.query as { comment?: string };
     if (comment) {
-      const owns = await pool.query('select 1 from issue_comments where id = $1 and issue_id = $2', [
-        comment,
-        id,
-      ]);
+      const owns = await pool.query<{ author_id: string }>(
+        'select author_id from issue_comments where id = $1 and issue_id = $2',
+        [comment, id]
+      );
       if (!owns.rowCount) return reply.code(400).send({ error: 'That comment is on another issue.' });
+      // Giving a comment a file is editing it, and a comment is edited by whoever wrote it.
+      if (owns.rows[0].author_id !== found.auth.userId) {
+        return reply.code(403).send({ error: 'Only the author can edit a comment.' });
+      }
     }
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: 'Send a file.' });
@@ -1106,6 +1110,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       // The issue went away while the bytes were landing: take the bytes with it.
       await unlink(stored).catch(() => {});
       throw err;
+    }
+    if (comment) {
+      await pool.query('update issue_comments set edited_at = now() where id = $1', [comment]);
     }
     await writeHistory(pool, id, found.auth.userId, 'file added', null, filename);
     void publish({
@@ -1165,18 +1172,36 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       storage_path: string;
       uploaded_by: string | null;
       issue_id: string;
+      comment_id: string | null;
       filename: string;
-    }>('select storage_path, uploaded_by, issue_id, filename from issue_attachments where id = $1', [
-      id,
-    ]);
+    }>(
+      'select storage_path, uploaded_by, issue_id, comment_id, filename from issue_attachments where id = $1',
+      [id]
+    );
     const row = res.rows[0];
     if (!row) return reply.code(404).send({ error: 'No such file.' });
     if (!(await mayReachIssue(auth, row.issue_id))) {
       return reply.code(403).send({ error: 'This file is not open to you.' });
     }
-    const mine = row.uploaded_by === auth.userId;
-    if (!mine && !(await requireDeleter(req, reply))) return;
+    if (row.comment_id) {
+      // Taking a file off a comment is editing it, so it follows the same rule the words do.
+      const owner = await pool.query<{ author_id: string }>(
+        'select author_id from issue_comments where id = $1',
+        [row.comment_id]
+      );
+      if (owner.rows[0]?.author_id !== auth.userId) {
+        return reply.code(403).send({ error: 'Only the author can edit a comment.' });
+      }
+    } else {
+      const mine = row.uploaded_by === auth.userId;
+      if (!mine && !(await requireDeleter(req, reply))) return;
+    }
     await pool.query('delete from issue_attachments where id = $1', [id]);
+    if (row.comment_id) {
+      await pool.query('update issue_comments set edited_at = now() where id = $1', [
+        row.comment_id,
+      ]);
+    }
     await unlink(row.storage_path).catch(() => {});
     const host = await issueById(row.issue_id);
     await writeHistory(pool, row.issue_id, auth.userId, 'file removed', null, row.filename);
