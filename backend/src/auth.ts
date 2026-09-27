@@ -259,6 +259,31 @@ export async function requireRoleManager(
   return null;
 }
 
+// What a person with no role still reaches: their own account, and the stream that tells the tab when that account changes. Everything else is behind the wall below, so a route added later is closed to them until it is named here.
+const ROLELESS_PATHS = new Set([
+  '/health',
+  '/login',
+  '/logout',
+  '/me',
+  '/me/password',
+  '/me/token',
+  '/me/regenerate-token',
+  '/events',
+]);
+
+// No role is no access. It is one wall rather than a guard on every route, because the rule is about the person, not about what they are reaching for: someone wearing no role has a profile and nothing else until somebody hands them one.
+export function registerRoleWall(app: FastifyInstance): void {
+  app.addHook('preHandler', async (req, reply) => {
+    if (ROLELESS_PATHS.has(req.url.split('?')[0])) return;
+    const auth = req.auth ?? (await resolveAuth(req));
+    // Not signed in at all is the route's own business, and it answers 401.
+    if (!auth) return;
+    req.auth = auth;
+    if (auth.isAdmin || auth.roleId) return;
+    return reply.code(403).send({ error: 'Nothing is open to you until you are given a role.' });
+  });
+}
+
 export async function requireAdmin(
   req: FastifyRequest,
   reply: FastifyReply

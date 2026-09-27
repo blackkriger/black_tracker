@@ -19,6 +19,9 @@ const session = useSession();
 const router = useRouter();
 const { projects, load } = useProjects();
 
+// No role is no access, so the one screen such a person has is not worth pointing at.
+const hasRole = computed(() => session.me.value?.isAdmin === true || !!session.me.value?.role);
+
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const currentShort = computed(() => props.project?.shortName ?? null);
 
@@ -138,7 +141,7 @@ async function signOut(): Promise<void> {
 
     <nav class="topitems" aria-label="Account">
       <RouterLink class="topitem" to="/profile">{{ session.me.value?.login }}</RouterLink>
-      <RouterLink class="topitem" to="/settings">Settings</RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
   </header>

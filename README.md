@@ -19,7 +19,7 @@ The decisions everything else leans on:
 - **Statuses are rows, not an enum.** Adding one is an insert; the board grows a column with no deploy. `is_resolved` is what "closed" means and stamps `issues.resolved_at`; a status is open or resolved, never both.
 - **A board owns its columns.** Statuses hang off `boards`, so two boards in one project can run different workflows, and an issue lives on exactly one board. A board is addressed by a slug unique inside the project, not by its id.
 - **An issue's key belongs to the project.** `PROJ-12` comes from the project's own counter, so moving a card between boards never changes it.
-- **Access is a denial list on roles.** A role can be shut out of a whole project or of single boards; someone with no role sees nothing; `users.is_admin` stands outside all of it.
+- **Access is a denial list on roles.** A role can be shut out of a whole project or of single boards; someone with no role reaches nothing but their own profile, refused at one wall rather than route by route; `users.is_admin` stands outside all of it.
 - **The settings screens are everyone's; two rights are not.** `roles.can_delete` allows deleting anything people made, `roles.can_manage_roles` allows handing someone a role and minting invite links. What a role itself may do — its denials, its rights, whether it exists — and the accounts behind people stay with the creator.
 
 ## Running it

@@ -48,5 +48,8 @@ router.beforeEach(async (to) => {
       ? { name: 'login' }
       : { name: 'login', query: { next: to.fullPath } };
   }
+  // No role is no access: until someone hands one out, the profile is the whole of the tracker.
+  const roleless = !session.me.value.isAdmin && !session.me.value.role;
+  if (roleless && to.name !== 'profile') return { name: 'profile' };
   return true;
 });

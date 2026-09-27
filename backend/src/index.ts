@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { env } from './env.js';
-import { pruneSessions, registerAuthRoutes } from './auth.js';
+import { pruneSessions, registerAuthRoutes, registerRoleWall } from './auth.js';
 import { registerProjectRoutes } from './project-routes.js';
 import { registerBoardRoutes } from './board-routes.js';
 import { registerTagRoutes } from './tag-routes.js';
@@ -26,6 +26,7 @@ await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 10 
 
 app.get('/health', async () => ({ data: { ok: true } }));
 
+registerRoleWall(app);
 registerAuthRoutes(app);
 registerProjectRoutes(app);
 registerBoardRoutes(app);
