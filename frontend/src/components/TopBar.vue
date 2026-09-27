@@ -358,7 +358,10 @@ async function signOut(): Promise<void> {
             </button>
           </template>
           <hr />
-          <button class="menu__i" type="button" @click="toCalendar">Full calendar</button>
+          <button class="menu__i" type="button" @click="toCalendar">
+            Full calendar
+            <ChevronRight class="ic ic--sm menu__to" />
+          </button>
         </div>
       </span>
       <RouterLink class="topitem" to="/profile">{{ session.me.value?.login }}</RouterLink>
@@ -555,6 +558,11 @@ async function signOut(): Promise<void> {
 }
 a.soon__title:hover {
   color: var(--accent-bright);
+}
+/* It leads somewhere, and says so at the end of the line. */
+.menu__to {
+  margin-left: auto;
+  color: var(--text-muted);
 }
 /* The one line under the month reads like the bar above it: the text brightens, nothing fills. */
 .datemenu .menu__i {
