@@ -6,6 +6,8 @@ import { useRoles } from '../lib/roles';
 import Quill from 'quill';
 import 'quill/dist/quill.core.css';
 import { clean } from '../lib/richtext';
+import '../lib/mention-blot';
+import { nameAt } from '../lib/mentions';
 import {
   Bold,
   ChevronLeft,
@@ -144,6 +146,25 @@ function lookForName(): void {
   }
 }
 
+// The names in the box, coloured where they stand. The format is applied silently, so it
+// never reaches the model — what is stored is the plain text, painted again when read.
+let painting = false;
+function paintNames(): void {
+  if (!quill || painting) return;
+  painting = true;
+  const text = quill.getText();
+  quill.formatText(0, text.length, 'mention', false, 'silent');
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== '@') continue;
+    if (i > 0 && !/\s/.test(text[i - 1])) continue;
+    const found = nameAt(text, i + 1);
+    if (!found) continue;
+    quill.formatText(i, found.name.length + 1, 'mention', found.name, 'silent');
+    i += found.name.length;
+  }
+  painting = false;
+}
+
 function pickName(login: string): void {
   if (!quill || !naming.value) return;
   const { from, query } = naming.value;
@@ -183,16 +204,33 @@ onMounted(() => {
   quill = new Quill(host.value, {
     theme: undefined,
     placeholder: props.placeholder,
-    formats: ['bold', 'italic', 'strike', 'code', 'code-block', 'blockquote', 'list', 'header', 'link'],
+    formats: [
+      'bold',
+      'italic',
+      'strike',
+      'code',
+      'code-block',
+      'blockquote',
+      'list',
+      'header',
+      'link',
+      'mention',
+    ],
   });
-  if (body.value) quill.clipboard.dangerouslyPasteHTML(clean(body.value), 'silent');
+  if (body.value) {
+    quill.clipboard.dangerouslyPasteHTML(clean(body.value), 'silent');
+    setTimeout(paintNames, 0);
+  }
   quill.on('text-change', () => {
     fromEditor = true;
     body.value = clean(quill?.root.innerHTML ?? '');
     readMarks();
     // Quill has not moved its caret yet when it says the text changed, so the list would
     // otherwise be a keystroke behind and an `@` on its own would show nothing.
-    setTimeout(lookForName, 0);
+    setTimeout(() => {
+      lookForName();
+      paintNames();
+    }, 0);
   });
   quill.on('selection-change', () => {
     readMarks();
@@ -236,6 +274,7 @@ watch(body, (next) => {
   }
   if (!quill || clean(quill.root.innerHTML) === next) return;
   quill.clipboard.dangerouslyPasteHTML(clean(next ?? ''), 'silent');
+  setTimeout(paintNames, 0);
 });
 
 function toggle(format: string, value: unknown = true): void {

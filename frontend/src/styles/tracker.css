@@ -372,6 +372,8 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .pv--ro { cursor: default; }
 .pv--ro:hover { border-color: transparent; background: none; }
 .stamp { font: 11px/1.2 var(--font-num); color: var(--text-muted); }
+/* A name written in a comment, in the colour of whoever it belongs to. */
+.mention { font-weight: 500; }
 .hr { height: 1px; background: var(--line); margin: 8px 0; }
 
 /* attachments */

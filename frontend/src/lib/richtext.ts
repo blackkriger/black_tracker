@@ -1,5 +1,6 @@
 // Text written by people, shown to people. The editor writes HTML and the reader is handed HTML, so everything on its way out of the database goes through a strict allowlist first — the same guard another project puts on its reviews.
 import DOMPurify from 'dompurify';
+import { paintNames } from './mentions';
 
 const ALLOWED_TAGS = [
   'p',
@@ -45,4 +46,4 @@ export function fromPlain(text: string): string {
 export const looksLikeHtml = (text: string): boolean => /^\s*<(p|h3|h4|ul|ol|pre|blockquote)\b/i.test(text);
 
 export const asHtml = (text: string): string =>
-  !text ? '' : looksLikeHtml(text) ? clean(text) : clean(fromPlain(text));
+  !text ? '' : paintNames(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text)));
