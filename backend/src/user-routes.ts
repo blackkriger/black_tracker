@@ -53,15 +53,28 @@ export function registerUserRoutes(app: FastifyInstance): void {
     });
   });
 
-  // Everyone signed in needs the names: an assignee picker, a comment's author, a mention later. It carries no dates, no token and no flags — just who there is.
+  // Everyone signed in needs the names: an assignee picker, a comment's author, a mention later. It carries no dates, no token and no flags — just who there is, and the colour their name is written in.
   app.get('/people', async (req, reply) => {
     if (!(await requireAuth(req, reply))) return;
-    const res = await pool.query<{ id: string; login: string; full_name: string }>(
-      `select id, login, full_name from users where active
-        order by lower(coalesce(nullif(full_name, ''), login))`
+    const res = await pool.query<{
+      id: string;
+      login: string;
+      full_name: string;
+      role_color: string | null;
+    }>(
+      `select u.id, u.login, u.full_name, r.color as role_color
+         from users u
+         left join roles r on r.id = u.role_id
+        where u.active
+        order by lower(coalesce(nullif(u.full_name, ''), u.login))`
     );
     return reply.send({
-      data: res.rows.map((r) => ({ id: r.id, login: r.login, fullName: r.full_name })),
+      data: res.rows.map((r) => ({
+        id: r.id,
+        login: r.login,
+        fullName: r.full_name,
+        roleColor: r.role_color,
+      })),
     });
   });
 

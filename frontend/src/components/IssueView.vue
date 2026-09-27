@@ -9,6 +9,8 @@ import { asHtml, isBlank } from '../lib/richtext';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
 import FileWall from './FileWall.vue';
+import Select from './Select.vue';
+import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Star, Trash2, X } from 'lucide-vue-next';
 import {
@@ -75,7 +77,7 @@ const draft = ref({
 const issue = ref<IssueFull | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
-const people = ref<{ id: string; login: string; fullName: string }[]>([]);
+const { people, colorOf, colorOfId, load: loadPeople } = usePeople();
 
 const tab = ref<'comments' | 'history'>('comments');
 const order = ref<CommentOrder>(commentOrder.get());
@@ -283,6 +285,22 @@ const gallery = computed(() => [
     .map((f) => ({ src: previewOf(f) ?? '', name: f.name })),
 ]);
 
+const stateChoices = computed(() =>
+  props.board.states.map((s) => ({ value: s.id, label: s.name, color: s.color }))
+);
+const priorityChoices = PRIORITIES.map((p) => ({ value: p, label: p, color: priorityColor(p) }));
+// A name is written in the colour of the role that wears it.
+const assigneeChoices = computed(() => [
+  { value: '', label: '—' },
+  ...people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor })),
+]);
+const boardChoices = computed(() => props.boards.map((b) => ({ value: b.id, label: b.name })));
+// The last entry is not a tag but the way to make one.
+const tagChoices = computed(() => [
+  ...freeTags.value.map((t) => ({ value: t.id, label: t.name, color: t.color })),
+  { value: 'new', label: 'New tag…' },
+]);
+
 const shotOfFile = (f: File): Shot => ({
   key: keyOf(f),
   src: previewOf(f) ?? '',
@@ -367,9 +385,7 @@ onMounted(() => {
   window.addEventListener('mouseup', onMouseUp);
   window.addEventListener('mousedown', onMouseDownAnywhere);
   window.addEventListener('mousemove', onMouseMove);
-  void api<{ id: string; login: string; fullName: string }[]>('/people')
-    .then((rows) => (people.value = rows))
-    .catch(() => {});
+  void loadPeople();
 });
 onUnmounted(() => {
   for (const url of previewUrls.values()) URL.revokeObjectURL(url);
@@ -561,14 +577,12 @@ async function saveText(): Promise<void> {
 
 const makingTag = ref(false);
 const newTagName = ref('');
-const newTagScope = ref<'project' | 'global'>('project');
+const newTagScope = ref('project');
 const tagBusy = ref(false);
 const tagError = ref<string | null>(null);
 
-// The select is a picker, so it never keeps what was picked: the tag it named is worn a moment later, or a dialog is open over it.
-function pickTag(el: HTMLSelectElement): void {
-  const chosen = el.value;
-  el.value = '';
+// The picker never keeps what was picked: the tag it named is worn a moment later, or a dialog is open over it.
+function pickTag(chosen: string): void {
   if (!chosen) return;
   if (chosen !== 'new') {
     toggleTag(chosen, true);
@@ -1153,7 +1167,9 @@ async function removeIssue(): Promise<void> {
                 <span class="av av--lg" :style="buddyAvatarStyle(c.author.login)"></span>
                 <div>
                   <div class="cm__head">
-                    <span class="cm__who">{{ c.author.login }}</span>
+                    <span class="cm__who" :style="{ color: colorOf(c.author.login) }">
+                      {{ c.author.login }}
+                    </span>
                     <time class="stamp">{{ stampAt(c.createdAt) }}</time>
                     <span v-if="c.editedAt" class="cm__edited">
                       edited
@@ -1299,7 +1315,7 @@ async function removeIssue(): Promise<void> {
             <div v-else-if="issue" class="hist">
               <div v-for="h in issue.history" :key="h.id" class="hi">
                 <time>{{ stampAt(h.at) }}</time>
-                <span class="hi__who">{{ h.by }}</span>
+                <span class="hi__who" :style="{ color: colorOf(h.by) }">{{ h.by }}</span>
                 <span class="hi__what">
                   <span class="hi__f">{{ h.field }}</span>
                   <!-- Nothing before it means there is nothing to point away from: the value stands alone. -->
@@ -1322,13 +1338,12 @@ async function removeIssue(): Promise<void> {
               <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('board') }">
                 <span class="prop__k">Board</span>
                 <div class="prop__stack">
-                  <select
-                    class="input input--sm"
-                    :value="issue.boardId"
-                    @change="moveBoard(($event.target as HTMLSelectElement).value)"
-                  >
-                    <option v-for="b in boards" :key="b.id" :value="b.id">{{ b.name }}</option>
-                  </select>
+                  <Select
+                    :model-value="issue.boardId"
+                    :options="boardChoices"
+                    small
+                    @update:model-value="moveBoard"
+                  />
                   <span class="hint">Moving it resets the status.</span>
                 </div>
               </div>
@@ -1336,48 +1351,30 @@ async function removeIssue(): Promise<void> {
             </template>
             <div class="prop" :class="{ 'is-fresh': fresh.has('status') }">
               <span class="prop__k">Status</span>
-              <select
-                class="input input--sm"
-                :value="shownStateId"
-                :style="{ color: state?.color }"
-                @change="setProp({ stateId: ($event.target as HTMLSelectElement).value })"
-              >
-                <option
-                  v-for="s in board.states"
-                  :key="s.id"
-                  :value="s.id"
-                  :style="{ color: s.color }"
-                >{{ s.name }}</option>
-              </select>
+              <Select
+                :model-value="shownStateId ?? ''"
+                :options="stateChoices"
+                small
+                @update:model-value="setProp({ stateId: $event })"
+              />
             </div>
             <div class="prop" :class="{ 'is-fresh': fresh.has('priority') }">
               <span class="prop__k">Priority</span>
-              <select
-                class="input input--sm"
-                :value="shownPriority"
-                :style="{ color: priorityColor(shownPriority) }"
-                @change="setProp({ priority: ($event.target as HTMLSelectElement).value as Priority })"
-              >
-                <option
-                  v-for="p in PRIORITIES"
-                  :key="p"
-                  :value="p"
-                  :style="{ color: priorityColor(p) }"
-                >{{ p }}</option>
-              </select>
+              <Select
+                :model-value="shownPriority"
+                :options="priorityChoices"
+                small
+                @update:model-value="setProp({ priority: $event as Priority })"
+              />
             </div>
             <div class="prop" :class="{ 'is-fresh': fresh.has('assignee') }">
               <span class="prop__k">Assignee</span>
-              <select
-                class="input input--sm"
-                :value="shownAssignee ?? ''"
-                @change="setProp({ assigneeId: ($event.target as HTMLSelectElement).value || null })"
-              >
-                <option value="">—</option>
-                <option v-for="p in people" :key="p.id" :value="p.id">
-                  {{ p.fullName || p.login }}
-                </option>
-              </select>
+              <Select
+                :model-value="shownAssignee ?? ''"
+                :options="assigneeChoices"
+                small
+                @update:model-value="setProp({ assigneeId: $event || null })"
+              />
             </div>
             <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
               <span class="prop__k">Due</span>
@@ -1411,15 +1408,13 @@ async function removeIssue(): Promise<void> {
                     @click="toggleTag(t.id, false)"
                   ><X class="ic ic--sm" /></button>
                 </span>
-                <select
-                  class="input input--sm"
-                  value=""
-                  @change="pickTag($event.target as HTMLSelectElement)"
-                >
-                  <option value="" hidden>Add tag…</option>
-                  <option v-for="t in freeTags" :key="t.id" :value="t.id">{{ t.name }}</option>
-                  <option value="new">New tag…</option>
-                </select>
+                <Select
+                  model-value=""
+                  :options="tagChoices"
+                  placeholder="Add tag…"
+                  small
+                  @update:model-value="pickTag"
+                />
               </div>
             </div>
 
@@ -1428,7 +1423,9 @@ async function removeIssue(): Promise<void> {
 
               <div class="prop">
                 <span class="prop__k">Author</span>
-                <span class="pv pv--ro">{{ issue.author?.login ?? '—' }}</span>
+                <span class="pv pv--ro" :style="{ color: colorOfId(issue.author?.id) }">
+                  {{ issue.author?.login ?? '—' }}
+                </span>
               </div>
               <div class="prop">
                 <span class="prop__k">Created</span>
@@ -1490,10 +1487,14 @@ async function removeIssue(): Promise<void> {
         </div>
         <div class="field">
           <label class="label" for="tag-scope">Scope</label>
-          <select id="tag-scope" v-model="newTagScope" class="input">
-            <option value="project">{{ project }} only</option>
-            <option value="global">Global</option>
-          </select>
+          <Select
+            id="tag-scope"
+            v-model="newTagScope"
+            :options="[
+              { value: 'project', label: `${project} only` },
+              { value: 'global', label: 'Global' },
+            ]"
+          />
         </div>
         <div v-if="tagError" class="err">{{ tagError }}</div>
         <template #footer>

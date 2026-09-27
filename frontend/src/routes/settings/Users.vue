@@ -3,6 +3,7 @@
 import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
+import Select from '../../components/Select.vue';
 import { api } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
 import { stamp, stampAt } from '../../lib/issues';
@@ -56,6 +57,17 @@ const loading = ref(true);
 const { errors, fail, clear } = usePanelErrors();
 
 const inviteRole = ref('');
+// A role is picked by its name in its own colour, the same way it is shown everywhere else.
+const roleChoices = computed(() => [
+  { value: '', label: '—' },
+  ...roles.value.map((r) => ({ value: r.id, label: r.name, color: r.color })),
+]);
+const inviteChoices = computed(() => [
+  { value: '', label: 'No role' },
+  ...roles.value.map((r) => ({ value: r.id, label: r.name, color: r.color })),
+]);
+const colorOfLogin = (login: string | null): string | undefined =>
+  users.value.find((u) => u.login === login)?.role?.color;
 const inviteBusy = ref(false);
 // Held only until the page is left: the server keeps a hash, so this is the one moment the link exists anywhere readable.
 const freshLink = ref<string | null>(null);
@@ -292,22 +304,21 @@ async function saveAccess(): Promise<void> {
                 <span class="who">
                   <span class="av av--lg" :style="buddyAvatarStyle(u.login)"></span>
                   <span class="who__lines">
-                    <span class="who__name">{{ u.fullName || u.login }}</span>
+                    <span class="who__name" :style="{ color: u.role?.color }">
+                      {{ u.fullName || u.login }}
+                    </span>
                     <span v-if="u.fullName" class="who__login">{{ u.login }}</span>
                   </span>
                 </span>
               </td>
               <td class="c-role">
-                <select
-                  class="input input--sm"
-                  :value="u.role?.id ?? ''"
-                  :style="{ color: u.role?.color ?? 'var(--text-dim)' }"
+                <Select
+                  :model-value="u.role?.id ?? ''"
+                  :options="roleChoices"
+                  small
                   :disabled="!canManageRoles"
-                  @change="patchUser(u, { roleId: ($event.target as HTMLSelectElement).value || null })"
-                >
-                  <option value="">—</option>
-                  <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
-                </select>
+                  @update:model-value="patchUser(u, { roleId: $event || null })"
+                />
               </td>
               <td>
                 <label class="check">
@@ -436,10 +447,7 @@ async function saveAccess(): Promise<void> {
           <span class="sk sk--field" style="flex: 0 0 96px"></span>
         </div>
         <div v-else-if="!freshLink" class="addrow">
-          <select v-model="inviteRole" class="input invite__role">
-            <option value="">No role</option>
-            <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
-          </select>
+          <Select v-model="inviteRole" class="invite__role" :options="inviteChoices" />
           <div class="sp"></div>
           <button class="btn" type="button" :disabled="inviteBusy" @click="createInvite">
             Create link
@@ -489,7 +497,10 @@ async function saveAccess(): Promise<void> {
                 </span>
               </td>
               <td>
-                <template v-if="i.status === 'used'">Used by {{ i.usedBy }}</template>
+                <template v-if="i.status === 'used'">
+                  Used by
+                  <span :style="{ color: colorOfLogin(i.usedBy) }">{{ i.usedBy }}</span>
+                </template>
                 <template v-else-if="i.status === 'expired'">Expired</template>
                 <template v-else>Good until {{ stampAt(i.expiresAt) }}</template>
               </td>

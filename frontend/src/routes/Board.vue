@@ -4,6 +4,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
+import Select from '../components/Select.vue';
+import { usePeople } from '../lib/people';
 import { api } from '../lib/api';
 import {
   PRIORITIES,
@@ -11,7 +13,6 @@ import {
   priorityClass,
   priorityColor,
   type Issue,
-  type Priority,
 } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
@@ -67,11 +68,21 @@ const creatingIn = ref<string | null>(null);
 const q = ref('');
 const byAssignee = ref('');
 const byAuthor = ref('');
-const byPriority = ref<Priority | ''>('');
-const people = ref<{ id: string; login: string; fullName: string }[]>([]);
+const byPriority = ref('');
+const { people, colorOf, load: loadPeople } = usePeople();
 // Tags narrow the board too: pick several and a card has to wear all of them.
 const byTags = ref<string[]>([]);
 const starred = ref(false);
+
+// A name is written in the colour of the role that wears it, here and everywhere else.
+const personChoices = computed(() =>
+  people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor }))
+);
+const assigneeChoices = computed(() => [
+  { value: 'none', label: 'Nobody' },
+  ...personChoices.value,
+]);
+const priorityChoices = PRIORITIES.map((p) => ({ value: p, label: p, color: priorityColor(p) }));
 
 const filtering = computed(
   () =>
@@ -317,9 +328,7 @@ async function load(short: string, quiet = false): Promise<void> {
 
 onMounted(() => {
   void load(String(route.params.short));
-  void api<{ id: string; login: string; fullName: string }[]>('/people')
-    .then((rows) => (people.value = rows))
-    .catch(() => {});
+  void loadPeople();
 });
 watch(
   () => route.params.short,
@@ -344,26 +353,33 @@ watch(
           aria-label="Search the board"
         />
       </span>
-      <select v-model="byAssignee" class="input input--sm filter" aria-label="Filter by assignee">
-        <option value="" :hidden="!byAssignee">Assignee</option>
-        <option value="none">Nobody</option>
-        <option v-for="p in people" :key="p.id" :value="p.id">{{ p.fullName || p.login }}</option>
-      </select>
-      <select v-model="byAuthor" class="input input--sm filter" aria-label="Filter by author">
-        <option value="" :hidden="!byAuthor">Author</option>
-        <option v-for="p in people" :key="p.id" :value="p.id">{{ p.fullName || p.login }}</option>
-      </select>
-      <select
+      <Select
+        v-model="byAssignee"
+        class="filter"
+        :options="assigneeChoices"
+        placeholder="Assignee"
+        keep-placeholder
+        small
+        label="Filter by assignee"
+      />
+      <Select
+        v-model="byAuthor"
+        class="filter"
+        :options="personChoices"
+        placeholder="Author"
+        keep-placeholder
+        small
+        label="Filter by author"
+      />
+      <Select
         v-model="byPriority"
-        class="input input--sm filter"
-        aria-label="Filter by priority"
-        :style="{ color: byPriority ? priorityColor(byPriority) : undefined }"
-      >
-        <option value="" :hidden="!byPriority">Priority</option>
-        <option v-for="p in PRIORITIES" :key="p" :value="p" :style="{ color: priorityColor(p) }">
-          {{ p }}
-        </option>
-      </select>
+        class="filter"
+        :options="priorityChoices"
+        placeholder="Priority"
+        keep-placeholder
+        small
+        label="Filter by priority"
+      />
 
       <button
         v-for="t in tags"
@@ -451,7 +467,11 @@ watch(
               </div>
               <div class="card__title">{{ i.summary }}</div>
               <div v-if="i.assignee || i.dueDate" class="card__meta">
-                <span v-if="i.assignee" class="card__who">{{ i.assignee.login }}</span>
+                <span
+                  v-if="i.assignee"
+                  class="card__who"
+                  :style="{ color: colorOf(i.assignee.login) }"
+                >{{ i.assignee.login }}</span>
                 <div class="sp"></div>
                 <span
                   v-if="dueLabel(i.dueDate)"

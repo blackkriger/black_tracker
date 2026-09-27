@@ -3,6 +3,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
+import Select from '../../components/Select.vue';
 import Dialog from '../../components/Dialog.vue';
 import { api } from '../../lib/api';
 import { useLive } from '../../lib/live';
@@ -333,14 +334,13 @@ async function onDrop(b: Board, target: State): Promise<void> {
           />
           <span class="panel__end">
             <label class="label" :for="`default-${b.id}`">Default status</label>
-            <select
+            <Select
               :id="`default-${b.id}`"
-              class="input default-pick"
-              :value="b.defaultStateId ?? ''"
-              @change="patchBoard(b, { defaultStateId: ($event.target as HTMLSelectElement).value })"
-            >
-              <option v-for="s in b.states" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
+              class="default-pick"
+              :model-value="b.defaultStateId ?? ''"
+              :options="b.states.map((s) => ({ value: s.id, label: s.name, color: s.color }))"
+              @update:model-value="patchBoard(b, { defaultStateId: $event })"
+            />
             <button
               class="btn btn--sm btn--danger"
               type="button"
