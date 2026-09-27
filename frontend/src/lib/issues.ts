@@ -5,6 +5,14 @@ export interface Person {
   login: string;
 }
 
+/** One picture on the wall, whether it is already uploaded or still waiting to go up. */
+export interface Shot {
+  key: string;
+  src: string;
+  name: string;
+  size: number;
+}
+
 export interface IssueTag {
   id: string;
   name: string;

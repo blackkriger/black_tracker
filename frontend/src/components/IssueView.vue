@@ -8,7 +8,7 @@ import { TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank } from '../lib/richtext';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
-import { useWall } from '../lib/masonry';
+import FileWall from './FileWall.vue';
 import { useSession } from '../lib/session';
 import { ArrowDown, ArrowUp, Link2, Paperclip, Pencil, Pin, Star, Trash2, X } from 'lucide-vue-next';
 import {
@@ -27,6 +27,7 @@ import {
   type IssueTag,
   type CommentOrder,
   type Priority,
+  type Shot,
 } from '../lib/issues';
 
 interface State {
@@ -271,11 +272,6 @@ const pending = ref<File[]>([]);
 const commentFiles = ref<File[]>([]);
 
 // The two walls of waiting files pack themselves: blocks keep their own heights and drop into whichever column is shortest.
-const issueWall = ref<HTMLElement | null>(null);
-const commentWall = ref<HTMLElement | null>(null);
-const issuePack = useWall(issueWall, () => pending.value.length);
-const commentPack = useWall(commentWall, () => commentFiles.value.length);
-
 // Every picture on the issue, in the order they are shown, and which one the viewer has open.
 const shown = ref<number | null>(null);
 const gallery = computed(() => [
@@ -286,6 +282,47 @@ const gallery = computed(() => [
     .filter((f) => f.type.startsWith('image/'))
     .map((f) => ({ src: previewOf(f) ?? '', name: f.name })),
 ]);
+
+const shotOfFile = (f: File): Shot => ({
+  key: keyOf(f),
+  src: previewOf(f) ?? '',
+  name: f.name,
+  size: f.size,
+});
+const shotOfAttachment = (a: Attachment): Shot => ({
+  key: a.id,
+  src: `/api/attachments/${a.id}`,
+  name: a.filename,
+  size: a.size,
+});
+
+const issueShots = computed(() => images.value.map(shotOfAttachment));
+const pendingShots = computed(() => pending.value.filter(previewOf).map(shotOfFile));
+const commentShots = computed(() => commentFiles.value.filter(previewOf).map(shotOfFile));
+const shotsOf = (commentId: string): Shot[] =>
+  filesOf(commentId)
+    .filter((a) => a.mime.startsWith('image/'))
+    .map(shotOfAttachment);
+
+// The walls hand back the key they were given; which list it belongs to is this side's business.
+function openPending(key: string, from: 'issue' | 'comment'): void {
+  const file = (from === 'issue' ? pending.value : commentFiles.value).find(
+    (f) => keyOf(f) === key
+  );
+  if (file) shown.value = galleryOfFile(file);
+}
+
+function dropPendingKey(key: string, from: 'issue' | 'comment'): void {
+  const file = (from === 'issue' ? pending.value : commentFiles.value).find(
+    (f) => keyOf(f) === key
+  );
+  if (file) dropPending(file, from);
+}
+
+function removeAttachmentKey(id: string): void {
+  const a = (issue.value?.attachments ?? []).find((row) => row.id === id);
+  if (a) void removeAttachment(a);
+}
 
 const galleryOfFile = (file: File): number =>
   gallery.value.findIndex((g) => g.src === previewOf(file));
@@ -1026,22 +1063,12 @@ async function removeIssue(): Promise<void> {
                   @click="removeAttachment(a)"
                 ><X class="ic ic--sm" /></button>
               </div>
-              <div v-if="images.length" class="atts">
-                <figure v-for="a in images" :key="a.id" class="att">
-                  <button class="att__img" type="button" @click="shown = galleryIndex(a.id)">
-                    <img :src="`/api/attachments/${a.id}`" :alt="a.filename" class="att__pic" />
-                  </button>
-                  <figcaption class="att__cap">
-                    <span>{{ a.filename }}</span>
-                    <button
-                      class="btn btn--sm btn--icon btn--ghost"
-                      type="button"
-                      :aria-label="`Delete ${a.filename}`"
-                      @click="removeAttachment(a)"
-                    ><X class="ic ic--sm" /></button>
-                  </figcaption>
-                </figure>
-              </div>
+              <FileWall
+                :shots="issueShots"
+                removable
+                @open="shown = galleryIndex($event)"
+                @remove="removeAttachmentKey"
+              />
 
               <!-- Chosen, not yet uploaded: anything that takes the whole row is listed first, and the pictures pack themselves underneath. -->
               <div
@@ -1058,30 +1085,16 @@ async function removeIssue(): Promise<void> {
                   @click="dropPending(f, 'issue')"
                 ><X class="ic ic--sm" /></button>
               </div>
-              <div v-if="pending.some((f) => previewOf(f))" ref="issueWall" class="waits">
-                <div
-                  v-for="f in pending.filter((x) => previewOf(x))"
-                  :key="keyOf(f)"
-                  class="wait"
-                >
-                  <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
-                    <img :src="previewOf(f) ?? ''" :alt="f.name" @load="issuePack.repack()" />
-                  </button>
-                  <div class="wait__row">
-                    <span class="wait__name">{{ f.name }}</span>
-                    <span class="stamp">{{ fileSize(f.size) }}</span>
-                    <button
-                      class="btn btn--sm btn--icon btn--ghost"
-                      type="button"
-                      :aria-label="`Remove ${f.name}`"
-                      @click="dropPending(f, 'issue')"
-                    ><X class="ic ic--sm" /></button>
-                  </div>
-                </div>
-              </div>
+              <FileWall
+                :shots="pendingShots"
+                removable
+                waiting
+                @open="openPending($event, 'issue')"
+                @remove="dropPendingKey($event, 'issue')"
+              />
               <label
                 class="drop"
-                :class="{ 'drop--idle': !dragOver }"
+                :class="{ 'drop--idle': !dragOver, 'is-off': uploading }"
                 @dragover.prevent="dragOver = true"
                 @dragleave="dragOver = false"
                 @drop.prevent="upload(($event as DragEvent).dataTransfer?.files ?? null)"
@@ -1090,6 +1103,7 @@ async function removeIssue(): Promise<void> {
                   type="file"
                   multiple
                   class="sr"
+                  :disabled="uploading"
                   @change="upload(($event.target as HTMLInputElement).files)"
                 />
                 {{ uploading ? 'Uploading…' : 'Drop files here, or click to choose' }}
@@ -1141,7 +1155,10 @@ async function removeIssue(): Promise<void> {
                   <div class="cm__head">
                     <span class="cm__who">{{ c.author.login }}</span>
                     <time class="stamp">{{ stampAt(c.createdAt) }}</time>
-                    <span v-if="c.editedAt" class="cm__edited">edited</span>
+                    <span v-if="c.editedAt" class="cm__edited">
+                      edited
+                      <span class="selbar cm__when">{{ stampAt(c.editedAt) }}</span>
+                    </span>
                     <Pin
                       v-if="c.pinnedAt"
                       class="ic ic--sm cm__pin"
@@ -1168,6 +1185,7 @@ async function removeIssue(): Promise<void> {
                   <template v-if="editingComment === c.id">
                     <RichText
                       v-model="commentEdit"
+                      class="cm__edit"
                       min-height="90px"
                       @files="(list) => addToComment(c.id, list)"
                     >
@@ -1177,6 +1195,7 @@ async function removeIssue(): Promise<void> {
                             type="file"
                             multiple
                             class="sr"
+                            :disabled="uploading"
                             @change="addToComment(c.id, ($event.target as HTMLInputElement).files)"
                           />
                           <Paperclip class="ic" />
@@ -1207,27 +1226,12 @@ async function removeIssue(): Promise<void> {
                         @click="removeAttachment(a)"
                       ><X class="ic ic--sm" /></button>
                     </span>
-                    <div
-                      v-if="filesOf(c.id).some((a) => a.mime.startsWith('image/'))"
-                      class="cm__shots"
-                    >
-                      <span
-                        v-for="a in filesOf(c.id).filter((x) => x.mime.startsWith('image/'))"
-                        :key="a.id"
-                        class="cm__pic"
-                      >
-                        <button class="cm__shot" type="button" @click="shown = galleryIndex(a.id)">
-                          <img :src="`/api/attachments/${a.id}`" :alt="a.filename" />
-                        </button>
-                        <button
-                          v-if="editingComment === c.id"
-                          class="btn btn--sm btn--icon btn--ghost cm__pic-x"
-                          type="button"
-                          :aria-label="`Delete ${a.filename}`"
-                          @click="removeAttachment(a)"
-                        ><X class="ic ic--sm" /></button>
-                      </span>
-                    </div>
+                    <FileWall
+                      :shots="shotsOf(c.id)"
+                      :removable="editingComment === c.id"
+                      @open="shown = galleryIndex($event)"
+                      @remove="removeAttachmentKey"
+                    />
                   </div>
                 </div>
               </article>
@@ -1270,32 +1274,13 @@ async function removeIssue(): Promise<void> {
                       @click="dropPending(f, 'comment')"
                     ><X class="ic ic--sm" /></button>
                   </div>
-                  <div
-                    v-if="commentFiles.some((f) => previewOf(f))"
-                    ref="commentWall"
-                    class="waits"
-                  >
-                    <div
-                      v-for="f in commentFiles.filter((x) => previewOf(x))"
-                      :key="keyOf(f)"
-                      class="wait"
-                    >
-                      <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
-                        <img :src="previewOf(f) ?? ''" :alt="f.name" @load="commentPack.repack()" />
-                      </button>
-                      <div class="wait__row">
-                        <span class="wait__name">{{ f.name }}</span>
-                        <span class="stamp">{{ fileSize(f.size) }}</span>
-                        <button
-                          class="btn btn--sm btn--icon btn--ghost"
-                          type="button"
-                          :aria-label="`Remove ${f.name}`"
-                          :disabled="posting"
-                          @click="dropPending(f, 'comment')"
-                        ><X class="ic ic--sm" /></button>
-                      </div>
-                    </div>
-                  </div>
+                  <FileWall
+                    :shots="commentShots"
+                    :removable="!posting"
+                    waiting
+                    @open="openPending($event, 'comment')"
+                    @remove="dropPendingKey($event, 'comment')"
+                  />
                   <div class="composer__row">
                     <div class="sp"></div>
                     <button
@@ -1373,7 +1358,12 @@ async function removeIssue(): Promise<void> {
                 :style="{ color: priorityColor(shownPriority) }"
                 @change="setProp({ priority: ($event.target as HTMLSelectElement).value as Priority })"
               >
-                <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
+                <option
+                  v-for="p in PRIORITIES"
+                  :key="p"
+                  :value="p"
+                  :style="{ color: priorityColor(p) }"
+                >{{ p }}</option>
               </select>
             </div>
             <div class="prop" :class="{ 'is-fresh': fresh.has('assignee') }">
@@ -1715,18 +1705,6 @@ async function removeIssue(): Promise<void> {
   flex: none;
   color: var(--accent);
 }
-.att__img {
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: zoom-in;
-  width: 100%;
-}
-.att__pic {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 .att__row {
   height: 32px;
   border: 1px solid var(--line);
@@ -1815,6 +1793,33 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-direction: column;
 }
+/* Open for editing, the box stands off the name and the time above it. */
+.cm__edit {
+  margin-top: 8px;
+}
+/* The same box the selection puts up, held over the word until the pointer leaves it. */
+.cm__edited {
+  position: relative;
+}
+.cm__when {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  display: none;
+  padding: 5px 10px;
+  transform: translate(-50%, -8px);
+  color: var(--text-dim);
+  font: 12px var(--font-num);
+  white-space: nowrap;
+}
+.cm__edited:hover .cm__when {
+  display: block;
+}
+/* Nothing answers while a file is on its way up, so the same one cannot be sent twice. */
+.drop.is-off {
+  pointer-events: none;
+  opacity: 0.6;
+}
 /* The pictures keep to themselves under the rows, each at thumbnail size. */
 .cm__shots {
   display: flex;
@@ -1834,20 +1839,6 @@ async function removeIssue(): Promise<void> {
   right: 3px;
   background: var(--card);
 }
-.cm__shot {
-  display: block;
-  width: 160px;
-  padding: 0;
-  border: 1px solid var(--line);
-  background: none;
-  cursor: zoom-in;
-}
-.cm__shot img {
-  display: block;
-  width: 100%;
-  height: 100px;
-  object-fit: cover;
-}
 /* The clip sits among the toolbar's own buttons and behaves like one. */
 .rt__clip {
   display: inline-flex;
@@ -1863,52 +1854,6 @@ async function removeIssue(): Promise<void> {
   background: var(--surface);
 }
 
-/* Waiting, not yet uploaded: one block per file — the picture itself at its own size, and under it the whole name, the size and the way to take it back. The dashed edge is what says it has not gone up yet. */
-/* No columns: every block is the size of the picture in it, and lib/masonry.ts puts each one at the lowest free place it fits. The blocks are placed absolutely, which is what lets one start under a short neighbour rather than after the tallest block beside it. */
-.waits {
-  position: relative;
-  margin-top: 8px;
-}
-.wait {
-  position: absolute;
-  top: 0;
-  left: 0;
-  max-width: 100%;
-  border: 1px dashed var(--line-2);
-  background: var(--bg);
-}
-.wait__img {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: zoom-in;
-}
-/* Its own size. A picture is never stretched to fill the column — only held back when it is wider than the column or taller than the ceiling. */
-.wait__img img {
-  display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 420px;
-}
-.wait__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 30px;
-  padding: 0 4px 0 8px;
-  border-top: 1px dashed var(--line-2);
-}
-/* The size belongs to the name, so it follows it; the cross keeps the right edge. */
-.wait__name {
-  overflow-wrap: anywhere;
-  font-size: 12.5px;
-}
-.wait__row .stamp {
-  margin-right: auto;
-}
 .drop {
   height: 56px;
   margin-top: 8px;
