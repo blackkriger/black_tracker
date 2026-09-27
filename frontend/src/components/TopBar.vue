@@ -20,7 +20,7 @@ import {
   type Mark,
 } from '../lib/calendar';
 import { stamp } from '../lib/issues';
-import { ChevronDown } from 'lucide-vue-next';
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const props = defineProps<{
   /** The project this screen belongs to, when it belongs to one. */
@@ -97,6 +97,13 @@ function toggleDate(): void {
   openShort.value = null;
   // Read again on every open: a day marked on the calendar screen is already old news here.
   if (dateOpen.value) void readMonth();
+}
+
+function stepMonth(by: number): void {
+  const d = new Date(calYear.value, calMonth.value + by, 1);
+  calYear.value = d.getFullYear();
+  calMonth.value = d.getMonth();
+  void readMonth();
 }
 
 async function toCalendar(): Promise<void> {
@@ -239,7 +246,22 @@ async function signOut(): Promise<void> {
           <span class="stamp">{{ today }}</span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
-          <div class="datemenu__h">{{ monthName(calYear, calMonth) }}</div>
+          <div class="datemenu__h">
+            {{ monthName(calYear, calMonth) }}
+            <div class="sp"></div>
+            <button
+              class="btn btn--sm btn--icon btn--ghost"
+              type="button"
+              aria-label="Previous month"
+              @click="stepMonth(-1)"
+            ><ChevronLeft class="ic ic--sm" /></button>
+            <button
+              class="btn btn--sm btn--icon btn--ghost"
+              type="button"
+              aria-label="Next month"
+              @click="stepMonth(1)"
+            ><ChevronRight class="ic ic--sm" /></button>
+          </div>
           <div class="datemenu__grid">
             <MonthGrid
               :year="calYear"
@@ -406,7 +428,10 @@ async function signOut(): Promise<void> {
   border-bottom-color: var(--card);
 }
 .datemenu__h {
-  padding: 4px 10px 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 6px 10px;
   color: var(--text-muted);
   font-size: 11.5px;
 }
