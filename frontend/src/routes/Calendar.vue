@@ -96,6 +96,8 @@ const title = ref('');
 const scope = ref('');
 const url = ref('');
 const banner = ref('');
+// The form for a new event stays folded away until it is asked for.
+const adding = ref(false);
 const busy = ref(false);
 const pickedDay = computed(() => (picked.value ? days.value.get(picked.value) : null));
 
@@ -105,6 +107,7 @@ function openDay(key: string): void {
   scope.value = '';
   url.value = '';
   banner.value = '';
+  adding.value = false;
   clear('day');
 }
 
@@ -127,6 +130,7 @@ async function addMark(): Promise<void> {
     title.value = '';
     url.value = '';
     banner.value = '';
+    adding.value = false;
     await load();
   } catch (err) {
     fail('day', err);
@@ -302,6 +306,12 @@ function closeIssue(): void {
         </button>
       </div>
 
+      <div v-if="!adding" class="addrow">
+        <button class="btn" type="button" @click="adding = true">Add event…</button>
+        <div class="sp"></div>
+      </div>
+
+      <template v-else>
       <div class="field">
         <label class="label" for="mark-title">Title</label>
         <input
@@ -328,10 +338,12 @@ function closeIssue(): void {
       </div>
       <div class="addrow">
         <Select v-model="scope" :options="projectChoices" />
+        <button class="btn" type="button" @click="adding = false">Cancel</button>
         <button class="btn" type="button" :disabled="busy || !title.trim()" @click="addMark">
           Add
         </button>
       </div>
+      </template>
       <div v-if="errors.day" class="err">{{ errors.day }}</div>
     </Dialog>
 
