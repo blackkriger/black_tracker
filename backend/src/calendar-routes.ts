@@ -90,15 +90,13 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
         slug: string;
         state_color: string;
         resolved_at: Date | null;
-        assignee_login: string | null;
       }>(
         `select i.id, i.readable_id, i.summary, i.due_date, p.short_name, b.id as board_id, b.slug,
-                s.color as state_color, i.resolved_at, a.login as assignee_login
+                s.color as state_color, i.resolved_at
            from issues i
            join projects p on p.id = i.project_id
            join boards b on b.id = i.board_id
            join states s on s.id = i.state_id
-           left join users a on a.id = i.assignee_id
           where i.due_date between $1 and $2
             and i.project_id <> all($3::uuid[])
             and i.board_id <> all($4::uuid[])
@@ -147,7 +145,6 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
         boardSlug: string;
         color: string;
         done: boolean;
-        assignee: string | null;
       }[]
     >();
     for (const d of dues.rows) {
@@ -161,7 +158,6 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
         boardSlug: d.slug,
         color: d.state_color,
         done: d.resolved_at !== null,
-        assignee: d.assignee_login,
       });
       byDay.set(day, list);
     }

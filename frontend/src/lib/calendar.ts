@@ -23,7 +23,6 @@ export interface Due {
   boardSlug: string;
   color: string;
   done: boolean;
-  assignee: string | null;
 }
 
 export interface Activity {
