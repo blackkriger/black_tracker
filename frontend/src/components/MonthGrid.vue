@@ -169,10 +169,10 @@ function onEnter(ev: MouseEvent, c: Cell): void {
   color: var(--accent);
 }
 .cal__at {
-  color: var(--focus);
+  color: var(--text);
 }
 .cal__pop-at {
-  color: var(--focus);
+  color: var(--text);
 }
 .cal__day.has-due .cal__bell {
   color: var(--accent-bright);

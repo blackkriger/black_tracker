@@ -465,7 +465,7 @@ async function signOut(): Promise<void> {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  color: var(--focus);
+  color: var(--text);
 }
 /* Who said it and what, cut where the menu ends. */
 .men__said {
