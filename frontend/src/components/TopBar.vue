@@ -10,6 +10,7 @@ import MonthGrid from './MonthGrid.vue';
 import { api } from '../lib/api';
 import {
   byDay,
+  longDate,
   monthName,
   monthRange,
   todayKey,
@@ -238,6 +239,31 @@ async function signOut(): Promise<void> {
           <span class="stamp">{{ today }}</span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
+          <!-- What the countdown counts to, shown before the month it sits in. -->
+          <div v-if="soon" class="soon">
+            <a
+              v-if="soon.banner"
+              class="soon__banner"
+              :href="soon.url ?? soon.banner"
+              target="_blank"
+              rel="noopener noreferrer"
+            ><img :src="soon.banner" :alt="soon.title" /></a>
+            <div class="soon__line">
+              <a
+                v-if="soon.url"
+                class="soon__title"
+                :href="soon.url"
+                target="_blank"
+                rel="noopener noreferrer"
+              >{{ soon.title }}</a>
+              <span v-else class="soon__title">{{ soon.title }}</span>
+            </div>
+            <div class="soon__line">
+              <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
+              <span class="stamp">{{ longDate(soon.day) }}</span>
+            </div>
+          </div>
+          <hr v-if="soon" />
           <div class="datemenu__h">{{ monthName(calYear, calMonth) }}</div>
           <div class="datemenu__grid">
             <MonthGrid
@@ -383,6 +409,38 @@ async function signOut(): Promise<void> {
 }
 .datemenu__grid {
   padding: 0 10px 6px;
+}
+.soon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 0 6px;
+}
+.soon__banner {
+  display: block;
+}
+.soon__banner img {
+  display: block;
+  width: 100%;
+  max-height: 96px;
+  object-fit: cover;
+}
+.soon__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+}
+.soon__title {
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+a.soon__title:hover {
+  color: var(--accent-bright);
 }
 /* The one line under the month reads like the bar above it: the text brightens, nothing fills. */
 .datemenu .menu__i {
