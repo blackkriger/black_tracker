@@ -43,6 +43,7 @@ interface Tag {
 interface Project {
   id: string;
   shortName: string;
+  nextKey: string;
   name: string;
   archived: boolean;
   boards: Board[];
@@ -521,6 +522,7 @@ watch(
       :boards="boards"
       :tags="tags"
       :project="project?.shortName ?? ''"
+      :next-key="project?.nextKey ?? ''"
       @close="closeIssue"
       @tag-created="tagCreated"
       @moved="issueMoved"

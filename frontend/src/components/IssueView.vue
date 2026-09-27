@@ -62,6 +62,8 @@ const props = defineProps<{
   tags: IssueTag[];
   /** The project's key, which is what a tag made here can be scoped to. */
   project: string;
+  /** What the issue being written will be called once it exists. */
+  nextKey?: string;
 }>();
 
 const emit = defineEmits<{
@@ -164,9 +166,38 @@ const commentDraft = ref('');
 // What was typed and not posted, kept per issue in this browser. It is a draft, not a
 // record: nobody else needs it and it never reaches the server.
 const DRAFTS = 'tracker:draft:';
+// An issue being written is kept the same way, one per board: what you were starting on
+// that board is what comes back when you open a new issue there again.
+const NEW_DRAFTS = 'tracker:new:';
 let keptDraft = '';
 const draftSaved = ref(false);
 let draftNote: ReturnType<typeof setTimeout> | null = null;
+
+function readNew(): { summary: string; description: string } | null {
+  try {
+    const kept = localStorage.getItem(NEW_DRAFTS + props.board.id);
+    return kept ? (JSON.parse(kept) as { summary: string; description: string }) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeNew(summary: string, description: string): void {
+  try {
+    if (summary || description) {
+      localStorage.setItem(NEW_DRAFTS + props.board.id, JSON.stringify({ summary, description }));
+    } else {
+      localStorage.removeItem(NEW_DRAFTS + props.board.id);
+    }
+  } catch {
+    /* a browser that refuses storage simply keeps no draft */
+  }
+}
+
+function keepNew(): void {
+  if (!creating.value) return;
+  writeNew(titleDraft.value.trim(), isBlank(bodyDraft.value) ? '' : bodyDraft.value);
+}
 
 function readDraft(): string {
   if (!props.issueKey) return '';
@@ -490,8 +521,9 @@ async function load(): Promise<void> {
       dueDate: null,
       tagIds: [],
     };
-    titleDraft.value = '';
-    bodyDraft.value = '';
+    const kept = readNew();
+    titleDraft.value = kept?.summary ?? '';
+    bodyDraft.value = kept?.description ?? '';
     editing.value = true;
     loading.value = false;
     return;
@@ -563,6 +595,7 @@ async function create(): Promise<void> {
         tagIds: draft.value.tagIds,
       },
     });
+    writeNew('', '');
     if (pendingLinks.value.length) {
       for (const link of pendingLinks.value) {
         try {
@@ -1009,7 +1042,7 @@ async function removeIssue(): Promise<void> {
             <span class="iv__sep">/</span>
             <span class="iv__where">{{ board.name }}</span>
             <span class="iv__sep">/</span>
-            <span class="key iv__key">{{ issueKey ?? 'NEW ISSUE' }}</span>
+            <span class="key iv__key">{{ issueKey ?? nextKey ?? 'NEW ISSUE' }}</span>
           </span>
           <div class="sp"></div>
           <template v-if="creating">
@@ -1111,6 +1144,7 @@ async function removeIssue(): Promise<void> {
               maxlength="300"
               placeholder="What needs doing?"
               autofocus
+              @blur="keepNew"
               @keydown.enter.prevent="creating ? create() : saveText()"
             />
             <h1
@@ -1125,6 +1159,7 @@ async function removeIssue(): Promise<void> {
                 v-model="bodyDraft"
                 placeholder="What is this about?"
                 @files="upload"
+                @blur="keepNew"
               />
               <div
                 v-else-if="issue?.description && !isBlank(issue.description)"

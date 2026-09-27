@@ -30,6 +30,8 @@ const publicProject = (r: ProjectRow) => ({
   description: r.description,
   archived: r.archived,
   position: r.position,
+  /** What the next issue here will be called, unless somebody else gets there first. */
+  nextKey: `${r.short_name}-${r.next_issue_number}`,
 });
 
 const projectCreate = z.object({
