@@ -7,7 +7,7 @@ import { clean } from '../lib/richtext';
 import { Bold, Code, Heading3, Italic, Link, List, ListOrdered, Quote, Strikethrough } from 'lucide-vue-next';
 
 const body = defineModel<string>({ required: true });
-const props = defineProps<{ placeholder?: string; minHeight?: string }>();
+const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?: boolean }>();
 const emit = defineEmits<{ (e: 'files', list: FileList): void }>();
 
 const wrap = ref<HTMLDivElement | null>(null);
@@ -79,6 +79,7 @@ onMounted(() => {
     readMarks();
   });
   quill.on('selection-change', readMarks);
+  quill.enable(!props.disabled);
   quill.root.addEventListener('focus', () => (focused.value = true));
   quill.root.addEventListener('blur', () => (focused.value = false));
 });
@@ -97,6 +98,12 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onPointerDown, true);
   quill = null;
 });
+
+// Shut while what was written is being sent: anything typed after that would be thrown away without saying so.
+watch(
+  () => props.disabled,
+  (off) => quill?.enable(!off)
+);
 
 watch(body, (next) => {
   if (fromEditor) {
@@ -136,7 +143,7 @@ function addLink(): void {
 </script>
 
 <template>
-  <div ref="wrap" class="rt">
+  <div ref="wrap" class="rt" :class="{ 'is-off': disabled }">
     <div class="mdbar">
       <button type="button" :aria-pressed="marks.bold" title="Bold" @click="toggle('bold')"><Bold class="ic" /></button>
       <button type="button" :aria-pressed="marks.italic" title="Italic" @click="toggle('italic')"><Italic class="ic" /></button>
@@ -162,6 +169,11 @@ function addLink(): void {
 </template>
 
 <style scoped>
+/* Nothing in here answers while it is off — the toolbar, the text and whatever the owner put in the toolbar alike. */
+.rt.is-off {
+  pointer-events: none;
+  opacity: 0.6;
+}
 /* The box is the frame; the editable part fills it, so a click anywhere inside lands in the text and not on a dead margin. */
 .rt__editor {
   position: relative;
