@@ -76,10 +76,11 @@ const daysOff = computed(() => {
 });
 const countdown = computed(() => {
   const left = daysOff.value;
+  const what = soon.value?.title ?? '';
   if (left === null || left < 0) return '';
-  if (left === 0) return 'TODAY';
-  if (left === 1) return 'TOMORROW';
-  return `${left} DAYS`;
+  if (left === 0) return `${what} is today`;
+  if (left === 1) return `1 day till ${what}`;
+  return `${left} days till ${what}`;
 });
 
 async function readNext(): Promise<void> {
@@ -344,8 +345,12 @@ async function signOut(): Promise<void> {
   display: inline-flex;
   align-items: center;
 }
-/* What the countdown counts to is in the menu under it; here it is only how far off it is. */
+/* A long name for an event cannot push the bar around, so it is cut where it runs out of room. */
 .topcount {
+  max-width: 280px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--accent);
 }
 .datemenu {

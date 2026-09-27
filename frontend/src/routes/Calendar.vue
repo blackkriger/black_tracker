@@ -199,8 +199,8 @@ function closeIssue(): void {
   <div class="page">
     <TopBar />
     <div class="page__body">
-      <div class="sheet">
-          <section class="panel sheet__wide">
+      <div class="sheet sheet--cal">
+          <section class="panel">
             <header class="panel__h">
               <span class="key year">{{ year }}</span>
               <span class="panel__end">
@@ -247,7 +247,7 @@ function closeIssue(): void {
           </section>
           <div v-if="errors.month" class="err panel__err sheet__wide">{{ errors.month }}</div>
 
-          <section class="panel sheet__wide">
+          <section class="panel">
             <header class="panel__h">Marked days</header>
             <div class="panel__b days">
               <template v-if="loading">
@@ -261,9 +261,11 @@ function closeIssue(): void {
                   type="button"
                   @click="openDay(m.day)"
                 >
-                  <span class="stamp day__when">{{ longDate(m.day) }}</span>
-                  <span v-if="m.project" class="key">{{ m.project.shortName }}</span>
-                  <span class="day__title">{{ m.title }}</span>
+                  <span class="stamp">{{ longDate(m.day) }}</span>
+                  <span class="day__what">
+                    <span v-if="m.project" class="key">{{ m.project.shortName }}</span>
+                    {{ m.title }}
+                  </span>
                 </button>
                 <div v-if="!yearMarks.length" class="empty empty--sm">
                   <span class="empty__g">◇</span>Nothing marked this year.
@@ -383,11 +385,15 @@ function closeIssue(): void {
   padding: var(--space-6) var(--space-5);
   overflow-y: auto;
 }
-/* Four months across, two on a narrow window: the year reads as a wall of months. */
+/* The year takes two thirds of the measure and what is marked on it stands beside it. */
+.sheet--cal {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+/* Three months across, a quarter of the year to a row. */
 .year-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
 }
 .month__h {
   padding-bottom: 6px;
@@ -407,12 +413,13 @@ function closeIssue(): void {
   flex-direction: column;
   gap: 2px;
 }
+/* Two lines, because the column beside the year is a narrow one. */
 .day {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 30px;
-  padding: 0 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 8px;
   border: 0;
   background: none;
   color: var(--text-dim);
@@ -420,12 +427,13 @@ function closeIssue(): void {
   text-align: left;
   cursor: pointer;
 }
+.day__what {
+  display: flex;
+  gap: 8px;
+}
 .day:hover {
   background: var(--card-hover);
   color: var(--text);
-}
-.day__when {
-  flex: 0 0 150px;
 }
 .marks {
   display: flex;
