@@ -383,7 +383,12 @@ async function lookAtComment(id?: string): Promise<void> {
   await nextTick();
   const el = document.getElementById(`comment-${id}`);
   if (!el) return;
-  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // The wall of files repacks a frame or two after the window draws, and a cached picture
+  // gives it no time to settle before this runs; the place is taken again as it moves.
+  const bring = (): void => el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  bring();
+  setTimeout(bring, 150);
+  setTimeout(bring, 500);
   litComment.value = id;
   setTimeout(() => {
     if (litComment.value === id) litComment.value = null;
