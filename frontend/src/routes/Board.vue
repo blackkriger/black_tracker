@@ -265,6 +265,14 @@ function issueChanged(updated: Issue): void {
   issues.value = issues.value.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
 }
 
+// It is on another board now, so this one stops showing it and the address follows the issue.
+function issueMoved(boardId: string): void {
+  const short = project.value?.shortName;
+  const to = boards.value.find((b) => b.id === boardId);
+  if (!short || !to) return;
+  void router.push(`/${short}/${to.slug}/${openKey.value}`);
+}
+
 function issueGone(id: string): void {
   issues.value = issues.value.filter((i) => i.id !== id);
   closeIssue();
@@ -337,12 +345,12 @@ watch(
         />
       </span>
       <select v-model="byAssignee" class="input input--sm filter" aria-label="Filter by assignee">
-        <option value="">Assignee</option>
+        <option value="" :hidden="!byAssignee">Assignee</option>
         <option value="none">Nobody</option>
         <option v-for="p in people" :key="p.id" :value="p.id">{{ p.fullName || p.login }}</option>
       </select>
       <select v-model="byAuthor" class="input input--sm filter" aria-label="Filter by author">
-        <option value="">Author</option>
+        <option value="" :hidden="!byAuthor">Author</option>
         <option v-for="p in people" :key="p.id" :value="p.id">{{ p.fullName || p.login }}</option>
       </select>
       <select
@@ -351,7 +359,7 @@ watch(
         aria-label="Filter by priority"
         :style="{ color: byPriority ? priorityColor(byPriority) : undefined }"
       >
-        <option value="">Priority</option>
+        <option value="" :hidden="!byPriority">Priority</option>
         <option v-for="p in PRIORITIES" :key="p" :value="p" :style="{ color: priorityColor(p) }">
           {{ p }}
         </option>
@@ -478,10 +486,12 @@ watch(
       :issue-key="openKey || undefined"
       :create-in="creatingIn"
       :board="current"
+      :boards="boards"
       :tags="tags"
       :project="project?.shortName ?? ''"
       @close="closeIssue"
       @tag-created="tagCreated"
+      @moved="issueMoved"
       @changed="issueChanged"
       @created="issueCreated"
       @deleted="issueGone"

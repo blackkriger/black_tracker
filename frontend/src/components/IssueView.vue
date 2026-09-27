@@ -41,6 +41,8 @@ const props = defineProps<{
   /** The column a new issue starts in. */
   createIn?: string | null;
   board: { id: string; name: string; states: State[] };
+  /** Every board of the project, so an issue can be moved to another one. */
+  boards: { id: string; name: string; slug: string }[];
   tags: IssueTag[];
   /** The project's key, which is what a tag made here can be scoped to. */
   project: string;
@@ -52,6 +54,7 @@ const emit = defineEmits<{
   (e: 'created', issue: Issue): void;
   (e: 'deleted', id: string): void;
   (e: 'tagCreated', tag: IssueTag): void;
+  (e: 'moved', boardId: string): void;
 }>();
 
 const session = useSession();
@@ -241,6 +244,8 @@ const FIELD_OF: Record<string, string> = {
   description: 'description',
   stateId: 'status',
   status: 'status',
+  boardId: 'board',
+  board: 'board',
   priority: 'priority',
   assigneeId: 'assignee',
   dueDate: 'due',
@@ -416,6 +421,13 @@ async function patch(body: Record<string, unknown>): Promise<boolean> {
 }
 
 // Each property either goes straight to the server or into the draft, depending on which kind of window this is.
+// A board owns its columns, so an issue arriving on another one cannot keep the status it wore: it lands in that board's default column, and the window follows it there.
+async function moveBoard(boardId: string): Promise<void> {
+  const current = issue.value;
+  if (!current || boardId === current.boardId) return;
+  if (await patch({ boardId })) emit('moved', boardId);
+}
+
 function setProp(body: Record<string, unknown>): void {
   if (!creating.value) {
     void patch(body);
@@ -1003,7 +1015,21 @@ async function removeIssue(): Promise<void> {
                 ><X class="ic ic--sm" /></button>
               </div>
 
-              <!-- Chosen, not yet uploaded: a picture shows itself, anything else says its name. -->
+              <!-- Chosen, not yet uploaded: anything that takes the whole row is listed first, and the pictures pack themselves underneath. -->
+              <div
+                v-for="f in pending.filter((x) => !previewOf(x))"
+                :key="keyOf(f)"
+                class="att__cap att__row att__row--wait"
+              >
+                <span class="att__name">{{ f.name }}</span>
+                <span class="stamp">{{ fileSize(f.size) }}</span>
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  :aria-label="`Remove ${f.name}`"
+                  @click="dropPending(f, 'issue')"
+                ><X class="ic ic--sm" /></button>
+              </div>
               <div v-if="pending.some((f) => previewOf(f))" ref="issueWall" class="waits">
                 <div
                   v-for="f in pending.filter((x) => previewOf(x))"
@@ -1024,20 +1050,6 @@ async function removeIssue(): Promise<void> {
                     ><X class="ic ic--sm" /></button>
                   </div>
                 </div>
-              </div>
-              <div
-                v-for="f in pending.filter((x) => !previewOf(x))"
-                :key="keyOf(f)"
-                class="att__cap att__row att__row--wait"
-              >
-                <span class="att__name">{{ f.name }}</span>
-                <span class="stamp">{{ fileSize(f.size) }}</span>
-                <button
-                  class="btn btn--sm btn--icon btn--ghost"
-                  type="button"
-                  :aria-label="`Remove ${f.name}`"
-                  @click="dropPending(f, 'issue')"
-                ><X class="ic ic--sm" /></button>
               </div>
               <label
                 class="drop"
@@ -1176,25 +1188,35 @@ async function removeIssue(): Promise<void> {
                       </label>
                     </template>
                   </RichText>
-                  <div v-if="commentFiles.length" ref="commentWall" class="cm__waiting waits">
-                    <template v-for="f in commentFiles" :key="keyOf(f)">
-                      <div v-if="previewOf(f)" class="wait">
-                        <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
-                          <img :src="previewOf(f) ?? ''" :alt="f.name" @load="commentPack.repack()" />
-                        </button>
-                        <div class="wait__row">
-                          <span class="wait__name">{{ f.name }}</span>
-                          <span class="stamp">{{ fileSize(f.size) }}</span>
-                          <button
-                            class="btn btn--sm btn--icon btn--ghost"
-                            type="button"
-                            :aria-label="`Remove ${f.name}`"
-                            @click="dropPending(f, 'comment')"
-                          ><X class="ic ic--sm" /></button>
-                        </div>
-                      </div>
-                      <span v-else class="att__cap att__row">
-                        <span class="att__name">{{ f.name }}</span>
+                  <div
+                    v-for="f in commentFiles.filter((x) => !previewOf(x))"
+                    :key="keyOf(f)"
+                    class="att__cap att__row att__row--wait"
+                  >
+                    <span class="att__name">{{ f.name }}</span>
+                    <span class="stamp">{{ fileSize(f.size) }}</span>
+                    <button
+                      class="btn btn--sm btn--icon btn--ghost"
+                      type="button"
+                      :aria-label="`Remove ${f.name}`"
+                      @click="dropPending(f, 'comment')"
+                    ><X class="ic ic--sm" /></button>
+                  </div>
+                  <div
+                    v-if="commentFiles.some((f) => previewOf(f))"
+                    ref="commentWall"
+                    class="waits"
+                  >
+                    <div
+                      v-for="f in commentFiles.filter((x) => previewOf(x))"
+                      :key="keyOf(f)"
+                      class="wait"
+                    >
+                      <button class="wait__img" type="button" @click="shown = galleryOfFile(f)">
+                        <img :src="previewOf(f) ?? ''" :alt="f.name" @load="commentPack.repack()" />
+                      </button>
+                      <div class="wait__row">
+                        <span class="wait__name">{{ f.name }}</span>
                         <span class="stamp">{{ fileSize(f.size) }}</span>
                         <button
                           class="btn btn--sm btn--icon btn--ghost"
@@ -1202,8 +1224,8 @@ async function removeIssue(): Promise<void> {
                           :aria-label="`Remove ${f.name}`"
                           @click="dropPending(f, 'comment')"
                         ><X class="ic ic--sm" /></button>
-                      </span>
-                    </template>
+                      </div>
+                    </div>
                   </div>
                   <div class="composer__row">
                     <div class="sp"></div>
@@ -1242,6 +1264,22 @@ async function removeIssue(): Promise<void> {
           </div>
 
           <aside class="props">
+            <template v-if="issue && boards.length > 1">
+              <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('board') }">
+                <span class="prop__k">Board</span>
+                <div class="prop__stack">
+                  <select
+                    class="input input--sm"
+                    :value="issue.boardId"
+                    @change="moveBoard(($event.target as HTMLSelectElement).value)"
+                  >
+                    <option v-for="b in boards" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  </select>
+                  <span class="hint">Moving it resets the status.</span>
+                </div>
+              </div>
+              <div class="hr"></div>
+            </template>
             <div class="prop" :class="{ 'is-fresh': fresh.has('status') }">
               <span class="prop__k">Status</span>
               <select
@@ -1313,7 +1351,7 @@ async function removeIssue(): Promise<void> {
                   value=""
                   @change="pickTag($event.target as HTMLSelectElement)"
                 >
-                  <option value="">Add tag…</option>
+                  <option value="" hidden>Add tag…</option>
                   <option v-for="t in freeTags" :key="t.id" :value="t.id">{{ t.name }}</option>
                   <option value="new">New tag…</option>
                 </select>
@@ -1780,6 +1818,11 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+.prop__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .iv__err {
   padding: 0 24px 16px;
