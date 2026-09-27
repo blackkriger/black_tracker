@@ -66,8 +66,7 @@ const inviteChoices = computed(() => [
   { value: '', label: 'No role' },
   ...roles.value.map((r) => ({ value: r.id, label: r.name, color: r.color })),
 ]);
-const colorOfLogin = (login: string | null): string | undefined =>
-  users.value.find((u) => u.login === login)?.role?.color;
+
 const inviteBusy = ref(false);
 // Held only until the page is left: the server keeps a hash, so this is the one moment the link exists anywhere readable.
 const freshLink = ref<string | null>(null);
@@ -304,9 +303,7 @@ async function saveAccess(): Promise<void> {
                 <span class="who">
                   <span class="av av--lg" :style="buddyAvatarStyle(u.login)"></span>
                   <span class="who__lines">
-                    <span class="who__name" :style="{ color: u.role?.color }">
-                      {{ u.fullName || u.login }}
-                    </span>
+                    <span class="who__name">{{ u.fullName || u.login }}</span>
                     <span v-if="u.fullName" class="who__login">{{ u.login }}</span>
                   </span>
                 </span>
@@ -497,10 +494,7 @@ async function saveAccess(): Promise<void> {
                 </span>
               </td>
               <td>
-                <template v-if="i.status === 'used'">
-                  Used by
-                  <span :style="{ color: colorOfLogin(i.usedBy) }">{{ i.usedBy }}</span>
-                </template>
+                <template v-if="i.status === 'used'">Used by {{ i.usedBy }}</template>
                 <template v-else-if="i.status === 'expired'">Expired</template>
                 <template v-else>Good until {{ stampAt(i.expiresAt) }}</template>
               </td>
