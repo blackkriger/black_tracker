@@ -252,8 +252,8 @@ async function signOut(): Promise<void> {
           </div>
           <!-- What the countdown counts to, under the month it falls in. -->
           <template v-if="soon">
-            <hr />
-            <div class="soon">
+            <hr v-if="!soon.banner" />
+            <div class="soon" :class="{ 'soon--banner': soon.banner }">
               <a
                 v-if="soon.banner"
                 class="soon__banner"
@@ -417,6 +417,9 @@ async function signOut(): Promise<void> {
   flex-direction: column;
   gap: 4px;
   padding: 2px 0 6px;
+}
+.soon--banner {
+  padding-top: 0;
 }
 .soon__banner {
   display: block;
