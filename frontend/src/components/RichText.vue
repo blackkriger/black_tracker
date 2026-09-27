@@ -6,7 +6,18 @@ import { useRoles } from '../lib/roles';
 import Quill from 'quill';
 import 'quill/dist/quill.core.css';
 import { clean } from '../lib/richtext';
-import { Bold, Code, Heading3, Italic, Link, List, ListOrdered, Quote, Strikethrough } from 'lucide-vue-next';
+import {
+  Bold,
+  ChevronLeft,
+  Code,
+  Heading3,
+  Italic,
+  Link,
+  List,
+  ListOrdered,
+  Quote,
+  Strikethrough,
+} from 'lucide-vue-next';
 
 const body = defineModel<string>({ required: true });
 const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?: boolean }>();
@@ -172,7 +183,9 @@ onMounted(() => {
     fromEditor = true;
     body.value = clean(quill?.root.innerHTML ?? '');
     readMarks();
-    lookForName();
+    // Quill has not moved its caret yet when it says the text changed, so the list would
+    // otherwise be a keystroke behind and an `@` on its own would show nothing.
+    setTimeout(lookForName, 0);
   });
   quill.on('selection-change', () => {
     readMarks();
@@ -284,10 +297,9 @@ function addLink(): void {
         type="button"
         @mousedown.prevent="pickName(n.label)"
       >
-        <span :style="{ color: i === chosen ? undefined : (n.color ?? undefined) }">
-          {{ n.label }}
-        </span>
+        <span :style="{ color: n.color ?? undefined }">{{ n.label }}</span>
         <span v-if="n.hint" class="rt__full">{{ n.hint }}</span>
+        <ChevronLeft class="ic ic--sm rt__at" :class="{ 'is-off': i !== chosen }" />
       </button>
     </div>
   </div>
@@ -319,16 +331,21 @@ function addLink(): void {
   margin-bottom: -1px;
   border-bottom-color: var(--card);
 }
-/* The one in hand says so in gold, the way the bar above does. Nothing fills. */
 .rt__names .menu__i:hover,
 .rt__names .menu__i.is-hover {
   background: none;
-  color: var(--accent);
 }
 .rt__full {
-  margin-left: auto;
   color: var(--text-muted);
   font-size: 12px;
+}
+/* The one in hand is pointed at rather than painted: every name keeps its own colour. */
+.rt__at {
+  margin-left: auto;
+  color: var(--accent);
+}
+.rt__at.is-off {
+  visibility: hidden;
 }
 /* Nothing in here answers while it is off — the toolbar, the text and whatever the owner put in the toolbar alike. */
 .rt.is-off {
