@@ -9,6 +9,7 @@ import { useNotices, type Notice } from '../lib/notices';
 import { useRoles } from '../lib/roles';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
+import DayWindow from './DayWindow.vue';
 import MonthGrid from './MonthGrid.vue';
 import { api } from '../lib/api';
 import {
@@ -132,10 +133,23 @@ async function toCalendar(): Promise<void> {
   await router.push('/calendar');
 }
 
-// A day picked here opens on the calendar screen, where there is room to say what is on it.
-async function toDay(key: string): Promise<void> {
+// A day picked here opens where you are: the screen behind the bar is not disturbed.
+const pickedDay = ref<string | null>(null);
+
+function toDay(key: string): void {
   dateOpen.value = false;
-  await router.push({ path: '/calendar', query: { day: key } });
+  pickedDay.value = key;
+}
+
+async function fromDay(where: {
+  key: string;
+  projectShort: string;
+  boardSlug: string;
+  comment?: string;
+}): Promise<void> {
+  pickedDay.value = null;
+  if (where.comment) ask(where.comment);
+  await router.push(`/${where.projectShort}/${where.boardSlug}/${where.key}`);
 }
 
 onMounted(() => {
@@ -304,6 +318,14 @@ async function signOut(): Promise<void> {
       <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
+
+    <DayWindow
+      v-if="pickedDay"
+      :day="pickedDay"
+      @close="pickedDay = null"
+      @changed="readNext(); readMonth()"
+      @open="fromDay"
+    />
   </header>
 </template>
 

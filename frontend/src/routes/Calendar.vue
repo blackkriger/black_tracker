@@ -3,12 +3,12 @@
 // how much work went through each day — for the whole team or for one person.
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { AtSign, ChevronLeft, ChevronRight, Smile, X } from 'lucide-vue-next';
+import { AtSign, ChevronLeft, ChevronRight, Smile } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
+import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import Select from '../components/Select.vue';
-import Dialog from '../components/Dialog.vue';
 import { api } from '../lib/api';
 import {
   byDay,
@@ -25,7 +25,7 @@ import type { IssueTag } from '../lib/issues';
 import { stampAt } from '../lib/issues';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
-import { dayOf, useNotices, type Notice } from '../lib/notices';
+import { useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
@@ -65,10 +65,6 @@ const yearMarks = computed(() => [...marks.value].sort((a, b) => a.day.localeCom
 const personChoices = computed(() =>
   people.value.map((p) => ({ value: p.login, label: p.fullName || p.login, color: p.roleColor }))
 );
-const projectChoices = computed(() => [
-  { value: '', label: 'Everything' },
-  ...projects.value.map((p) => ({ value: p.shortName, label: p.name })),
-]);
 
 async function load(): Promise<void> {
   clear('month');
@@ -129,64 +125,9 @@ function step(by: number): void {
 
 // ── one day, opened ──
 const picked = ref<string | null>(null);
-const title = ref('');
-const scope = ref('');
-const url = ref('');
-const banner = ref('');
-// The form for a new event stays folded away until it is asked for.
-const adding = ref(false);
-const busy = ref(false);
-const pickedDay = computed(() => (picked.value ? days.value.get(picked.value) : null));
-const dayNotices = computed(() =>
-  picked.value ? notices.value.filter((n) => dayOf(n) === picked.value) : []
-);
 
 function openDay(key: string): void {
   picked.value = key;
-  title.value = '';
-  scope.value = '';
-  url.value = '';
-  banner.value = '';
-  adding.value = false;
-  clear('day');
-}
-
-async function addMark(): Promise<void> {
-  const text = title.value.trim();
-  if (!text || !picked.value || busy.value) return;
-  busy.value = true;
-  clear('day');
-  try {
-    await api('/key-dates', {
-      method: 'POST',
-      body: {
-        day: picked.value,
-        title: text,
-        project: scope.value || null,
-        url: url.value.trim() || null,
-        banner: banner.value.trim() || null,
-      },
-    });
-    title.value = '';
-    url.value = '';
-    banner.value = '';
-    adding.value = false;
-    await load();
-  } catch (err) {
-    fail('day', err);
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function removeMark(m: Mark): Promise<void> {
-  clear('day');
-  try {
-    await api(`/key-dates/${m.id}`, { method: 'DELETE' });
-    await load();
-  } catch (err) {
-    fail('day', err);
-  }
 }
 
 // The window wants the board it sits on and the tags its project can wear; neither is
@@ -222,6 +163,30 @@ async function openNotice(n: Notice): Promise<void> {
     color: '',
     done: false,
   });
+}
+
+async function openFromDay(where: {
+  key: string;
+  projectShort: string;
+  boardSlug: string;
+  comment?: string;
+}): Promise<void> {
+  const board = projects.value
+    .find((p) => p.shortName === where.projectShort)
+    ?.boards.find((b) => b.slug === where.boardSlug);
+  if (!board) return;
+  if (where.comment) ask(where.comment);
+  picked.value = null;
+  await openIssue({
+    key: where.key,
+    summary: '',
+    projectShort: where.projectShort,
+    boardId: board.id,
+    boardSlug: where.boardSlug,
+    color: '',
+    done: false,
+    assignee: null,
+  } as unknown as Due);
 }
 
 async function openIssue(d: Due): Promise<void> {
@@ -376,110 +341,13 @@ function closeIssue(): void {
       </div>
     </div>
 
-    <Dialog v-if="picked" :title="longDate(picked)" :width="460" @close="picked = null">
-      <div v-if="dayNotices.length" class="marks">
-        <button
-          v-for="n in dayNotices"
-          :key="n.id"
-          class="mark mark--due"
-          type="button"
-          @click="openNotice(n)"
-        >
-          <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
-          <span v-if="n.emoji">{{ n.emoji }}</span>
-          <span class="mark__title">
-            <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
-            <template v-else>
-              <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
-              {{ n.said }}
-            </template>
-          </span>
-        </button>
-      </div>
-
-      <div v-if="pickedDay?.marks.length" class="marks">
-        <div v-for="m in pickedDay.marks" :key="m.id" class="mark mark--kept">
-          <a
-            v-if="m.banner"
-            class="mark__banner"
-            :href="m.url ?? m.banner"
-            target="_blank"
-            rel="noopener noreferrer"
-          ><img :src="m.banner" :alt="m.title" /></a>
-          <div class="mark__line">
-            <span v-if="m.project" class="key">{{ m.project.shortName }}</span>
-            <a
-              v-if="m.url"
-              class="mark__title"
-              :href="m.url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >{{ m.title }}</a>
-            <span v-else class="mark__title">{{ m.title }}</span>
-            <button
-              class="btn btn--sm btn--icon btn--ghost"
-              type="button"
-              :disabled="!session.canDelete.value"
-              :aria-label="`Delete ${m.title}`"
-              @click="removeMark(m)"
-            ><X class="ic ic--sm" /></button>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="pickedDay?.dues.length" class="marks">
-        <button
-          v-for="d in pickedDay.dues"
-          :key="d.key"
-          class="mark mark--due"
-          type="button"
-          @click="openIssue(d)"
-        >
-          <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
-          <span class="mark__title">{{ d.summary }}</span>
-        </button>
-      </div>
-
-      <div v-if="!adding" class="addrow">
-        <button class="btn" type="button" @click="adding = true">Add event…</button>
-        <div class="sp"></div>
-      </div>
-
-      <template v-else>
-      <div class="field">
-        <label class="label" for="mark-title">Title</label>
-        <input
-          id="mark-title"
-          v-model="title"
-          class="input"
-          maxlength="120"
-          @keydown.enter.prevent="addMark"
-        />
-      </div>
-      <div class="field">
-        <label class="label" for="mark-url">Link</label>
-        <input id="mark-url" v-model="url" class="input" maxlength="500" placeholder="https://" />
-      </div>
-      <div class="field">
-        <label class="label" for="mark-banner">Banner</label>
-        <input
-          id="mark-banner"
-          v-model="banner"
-          class="input"
-          maxlength="500"
-          placeholder="https://"
-        />
-      </div>
-      <div class="addrow">
-        <Select v-model="scope" :options="projectChoices" />
-        <button class="btn" type="button" @click="adding = false">Cancel</button>
-        <button class="btn" type="button" :disabled="busy || !title.trim()" @click="addMark">
-          Add
-        </button>
-      </div>
-      </template>
-      <div v-if="errors.day" class="err">{{ errors.day }}</div>
-    </Dialog>
+    <DayWindow
+      v-if="picked"
+      :day="picked"
+      @close="picked = null"
+      @changed="load"
+      @open="openFromDay"
+    />
 
     <IssueView
       v-if="open"
