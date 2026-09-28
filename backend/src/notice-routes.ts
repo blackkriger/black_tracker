@@ -83,6 +83,7 @@ interface NoticeRow {
   detail: string | null;
   comment_id: string | null;
   text: string | null;
+  summary: string | null;
   created_at: Date;
   read_at: Date | null;
   by_login: string | null;
@@ -101,12 +102,12 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
     if (denied.everything) return reply.send({ data: [] });
 
     const res = await pool.query<NoticeRow>(
-      `select n.id, n.kind, n.detail, n.comment_id, c.text, n.created_at, n.read_at,
+      `select n.id, n.kind, n.detail, n.comment_id, c.text, i.summary, n.created_at, n.read_at,
               u.login as by_login, i.readable_id, p.short_name, b.slug, st.color as state_color
          from notices n
-         join issue_comments c on c.id = n.comment_id
+         left join issue_comments c on c.id = n.comment_id
          left join users u on u.id = n.by_id
-         join issues i on i.id = c.issue_id
+         join issues i on i.id = coalesce(c.issue_id, n.issue_id)
          join projects p on p.id = i.project_id
          join boards b on b.id = i.board_id
          join states st on st.id = i.state_id
@@ -137,6 +138,23 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
 }
 
 function publicNotice(r: NoticeRow, mine: string) {
+  // A notice about the issue itself has no words of its own, so it carries its title.
+  if (!r.comment_id) {
+    return {
+      id: r.id,
+      kind: r.kind,
+      commentId: null,
+      emoji: r.detail,
+      said: (r.summary ?? '').slice(0, 140),
+      by: r.by_login,
+      key: r.readable_id,
+      color: r.state_color,
+      projectShort: r.short_name,
+      boardSlug: r.slug,
+      at: r.created_at.toISOString(),
+      read: r.read_at !== null,
+    };
+  }
   // The name that is being answered is the reader's own, so it says nothing they do not know.
   const said = plain(r.text ?? '')
     .replace(new RegExp(`(^|\\s)@${escape(mine)}(?![a-zA-Z0-9_.-])`, 'gi'), '$1')

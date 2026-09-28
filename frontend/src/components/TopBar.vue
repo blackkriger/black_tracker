@@ -300,6 +300,7 @@ async function signOut(): Promise<void> {
               <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
               <span class="men__said">
                 <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
+                <template v-else-if="n.kind === 'assigned'">{{ n.by }} assigned you</template>
                 <template v-else>
                   <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
                   {{ n.said }}

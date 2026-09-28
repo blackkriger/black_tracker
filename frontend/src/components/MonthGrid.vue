@@ -3,7 +3,7 @@
 // marked on it, what is due on it, and how much work went through it — the shading. The
 // same grid hangs in the top bar and fills the calendar screen.
 import { computed, ref } from 'vue';
-import { AtSign, Bell, Smile } from 'lucide-vue-next';
+import { AtSign, Bell, ContactRound, Smile } from 'lucide-vue-next';
 import { useSession } from '../lib/session';
 import {
   WEEKDAYS,
@@ -41,7 +41,7 @@ function heat(key?: string): number {
 
 // What stands in place of the number, in the order it outranks: an unread name, an unread
 // reaction, then a day somebody marked. The number is the quietest thing a day says.
-const WAITING = ['mention', 'reaction'];
+const WAITING = ['mention', 'assigned', 'reaction'];
 
 function markOf(key?: string): string | null {
   const day = info(key);
@@ -93,6 +93,11 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       <template v-if="c.day">
         <AtSign
           v-if="markOf(c.key) === 'mention'"
+          class="ic ic--sm cal__at"
+          :style="{ color: mine }"
+        />
+        <ContactRound
+          v-else-if="markOf(c.key) === 'assigned'"
           class="ic ic--sm cal__at"
           :style="{ color: mine }"
         />

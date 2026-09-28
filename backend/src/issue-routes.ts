@@ -355,6 +355,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         );
       }
       await writeHistory(client, row.rows[0].id, auth.userId, 'created', null, null);
+      // Written straight onto somebody: the same telling as handing it over later.
+      if (p.assigneeId && p.assigneeId !== auth.userId) {
+        await client.query(
+          `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
+          [p.assigneeId, row.rows[0].id, auth.userId]
+        );
+      }
       return row.rows[0].id;
     });
 
@@ -608,6 +615,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           login(issue.assignee_id),
           login(p.assigneeId ?? null)
         );
+        // Handed to somebody else: they are told. Taking it yourself needs no telling.
+        if (p.assigneeId && p.assigneeId !== auth.userId) {
+          await client.query(
+            `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
+            [p.assigneeId, id, auth.userId]
+          );
+        }
       }
       if (landing) {
         const was = await client.query<{ name: string }>('select name from boards where id = $1', [

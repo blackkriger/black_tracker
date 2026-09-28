@@ -5,7 +5,7 @@
 import { computed, ref } from 'vue';
 import { api } from './api';
 
-export type NoticeKind = 'mention' | 'reaction';
+export type NoticeKind = 'mention' | 'reaction' | 'assigned';
 
 export interface Notice {
   id: string;

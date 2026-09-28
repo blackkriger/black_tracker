@@ -3,7 +3,7 @@
 // how much work went through each day — for the whole team or for one person.
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { AtSign, ChevronLeft, ChevronRight, Smile } from 'lucide-vue-next';
+import { AtSign, ChevronLeft, ChevronRight, ContactRound, Smile } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import DayWindow from '../components/DayWindow.vue';
@@ -275,6 +275,13 @@ function closeIssue(): void {
               ><AtSign class="ic" /></button>
               <button
                 class="btn btn--sm btn--icon btn--ghost kind"
+                :class="{ 'is-off': off.includes('assigned') }"
+                type="button"
+                aria-label="Assigned to you"
+                @click="toggleKind('assigned')"
+              ><ContactRound class="ic" /></button>
+              <button
+                class="btn btn--sm btn--icon btn--ghost kind"
                 :class="{ 'is-off': off.includes('reaction') }"
                 type="button"
                 aria-label="Reactions"
@@ -296,6 +303,7 @@ function closeIssue(): void {
                   <span v-if="n.emoji">{{ n.emoji }}</span>
                   <span class="note__said">
                     <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
+                    <template v-else-if="n.kind === 'assigned'">{{ n.by }} assigned you</template>
                     <template v-else>
                       <template v-if="n.by && n.by !== session.me.value?.login">
                         {{ n.by }}:
