@@ -367,6 +367,15 @@ watch(
         />
       </span>
       <Select
+        v-model="byPriority"
+        class="filter"
+        :options="priorityChoices"
+        placeholder="Priority"
+        keep-placeholder
+        small
+        label="Filter by priority"
+      />
+      <Select
         v-model="byAssignee"
         class="filter"
         :options="assigneeChoices"
@@ -383,15 +392,6 @@ watch(
         keep-placeholder
         small
         label="Filter by author"
-      />
-      <Select
-        v-model="byPriority"
-        class="filter"
-        :options="priorityChoices"
-        placeholder="Priority"
-        keep-placeholder
-        small
-        label="Filter by priority"
       />
 
       <button
