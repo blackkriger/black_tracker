@@ -1,9 +1,18 @@
 <script setup lang="ts">
-// The year at a glance: the days somebody marked, the deadlines the issues carry, and
-// how much work went through each day — for the whole team or for one person.
+// Where the tracker opens: what is on your own hands, and under it the calendar — three
+// months of it by default, the whole year when it is asked for. The days somebody marked,
+// the deadlines the issues carry, and how much work went through each day.
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
-import { AtSign, ChevronLeft, ChevronRight, ContactRound, Smile } from 'lucide-vue-next';
+import { useRoute, useRouter } from 'vue-router';
+import {
+  AtSign,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  ContactRound,
+  Smile,
+} from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import DayWindow from '../components/DayWindow.vue';
@@ -12,8 +21,10 @@ import Select from '../components/Select.vue';
 import { api } from '../lib/api';
 import {
   byDay,
+  dayAndMonth,
   longDate,
   dayKey,
+  daysInMonth,
   monthName,
   type Activity,
   type DayInfo,
@@ -22,7 +33,7 @@ import {
   type Mark,
 } from '../lib/calendar';
 import type { IssueTag } from '../lib/issues';
-import { stampAt } from '../lib/issues';
+import { priorityColor, stampAt, type Priority } from '../lib/issues';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
 import { useNotices, type Notice } from '../lib/notices';
@@ -32,6 +43,7 @@ import { useSession } from '../lib/session';
 import { useLive } from '../lib/live';
 
 const route = useRoute();
+const router = useRouter();
 const session = useSession();
 const { people, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
@@ -48,8 +60,49 @@ const {
 const now = new Date();
 const year = ref(now.getFullYear());
 const who = ref('');
-const months = Array.from({ length: 12 }, (_, m) => m);
 const loading = ref(true);
+
+/** What is on your own hands, nearest deadline first and the undated ones after them. */
+interface Mine {
+  key: string;
+  summary: string;
+  priority: string;
+  due: string | null;
+  projectShort: string;
+  boardSlug: string;
+  stateName: string;
+  color: string;
+}
+const mine = ref<Mine[]>([]);
+const today = dayKey(now.getFullYear(), now.getMonth(), now.getDate());
+
+async function loadMine(): Promise<void> {
+  try {
+    mine.value = await api<Mine[]>('/my-issues');
+  } catch (err) {
+    fail('mine', err, 'Could not read your issues.');
+  }
+}
+
+// Folded, the calendar is the month before, this one and the next; opened, it is the year.
+const wide = ref(route.query.calendar === 'full');
+
+const shownMonths = computed<{ year: number; month: number }[]>(() => {
+  if (wide.value) {
+    return Array.from({ length: 12 }, (_, m) => ({ year: year.value, month: m }));
+  }
+  return [-1, 0, 1].map((step) => {
+    const at = new Date(now.getFullYear(), now.getMonth() + step, 1);
+    return { year: at.getFullYear(), month: at.getMonth() };
+  });
+});
+
+function unfold(): void {
+  wide.value = !wide.value;
+  void router.replace({
+    query: { ...route.query, calendar: wide.value ? 'full' : undefined },
+  });
+}
 
 const marks = ref<Mark[]>([]);
 const dues = ref<{ day: string; issues: Due[] }[]>([]);
@@ -68,8 +121,10 @@ const personChoices = computed(() =>
 
 async function load(): Promise<void> {
   clear('month');
-  const from = dayKey(year.value, 0, 1);
-  const to = dayKey(year.value, 11, 31);
+  const first = shownMonths.value[0];
+  const last = shownMonths.value[shownMonths.value.length - 1];
+  const from = dayKey(first.year, first.month, 1);
+  const to = dayKey(last.year, last.month, daysInMonth(last.year, last.month));
   const user = who.value ? `&user=${encodeURIComponent(who.value)}` : '';
   try {
     const got = await api<{
@@ -102,10 +157,15 @@ onMounted(() => {
   void loadProjects();
   void loadNotices();
   void load();
+  void loadMine();
   fromAddress();
 });
 watch(() => route.query.day, fromAddress);
-watch([year, who], () => void load());
+watch(
+  () => route.query.calendar,
+  (asked) => (wide.value = asked === 'full')
+);
+watch([year, who, wide], () => void load());
 // The whole screen is made of what other people are doing, so almost everything redraws it.
 useLive((ev) => {
   if (
@@ -116,6 +176,7 @@ useLive((ev) => {
   ) {
     void load();
   }
+  if (ev.type.startsWith('issue.')) void loadMine();
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadNotices();
 });
 
@@ -216,22 +277,62 @@ function closeIssue(): void {
     <TopBar />
     <div class="page__body">
       <div class="sheet sheet--cal">
+          <section class="panel sheet__wide">
+            <header class="panel__h">
+              Your issues
+              <span class="panel__end">{{ mine.length }}</span>
+            </header>
+            <div class="panel__b mine">
+              <button
+                v-for="i in mine"
+                :key="i.key"
+                class="mine__row"
+                type="button"
+                @click="openFromDay({ key: i.key, projectShort: i.projectShort, boardSlug: i.boardSlug })"
+              >
+                <span class="key" :style="{ color: i.color }">{{ i.key }}</span>
+                <span class="mine__pri" :style="{ color: priorityColor(i.priority as Priority) }">
+                  {{ i.priority }}
+                </span>
+                <span class="mine__what">{{ i.summary }}</span>
+                <span class="stamp" :style="{ color: i.color }">{{ i.stateName }}</span>
+                <span
+                  class="stamp mine__due"
+                  :class="{ 'is-late': i.due && i.due < today }"
+                >{{ i.due ? dayAndMonth(i.due) : '—' }}</span>
+              </button>
+              <div v-if="!mine.length" class="hint faint">Nothing is on you.</div>
+            </div>
+          </section>
+          <div v-if="errors.mine" class="err panel__err sheet__wide">{{ errors.mine }}</div>
+
           <section class="panel">
             <header class="panel__h">
-              <span class="key year">{{ year }}</span>
-              <button
-                class="btn btn--sm btn--icon btn--ghost"
-                type="button"
-                aria-label="Previous year"
-                @click="step(-1)"
-              ><ChevronLeft class="ic" /></button>
-              <button
-                class="btn btn--sm btn--icon btn--ghost"
-                type="button"
-                aria-label="Next year"
-                @click="step(1)"
-              ><ChevronRight class="ic" /></button>
+              <span class="key year">{{ wide ? year : monthName(now.getFullYear(), now.getMonth()) }}</span>
+              <template v-if="wide">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  aria-label="Previous year"
+                  @click="step(-1)"
+                ><ChevronLeft class="ic" /></button>
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  aria-label="Next year"
+                  @click="step(1)"
+                ><ChevronRight class="ic" /></button>
+              </template>
               <span class="panel__end">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  :aria-label="wide ? 'Show three months' : 'Show the whole year'"
+                  @click="unfold"
+                >
+                  <ChevronsDownUp v-if="wide" class="ic" />
+                  <ChevronsUpDown v-else class="ic" />
+                </button>
                 <Select
                   v-model="who"
                   :options="personChoices"
@@ -244,14 +345,14 @@ function closeIssue(): void {
             </header>
             <div class="panel__b year-grid">
               <template v-if="loading">
-                <span v-for="n in 12" :key="n" class="sk cal-sk"></span>
+                <span v-for="n in shownMonths.length" :key="n" class="sk cal-sk"></span>
               </template>
               <template v-else>
-                <div v-for="m in months" :key="m" class="month">
-                  <div class="month__h">{{ monthName(year, m) }}</div>
+                <div v-for="m in shownMonths" :key="`${m.year}-${m.month}`" class="month">
+                  <div class="month__h">{{ monthName(m.year, m.month) }}</div>
                   <MonthGrid
-                    :year="year"
-                    :month="m"
+                    :year="m.year"
+                    :month="m.month"
                     :days="days"
                     :peak="peak"
                     compact
@@ -385,6 +486,40 @@ function closeIssue(): void {
 </template>
 
 <style scoped>
+/* What is on your own hands: one row per issue, the summary taking whatever is left. */
+.mine {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mine__row {
+  display: grid;
+  grid-template-columns: 84px 72px minmax(0, 1fr) 110px 96px;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.mine__row:hover {
+  border-color: var(--line-2);
+}
+.mine__pri {
+  font-size: 12px;
+}
+.mine__what {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mine__due {
+  text-align: right;
+}
 .page__body {
   flex: 1 1 auto;
   min-height: 0;

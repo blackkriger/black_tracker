@@ -1,24 +1,25 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useSession } from './lib/session';
 import Login from './routes/Login.vue';
-import Home from './routes/Home.vue';
 import Board from './routes/Board.vue';
 import Profile from './routes/Profile.vue';
 import NotFound from './routes/NotFound.vue';
 import SettingsIndex from './routes/settings/Index.vue';
+import SettingsProfile from './routes/settings/Profile.vue';
+import SettingsApi from './routes/settings/Api.vue';
 import SettingsProject from './routes/settings/Project.vue';
 import SettingsNewProject from './routes/settings/NewProject.vue';
 import SettingsTags from './routes/settings/Tags.vue';
 import SettingsUsers from './routes/settings/Users.vue';
 import Join from './routes/Join.vue';
-import Calendar from './routes/Calendar.vue';
+import Dashboard from './routes/Dashboard.vue';
 import Analytics from './routes/Analytics.vue';
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    // The root decides where you belong: the board of the project you last had open, or an empty state when there are no projects yet.
-    { path: '/', name: 'home', component: Home },
+    // The root is where the tracker opens: your own issues over a calendar folded to three months.
+    { path: '/', name: 'home', component: Dashboard },
     { path: '/login', name: 'login', component: Login, meta: { public: true } },
     // The far end of an invite link: open to whoever holds it, and the only way an account is ever born in the browser.
     { path: '/join/:token', name: 'join', component: Join, meta: { public: true } },
@@ -28,9 +29,12 @@ export const router = createRouter({
     // The same board with one of its issues open over it, so a card can be linked to.
     { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
     { path: '/profile', name: 'profile', component: Profile },
-    { path: '/calendar', name: 'calendar', component: Calendar },
+    // The calendar is the root with its year opened, and its old address still leads there.
+    { path: '/calendar', redirect: { name: 'home', query: { calendar: 'full' } } },
     { path: '/analytics', name: 'analytics', component: Analytics },
     { path: '/settings', name: 'settings', component: SettingsIndex },
+    { path: '/settings/profile', name: 'settings-profile', component: SettingsProfile },
+    { path: '/settings/api', name: 'settings-api', component: SettingsApi },
     { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject },
     { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject },
     { path: '/settings/tags', name: 'settings-tags', component: SettingsTags },

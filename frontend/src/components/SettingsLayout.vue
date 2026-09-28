@@ -1,17 +1,30 @@
 <script setup lang="ts">
 // The frame every admin screen sits in: the top bar, the section list on the left, and whatever the screen puts in the slot.
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import TopBar from './TopBar.vue';
 import { ExternalLink } from 'lucide-vue-next';
+import { api } from '../lib/api';
+import { stamp } from '../lib/issues';
 import { useLive } from '../lib/live';
 import { useProjects } from '../lib/projects';
 
 const { projects, loaded, load } = useProjects();
 
+// When the running code was last changed, read from the commit the server stands on.
+const updated = ref<string | null>(null);
+
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const archived = computed(() => projects.value.filter((p) => p.archived));
 
-onMounted(() => void load());
+onMounted(async () => {
+  void load();
+  try {
+    const got = await api<{ updatedAt: string }>('/version');
+    updated.value = got.updatedAt;
+  } catch {
+    // The date is a footnote; the settings themselves do not depend on it.
+  }
+});
 
 useLive((ev) => {
   if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
@@ -24,6 +37,10 @@ useLive((ev) => {
 
     <div class="page__body">
       <nav class="side settings__side" aria-label="Settings sections">
+        <div class="side__h">Profile</div>
+        <RouterLink to="/settings/profile">Profile</RouterLink>
+        <RouterLink to="/settings/api">API</RouterLink>
+
         <div class="side__h">Projects</div>
         <span v-for="n in loaded ? 0 : 3" :key="n" class="sk sk--row side__sk"></span>
         <RouterLink v-for="p in live" :key="p.id" :to="`/settings/${p.shortName}`">
@@ -42,6 +59,10 @@ useLive((ev) => {
           DB
           <ExternalLink class="ic ic--sm" />
         </a>
+
+        <span class="side__foot stamp">
+          <template v-if="updated">UPDATED {{ stamp(updated) }}</template>
+        </span>
       </nav>
 
       <div class="sheet">
@@ -71,9 +92,18 @@ useLive((ev) => {
   justify-content: center;
   min-height: 0;
 }
+/* The list runs the height of the screen so its last line, the date the service was last
+   updated, sits at the very bottom rather than under the links. */
 .settings__side {
+  display: flex;
+  flex-direction: column;
   width: 220px;
   flex: none;
+  min-height: calc(100vh - 48px - var(--space-5) * 2);
+}
+.side__foot {
+  margin-top: auto;
+  padding: 14px 10px 4px;
 }
 @media (max-width: 1240px) {
   .page__body {

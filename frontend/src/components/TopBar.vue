@@ -131,7 +131,7 @@ function stepMonth(by: number): void {
 
 async function toCalendar(): Promise<void> {
   dateOpen.value = false;
-  await router.push('/calendar');
+  await router.push({ name: 'home', query: { calendar: 'full' } });
 }
 
 // A day picked here opens where you are: the screen behind the bar is not disturbed.
@@ -316,7 +316,7 @@ async function signOut(): Promise<void> {
           </button>
         </div>
       </span>
-      <RouterLink class="topitem" to="/profile">
+      <RouterLink class="topitem" :to="{ name: 'home', query: { calendar: 'full' } }">
         <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
         {{ session.me.value?.login }}
       </RouterLink>

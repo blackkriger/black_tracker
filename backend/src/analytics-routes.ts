@@ -122,6 +122,48 @@ function median(all: number[]): number | null {
 }
 
 export function registerAnalyticsRoutes(app: FastifyInstance): void {
+  // The dashboard's own list: everything on the reader's hands, nearest deadline first and
+  // the undated ones after them.
+  app.get('/my-issues', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const denied = await shutOut(auth);
+    if (denied.all) return reply.send({ data: [] });
+    const res = await pool.query<{
+      readable_id: string;
+      summary: string;
+      priority: string;
+      due_date: string | null;
+      short_name: string;
+      slug: string;
+      state_name: string;
+      color: string;
+    }>(
+      `select i.readable_id, i.summary, i.priority, i.due_date, p.short_name, b.slug,
+              s.name as state_name, s.color
+         from issues i
+         join projects p on p.id = i.project_id
+         join boards b on b.id = i.board_id
+         join states s on s.id = i.state_id
+        where i.assignee_id = $3 and i.resolved_at is null
+          and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
+        order by i.due_date nulls last, i.readable_id`,
+      [denied.boards, denied.projects, auth.userId]
+    );
+    return reply.send({
+      data: res.rows.map((r) => ({
+        key: r.readable_id,
+        summary: r.summary,
+        priority: r.priority,
+        due: r.due_date ? day(r.due_date) : null,
+        projectShort: r.short_name,
+        boardSlug: r.slug,
+        stateName: r.state_name,
+        color: r.color,
+      })),
+    });
+  });
+
   app.get('/analytics', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;

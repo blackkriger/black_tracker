@@ -4,6 +4,8 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { env } from './env.js';
+import { execFile } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { pruneSessions, registerAuthRoutes, registerRoleWall } from './auth.js';
 import { registerProjectRoutes } from './project-routes.js';
 import { registerBoardRoutes } from './board-routes.js';
@@ -28,6 +30,19 @@ await app.register(cors, { origin: env.corsOrigins, credentials: true });
 await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 10 } });
 
 app.get('/health', async () => ({ data: { ok: true } }));
+
+// When the running code was last changed. The server deploys by pulling, so the commit it
+// stands on is the moment the service itself was last updated; without git to ask, the
+// moment this process started is the nearest true answer.
+const updatedAt = await new Promise<string>((resolve) => {
+  execFile(
+    'git',
+    ['log', '-1', '--format=%cI'],
+    { cwd: fileURLToPath(new URL('../..', import.meta.url)) },
+    (err, out) => resolve(err ? new Date().toISOString() : out.trim())
+  );
+});
+app.get('/version', async () => ({ data: { updatedAt } }));
 
 registerRoleWall(app);
 registerAuthRoutes(app);
