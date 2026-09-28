@@ -81,6 +81,12 @@ export function monthName(year: number, month: number): string {
   return new Date(year, month, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 }
 
+/** The day without its weekday, for places that already say which day they mean. */
+export function dayAndMonth(key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+}
+
 export function longDate(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', {

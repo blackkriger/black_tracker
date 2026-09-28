@@ -14,7 +14,7 @@ import MonthGrid from './MonthGrid.vue';
 import { api } from '../lib/api';
 import {
   byDay,
-  longDate,
+  dayAndMonth,
   monthName,
   monthRange,
   todayKey,
@@ -279,7 +279,7 @@ async function signOut(): Promise<void> {
                     rel="noopener noreferrer"
                   >{{ soon.title }}</a>
                   <span v-else class="soon__title">{{ soon.title }}</span>
-                  <span class="stamp">{{ longDate(soon.day) }}</span>
+                  <span class="stamp">{{ dayAndMonth(soon.day) }}</span>
                 </span>
                 <!-- A day that belongs to one project says which, against both lines. -->
                 <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
