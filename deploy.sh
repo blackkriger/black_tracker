@@ -34,7 +34,7 @@ tar -czf - -C frontend/dist . \
 
 echo ">> Updating backend (git pull + npm install + migrate + pm2 restart)"
 ssh "${SSH_KEEPALIVE[@]}" "$SERVER" "set -e; \
-  cd $DEPLOY_DIR && git pull --ff-only origin main; \
+  cd $DEPLOY_DIR && git checkout -- backend/package-lock.json && git pull --ff-only origin main; \
   cd $DEPLOY_DIR/backend && npm install --no-audit --no-fund 2>&1 | tail -3 && npm run migrate && pm2 restart $PM2_APP --update-env"
 
 echo ">> Waiting for /health"
