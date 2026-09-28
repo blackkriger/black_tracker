@@ -3,7 +3,7 @@
 // shown as code with its lines numbered. The text arrives as data and is put on the page by
 // us, so nothing the file carries is ever parsed as a document on our own origin.
 import { computed, ref, watch, onUnmounted } from 'vue';
-import { Download, WrapText, X } from 'lucide-vue-next';
+import { FileDown, WrapText, X } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
 import { api } from '../lib/api';
 import { langOf } from '../lib/files';
@@ -167,7 +167,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
             Wrap
           </button>
           <a class="btn btn--sm" :href="`/api/attachments/${file.id}`" download>
-            <Download class="ic" />
+            <FileDown class="ic" />
             Download
           </a>
         </div>

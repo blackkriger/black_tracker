@@ -19,7 +19,7 @@ import { useSession } from '../lib/session';
 import {
   ArrowDown,
   ArrowUp,
-  Download,
+  FileDown,
   Link2,
   Paperclip,
   Pencil,
@@ -1313,7 +1313,7 @@ async function removeIssue(): Promise<void> {
                   :href="`/api/attachments/${a.id}`"
                   download
                   :aria-label="`Download ${a.filename}`"
-                ><Download class="ic ic--sm" /></a>
+                ><FileDown class="ic ic--sm" /></a>
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
@@ -1505,7 +1505,7 @@ async function removeIssue(): Promise<void> {
                         :href="`/api/attachments/${a.id}`"
                         download
                         :aria-label="`Download ${a.filename}`"
-                      ><Download class="ic ic--sm" /></a>
+                      ><FileDown class="ic ic--sm" /></a>
                       <button
                         v-if="editingComment === c.id"
                         class="btn btn--sm btn--icon btn--ghost"
