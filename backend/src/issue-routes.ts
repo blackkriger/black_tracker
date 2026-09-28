@@ -27,6 +27,21 @@ const INLINE_TYPES = new Set([
   'video/webm',
 ]);
 
+// What the reader may open. A file listed here is still never served as a document: its
+// bytes come back as a string in a JSON body, so nothing in it is ever parsed by the browser.
+const READABLE = new Set([
+  'bat', 'c', 'cfg', 'cmd', 'conf', 'cpp', 'cs', 'css', 'csv', 'diff', 'env', 'gd', 'go',
+  'godot', 'gradle', 'h', 'hpp', 'htm', 'html', 'import', 'ini', 'java', 'js', 'json',
+  'jsx', 'kt', 'less', 'log', 'lua', 'md', 'patch', 'php', 'pl', 'properties', 'ps1',
+  'py', 'rb', 'rs', 'scss', 'sh', 'sql', 'svg', 'swift', 'toml', 'tres', 'ts', 'tscn',
+  'tsx', 'txt', 'vue', 'xml', 'yaml', 'yml',
+]);
+// Enough for a README or a patch; past it the reader says so and offers the download.
+const READ_MAX = 512 * 1024;
+
+const readable = (filename: string): boolean =>
+  READABLE.has(filename.split('.').pop()?.toLowerCase() ?? '');
+
 interface IssueRow {
   id: string;
   readable_id: string;
@@ -1270,6 +1285,40 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(row.filename)}"`
     );
     return reply.send(createReadStream(row.storage_path));
+  });
+
+  // The reader's own way in: the text as data, never as a page.
+  app.get('/attachments/:id/text', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const { id } = req.params as { id: string };
+    const res = await pool.query<{
+      filename: string;
+      size: number;
+      storage_path: string;
+      issue_id: string;
+    }>('select filename, size, storage_path, issue_id from issue_attachments where id = $1', [id]);
+    const row = res.rows[0];
+    if (!row) return reply.code(404).send({ error: 'No such file.' });
+    const issue = await issueById(row.issue_id);
+    if (!issue || !(await mayOpenBoard(auth, issue.board_id, issue.project_id))) {
+      return reply.code(403).send({ error: 'This file is not open to you.' });
+    }
+    if (!readable(row.filename)) {
+      return reply.code(415).send({ error: 'There is nothing to read in this kind of file.' });
+    }
+    const chunks: Buffer[] = [];
+    for await (const part of createReadStream(row.storage_path, { end: READ_MAX })) {
+      chunks.push(part as Buffer);
+    }
+    const read = Buffer.concat(chunks).subarray(0, READ_MAX);
+    return reply.send({
+      data: {
+        filename: row.filename,
+        text: read.toString('utf8'),
+        truncated: Number(row.size) > READ_MAX,
+      },
+    });
   });
 
   app.delete('/attachments/:id', async (req, reply) => {

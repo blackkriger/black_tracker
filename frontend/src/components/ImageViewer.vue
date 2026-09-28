@@ -121,15 +121,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 </template>
 
 <style scoped>
-.iviewer {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  background: rgba(0, 0, 0, 0.88);
-  user-select: none;
-}
 .iviewer__stage {
   flex: 1 1 auto;
   min-height: 0;
@@ -149,36 +140,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 .iviewer__img:active {
   cursor: grabbing;
 }
-/* Three columns of equal weight on the outside: the name reads from the left edge, the close sits on the right, and the walk stays in the middle of the screen however long the name is. */
-.iviewer__bar {
-  flex: none;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--surface);
-  border-top: 1px solid var(--line);
-}
-.iviewer__nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.iviewer__close {
-  justify-self: end;
-}
 .iviewer__n {
   min-width: 56px;
   text-align: center;
   font: 12px/1 var(--font-num);
   color: var(--accent);
-}
-.iviewer__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
-  color: var(--text-muted);
 }
 </style>

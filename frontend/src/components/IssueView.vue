@@ -8,8 +8,10 @@ import { TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank } from '../lib/richtext';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
+import FileViewer from './FileViewer.vue';
 import FileWall from './FileWall.vue';
 import Select from './Select.vue';
+import { canRead } from '../lib/files';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
 import { useNotices } from '../lib/notices';
@@ -525,10 +527,22 @@ const files = computed(() => own.value.filter((a) => !a.mime.startsWith('image/'
 const filesOf = (commentId: string) =>
   (issue.value?.attachments ?? []).filter((a) => a.commentId === commentId);
 
+// The file being read over the issue, if any: a name that can be read opens the reader,
+// and every other way of reaching it still downloads it.
+const reading = ref<{ id: string; name: string } | null>(null);
+
+function onFileClick(ev: MouseEvent, a: Attachment): void {
+  if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey || ev.button !== 0) return;
+  if (!canRead(a.filename)) return;
+  ev.preventDefault();
+  reading.value = { id: a.id, name: a.filename };
+}
+
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
   // Anything opened over this window answers Escape first; only when nothing is does it close the issue.
   if (deleting.value || picking.value || makingTag.value || shown.value !== null) return;
+  if (reading.value) return;
   if (creating.value || !editing.value) emit('close');
   else editing.value = false;
 }
@@ -1287,7 +1301,11 @@ async function removeIssue(): Promise<void> {
 
             <div :class="{ 'is-fresh': fresh.has('files') }">
               <div v-for="a in files" :key="a.id" class="att__cap att__row">
-                <a :href="`/api/attachments/${a.id}`" target="_blank">{{ a.filename }}</a>
+                <a
+                  :href="`/api/attachments/${a.id}`"
+                  target="_blank"
+                  @click="onFileClick($event, a)"
+                >{{ a.filename }}</a>
                 <span class="stamp">{{ fileSize(a.size) }}</span>
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
@@ -1469,7 +1487,11 @@ async function removeIssue(): Promise<void> {
                       :key="a.id"
                       class="att__cap att__row"
                     >
-                      <a :href="`/api/attachments/${a.id}`" target="_blank">{{ a.filename }}</a>
+                      <a
+                        :href="`/api/attachments/${a.id}`"
+                        target="_blank"
+                        @click="onFileClick($event, a)"
+                      >{{ a.filename }}</a>
                       <span class="stamp">{{ fileSize(a.size) }}</span>
                       <button
                         v-if="editingComment === c.id"
@@ -1778,6 +1800,7 @@ async function removeIssue(): Promise<void> {
       </div>
 
       <ImageViewer v-model:index="shown" :images="gallery" />
+      <FileViewer :file="reading" @close="reading = null" />
 
       <Dialog v-if="deleting" :title="`Delete ${issueKey}`" @close="deleting = false">
         <p class="iv__lede">This takes its comments, files and history with it. This cannot be undone.</p>
