@@ -188,7 +188,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   /* The gutter is the box's own margin rather than padding inside it: what scrolls starts
      at the box's edge, so a file sliding sideways never shows up beside the line numbers
      that pin there. */
-  margin: 24px;
+  margin: 24px 24px 0;
   user-select: text;
 }
 .fv__md,
