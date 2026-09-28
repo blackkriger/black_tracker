@@ -113,9 +113,10 @@ interface Named {
 const matches = computed<Named[]>(() => {
   if (!naming.value) return [];
   const q = naming.value.query.toLowerCase();
+  // Only the roles are coloured here: a colour on a person would be their role's, said twice.
   const who = people.value
     .filter((p) => p.login.toLowerCase().includes(q) || p.fullName.toLowerCase().includes(q))
-    .map((p) => ({ id: p.id, label: p.login, color: p.roleColor, hint: p.fullName }));
+    .map((p) => ({ id: p.id, label: p.login, color: null, hint: p.fullName }));
   const what = roles.value
     .filter((r) => r.name.toLowerCase().includes(q))
     .map((r) => ({ id: r.id, label: r.name, color: r.color, hint: '' }));
