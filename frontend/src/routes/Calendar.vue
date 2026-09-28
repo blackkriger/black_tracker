@@ -266,27 +266,36 @@ function closeIssue(): void {
         <div class="stack">
           <section class="panel">
             <header class="panel__h">
-              <button
-                class="btn btn--sm btn--icon btn--ghost kind"
-                :class="{ 'is-off': off.includes('mention') }"
-                type="button"
-                aria-label="Mentions"
-                @click="toggleKind('mention')"
-              ><AtSign class="ic" /></button>
-              <button
-                class="btn btn--sm btn--icon btn--ghost kind"
-                :class="{ 'is-off': off.includes('reaction') }"
-                type="button"
-                aria-label="Reactions"
-                @click="toggleKind('reaction')"
-              ><Smile class="ic" /></button>
-              <button
-                class="btn btn--sm btn--icon btn--ghost kind"
-                :class="{ 'is-off': off.includes('assigned') }"
-                type="button"
-                aria-label="Assigned to you"
-                @click="toggleKind('assigned')"
-              ><ContactRound class="ic" /></button>
+              <span class="kind__hold">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost kind"
+                  :class="{ 'is-off': off.includes('mention') }"
+                  type="button"
+                  aria-label="Mentions"
+                  @click="toggleKind('mention')"
+                ><AtSign class="ic" /></button>
+                <span class="selbar kind__what">Mentions</span>
+              </span>
+              <span class="kind__hold">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost kind"
+                  :class="{ 'is-off': off.includes('reaction') }"
+                  type="button"
+                  aria-label="Reactions"
+                  @click="toggleKind('reaction')"
+                ><Smile class="ic" /></button>
+                <span class="selbar kind__what">Reactions</span>
+              </span>
+              <span class="kind__hold">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost kind"
+                  :class="{ 'is-off': off.includes('assigned') }"
+                  type="button"
+                  aria-label="Assigned to you"
+                  @click="toggleKind('assigned')"
+                ><ContactRound class="ic" /></button>
+                <span class="selbar kind__what">Assigned to you</span>
+              </span>
             </header>
             <div class="panel__b days">
               <button
@@ -441,6 +450,25 @@ function closeIssue(): void {
 /* A kind switched off is still there, just not listened to. */
 .kind.is-off {
   opacity: 0.35;
+}
+/* What the icon stands for, held over it until the pointer leaves. */
+.kind__hold {
+  position: relative;
+  display: inline-flex;
+}
+.kind__what {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  display: none;
+  padding: 5px 10px;
+  transform: translate(-50%, -8px);
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.kind__hold:hover .kind__what {
+  display: block;
 }
 .day:hover {
   background: var(--card-hover);
