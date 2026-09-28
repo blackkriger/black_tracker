@@ -584,7 +584,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         await writeHistory(client, id, auth.userId, 'summary', issue.summary, p.summary);
       }
       if (p.description !== undefined && p.description !== issue.description) {
-        await writeHistory(client, id, auth.userId, 'description', null, null);
+        // The words themselves are not kept twice, so the line says what happened to them.
+        await writeHistory(client, id, auth.userId, 'description edited', null, null);
       }
       if (p.priority !== undefined && p.priority !== issue.priority) {
         await writeHistory(client, id, auth.userId, 'priority', issue.priority, p.priority);
