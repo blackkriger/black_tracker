@@ -19,6 +19,7 @@ import { useSession } from '../lib/session';
 import {
   ArrowDown,
   ArrowUp,
+  FileArchive,
   FileDown,
   Link2,
   Paperclip,
@@ -1503,14 +1504,18 @@ async function removeIssue(): Promise<void> {
                   <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
 
                   <div v-if="filesOf(c.id).length" class="cm__files">
-                    <div v-if="filesOf(c.id).length > 1" class="att__cap att__row">
-                      <span class="att__name">{{ filesOf(c.id).length }} files</span>
-                      <span class="stamp">{{ fileSize(bytesOf(c.id)) }}</span>
+                    <div v-if="filesOf(c.id).length > 1" class="att__cap att__row att__all">
+                      <div></div>
+                      <span class="att__all__what">
+                        {{ filesOf(c.id).length }} files
+                        <span class="stamp">{{ fileSize(bytesOf(c.id)) }}</span>
+                      </span>
                       <a
-                        class="btn btn--sm btn--ghost"
+                        class="btn btn--sm btn--icon btn--ghost att__all__go"
                         :href="`/api/comments/${c.id}/files.zip`"
                         download
-                      >Download all</a>
+                        aria-label="Download every file here"
+                      ><FileArchive class="ic ic--sm" /></a>
                     </div>
                     <span
                       v-for="a in filesOf(c.id).filter((x) => !x.mime.startsWith('image/'))"
@@ -1993,6 +1998,20 @@ async function removeIssue(): Promise<void> {
 }
 .att__row--wait {
   border-style: dashed;
+}
+/* What the whole set weighs stands in the middle of the line, the way the viewer's bar
+   holds its own middle: three columns of equal weight, the way out on the right. */
+.att__all {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+}
+.att__all__what {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.att__all__go {
+  justify-self: end;
 }
 /* One line: the chain, what it holds, and the way to add more. The keys are enough — the title rides in the tooltip. */
 .links {
