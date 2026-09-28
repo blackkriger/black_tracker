@@ -13,6 +13,7 @@ import { registerInviteRoutes } from './invite-routes.js';
 import { registerRoleRoutes } from './role-routes.js';
 import { registerIssueRoutes } from './issue-routes.js';
 import { registerCalendarRoutes } from './calendar-routes.js';
+import { registerAnalyticsRoutes } from './analytics-routes.js';
 import { registerNoticeRoutes } from './notice-routes.js';
 import { registerChangeFeed, registerEventRoutes } from './events.js';
 
@@ -38,6 +39,7 @@ registerInviteRoutes(app);
 registerRoleRoutes(app);
 registerIssueRoutes(app);
 registerCalendarRoutes(app);
+registerAnalyticsRoutes(app);
 registerNoticeRoutes(app);
 registerEventRoutes(app);
 // After the routes, so it sees the pattern each one matched.

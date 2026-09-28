@@ -320,6 +320,7 @@ async function signOut(): Promise<void> {
         <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
         {{ session.me.value?.login }}
       </RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" to="/analytics">Analytics</RouterLink>
       <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
