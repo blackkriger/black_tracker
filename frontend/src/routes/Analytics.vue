@@ -308,7 +308,7 @@ async function openIssue(w: Where): Promise<void> {
 
         <div class="stack">
           <section class="panel">
-            <header class="panel__h">People</header>
+            <header class="panel__h">Team</header>
             <div class="panel__b nums">
               <div class="who who--h">
                 <span></span>
