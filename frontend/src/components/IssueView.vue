@@ -2034,6 +2034,14 @@ async function removeIssue(): Promise<void> {
 .att__all__go:hover .att__all__tip {
   display: block;
 }
+/* The box hangs by its right edge, so its pointer stands over the middle of the icon
+   rather than the middle of the box. */
+.att__all__tip::before,
+.att__all__tip::after {
+  left: auto;
+  right: 7px;
+  margin-left: 0;
+}
 /* One line: the chain, what it holds, and the way to add more. The keys are enough — the title rides in the tooltip. */
 .links {
   flex-wrap: wrap;
