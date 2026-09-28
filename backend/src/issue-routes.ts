@@ -1333,9 +1333,12 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { id } = req.params as { id: string };
-    const owner = await pool.query<{ issue_id: string; readable_id: string }>(
-      `select c.issue_id, i.readable_id from issue_comments c
-         join issues i on i.id = c.issue_id where c.id = $1`,
+    const owner = await pool.query<{ issue_id: string; readable_id: string; said_at: string }>(
+      // The hour it was written tells two archives from the same issue apart; a colon cannot
+      // be in a filename, so the clock is written with a dash like the rest of it.
+      `select c.issue_id, i.readable_id,
+              to_char(c.created_at at time zone 'Europe/Moscow', 'YYYY-MM-DD-HH24-MI') as said_at
+         from issue_comments c join issues i on i.id = c.issue_id where c.id = $1`,
       [id]
     );
     const host = owner.rows[0];
@@ -1349,7 +1352,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'Nothing is attached here.' });
-    return sendZip(reply, `${host.readable_id}-comment.zip`, res.rows);
+    return sendZip(reply, `${host.readable_id}-comment-${host.said_at}.zip`, res.rows);
   });
 
   // The reader's own way in: the text as data, never as a page.

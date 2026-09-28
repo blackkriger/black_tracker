@@ -1506,16 +1506,19 @@ async function removeIssue(): Promise<void> {
                   <div v-if="filesOf(c.id).length" class="cm__files">
                     <div v-if="filesOf(c.id).length > 1" class="att__cap att__row att__all">
                       <div></div>
-                      <span class="att__all__what">
+                      <div class="att__all__what">
                         {{ filesOf(c.id).length }} files
                         <span class="stamp">{{ fileSize(bytesOf(c.id)) }}</span>
-                      </span>
-                      <a
-                        class="btn btn--sm btn--icon btn--ghost att__all__go"
-                        :href="`/api/comments/${c.id}/files.zip`"
-                        download
-                        aria-label="Download every file here"
-                      ><FileArchive class="ic ic--sm" /></a>
+                      </div>
+                      <div class="att__all__go">
+                        <a
+                          class="btn btn--sm btn--icon btn--ghost"
+                          :href="`/api/comments/${c.id}/files.zip`"
+                          download
+                          aria-label="Download all"
+                        ><FileArchive class="ic ic--sm" /></a>
+                        <div class="selbar att__all__tip">Download all</div>
+                      </div>
                     </div>
                     <span
                       v-for="a in filesOf(c.id).filter((x) => !x.mime.startsWith('image/'))"
@@ -2011,7 +2014,25 @@ async function removeIssue(): Promise<void> {
   gap: 10px;
 }
 .att__all__go {
+  position: relative;
+  display: inline-flex;
   justify-self: end;
+}
+/* Held over the icon by its right edge, not its middle: the icon is already at the end of
+   the line, and a box centred on it would hang out past it. */
+.att__all__tip {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  display: none;
+  padding: 5px 10px;
+  transform: translateY(-8px);
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.att__all__go:hover .att__all__tip {
+  display: block;
 }
 /* One line: the chain, what it holds, and the way to add more. The keys are enough — the title rides in the tooltip. */
 .links {
