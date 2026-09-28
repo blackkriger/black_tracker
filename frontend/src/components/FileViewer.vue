@@ -3,7 +3,7 @@
 // shown as code with its lines numbered. The text arrives as data and is put on the page by
 // us, so nothing the file carries is ever parsed as a document on our own origin.
 import { computed, ref, watch, onUnmounted } from 'vue';
-import { Download, X } from 'lucide-vue-next';
+import { Download, WrapText, X } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
 import { api } from '../lib/api';
 import { langOf } from '../lib/files';
@@ -18,12 +18,38 @@ const error = ref('');
 const marked_ = ref('');
 const code = ref('');
 
+// Long lines run off the side until they are told to fold, the way Alt+Z folds them in an
+// editor. Whoever asks for it keeps it for every file they open after this one.
+const wrapped = ref(false);
+
 const lang = computed(() => (props.file ? langOf(props.file.name) : 'plaintext'));
 const isMd = computed(() => lang.value === 'markdown');
-const lines = computed(() => {
-  const n = text.value.split('\n').length;
-  return Array.from({ length: n }, (_, i) => i + 1).join('\n');
-});
+const lines = computed(() => (code.value ? byLines(code.value) : []));
+
+// The highlighter paints the file in one pass and a span may run over several lines, so the
+// markup is cut line by line with whatever was left open reopened on the next one. A line
+// has to be its own row for its number to stay beside it once the line folds.
+function byLines(html: string): string[] {
+  const out: string[] = [];
+  const open: string[] = [];
+  let line = '';
+  for (const piece of html.match(/<span [^>]*>|<\/span>|\n|[^<\n]+|</g) ?? []) {
+    if (piece === '\n') {
+      out.push(line + '</span>'.repeat(open.length));
+      line = open.join('');
+    } else if (piece === '</span>') {
+      open.pop();
+      line += piece;
+    } else if (piece.startsWith('<span')) {
+      open.push(piece);
+      line += piece;
+    } else {
+      line += piece;
+    }
+  }
+  out.push(line + '</span>'.repeat(open.length));
+  return out;
+}
 
 // Neither the parser nor the highlighter is worth its weight until a file is opened, so
 // both are fetched at that point rather than riding in the bundle.
@@ -77,10 +103,21 @@ async function read(): Promise<void> {
 }
 
 function onKey(ev: KeyboardEvent): void {
-  if (props.file && ev.key === 'Escape') {
+  if (!props.file) return;
+  if (ev.key === 'Escape') {
     ev.stopPropagation();
     emit('close');
+  } else if (ev.altKey && (ev.key === 'z' || ev.key === 'Z' || ev.code === 'KeyZ')) {
+    ev.preventDefault();
+    wrapped.value = !wrapped.value;
   }
+}
+
+// The empty page around the file closes it, as the dark around a picture does — unless
+// something is selected, which is what a drag that ended out here was for.
+function onPage(): void {
+  if (window.getSelection()?.isCollapsed === false) return;
+  emit('close');
 }
 
 watch(
@@ -100,13 +137,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 <template>
   <Teleport to="body">
     <div v-if="file" class="iviewer">
-      <div class="fv__page">
+      <div class="fv__page" @click.self="onPage">
         <div v-if="loading" class="fv__said">Reading…</div>
         <div v-else-if="error" class="err fv__said">{{ error }}</div>
         <div v-else-if="isMd" class="md fv__md" v-html="marked_"></div>
-        <div v-else class="fv__code">
-          <pre class="fv__nums" aria-hidden="true">{{ lines }}</pre>
-          <pre class="fv__src"><code v-html="code"></code></pre>
+        <div v-else class="fv__code" :class="{ 'is-folded': wrapped }">
+          <template v-for="(line, i) in lines" :key="i">
+            <span class="fv__num" aria-hidden="true">{{ i + 1 }}</span>
+            <code class="fv__src" v-html="line"></code>
+          </template>
         </div>
         <div v-if="truncated && !loading && !error" class="fv__cut">
           Only the first 512 KB are shown. Download the file to read the rest.
@@ -116,6 +155,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
       <div class="iviewer__bar">
         <span class="iviewer__name">{{ file.name }}</span>
         <div class="iviewer__nav">
+          <button
+            v-if="!isMd && !loading && !error"
+            class="btn btn--sm"
+            type="button"
+            :aria-pressed="wrapped"
+            title="Fold long lines (Alt+Z)"
+            @click="wrapped = !wrapped"
+          >
+            <WrapText class="ic" />
+            Wrap
+          </button>
           <a class="btn btn--sm" :href="`/api/attachments/${file.id}`" download>
             <Download class="ic" />
             Download
@@ -139,10 +189,16 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   user-select: text;
 }
 .fv__md,
-.fv__code,
 .fv__said,
 .fv__cut {
   max-width: 900px;
+  margin: 0 auto;
+}
+/* A document keeps a book's width; code is as wide as its longest line lets it be, and
+   only scrolls sideways once that is wider than the screen. */
+.fv__code {
+  width: max-content;
+  max-width: 100%;
   margin: 0 auto;
 }
 .fv__said {
@@ -155,35 +211,43 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   color: var(--text-muted);
   font-size: 12px;
 }
-/* The numbers ride in their own column and stay put when the code is scrolled sideways. */
+/* One row per line, so a number stays beside its line even after the line folds. The
+   numbers ride in their own column and stay put when the code is scrolled sideways. */
 .fv__code {
-  display: flex;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-content: start;
   padding: 14px 16px;
   border: 1px solid var(--line);
   background: var(--surface);
   overflow-x: auto;
-}
-.fv__nums,
-.fv__src {
-  margin: 0;
   font: 12.5px/1.6 var(--font-mono);
 }
-.fv__nums {
+.fv__num {
   position: sticky;
   left: 0;
-  flex: none;
   padding-right: 14px;
   border-right: 1px solid var(--line);
+  /* The strip between the rule and the code is covered too, so nothing slides out under it. */
+  box-shadow: 14px 0 0 var(--surface);
   background: var(--surface);
   color: var(--text-faint);
   text-align: right;
   user-select: none;
 }
 .fv__src {
-  flex: 1 1 auto;
+  padding-left: 14px;
   color: var(--text);
   white-space: pre;
+}
+/* Folded, the file is as wide as the screen and nothing runs off the side of it. */
+.fv__code.is-folded {
+  width: 100%;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+.fv__code.is-folded .fv__src {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .fv__md {
   color: var(--text);
