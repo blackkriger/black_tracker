@@ -528,6 +528,8 @@ const images = computed(() => own.value.filter((a) => a.mime.startsWith('image/'
 const files = computed(() => own.value.filter((a) => !a.mime.startsWith('image/')));
 const filesOf = (commentId: string) =>
   (issue.value?.attachments ?? []).filter((a) => a.commentId === commentId);
+const bytesOf = (commentId: string) =>
+  filesOf(commentId).reduce((all, a) => all + a.size, 0);
 
 // The file being read over the issue, if any: a name that can be read opens the reader,
 // and every other way of reaching it still downloads it.
@@ -1501,8 +1503,9 @@ async function removeIssue(): Promise<void> {
                   <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
 
                   <div v-if="filesOf(c.id).length" class="cm__files">
-                    <div v-if="filesOf(c.id).length > 1" class="sec-h">
-                      <div class="sp"></div>
+                    <div v-if="filesOf(c.id).length > 1" class="att__cap att__row">
+                      <span class="att__name">{{ filesOf(c.id).length }} files</span>
+                      <span class="stamp">{{ fileSize(bytesOf(c.id)) }}</span>
                       <a
                         class="btn btn--sm btn--ghost"
                         :href="`/api/comments/${c.id}/files.zip`"
