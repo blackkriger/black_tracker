@@ -25,6 +25,7 @@ import {
   type Mark,
 } from '../lib/calendar';
 import { stamp } from '../lib/issues';
+import { buddyAvatarStyle } from '../lib/avatar';
 import { ArrowRight, AtSign, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const props = defineProps<{
@@ -315,7 +316,10 @@ async function signOut(): Promise<void> {
           </button>
         </div>
       </span>
-      <RouterLink class="topitem" to="/profile">{{ session.me.value?.login }}</RouterLink>
+      <RouterLink class="topitem" to="/profile">
+        <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
+        {{ session.me.value?.login }}
+      </RouterLink>
       <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
