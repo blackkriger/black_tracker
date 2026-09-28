@@ -369,7 +369,7 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .itab { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 0; background: none; color: var(--text-dim); font-size: 13px; cursor: pointer; }
 .itab:hover { color: var(--text); }
 /* The tab you are on says so in gold, like everything else that is current here: no bar under it. */
-.itab[aria-selected="true"] { color: var(--accent); }
+.itab[aria-selected="true"] { color: var(--text); }
 .itab .n { font: 12px/1 var(--font-num); color: var(--text-muted); }
 .props { display: flex; flex-direction: column; padding: 14px 16px; gap: 2px; }
 .prop { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; }

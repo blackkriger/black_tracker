@@ -19,6 +19,7 @@ import { useSession } from '../lib/session';
 import {
   ArrowDown,
   ArrowUp,
+  Download,
   Link2,
   Paperclip,
   Pencil,
@@ -1307,6 +1308,12 @@ async function removeIssue(): Promise<void> {
                   @click="onFileClick($event, a)"
                 >{{ a.filename }}</a>
                 <span class="stamp">{{ fileSize(a.size) }}</span>
+                <a
+                  class="btn btn--sm btn--icon btn--ghost"
+                  :href="`/api/attachments/${a.id}`"
+                  download
+                  :aria-label="`Download ${a.filename}`"
+                ><Download class="ic ic--sm" /></a>
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
@@ -1493,6 +1500,12 @@ async function removeIssue(): Promise<void> {
                         @click="onFileClick($event, a)"
                       >{{ a.filename }}</a>
                       <span class="stamp">{{ fileSize(a.size) }}</span>
+                      <a
+                        class="btn btn--sm btn--icon btn--ghost"
+                        :href="`/api/attachments/${a.id}`"
+                        download
+                        :aria-label="`Download ${a.filename}`"
+                      ><Download class="ic ic--sm" /></a>
                       <button
                         v-if="editingComment === c.id"
                         class="btn btn--sm btn--icon btn--ghost"

@@ -185,7 +185,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 24px;
+  /* The sides are the content's own, not the page's: a file wider than the screen slides
+     under the line numbers, and they only cover it if they can pin to the very edge. */
+  padding: 24px 0;
   user-select: text;
 }
 .fv__md,
@@ -193,12 +195,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 .fv__cut {
   max-width: 900px;
   margin: 0 auto;
+  padding: 0 24px;
 }
-/* A document keeps a book's width; code is as wide as its longest line lets it be, and
-   only scrolls sideways once that is wider than the screen. */
+/* A document keeps a book's width; code is as wide as its longest line. Nothing here
+   scrolls on its own — the page under it is the one scroller, in both directions, or the
+   middle mouse button would take hold of the code and only ever drag it sideways. */
 .fv__code {
   width: max-content;
-  max-width: 100%;
   margin: 0 auto;
 }
 .fv__said {
@@ -208,6 +211,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   margin-top: 14px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
+  max-width: 948px;
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -220,7 +224,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   padding: 14px 16px;
   border: 1px solid var(--line);
   background: var(--surface);
-  overflow-x: auto;
   font: 12.5px/1.6 var(--font-mono);
 }
 .fv__num {
