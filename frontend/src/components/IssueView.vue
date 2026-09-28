@@ -523,6 +523,7 @@ const freeTags = computed(() =>
 );
 // The issue's own files; anything hanging off a comment is shown under that comment instead.
 const own = computed(() => (issue.value?.attachments ?? []).filter((a) => !a.commentId));
+const ownBytes = computed(() => own.value.reduce((all, a) => all + a.size, 0));
 const images = computed(() => own.value.filter((a) => a.mime.startsWith('image/')));
 const files = computed(() => own.value.filter((a) => !a.mime.startsWith('image/')));
 const filesOf = (commentId: string) =>
@@ -1301,6 +1302,17 @@ async function removeIssue(): Promise<void> {
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('files') }">
+              <div v-if="own.length" class="sec-h">
+                <Paperclip class="ic" aria-hidden="true" />
+                <span>{{ own.length }} {{ own.length === 1 ? 'file' : 'files' }}, {{ fileSize(ownBytes) }}</span>
+                <div class="sp"></div>
+                <a
+                  v-if="own.length > 1 && issue"
+                  class="btn btn--sm btn--ghost"
+                  :href="`/api/issues/${issue.id}/files.zip`"
+                  download
+                >Download all</a>
+              </div>
               <div v-for="a in files" :key="a.id" class="att__cap att__row">
                 <a
                   :href="`/api/attachments/${a.id}`"
@@ -1489,6 +1501,14 @@ async function removeIssue(): Promise<void> {
                   <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
 
                   <div v-if="filesOf(c.id).length" class="cm__files">
+                    <div v-if="filesOf(c.id).length > 1" class="sec-h">
+                      <div class="sp"></div>
+                      <a
+                        class="btn btn--sm btn--ghost"
+                        :href="`/api/comments/${c.id}/files.zip`"
+                        download
+                      >Download all</a>
+                    </div>
                     <span
                       v-for="a in filesOf(c.id).filter((x) => !x.mime.startsWith('image/'))"
                       :key="a.id"

@@ -1,6 +1,7 @@
 // Issues, and everything hanging off one: comments, files and the record of what changed. An issue lives on exactly one board and wears that board's status. Its key — PROJ-12 — is minted from the project's own counter inside the transaction that inserts it, so two writers never land on one number.
 
 import { randomUUID } from 'node:crypto';
+import { ZipArchive } from 'archiver';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -1285,6 +1286,70 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(row.filename)}"`
     );
     return reply.send(createReadStream(row.storage_path));
+  });
+
+  // Everything hanging off one thing, in one archive: the issue's own files, or one
+  // comment's. Nothing is held in memory — the files are read into the stream as it is sent.
+  async function sendZip(
+    reply: FastifyReply,
+    name: string,
+    files: { filename: string; storage_path: string }[]
+  ): Promise<void> {
+    reply.header('Content-Type', 'application/zip');
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('Content-Disposition', `attachment; filename="${encodeURIComponent(name)}"`);
+    const zip = new ZipArchive();
+    const taken = new Set<string>();
+    for (const file of files) {
+      // Two screenshots are both called image.png; inside one folder only one of them can be.
+      let named = file.filename;
+      for (let n = 2; taken.has(named.toLowerCase()); n++) {
+        const dot = file.filename.lastIndexOf('.');
+        const stem = dot > 0 ? file.filename.slice(0, dot) : file.filename;
+        const ext = dot > 0 ? file.filename.slice(dot) : '';
+        named = `${stem} (${n})${ext}`;
+      }
+      taken.add(named.toLowerCase());
+      zip.file(file.storage_path, { name: named });
+    }
+    void zip.finalize();
+    return reply.send(zip);
+  }
+
+  app.get('/issues/:id/files.zip', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const found = await loadIssueFor(req, reply, id);
+    if (!found) return;
+    const res = await pool.query<{ filename: string; storage_path: string }>(
+      `select filename, storage_path from issue_attachments
+        where issue_id = $1 and comment_id is null order by created_at`,
+      [id]
+    );
+    if (!res.rowCount) return reply.code(404).send({ error: 'Nothing is attached here.' });
+    return sendZip(reply, `${found.issue.readable_id}.zip`, res.rows);
+  });
+
+  app.get('/comments/:id/files.zip', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const { id } = req.params as { id: string };
+    const owner = await pool.query<{ issue_id: string; readable_id: string }>(
+      `select c.issue_id, i.readable_id from issue_comments c
+         join issues i on i.id = c.issue_id where c.id = $1`,
+      [id]
+    );
+    const host = owner.rows[0];
+    if (!host) return reply.code(404).send({ error: 'No such comment.' });
+    if (!(await mayReachIssue(auth, host.issue_id))) {
+      return reply.code(403).send({ error: 'This comment is not open to you.' });
+    }
+    const res = await pool.query<{ filename: string; storage_path: string }>(
+      `select filename, storage_path from issue_attachments
+        where comment_id = $1 order by created_at`,
+      [id]
+    );
+    if (!res.rowCount) return reply.code(404).send({ error: 'Nothing is attached here.' });
+    return sendZip(reply, `${host.readable_id}-comment.zip`, res.rows);
   });
 
   // The reader's own way in: the text as data, never as a page.
