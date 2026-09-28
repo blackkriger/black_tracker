@@ -258,7 +258,7 @@ async function openIssue(w: Where): Promise<void> {
         <div class="stack">
           <section class="panel">
             <header class="panel__h">Deadlines</header>
-            <div class="panel__b nums">
+            <div class="panel__b nums nums--table">
               <template v-if="data?.due.overdue.length">
                 <div class="sec-h">Overdue</div>
                 <button
@@ -366,7 +366,7 @@ async function openIssue(w: Where): Promise<void> {
           <section class="panel">
             <header class="panel__h">
               Time to close
-              <span class="panel__end">{{ data?.cycle.closed ?? 0 }} closed</span>
+              <span class="panel__end">{{ data?.cycle.closed ?? 0 }}</span>
             </header>
             <div class="panel__b nums">
               <div class="big">{{ days(data?.cycle.median ?? null) }}</div>
@@ -388,7 +388,7 @@ async function openIssue(w: Where): Promise<void> {
 
           <section class="panel">
             <header class="panel__h">Untouched</header>
-            <div class="panel__b nums">
+            <div class="panel__b nums nums--table">
               <button
                 v-for="s in data?.stale ?? []"
                 :key="s.key"
@@ -450,14 +450,16 @@ async function openIssue(w: Where): Promise<void> {
   height: 100%;
   background: var(--accent);
 }
-/* A row that opens what it counts. */
+/* A row that opens what it counts: ruled like a table rather than boxed on its own. */
 .line {
-  display: flex;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  min-height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
+  min-height: 30px;
+  padding: 0 2px;
+  border: 0;
+  border-top: 1px solid var(--line);
   background: none;
   color: var(--text);
   font-size: 13px;
@@ -465,13 +467,19 @@ async function openIssue(w: Where): Promise<void> {
   cursor: pointer;
 }
 .line:hover {
-  border-color: var(--line-2);
+  background: var(--card-hover);
 }
 .line__what {
-  flex: 1 1 auto;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* The group a run of rows belongs to; the first one needs no room above it. */
+.nums--table .sec-h {
+  margin-top: 8px;
+}
+.nums--table > .sec-h:first-child {
+  margin-top: 0;
 }
 .who {
   display: grid;
