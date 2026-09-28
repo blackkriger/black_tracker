@@ -43,6 +43,10 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
 .rg {
   display: flex;
   flex-direction: column;
+  /* How tall a hill is drawn, and how far the next row stands below it. The difference
+     between the two is the overlap: less of it gives every row more room of its own. */
+  --rg-h: 44px;
+  --rg-step: 36px;
   --rg-line: color-mix(in srgb, var(--text) 55%, transparent);
   /* What the area is filled with hides the rows behind each row, so it has to be the very
      colour of the panel the stack stands on. */
@@ -55,12 +59,12 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
   padding: 6px 2px 0;
   /* The first row's headroom is empty by design; the stack is pulled up so that emptiness
      falls behind the chrome above rather than reading as a gap. */
-  margin-top: -22px;
+  margin-top: calc(var(--rg-step) - var(--rg-h));
 }
 .rg-row {
   position: relative;
-  height: 44px;
-  margin-top: -21px;
+  height: var(--rg-h);
+  margin-top: calc(var(--rg-step) - var(--rg-h));
   display: grid;
   grid-template-columns: 96px 1fr 44px;
   gap: 12px;
@@ -88,7 +92,7 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
 .rg-svg {
   display: block;
   width: 100%;
-  height: 44px;
+  height: var(--rg-h);
   overflow: visible;
 }
 .rg-area {

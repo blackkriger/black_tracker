@@ -308,15 +308,16 @@ async function openIssue(w: Where): Promise<void> {
 
         <div class="stack">
           <section class="panel">
-            <header class="panel__h">Team</header>
-            <div class="panel__b nums">
-              <div class="who who--h">
-                <span></span>
+            <header class="panel__h">
+              Team
+              <span class="panel__end who__head">
                 <span class="stamp">open</span>
                 <span class="stamp">late</span>
                 <span class="stamp">closed</span>
                 <span class="stamp">held</span>
-              </div>
+              </span>
+            </header>
+            <div class="panel__b nums nums--table">
               <template v-for="p in data?.people ?? []" :key="p.login">
                 <button class="who who--go" type="button" @click="togglePerson(p.login)">
                   <span class="who__name">
@@ -501,13 +502,32 @@ async function openIssue(w: Where): Promise<void> {
   gap: 6px;
   color: var(--text-dim);
 }
-.who--h {
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 6px;
+/* The columns are named in the panel's own header, over the numbers they belong to: the
+   header's gutter is four pixels narrower than the body's, hence the nudge. */
+.who__head {
+  display: grid;
+  grid-template-columns: 40px 40px 48px 52px;
+  gap: 8px;
+  padding-right: 4px;
+}
+.who__head .stamp {
+  text-align: right;
+}
+/* Ruled like a table: a line between people, none inside what one person is holding. */
+.nums--table {
+  gap: 0;
+}
+.who--go {
+  padding: 5px 0;
+}
+.who--go + .who--go,
+.held + .who--go {
+  border-top: 1px solid var(--line);
 }
 .who--loose {
   border-top: 1px solid var(--line);
   padding-top: 8px;
+  margin-top: 2px;
 }
 /* What one person is holding, and under an issue, whose hands it passed through. */
 .held {
