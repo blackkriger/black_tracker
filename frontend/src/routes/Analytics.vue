@@ -1,14 +1,18 @@
 <script setup lang="ts">
-// The work itself, counted: what stands on each board, what is late, who carries what,
-// how long a finished issue took, and what nobody has touched in a fortnight. Every key on
-// the page opens its issue, so a number is never a dead end.
+// The work itself, counted: the shape of every board and every priority across the same
+// run of statuses, what is late, who carries what and for how long, how long a finished
+// issue took, and what nobody has touched in a fortnight. Every key opens its issue, so a
+// number is never a dead end.
 import { computed, onMounted, ref, watch } from 'vue';
+import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
+import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import Select from '../components/Select.vue';
 import { api } from '../lib/api';
 import { dayAndMonth } from '../lib/calendar';
 import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/issues';
+import { RIDGE_SMOOTH_KERNEL, smoothRidge } from '../lib/ridge';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useLive } from '../lib/live';
@@ -28,7 +32,24 @@ interface Stale extends Where {
   stateName: string;
   days: number;
 }
+interface Held extends Where {
+  stateName: string;
+  priority: string;
+  due: string | null;
+  days: number;
+  hands: { login: string | null; days: number; current: boolean }[];
+}
+interface Person {
+  login: string;
+  color: string | null;
+  open: number;
+  late: number;
+  closed: number;
+  held: number | null;
+  issues: Held[];
+}
 interface Numbers {
+  statuses: string[];
   boards: {
     id: string;
     name: string;
@@ -39,9 +60,9 @@ interface Numbers {
     states: { name: string; color: string; count: number }[];
   }[];
   due: { overdue: Dated[]; soon: Dated[] };
-  people: { login: string; color: string | null; open: number; late: number; closed: number }[];
+  people: Person[];
   unassigned: number;
-  priorities: { name: string; count: number }[];
+  priorities: { name: string; count: number; byState: Record<string, number> }[];
   cycle: {
     median: number | null;
     closed: number;
@@ -54,19 +75,29 @@ const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 
 const project = ref('');
+const status = ref('');
 const loading = ref(true);
 const data = ref<Numbers | null>(null);
+const openPeople = ref<string[]>([]);
+const openIssues = ref<string[]>([]);
 
 const projectChoices = computed(() => [
   { value: '', label: 'All projects' },
   ...projects.value.map((p) => ({ value: p.shortName, label: p.name })),
 ]);
+const statusChoices = computed(() => [
+  { value: '', label: 'Any status' },
+  ...(data.value?.statuses ?? []).map((s) => ({ value: s, label: s })),
+]);
 
 async function load(): Promise<void> {
   clear('numbers');
   try {
-    const q = project.value ? `?project=${encodeURIComponent(project.value)}` : '';
-    data.value = await api<Numbers>(`/analytics${q}`);
+    const q = new URLSearchParams();
+    if (project.value) q.set('project', project.value);
+    if (status.value) q.set('status', status.value);
+    const query = q.toString();
+    data.value = await api<Numbers>(`/analytics${query ? `?${query}` : ''}`);
   } catch (err) {
     fail('numbers', err, 'Could not count anything.');
   } finally {
@@ -77,22 +108,58 @@ async function load(): Promise<void> {
 onMounted(async () => {
   await Promise.all([loadProjects(), load()]);
 });
-watch(project, () => void load());
+watch([project, status], () => void load());
 useLive((ev) => {
   if (ev.type.startsWith('issue.') || ev.type.startsWith('state.')) void load();
 });
 
-// ── how each row is drawn ──
-const priorityRows = computed(() => {
-  const counts = new Map(data.value?.priorities.map((p) => [p.name, p.count]));
-  return PRIORITIES.map((name) => ({
-    name,
-    count: counts.get(name) ?? 0,
-    color: priorityColor(name as Priority),
-  }));
+// ── the two stacks, both read against the same run of statuses ──
+const axis = computed(() => data.value?.statuses ?? []);
+
+/** Five samples a status wide, so a run of four reads as hills rather than a zigzag. */
+const WEIGHT = RIDGE_SMOOTH_KERNEL.reduce((all, k) => all + k, 0);
+function shape(counts: number[]): number[] {
+  // The kernel adds up to more than one, so the smoothed run is scaled back to the range
+  // the counts themselves are in — otherwise every hill would sit clamped at the ceiling.
+  return smoothRidge(counts.flatMap((n) => [n, n, n, n, n])).map((v) => v / WEIGHT);
+}
+
+const tallest = computed(() => {
+  const all = [
+    ...(data.value?.boards ?? []).flatMap((b) => b.states.map((s) => s.count)),
+    ...(data.value?.priorities ?? []).flatMap((p) => Object.values(p.byState)),
+  ];
+  return Math.max(1, ...all);
 });
-const mostOfAPriority = computed(() => Math.max(1, ...priorityRows.value.map((p) => p.count)));
-const widestBoard = computed(() => Math.max(1, ...(data.value?.boards ?? []).map((b) => b.total)));
+
+const boardRows = computed<RidgeRow[]>(() => {
+  const busiest = Math.max(0, ...(data.value?.boards ?? []).map((b) => b.open));
+  return (data.value?.boards ?? []).map((b) => {
+    const byName = new Map(b.states.map((s) => [s.name, s.count]));
+    return {
+      key: b.id,
+      label: b.name,
+      profile: shape(axis.value.map((name) => byName.get(name) ?? 0)),
+      value: b.open,
+      highlight: b.open === busiest && busiest > 0,
+    };
+  });
+});
+
+const priorityRows = computed<RidgeRow[]>(() => {
+  const found = new Map(data.value?.priorities.map((p) => [p.name, p]));
+  return PRIORITIES.map((name) => {
+    const p = found.get(name);
+    return {
+      key: name,
+      label: name,
+      profile: shape(axis.value.map((s) => p?.byState[s] ?? 0)),
+      value: p?.count ?? 0,
+      color: priorityColor(name as Priority),
+    };
+  });
+});
+
 const longestMonth = computed(() =>
   Math.max(1, ...(data.value?.cycle.months ?? []).map((m) => m.median ?? 0))
 );
@@ -103,11 +170,27 @@ const monthLabel = (month: string): string => {
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 };
 
+function togglePerson(login: string): void {
+  openPeople.value = openPeople.value.includes(login)
+    ? openPeople.value.filter((l) => l !== login)
+    : [...openPeople.value, login];
+}
+function toggleIssue(key: string): void {
+  openIssues.value = openIssues.value.includes(key)
+    ? openIssues.value.filter((k) => k !== key)
+    : [...openIssues.value, key];
+}
+
 // ── opening an issue from a number ──
 interface OpenIssue {
   key: string;
   project: string;
-  board: { id: string; name: string; slug: string; states: { id: string; name: string; color: string }[] };
+  board: {
+    id: string;
+    name: string;
+    slug: string;
+    states: { id: string; name: string; color: string }[];
+  };
 }
 const open = ref<OpenIssue | null>(null);
 const openTags = ref<IssueTag[]>([]);
@@ -144,6 +227,14 @@ async function openIssue(w: Where): Promise<void> {
             Boards
             <span class="panel__end">
               <Select
+                v-model="status"
+                :options="statusChoices"
+                placeholder="Any status"
+                keep-placeholder
+                small
+                label="Which status to count"
+              />
+              <Select
                 v-model="project"
                 :options="projectChoices"
                 placeholder="All projects"
@@ -153,31 +244,14 @@ async function openIssue(w: Where): Promise<void> {
               />
             </span>
           </header>
-          <div class="panel__b nums">
+          <div class="panel__b">
             <div v-if="loading" class="hint faint">Counting…</div>
-            <div v-else-if="!data?.boards.length" class="hint faint">No boards to count.</div>
-            <div v-for="b in data?.boards ?? []" v-else :key="b.id" class="load">
-              <div class="load__h">
-                <span class="key">{{ b.projectShort }}</span>
-                <span class="load__name">{{ b.name }}</span>
-                <span class="n">{{ b.open }} open</span>
-                <span class="stamp">of {{ b.total }}</span>
-              </div>
-              <div class="bar" :style="{ width: `${(b.total / widestBoard) * 100}%` }">
-                <span
-                  v-for="s in b.states.filter((x) => x.count)"
-                  :key="s.name"
-                  class="bar__part"
-                  :style="{ flexGrow: s.count, background: s.color }"
-                ></span>
-              </div>
-              <div class="legend">
-                <span v-for="s in b.states" :key="s.name" class="legend__i">
-                  <span :style="{ color: s.color }">{{ s.name }}</span>
-                  <span class="n">{{ s.count }}</span>
-                </span>
-              </div>
-            </div>
+            <div v-else-if="!boardRows.length" class="hint faint">No boards to count.</div>
+            <RidgeRows v-else :rows="boardRows" :full="tallest">
+              <template #axis>
+                <span v-for="s in axis" :key="s">{{ s }}</span>
+              </template>
+            </RidgeRows>
           </div>
         </section>
 
@@ -221,6 +295,19 @@ async function openIssue(w: Where): Promise<void> {
           </section>
 
           <section class="panel">
+            <header class="panel__h">Priorities</header>
+            <div class="panel__b">
+              <RidgeRows :rows="priorityRows" :full="tallest">
+                <template #axis>
+                  <span v-for="s in axis" :key="s">{{ s }}</span>
+                </template>
+              </RidgeRows>
+            </div>
+          </section>
+        </div>
+
+        <div class="stack">
+          <section class="panel">
             <header class="panel__h">People</header>
             <div class="panel__b nums">
               <div class="who who--h">
@@ -228,36 +315,49 @@ async function openIssue(w: Where): Promise<void> {
                 <span class="stamp">open</span>
                 <span class="stamp">late</span>
                 <span class="stamp">closed</span>
+                <span class="stamp">held</span>
               </div>
-              <div v-for="p in data?.people ?? []" :key="p.login" class="who">
-                <span :style="{ color: p.color ?? undefined }">{{ p.login }}</span>
-                <span class="n">{{ p.open }}</span>
-                <span class="n" :class="{ 'is-late': p.late }">{{ p.late }}</span>
-                <span class="n">{{ p.closed }}</span>
-              </div>
+              <template v-for="p in data?.people ?? []" :key="p.login">
+                <button class="who who--go" type="button" @click="togglePerson(p.login)">
+                  <span class="who__name">
+                    <ChevronDown v-if="openPeople.includes(p.login)" class="ic ic--sm" />
+                    <ChevronRight v-else class="ic ic--sm" />
+                    <span :style="{ color: p.color ?? undefined }">{{ p.login }}</span>
+                  </span>
+                  <span class="n">{{ p.open }}</span>
+                  <span class="n" :class="{ 'is-late': p.late }">{{ p.late }}</span>
+                  <span class="n">{{ p.closed }}</span>
+                  <span class="n">{{ days(p.held) }}</span>
+                </button>
+                <div v-if="openPeople.includes(p.login)" class="held">
+                  <div v-if="!p.issues.length" class="hint faint">Holding nothing.</div>
+                  <template v-for="i in p.issues" :key="i.key">
+                    <div class="held__row">
+                      <button class="key held__key" type="button" @click="openIssue(i)">
+                        <span :style="{ color: i.color }">{{ i.key }}</span>
+                      </button>
+                      <span class="held__what">{{ i.summary }}</span>
+                      <span class="stamp" :style="{ color: i.color }">{{ i.stateName }}</span>
+                      <button class="held__days" type="button" @click="toggleIssue(i.key)">
+                        {{ days(i.days) }}
+                      </button>
+                    </div>
+                    <div v-if="openIssues.includes(i.key)" class="hands">
+                      <div v-for="(h, n) in i.hands" :key="n" class="hands__row">
+                        <span :class="{ faint: !h.login }">{{ h.login ?? 'Nobody' }}</span>
+                        <span class="n">{{ days(h.days) }}</span>
+                        <span class="stamp">{{ h.current ? 'still' : '' }}</span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
               <div v-if="data?.unassigned" class="who who--loose">
                 <span class="faint">Nobody</span>
                 <span class="n">{{ data.unassigned }}</span>
                 <span></span>
                 <span></span>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div class="stack">
-          <section class="panel">
-            <header class="panel__h">Priorities</header>
-            <div class="panel__b nums">
-              <div v-for="p in priorityRows" :key="p.name" class="pri">
-                <span class="pri__name" :style="{ color: p.color }">{{ p.name }}</span>
-                <span class="bar bar--one">
-                  <span
-                    class="bar__part"
-                    :style="{ width: `${(p.count / mostOfAPriority) * 100}%`, background: p.color }"
-                  ></span>
-                </span>
-                <span class="n">{{ p.count }}</span>
+                <span></span>
               </div>
             </div>
           </section>
@@ -271,7 +371,7 @@ async function openIssue(w: Where): Promise<void> {
               <div class="big">{{ days(data?.cycle.median ?? null) }}</div>
               <div v-for="m in data?.cycle.months ?? []" :key="m.month" class="pri">
                 <span class="pri__name">{{ monthLabel(m.month) }}</span>
-                <span class="bar bar--one">
+                <span class="bar">
                   <span
                     class="bar__part"
                     :style="{ width: `${((m.median ?? 0) / longestMonth) * 100}%` }"
@@ -338,45 +438,16 @@ async function openIssue(w: Where): Promise<void> {
   flex-direction: column;
   gap: 10px;
 }
-/* One board: its name over a bar as wide as its share of the busiest board. The
-   plain name is taken by the kanban strip, hence its own. */
-.load__h {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-.load__name {
-  margin-right: auto;
-}
 .bar {
   display: flex;
+  flex: 1 1 auto;
   height: 8px;
-  margin-top: 6px;
   background: var(--bg);
 }
 .bar__part {
   display: block;
   height: 100%;
-}
-.bar--one {
-  flex: 1 1 auto;
-  margin-top: 0;
-}
-.bar--one .bar__part {
   background: var(--accent);
-}
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 6px;
-  font-size: 12px;
-}
-.legend__i {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 /* A row that opens what it counts. */
 .line {
@@ -403,14 +474,32 @@ async function openIssue(w: Where): Promise<void> {
 }
 .who {
   display: grid;
-  grid-template-columns: 1fr 44px 44px 52px;
+  grid-template-columns: 1fr 40px 40px 48px 52px;
   align-items: center;
   gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
   font-size: 13px;
+  text-align: left;
 }
 .who .n,
 .who .stamp {
   text-align: right;
+}
+.who--go {
+  min-height: 26px;
+  cursor: pointer;
+}
+.who--go:hover .who__name {
+  color: var(--text);
+}
+.who__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
 }
 .who--h {
   border-bottom: 1px solid var(--line);
@@ -419,6 +508,62 @@ async function openIssue(w: Where): Promise<void> {
 .who--loose {
   border-top: 1px solid var(--line);
   padding-top: 8px;
+}
+/* What one person is holding, and under an issue, whose hands it passed through. */
+.held {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 6px 22px;
+}
+.held__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.held__key,
+.held__days {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.held__key {
+  flex: none;
+}
+.held__days {
+  flex: none;
+  color: var(--text-dim);
+  font: 12px var(--font-num);
+}
+.held__days:hover {
+  color: var(--text);
+}
+.held__what {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--text-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hands {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 6px 22px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  font-size: 12px;
+}
+.hands__row {
+  display: grid;
+  grid-template-columns: 1fr 56px 40px;
+  gap: 8px;
+  color: var(--text-dim);
+}
+.hands__row .n {
+  text-align: right;
 }
 .pri {
   display: flex;
