@@ -136,7 +136,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 
 <template>
   <Teleport to="body">
-    <div v-if="file" class="iviewer">
+    <div v-if="file" class="iviewer" @click.self="onPage">
       <div class="fv__page" @click.self="onPage">
         <div v-if="loading" class="fv__said">Reading…</div>
         <div v-else-if="error" class="err fv__said">{{ error }}</div>
@@ -185,9 +185,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  /* The sides are the content's own, not the page's: a file wider than the screen slides
-     under the line numbers, and they only cover it if they can pin to the very edge. */
-  padding: 24px 0;
+  /* The gutter is the box's own margin rather than padding inside it: what scrolls starts
+     at the box's edge, so a file sliding sideways never shows up beside the line numbers
+     that pin there. */
+  margin: 24px;
   user-select: text;
 }
 .fv__md,
@@ -195,7 +196,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 .fv__cut {
   max-width: 900px;
   margin: 0 auto;
-  padding: 0 24px;
 }
 /* A document keeps a book's width; code is as wide as its longest line. Nothing here
    scrolls on its own — the page under it is the one scroller, in both directions, or the
@@ -211,7 +211,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   margin-top: 14px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
-  max-width: 948px;
   color: var(--text-muted);
   font-size: 12px;
 }
