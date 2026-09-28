@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The editor behind a description and a comment: Quill with a short toolbar and nothing else — no images (files hang off the issue), no fonts, no colours. It speaks the same v-model contract as a textarea, handing back HTML that is sanitised before it is ever shown again.
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { usePeople } from '../lib/people';
 import { useRoles } from '../lib/roles';
 import Quill from 'quill';
@@ -96,7 +96,11 @@ function readMarks(): void {
 // An `@` and what has been typed after it, while the caret is still on the end of it.
 const naming = ref<{ from: number; query: string } | null>(null);
 const chosen = ref(0);
-const at = ref({ left: 0, top: 0 });
+const list = ref<HTMLDivElement | null>(null);
+const rows = ref<HTMLDivElement | null>(null);
+// Where the caret stands in the window, and where the list was put beside it.
+const caret = ref({ left: 0, top: 0, bottom: 0 });
+const at = ref({ left: 0, top: 0, tip: 12, room: 0, up: false, ready: false });
 
 // A name can be a person or a role: naming a role names everyone wearing it.
 interface Named {
@@ -118,6 +122,53 @@ const matches = computed<Named[]>(() => {
   return [...who, ...what].slice(0, 8);
 });
 
+const GAP = 6;
+const EDGE = 8;
+
+// Where the caret is in the window. Quill measures it against the editor, which scrolls
+// inside a window that scrolls too, so the answer only holds for the moment it is asked.
+function measure(): void {
+  if (!quill) return;
+  const sel = quill.getSelection();
+  const box = sel ? quill.getBounds(sel.index) : null;
+  const rect = host.value?.getBoundingClientRect();
+  if (!box || !rect) return;
+  caret.value = {
+    left: rect.left + box.left,
+    top: rect.top + box.top,
+    bottom: rect.top + box.bottom,
+  };
+}
+
+// The list hangs in the window rather than in the editor, which clips it: it is held
+// inside the dialog around it, turned upwards when the room below runs out, and given
+// only the height that is left, so it never reaches past the frame it belongs to.
+function place(): void {
+  const el = list.value;
+  if (!el) return;
+  const walls = wrap.value?.closest('.dlg')?.getBoundingClientRect();
+  const wallL = (walls?.left ?? 0) + EDGE;
+  const wallR = (walls?.right ?? window.innerWidth) - EDGE;
+  const wallT = (walls?.top ?? 0) + EDGE;
+  const wallB = (walls?.bottom ?? window.innerHeight) - EDGE;
+  const below = wallB - caret.value.bottom - GAP;
+  const above = caret.value.top - GAP - wallT;
+  // The rows scroll, the box around them does not: what is left over is theirs to have.
+  const shell = el.offsetHeight - (rows.value?.offsetHeight ?? 0);
+  const up = (rows.value?.scrollHeight ?? 0) + shell > below && above > below;
+  const room = Math.max(0, (up ? above : below) - shell);
+  const left = Math.max(wallL, Math.min(caret.value.left, wallR - el.offsetWidth));
+  at.value = {
+    left,
+    top: up ? caret.value.top - GAP : caret.value.bottom + GAP,
+    tip: Math.max(12, Math.min(caret.value.left - left, el.offsetWidth - 12)),
+    room,
+    up,
+    // Scrolled out of its own dialog, or with no room left to stand in: nothing to show.
+    ready: room > 32 && caret.value.top < wallB && caret.value.bottom > wallT,
+  };
+}
+
 function lookForName(): void {
   if (!quill) return;
   const sel = quill.getSelection();
@@ -131,19 +182,20 @@ function lookForName(): void {
   const found = /(?:^|\s)@([a-zA-Z0-9_.-]*)$/.exec(before);
   if (!found) {
     naming.value = null;
+    at.value = { ...at.value, ready: false };
     return;
   }
   naming.value = { from: sel.index - found[1].length - 1, query: found[1] };
   chosen.value = 0;
-  // The bounds are the editor's own, the list is placed against the whole box: the
-  // toolbar stands between the two, and without it the pointer lands above the line.
-  const box = quill.getBounds(sel.index);
-  if (box) {
-    at.value = {
-      left: box.left + (host.value?.offsetLeft ?? 0),
-      top: box.bottom + 6 + (host.value?.offsetTop ?? 0),
-    };
-  }
+  measure();
+  void nextTick(place);
+}
+
+// Anything that moves the editor moves the caret with it, and the list has to follow.
+function follow(): void {
+  if (!naming.value) return;
+  measure();
+  place();
 }
 
 // The names in the box, coloured where they stand. The format is applied silently, so it
@@ -241,6 +293,8 @@ onMounted(() => {
     lookForName();
   });
   quill.root.addEventListener('keydown', onNameKey, true);
+  document.addEventListener('scroll', follow, true);
+  window.addEventListener('resize', follow);
   quill.enable(!props.disabled);
   quill.root.addEventListener('focus', () => (focused.value = true));
   quill.root.addEventListener('blur', () => {
@@ -261,6 +315,8 @@ onMounted(() => document.addEventListener('pointerdown', onPointerDown, true));
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onPointerDown, true);
+  document.removeEventListener('scroll', follow, true);
+  window.removeEventListener('resize', follow);
   quill?.root.removeEventListener('keydown', onNameKey, true);
   quill = null;
 });
@@ -336,42 +392,60 @@ function addLink(): void {
 
     <div
       v-if="matches.length"
+      ref="list"
       class="menu rt__names"
-      :style="{ left: `${at.left}px`, top: `${at.top}px` }"
+      :class="{ 'is-up': at.up, 'is-set': at.ready }"
+      :style="{ left: `${at.left}px`, top: `${at.top}px`, '--tip': `${at.tip}px` }"
     >
-      <button
-        v-for="(n, i) in matches"
-        :key="n.id"
-        class="menu__i"
-        :class="{ 'is-hover': i === chosen }"
-        type="button"
-        @mousedown.prevent="pickName(n.label)"
-      >
-        <span :style="{ color: n.color ?? undefined }">{{ n.label }}</span>
-        <span v-if="n.hint" class="rt__full">{{ n.hint }}</span>
-        <ChevronLeft class="ic ic--sm rt__at" :class="{ 'is-off': i !== chosen }" />
-      </button>
+      <div ref="rows" class="rt__rows" :style="{ maxHeight: `${at.room}px` }">
+        <button
+          v-for="(n, i) in matches"
+          :key="n.id"
+          class="menu__i"
+          :class="{ 'is-hover': i === chosen }"
+          type="button"
+          @mousedown.prevent="pickName(n.label)"
+        >
+          <span :style="{ color: n.color ?? undefined }">{{ n.label }}</span>
+          <span v-if="n.hint" class="rt__full">{{ n.hint }}</span>
+          <ChevronLeft class="ic ic--sm rt__at" :class="{ 'is-off': i !== chosen }" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* The list of names stands where the caret is, inside the box it is being typed in. */
 .rt {
   position: relative;
 }
+/* The list of names stands where the caret is, in the window: the editor clips whatever
+   hangs out of it, and the caret it belongs to is at the foot of the frame as often as not. */
 .rt__names {
-  position: absolute;
+  position: fixed;
   z-index: 40;
   min-width: 180px;
+  visibility: hidden;
 }
-/* The pointer every popup here has, drawn twice: the border's triangle, then the surface's one pixel lower to cover the line under it. */
+/* Only the names scroll: the box keeps its pointer, which hangs outside it. */
+.rt__rows {
+  overflow-y: auto;
+}
+.rt__names.is-up {
+  transform: translateY(-100%);
+}
+/* Measured before it is seen: until then it would stand wherever it last stood. */
+.rt__names.is-set {
+  visibility: visible;
+}
+/* The pointer every popup here has, drawn twice: the border's triangle, then the surface's one pixel lower to cover the line under it. It stands under the `@` it was opened by, wherever the list itself had to be pushed to stay inside. */
 .rt__names::before,
 .rt__names::after {
   content: "";
   position: absolute;
   bottom: 100%;
-  left: 11px;
+  left: var(--tip, 12px);
+  margin-left: -6px;
   border: 6px solid transparent;
 }
 .rt__names::before {
@@ -380,6 +454,20 @@ function addLink(): void {
 .rt__names::after {
   margin-bottom: -1px;
   border-bottom-color: var(--card);
+}
+.rt__names.is-up::before,
+.rt__names.is-up::after {
+  top: 100%;
+  bottom: auto;
+  border-bottom-color: transparent;
+}
+.rt__names.is-up::before {
+  border-top-color: var(--line-2);
+}
+.rt__names.is-up::after {
+  margin-top: -1px;
+  margin-bottom: 0;
+  border-top-color: var(--card);
 }
 .rt__names .menu__i:hover,
 .rt__names .menu__i.is-hover {
@@ -392,7 +480,7 @@ function addLink(): void {
 /* The one in hand is pointed at rather than painted: every name keeps its own colour. */
 .rt__at {
   margin-left: auto;
-  color: var(--accent);
+  color: var(--text);
 }
 .rt__at.is-off {
   visibility: hidden;
