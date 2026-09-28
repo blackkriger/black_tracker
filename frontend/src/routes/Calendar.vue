@@ -275,18 +275,18 @@ function closeIssue(): void {
               ><AtSign class="ic" /></button>
               <button
                 class="btn btn--sm btn--icon btn--ghost kind"
-                :class="{ 'is-off': off.includes('assigned') }"
-                type="button"
-                aria-label="Assigned to you"
-                @click="toggleKind('assigned')"
-              ><ContactRound class="ic" /></button>
-              <button
-                class="btn btn--sm btn--icon btn--ghost kind"
                 :class="{ 'is-off': off.includes('reaction') }"
                 type="button"
                 aria-label="Reactions"
                 @click="toggleKind('reaction')"
               ><Smile class="ic" /></button>
+              <button
+                class="btn btn--sm btn--icon btn--ghost kind"
+                :class="{ 'is-off': off.includes('assigned') }"
+                type="button"
+                aria-label="Assigned to you"
+                @click="toggleKind('assigned')"
+              ><ContactRound class="ic" /></button>
             </header>
             <div class="panel__b days">
               <button

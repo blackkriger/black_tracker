@@ -41,7 +41,7 @@ function heat(key?: string): number {
 
 // What stands in place of the number, in the order it outranks: an unread name, an unread
 // reaction, then a day somebody marked. The number is the quietest thing a day says.
-const WAITING = ['mention', 'assigned', 'reaction'];
+const WAITING = ['mention', 'reaction', 'assigned'];
 
 function markOf(key?: string): string | null {
   const day = info(key);
