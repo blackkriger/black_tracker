@@ -72,6 +72,7 @@ const examples = computed(() => {
     {
       label: 'Your token, set once per terminal session',
       code: `export TRACKER_TOKEN="${freshToken.value ?? 'trk_…'}"`,
+      bare: true,
     },
     { label: 'Your issues', code: `curl -s ${BASE}/my-issues \\\n  ${auth}` },
     { label: 'One issue by its key', code: `curl -s ${BASE}/issues/ISSUE-KEY \\\n  ${auth}` },
@@ -88,7 +89,7 @@ const examples = computed(() => {
       label: 'Moving an issue to another status',
       code: `curl -s -X PATCH ${BASE}/issues/ISSUE-UUID \\\n  ${auth} \\\n  ${json} \\\n  -d '{"stateId":"STATE-UUID"}'`,
     },
-  ] as { label: string; code: string; hint?: string }[];
+  ] as { label: string; code: string; hint?: string; bare?: boolean }[];
 });
 
 const copiedAt = ref<number | null>(null);
@@ -201,7 +202,12 @@ const CALLS: { verb: string; path: string; what: string }[] = [
         <div v-for="(ex, i) in examples" :key="ex.label" class="field">
           <div class="api__ex-h">
             <span class="label">{{ ex.label }}</span>
-            <button class="btn btn--sm btn--ghost" type="button" @click="copyExample(i, ex.code)">
+            <button
+              v-if="!ex.bare"
+              class="btn btn--sm btn--ghost"
+              type="button"
+              @click="copyExample(i, ex.code)"
+            >
               {{ copiedAt === i ? 'Copied' : 'Copy' }}
             </button>
           </div>
