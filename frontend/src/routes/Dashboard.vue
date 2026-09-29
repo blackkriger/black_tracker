@@ -16,6 +16,7 @@ import {
 } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
+import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import Select from '../components/Select.vue';
 import { api } from '../lib/api';
@@ -288,6 +289,13 @@ function step(by: number): void {
   year.value += by;
 }
 
+// ── one day, opened ──
+const picked = ref<string | null>(null);
+
+function openDay(key: string): void {
+  picked.value = key;
+}
+
 // The window wants the board it sits on and the tags its project can wear; neither is
 // on this screen, so both are read when a deadline is opened.
 interface OpenIssue {
@@ -337,6 +345,7 @@ async function openFromDay(where: {
     ?.boards.find((b) => b.slug === where.boardSlug);
   if (!board) return;
   if (where.comment) ask(where.comment);
+  picked.value = null;
   await openIssue({
     key: where.key,
     summary: '',
@@ -359,6 +368,7 @@ async function openIssue(d: Due): Promise<void> {
     openTags.value = tags;
     open.value = { key: d.key, project: d.projectShort, board, comment: lookAt.value };
     lookAt.value = undefined;
+    picked.value = null;
   } catch (err) {
     fail('day', err, 'Could not open the issue.');
   }
@@ -485,7 +495,7 @@ function closeIssue(): void {
                   :key="m.id"
                   class="day"
                   type="button"
-                  @click="pickDay(m.day)"
+                  @click="openDay(m.day)"
                 >
                   <span class="stamp">{{ longDate(m.day) }}</span>
                   <span class="day__what">
@@ -608,6 +618,14 @@ function closeIssue(): void {
         </div>
       </div>
     </div>
+
+    <DayWindow
+      v-if="picked"
+      :day="picked"
+      @close="picked = null"
+      @changed="refresh"
+      @open="openFromDay"
+    />
 
     <IssueView
       v-if="open"
