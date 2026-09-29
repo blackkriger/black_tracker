@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Who you are here: the name the tracker calls you, the password behind it, and the
-// handful of choices the tracker keeps for you. Everything the API side of the account
-// needs lives in ApiPanels instead.
+// Who you are here: the name the tracker calls you and the password behind it in one
+// column, the handful of choices the tracker keeps for you in the other. Everything the API
+// side of the account needs lives in ApiPanels instead.
 import { computed, ref } from 'vue';
 import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
@@ -127,50 +127,6 @@ async function changePassword(): Promise<void> {
       </form>
     </section>
 
-    <section class="panel">
-      <header class="panel__h">Preferences</header>
-      <div class="panel__b form">
-        <div class="field">
-          <span class="label">Comments read</span>
-          <div class="seg">
-            <button
-              class="btn btn--sm"
-              type="button"
-              :aria-pressed="order === 'oldest'"
-              @click="setOrder('oldest')"
-            >Oldest first</button>
-            <button
-              class="btn btn--sm"
-              type="button"
-              :aria-pressed="order === 'newest'"
-              @click="setOrder('newest')"
-            >Newest first</button>
-          </div>
-        </div>
-        <div class="field">
-          <span class="label">Files</span>
-          <label class="flag">
-            <input
-              type="checkbox"
-              :checked="wrapLines"
-              @change="setWrapLines(($event.target as HTMLInputElement).checked)"
-            />
-            Wrap long lines
-          </label>
-        </div>
-        <div class="field">
-          <span class="label">Notices shown</span>
-          <label v-for="k in KINDS" :key="k.kind" class="flag">
-            <input
-              type="checkbox"
-              :checked="!off.includes(k.kind)"
-              @change="toggleKind(k.kind)"
-            />
-            {{ k.label }}
-          </label>
-        </div>
-      </div>
-    </section>
 
     <section class="panel">
       <header class="panel__h">Password</header>
@@ -206,6 +162,57 @@ async function changePassword(): Promise<void> {
       </form>
     </section>
   </div>
+
+  <section class="panel">
+    <header class="panel__h">Preferences</header>
+    <div class="panel__b form">
+      <div class="field">
+        <span class="label">Comments read</span>
+        <label class="flag">
+          <input
+            type="radio"
+            name="comment-order"
+            :checked="order === 'oldest'"
+            @change="setOrder('oldest')"
+          />
+          Oldest first
+        </label>
+        <label class="flag">
+          <input
+            type="radio"
+            name="comment-order"
+            :checked="order === 'newest'"
+            @change="setOrder('newest')"
+          />
+          Newest first
+        </label>
+      </div>
+      <div class="pairs">
+        <div class="field">
+          <span class="label">Notices shown</span>
+          <label v-for="k in KINDS" :key="k.kind" class="flag">
+            <input
+              type="checkbox"
+              :checked="!off.includes(k.kind)"
+              @change="toggleKind(k.kind)"
+            />
+            {{ k.label }}
+          </label>
+        </div>
+        <div class="field">
+          <span class="label">Files</span>
+          <label class="flag">
+            <input
+              type="checkbox"
+              :checked="wrapLines"
+              @change="setWrapLines(($event.target as HTMLInputElement).checked)"
+            />
+            Wrap long lines
+          </label>
+        </div>
+      </div>
+    </div>
+  </section>
 </template>
 
 <style scoped>
@@ -243,10 +250,12 @@ async function changePassword(): Promise<void> {
 .row-end .hint {
   margin-right: auto;
 }
-/* The two ways a thread can read, side by side; the one in force is pressed. */
-.seg {
-  display: flex;
-  gap: 6px;
+/* Two groups of switches side by side, each under its own label. */
+.pairs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
 }
 .flag {
   display: flex;

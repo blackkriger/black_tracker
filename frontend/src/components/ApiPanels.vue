@@ -74,8 +74,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
 </script>
 
 <template>
-  <div class="stack">
-    <section class="panel">
+    <section class="panel sheet__wide">
       <header class="panel__h">API token</header>
       <div class="panel__b form">
         <p class="token__lede">
@@ -128,7 +127,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel sheet__wide">
       <header class="panel__h">Using it</header>
       <div class="panel__b form">
         <div class="field">
@@ -183,7 +182,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
         </div>
       </div>
     </section>
-  </div>
 </template>
 
 <style scoped>
