@@ -565,11 +565,7 @@ function closeIssue(): void {
                 ><ContactRound class="ic" /></button>
                 <span class="selbar kind__what">Assigned to you</span>
               </span>
-              <span class="panel__end">
-                <button class="btn btn--sm btn--ghost" type="button" @click="pickDay(today)">
-                  {{ spanLabel(pickedDays.from, pickedDays.to) }}
-                </button>
-              </span>
+              <span class="panel__end">{{ spanLabel(pickedDays.from, pickedDays.to) }}</span>
             </header>
             <div class="panel__b days">
               <template v-if="!feedLoaded">
