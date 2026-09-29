@@ -469,9 +469,7 @@ function closeIssue(): void {
                   <span class="note__said">{{ f.summary }}</span>
                 </span>
               </button>
-              <div v-if="!starredLoading && !starred.length" class="empty empty--sm">
-                <span class="empty__g">◇</span>Nothing starred.
-              </div>
+              <div v-if="!starredLoading && !starred.length" class="hint faint">Nothing starred.</div>
             </div>
           </section>
           <div v-if="errors.starred" class="err panel__err">{{ errors.starred }}</div>
