@@ -166,40 +166,38 @@ async function changePassword(): Promise<void> {
   <section class="panel">
     <header class="panel__h">Preferences</header>
     <div class="panel__b form">
+      <div class="field">
+        <span class="label">Comments read</span>
+        <label class="flag">
+          <input
+            type="radio"
+            name="comment-order"
+            :checked="order === 'oldest'"
+            @change="setOrder('oldest')"
+          />
+          Oldest first
+        </label>
+        <label class="flag">
+          <input
+            type="radio"
+            name="comment-order"
+            :checked="order === 'newest'"
+            @change="setOrder('newest')"
+          />
+          Newest first
+        </label>
+      </div>
       <div class="pairs">
-        <div class="pairs__col">
-          <div class="field">
-            <span class="label">Notices shown</span>
-            <label v-for="k in KINDS" :key="k.kind" class="flag">
-              <input
-                type="checkbox"
-                :checked="!off.includes(k.kind)"
-                @change="toggleKind(k.kind)"
-              />
-              {{ k.label }}
-            </label>
-          </div>
-          <div class="field">
-            <span class="label">Comments read</span>
-            <label class="flag">
-              <input
-                type="radio"
-                name="comment-order"
-                :checked="order === 'oldest'"
-                @change="setOrder('oldest')"
-              />
-              Oldest first
-            </label>
-            <label class="flag">
-              <input
-                type="radio"
-                name="comment-order"
-                :checked="order === 'newest'"
-                @change="setOrder('newest')"
-              />
-              Newest first
-            </label>
-          </div>
+        <div class="field">
+          <span class="label">Notices shown</span>
+          <label v-for="k in KINDS" :key="k.kind" class="flag">
+            <input
+              type="checkbox"
+              :checked="!off.includes(k.kind)"
+              @change="toggleKind(k.kind)"
+            />
+            {{ k.label }}
+          </label>
         </div>
         <div class="field">
           <span class="label">Files</span>
@@ -252,12 +250,7 @@ async function changePassword(): Promise<void> {
 .row-end .hint {
   margin-right: auto;
 }
-/* Two columns of switches, each group under its own label. */
-.pairs__col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
+/* Two groups of switches side by side, each under its own label. */
 .pairs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
