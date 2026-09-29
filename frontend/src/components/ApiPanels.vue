@@ -112,6 +112,13 @@ const examples = computed(() => {
   const board = s?.boardId ?? '<board-uuid>';
   const key = s?.issueKey ?? 'PROJ-1';
   const list: { label: string; code: string; hint?: string }[] = [
+    {
+      label: 'Your token, set once for the terminal',
+      code: `export TRACKER_TOKEN="${freshToken.value ?? 'trk_…'}"`,
+      hint: freshToken.value
+        ? undefined
+        : 'The token is shown whole only when it is made; to have it again, Regenerate it above.',
+    },
     { label: 'Your issues', code: `curl -s ${BASE}/my-issues \\\n  ${auth}` },
     { label: `One issue, ${key}`, code: `curl -s ${BASE}/issues/${key} \\\n  ${auth}` },
     {
