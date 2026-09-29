@@ -4,7 +4,7 @@
 // issue took, and what nobody has touched in a fortnight. Every key opens its issue, so a
 // number is never a dead end.
 import { computed, onMounted, ref, watch } from 'vue';
-import { ChevronDown, ChevronRight } from 'lucide-vue-next';
+import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
@@ -376,6 +376,7 @@ async function openIssue(w: Where): Promise<void> {
                       <span class="held__what">{{ i.summary }}</span>
                       <span class="stamp" :style="{ color: i.color }">{{ i.stateName }}</span>
                       <button class="held__days" type="button" @click="toggleIssue(i.key)">
+                        <Clock class="ic ic--sm" />
                         {{ days(i.days) }}
                       </button>
                     </div>
@@ -615,6 +616,9 @@ async function openIssue(w: Where): Promise<void> {
   flex: none;
 }
 .held__days {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex: none;
   color: var(--text-dim);
   font: 12px var(--font-num);
