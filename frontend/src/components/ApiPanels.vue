@@ -112,13 +112,6 @@ const examples = computed(() => {
   const board = s?.boardId ?? '<board-uuid>';
   const key = s?.issueKey ?? 'PROJ-1';
   const list: { label: string; code: string; hint?: string }[] = [
-    {
-      label: 'Your token, set once for the terminal',
-      code: `export TRACKER_TOKEN="${freshToken.value ?? 'trk_…'}"`,
-      hint: freshToken.value
-        ? undefined
-        : 'The token is shown whole only when it is made; to have it again, Regenerate it above.',
-    },
     { label: 'Your issues', code: `curl -s ${BASE}/my-issues \\\n  ${auth}` },
     { label: `One issue, ${key}`, code: `curl -s ${BASE}/issues/${key} \\\n  ${auth}` },
     {
@@ -223,12 +216,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
       <header class="panel__h">Using it</header>
       <div class="panel__b form">
         <div class="field">
-          <div class="api__ex-h">
-            <span class="label">Where to send it</span>
-            <button class="btn btn--sm btn--ghost" type="button" @click="copyExample(-1, BASE)">
-              {{ copiedAt === -1 ? 'Copied' : 'Copy' }}
-            </button>
-          </div>
+          <span class="label">Where to send it</span>
           <pre class="api__code">{{ BASE }}</pre>
         </div>
 
@@ -243,17 +231,12 @@ const CALLS: { verb: string; path: string; what: string }[] = [
           </div>
           <span class="hint">
             Every answer is <code>{ data }</code> or <code>{ error }</code>, and a board you
-            cannot open answers 403 rather than pretending to be empty.
+            cannot open answers 403
           </span>
         </div>
 
         <div class="field">
-          <div class="api__ex-h">
-            <span class="label">Authorization header</span>
-            <button class="btn btn--sm btn--ghost" type="button" @click="copyExample(-2, HEADER)">
-              {{ copiedAt === -2 ? 'Copied' : 'Copy' }}
-            </button>
-          </div>
+          <span class="label">Authorization header</span>
           <pre class="api__code">{{ HEADER }}</pre>
         </div>
 
