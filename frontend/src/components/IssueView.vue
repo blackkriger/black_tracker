@@ -100,7 +100,7 @@ const draft = ref({
 const issue = ref<IssueFull | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
-const { people, colorOf, colorOfId, load: loadPeople } = usePeople();
+const { people, colorOf, colorOfId, nameOf, load: loadPeople } = usePeople();
 const { load: readNotices } = useNotices();
 const { wanted, pending: askedFor } = useFocus();
 
@@ -946,7 +946,7 @@ function reactionsOf(c: Comment): Nod[] {
   for (const r of c.reactions ?? []) {
     const found = byEmoji.get(r.emoji) ?? { emoji: r.emoji, n: 0, mine: false, who: '', names: [] };
     found.n += 1;
-    found.names.push(r.by);
+    found.names.push(nameOf(r.by));
     if (r.by === me) found.mine = true;
     byEmoji.set(r.emoji, found);
   }
@@ -1429,7 +1429,7 @@ async function removeIssue(): Promise<void> {
                 <div>
                   <div class="cm__head">
                     <span class="cm__who" :style="{ color: ink(colorOf(c.author.login)) }">
-                      {{ c.author.login }}
+                      {{ nameOf(c.author.login) }}
                     </span>
                     <time class="stamp">{{ stampAt(c.createdAt) }}</time>
                     <span v-if="c.editedAt" class="cm__edited">
@@ -1621,7 +1621,7 @@ async function removeIssue(): Promise<void> {
             <div v-else-if="issue" class="hist">
               <div v-for="h in issue.history" :key="h.id" class="hi">
                 <time>{{ stampAt(h.at) }}</time>
-                <span class="hi__who" :style="{ color: ink(colorOf(h.by)) }">{{ h.by }}</span>
+                <span class="hi__who" :style="{ color: ink(colorOf(h.by)) }">{{ nameOf(h.by) }}</span>
                 <span class="hi__what">
                   <span class="hi__f">{{ h.field }}</span>
                   <!-- Nothing before it means there is nothing to point away from: the value stands alone. -->
@@ -1730,7 +1730,7 @@ async function removeIssue(): Promise<void> {
               <div class="prop">
                 <span class="prop__k">Author</span>
                 <span class="pv pv--ro" :style="{ color: ink(colorOfId(issue.author?.id)) }">
-                  {{ issue.author?.login ?? '—' }}
+                  {{ issue.author ? nameOf(issue.author.login) : '—' }}
                 </span>
               </div>
               <div class="prop">

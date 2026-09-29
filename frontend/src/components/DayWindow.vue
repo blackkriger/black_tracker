@@ -10,6 +10,7 @@ import { longDate, type Due, type Mark } from '../lib/calendar';
 import { dayOf, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
+import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
 
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 
 const session = useSession();
 const { projects } = useProjects();
+const { nameOf } = usePeople();
 const { shown: notices, markRead } = useNotices();
 const { errors, fail, clear } = usePanelErrors();
 
@@ -122,10 +124,10 @@ async function openNotice(n: Notice): Promise<void> {
         <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
         <span v-if="n.emoji">{{ n.emoji }}</span>
         <span class="mark__title">
-          <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
-          <template v-else-if="n.kind === 'assigned'">{{ n.by }} assigned you</template>
+          <template v-if="n.kind === 'reaction'">{{ nameOf(n.by) }} reacted</template>
+          <template v-else-if="n.kind === 'assigned'">{{ nameOf(n.by) }} assigned you</template>
           <template v-else>
-            <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
+            <template v-if="n.by && n.by !== session.me.value?.login">{{ nameOf(n.by) }}: </template>
             {{ n.said }}
           </template>
         </span>

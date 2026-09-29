@@ -72,7 +72,7 @@ const search = ref<HTMLInputElement | null>(null);
 const byAssignee = ref('');
 const byAuthor = ref('');
 const byPriority = ref('');
-const { people, colorOf, load: loadPeople } = usePeople();
+const { people, colorOf, nameOf, load: loadPeople } = usePeople();
 // Tags narrow the board too: pick several and a card has to wear all of them.
 const byTags = ref<string[]>([]);
 const starred = ref(false);
@@ -485,7 +485,7 @@ watch(
                   v-if="i.assignee"
                   class="card__who"
                   :style="{ color: ink(colorOf(i.assignee.login)) }"
-                >{{ i.assignee.login }}</span>
+                >{{ nameOf(i.assignee.login) }}</span>
                 <div class="sp"></div>
                 <span
                   v-if="dueLabel(i.dueDate)"

@@ -9,6 +9,7 @@ import { buddyAvatarStyle } from '../../lib/avatar';
 import { stamp, stampAt } from '../../lib/issues';
 import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
+import { usePeople } from '../../lib/people';
 import { useProjects } from '../../lib/projects';
 import { useSession } from '../../lib/session';
 import { X } from 'lucide-vue-next';
@@ -56,6 +57,7 @@ const roles = ref<Role[]>([]);
 const removingRole = ref<Role | null>(null);
 const loading = ref(true);
 const { errors, fail, clear } = usePanelErrors();
+const { nameOf } = usePeople();
 
 const inviteRole = ref('');
 // A role is picked by its name in its own colour, the same way it is shown everywhere else.
@@ -495,11 +497,11 @@ async function saveAccess(): Promise<void> {
                 </span>
               </td>
               <td>
-                <template v-if="i.status === 'used'">Used by {{ i.usedBy }}</template>
+                <template v-if="i.status === 'used'">Used by {{ nameOf(i.usedBy) }}</template>
                 <template v-else-if="i.status === 'expired'">Expired</template>
                 <template v-else>Good until {{ stampAt(i.expiresAt) }}</template>
               </td>
-              <td class="stamp">{{ stampAt(i.createdAt) }}, {{ i.createdBy }}</td>
+              <td class="stamp">{{ stampAt(i.createdAt) }}, {{ nameOf(i.createdBy) }}</td>
               <td class="c-act">
                 <!-- A used link is the record of how an account came to be, so only an unused one can go. -->
                 <button

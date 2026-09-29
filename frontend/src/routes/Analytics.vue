@@ -13,6 +13,7 @@ import { dayAndMonth } from '../lib/calendar';
 import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/issues';
 import { RIDGE_SMOOTH_KERNEL, smoothRidge } from '../lib/ridge';
 import { usePanelErrors } from '../lib/panelErrors';
+import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
 import { settled, useLive } from '../lib/live';
 import { ink } from '../lib/theme';
@@ -73,6 +74,7 @@ interface Numbers {
 
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
+const { nameOf } = usePeople();
 
 const project = ref('');
 const status = ref('');
@@ -382,7 +384,7 @@ async function openIssue(w: Where): Promise<void> {
                   <span class="who__name">
                     <ChevronDown v-if="openPeople.includes(p.login)" class="ic ic--sm" />
                     <ChevronRight v-else class="ic ic--sm" />
-                    <span :style="{ color: ink(p.color) }">{{ p.login }}</span>
+                    <span :style="{ color: ink(p.color) }">{{ nameOf(p.login) }}</span>
                   </span>
                   <span class="n">{{ p.open }}</span>
                   <span class="n" :class="{ 'is-late': p.late }">{{ p.late }}</span>
@@ -413,7 +415,7 @@ async function openIssue(w: Where): Promise<void> {
                     <div v-if="openIssues.includes(i.key)" class="hands">
                       <template v-for="(h, n) in [...i.hands].reverse()" :key="n">
                         <div class="hands__row">
-                          <span :class="{ faint: !h.login }">{{ h.login ?? 'Nobody' }}</span>
+                          <span :class="{ faint: !h.login }">{{ h.login ? nameOf(h.login) : 'Nobody' }}</span>
                           <span class="n" :title="exact(h.days)">{{ days(h.days) }}</span>
                           <span class="stamp">{{ h.current ? 'still' : '' }}</span>
                         </div>

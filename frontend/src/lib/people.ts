@@ -29,7 +29,8 @@ export function usePeople() {
     colorOfId(id: string | null | undefined): string | undefined {
       return (id && byId.value.get(id)?.roleColor) || undefined;
     },
-    nameOf(login: string): string {
+    nameOf(login: string | null | undefined): string {
+      if (!login) return '';
       const p = byLogin.value.get(login);
       return p?.fullName || login;
     },
