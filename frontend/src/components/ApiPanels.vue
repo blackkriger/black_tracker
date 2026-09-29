@@ -60,7 +60,7 @@ async function copyToken(): Promise<void> {
   }
 }
 
-const BASE = 'https://tracker.example.com/api';
+const BASE = `${window.location.origin}/api`;
 const HEADER = '-H "Authorization: Bearer trk_…"';
 
 // The examples name what the reader fills in, in capitals, rather than borrowing one of
@@ -137,7 +137,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
 
         <div v-else-if="me?.token" class="field">
           <span class="label">Token</span>
-          <code class="input token__value">trk_••••••••••••{{ me.token.hint }}</code>
+          <code class="input token__value">••••••••••••{{ me.token.hint }}</code>
           <span class="stamp">
             CREATED {{ tokenCreated }}<template v-if="tokenUsed">, LAST USED {{ tokenUsed }}</template>
             <template v-else>, NEVER USED</template>
