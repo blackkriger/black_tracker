@@ -12,14 +12,17 @@ import SettingsNewProject from './routes/settings/NewProject.vue';
 import SettingsTags from './routes/settings/Tags.vue';
 import SettingsUsers from './routes/settings/Users.vue';
 import Join from './routes/Join.vue';
+import Home from './routes/Home.vue';
 import Dashboard from './routes/Dashboard.vue';
 import Analytics from './routes/Analytics.vue';
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    // The root is where the tracker opens: your own issues over a calendar folded to three months.
-    { path: '/', name: 'home', component: Dashboard },
+    // The root decides where you belong: the board of the project you last had open, or an empty state when there are no projects yet.
+    { path: '/', name: 'home', component: Home },
+    // Your own page: your issues and your starred ones, over a calendar folded to three months.
+    { path: '/me', name: 'me', component: Dashboard },
     { path: '/login', name: 'login', component: Login, meta: { public: true } },
     // The far end of an invite link: open to whoever holds it, and the only way an account is ever born in the browser.
     { path: '/join/:token', name: 'join', component: Join, meta: { public: true } },
@@ -29,8 +32,8 @@ export const router = createRouter({
     // The same board with one of its issues open over it, so a card can be linked to.
     { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
     { path: '/profile', name: 'profile', component: Profile },
-    // The calendar is the root with its year opened, and its old address still leads there.
-    { path: '/calendar', redirect: { name: 'home', query: { calendar: 'full' } } },
+    // The calendar is your own page with its year opened, and its old address still leads there.
+    { path: '/calendar', redirect: { name: 'me', query: { calendar: 'full' } } },
     { path: '/analytics', name: 'analytics', component: Analytics },
     { path: '/settings', name: 'settings', component: SettingsIndex },
     { path: '/settings/profile', name: 'settings-profile', component: SettingsProfile },
