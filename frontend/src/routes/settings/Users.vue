@@ -497,11 +497,19 @@ async function saveAccess(): Promise<void> {
                 </span>
               </td>
               <td>
-                <template v-if="i.status === 'used'">Used by {{ nameOf(i.usedBy) }}</template>
+                <span v-if="i.status === 'used'" class="who__lines">
+                  Used by {{ nameOf(i.usedBy) }}
+                  <span v-if="i.usedBy && nameOf(i.usedBy) !== i.usedBy" class="who__login">{{ i.usedBy }}</span>
+                </span>
                 <template v-else-if="i.status === 'expired'">Expired</template>
                 <template v-else>Good until {{ stampAt(i.expiresAt) }}</template>
               </td>
-              <td class="stamp">{{ stampAt(i.createdAt) }}, {{ nameOf(i.createdBy) }}</td>
+              <td class="stamp">
+                <span class="who__lines">
+                  {{ stampAt(i.createdAt) }}, {{ nameOf(i.createdBy) }}
+                  <span v-if="i.createdBy && nameOf(i.createdBy) !== i.createdBy" class="who__login">{{ i.createdBy }}</span>
+                </span>
+              </td>
               <td class="c-act">
                 <!-- A used link is the record of how an account came to be, so only an unused one can go. -->
                 <button
