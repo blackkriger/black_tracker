@@ -7,7 +7,7 @@
     <title>tracker</title>
     <script>
       try {
-        var theme = localStorage.getItem('tracker:theme');
+        var theme = localStorage.getItem('tracker:theme') || 'system';
         if (theme === 'light' || (theme === 'system' && matchMedia('(prefers-color-scheme: light)').matches)) {
           document.documentElement.dataset.theme = 'light';
         }

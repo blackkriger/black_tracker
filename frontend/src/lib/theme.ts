@@ -9,9 +9,9 @@ const prefersLight = window.matchMedia('(prefers-color-scheme: light)');
 function readTheme(): Theme {
   try {
     const saved = localStorage.getItem(KEY) as Theme | null;
-    return saved && THEMES.includes(saved) ? saved : 'dark';
+    return saved && THEMES.includes(saved) ? saved : 'system';
   } catch {
-    return 'dark';
+    return 'system';
   }
 }
 

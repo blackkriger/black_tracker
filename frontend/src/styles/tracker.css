@@ -10,6 +10,7 @@
 
 :root {
   color-scheme: dark;
+  accent-color: var(--accent-fill);
   /* surfaces */
   --bg: #0f0f0f;
   --surface: #161416;
