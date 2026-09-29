@@ -64,7 +64,8 @@ const BASE = 'https://tracker.example.com/api';
 
 const CALLS: { verb: string; path: string; what: string }[] = [
   { verb: 'GET', path: '/projects', what: 'Every project open to you, with its boards' },
-  { verb: 'GET', path: '/boards/:boardId/issues', what: 'The cards on one board' },
+  { verb: 'GET', path: '/boards/:boardId', what: 'One board with its statuses and their uuids' },
+  { verb: 'GET', path: '/boards/:boardId/issues', what: 'The tasks on one board' },
   { verb: 'GET', path: '/issues/:key', what: 'One issue whole — PROJ-4, not its uuid' },
   { verb: 'GET', path: '/issues/search?q=text', what: 'Issues whose summary carries the text' },
   { verb: 'POST', path: '/boards/:boardId/issues', what: 'Write a new issue onto that board' },
@@ -164,8 +165,8 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   -H "Content-Type: application/json" \
   -d '{"summary":"Search ignores the second word","priority":"Major"}'</pre>
           <span class="hint">
-            The board's uuid comes from <code>GET /projects</code>; everything but the
-            summary is optional and the board's first status is used when none is named.
+            The board's uuid comes from <code>GET /projects</code>. Everything but the
+            summary is optional; with no status named, the issue lands in the board's default one.
           </span>
         </div>
 
@@ -174,10 +175,11 @@ const CALLS: { verb: string; path: string; what: string }[] = [
           <pre class="api__code">curl -s -X PATCH {{ BASE }}/issues/$ISSUE \
   -H "Authorization: Bearer $TRACKER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"stateId":"$STATE","dueDate":"2026-10-31"}'</pre>
+  -d "{\"stateId\":\"$STATE\",\"dueDate\":\"2026-10-31\"}"</pre>
           <span class="hint">
-            Here the issue is its uuid, which <code>GET /issues/PROJ-4</code> hands back along
-            with the statuses its board offers.
+            Here the issue is its uuid, which <code>GET /issues/PROJ-4</code> hands back as
+            <code>id</code>; the uuid of the status to move it to comes from
+            <code>GET /boards/:boardId</code>.
           </span>
         </div>
       </div>
