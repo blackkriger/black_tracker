@@ -99,6 +99,10 @@ async function paint(): Promise<void> {
     );
     // A fenced block is code like any other. The highlighter is handed the block's text,
     // never its markup, so what it gives back is spans around what was already there.
+    for (const link of doc.querySelectorAll('a[href]')) {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+    }
     for (const block of doc.querySelectorAll('pre code')) {
       const named = [...block.classList].find((c) => c.startsWith('language-'));
       block.innerHTML = await colour(block.textContent ?? '', named?.slice(9) ?? '');
