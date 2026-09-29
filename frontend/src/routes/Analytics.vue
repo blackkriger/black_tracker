@@ -399,6 +399,7 @@ async function openIssue(w: Where): Promise<void> {
                     <ChevronDown v-if="openPeople.includes(p.login)" class="ic ic--sm" />
                     <ChevronRight v-else class="ic ic--sm" />
                     <span :style="{ color: ink(p.color) }">{{ nameOf(p.login) }}</span>
+                    <span v-if="nameOf(p.login) !== p.login" class="who__login">{{ p.login }}</span>
                   </span>
                   <span class="n">{{ p.open }}</span>
                   <span class="n" :class="{ 'is-late': p.late }">{{ p.late }}</span>
@@ -589,6 +590,10 @@ async function openIssue(w: Where): Promise<void> {
   align-items: center;
   gap: 6px;
   color: var(--text-dim);
+}
+.who__login {
+  font: 11px/1 var(--font-num);
+  color: var(--text-muted);
 }
 /* The columns are named in the panel's own header, over the numbers they belong to: the
    header's gutter is four pixels narrower than the body's, hence the nudge. */
