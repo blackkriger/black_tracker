@@ -87,17 +87,19 @@ export function dayAndMonth(key: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
 }
 
-export function shortDate(key: string): string {
+export function shortDate(key: string, withYear = true): string {
   return new Date(`${key}T00:00:00Z`).toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
-    year: '2-digit',
+    year: withYear ? '2-digit' : undefined,
     timeZone: 'UTC',
   });
 }
 
-export function spanLabel(from: string, to: string): string {
-  return from === to ? shortDate(from) : `${shortDate(from)} – ${shortDate(to)}`;
+export function spanLabel(from: string, to: string, withYear = true): string {
+  return from === to
+    ? shortDate(from, withYear)
+    : `${shortDate(from, withYear)} – ${shortDate(to, withYear)}`;
 }
 
 export function longDate(key: string): string {

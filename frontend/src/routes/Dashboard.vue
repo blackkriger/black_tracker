@@ -575,7 +575,7 @@ function closeIssue(): void {
                 ><ContactRound class="ic" /></button>
                 <span class="selbar kind__what">Assigned to you</span>
               </span>
-              <span class="panel__end">{{ spanLabel(pickedDays.from, pickedDays.to) }}</span>
+              <span class="panel__end">{{ spanLabel(pickedDays.from, pickedDays.to, false) }}</span>
             </header>
             <div class="panel__b days">
               <template v-if="!feedLoaded">
