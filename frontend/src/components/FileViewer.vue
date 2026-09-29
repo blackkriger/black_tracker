@@ -28,6 +28,9 @@ const isDrawio = computed(() => lang.value === 'drawio');
 // and the text is handed over then — whichever of the two arrives second sends it.
 const frame = ref<HTMLIFrameElement | null>(null);
 const frameReady = ref(false);
+// How big the diagram is drawn, as the frame reports it; the frame is sized to match and
+// stays hidden until the first report, so it never jumps from the page's width to its own.
+const frameSize = ref<{ width: number; height: number } | null>(null);
 
 function feedFrame(): void {
   if (!isDrawio.value || !frameReady.value || !text.value) return;
@@ -35,9 +38,17 @@ function feedFrame(): void {
 }
 
 function onFrameMessage(ev: MessageEvent): void {
-  if (ev.source !== frame.value?.contentWindow || ev.data?.type !== 'drawio-ready') return;
-  frameReady.value = true;
-  feedFrame();
+  if (ev.source !== frame.value?.contentWindow) return;
+  if (ev.data?.type === 'drawio-ready') {
+    frameReady.value = true;
+    feedFrame();
+  } else if (
+    ev.data?.type === 'drawio-size' &&
+    Number.isFinite(ev.data.width) &&
+    Number.isFinite(ev.data.height)
+  ) {
+    frameSize.value = { width: ev.data.width, height: ev.data.height };
+  }
 }
 
 window.addEventListener('message', onFrameMessage);
@@ -109,6 +120,7 @@ async function read(): Promise<void> {
   marked_.value = '';
   code.value = '';
   frameReady.value = false;
+  frameSize.value = null;
   try {
     const got = await api<{ text: string; truncated: boolean }>(`/attachments/${file.id}/text`);
     if (props.file?.id !== file.id) return;
@@ -169,6 +181,12 @@ onUnmounted(() => {
           :key="file.id"
           ref="frame"
           class="fv__drawio"
+          :class="{ 'is-sized': frameSize }"
+          :style="
+            frameSize
+              ? { width: `${frameSize.width + 2}px`, height: `${frameSize.height + 2}px` }
+              : undefined
+          "
           src="/drawio/viewer.html"
           sandbox="allow-scripts"
           title="Diagram"
@@ -287,13 +305,21 @@ onUnmounted(() => {
 .fv__md {
   color: var(--text);
 }
-/* A diagram takes the whole page: it is drawn on the white it was drawn on, whatever the theme. */
+/* A diagram is as wide as it is drawn, like a file is as wide as its lines, and never wider
+   or taller than the page; past that the frame scrolls it inside. */
 .fv__drawio {
   display: block;
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0 auto;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
+  visibility: hidden;
+}
+.fv__drawio.is-sized {
+  visibility: visible;
 }
 /* A document carries more than a comment ever does: .md draws the rest, these are the parts
    Quill has no button for. */

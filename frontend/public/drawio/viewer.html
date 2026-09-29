@@ -14,7 +14,8 @@
       body {
         height: 100%;
         margin: 0;
-        background: #fff;
+        background: #141618;
+        color-scheme: dark;
       }
     </style>
   </head>
@@ -75,11 +76,50 @@
             toolbar: 'pages zoom layers',
             'toolbar-position': 'top',
             'toolbar-nohide': true,
+            'dark-mode': 'dark',
           })
         );
         host.appendChild(el);
         GraphViewer.processElements();
+        watchSize();
       });
+
+      // The tracker sizes the frame to the diagram, so the frame says how big the diagram is —
+      // again whenever it changes, as it does when the zoom buttons are pressed.
+      var watching = null;
+      function watchSize() {
+        var graph = document.querySelector('.mxgraph');
+        if (!graph) return;
+        if (watching) watching.disconnect();
+        // The toolbar hangs above the diagram's own box, and its strip is stretched to the
+        // width of the window, so it counts only by the buttons on it; the size is the box
+        // together with those, measured from the top of the page.
+        var report = function () {
+          var box = graph.getBoundingClientRect();
+          var right = box.right;
+          var bottom = box.bottom;
+          for (var i = 0; i < graph.children.length; i++) {
+            var child = graph.children[i];
+            var parts = getComputedStyle(child).position === 'absolute' ? child.children : [child];
+            for (var j = 0; j < parts.length; j++) {
+              var part = parts[j].getBoundingClientRect();
+              right = Math.max(right, part.right);
+              bottom = Math.max(bottom, part.bottom);
+            }
+          }
+          parent.postMessage(
+            {
+              type: 'drawio-size',
+              width: Math.ceil(right + window.scrollX),
+              height: Math.ceil(bottom + window.scrollY),
+            },
+            '*'
+          );
+        };
+        watching = new ResizeObserver(report);
+        watching.observe(graph);
+        report();
+      }
       parent.postMessage({ type: 'drawio-ready' }, '*');
     </script>
   </body>
