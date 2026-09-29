@@ -39,6 +39,22 @@ function open(): void {
 }
 
 /** Listen for as long as the component lives. The stream itself stays open: navigating from one screen to the next unmounts before it mounts, and closing on the way would tear the connection down and build it again on every click. */
+/**
+ * A burst of events read as one: whatever runs is called once, a moment after the last of
+ * them. A screen that reads everything again on each change would otherwise send a request
+ * per card moved, and the answers could land out of order.
+ */
+export function settled(run: () => void, ms = 300): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      run();
+    }, ms);
+  };
+}
+
 export function useLive(handler: Handler): void {
   handlers.add(handler);
   open();

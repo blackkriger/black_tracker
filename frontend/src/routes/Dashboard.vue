@@ -41,7 +41,7 @@ import { useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
-import { useLive } from '../lib/live';
+import { settled, useLive } from '../lib/live';
 
 const route = useRoute();
 const router = useRouter();
@@ -154,8 +154,13 @@ const personChoices = computed(() =>
   people.value.map((p) => ({ value: p.login, label: p.fullName || p.login, color: p.roleColor }))
 );
 
+// Only the latest read's answer is kept: the year or the person changed while a slower read
+// was still out must not be overwritten by it.
+let reads = 0;
+
 async function load(): Promise<void> {
   clear('month');
+  const mine = ++reads;
   const first = shownMonths.value[0];
   const last = shownMonths.value[shownMonths.value.length - 1];
   const from = dayKey(first.year, first.month, 1);
@@ -168,6 +173,7 @@ async function load(): Promise<void> {
       activity: Activity[];
       mentions: DayMentions[];
     }>(`/calendar?from=${from}&to=${to}${user}`);
+    if (mine !== reads) return;
     marks.value = got.marks;
     dues.value = got.dues;
     activity.value = got.activity;
@@ -203,6 +209,11 @@ watch(
 );
 watch([year, who, wide], () => void load());
 // The whole screen is made of what other people are doing, so almost everything redraws it.
+const reloadDays = settled(() => void load());
+const reloadLists = settled(() => {
+  void loadMine();
+  void loadStarred();
+});
 useLive((ev) => {
   if (
     ev.type.startsWith('issue.') ||
@@ -210,13 +221,9 @@ useLive((ev) => {
     ev.type.startsWith('mention.') ||
     ev.type === 'key-date.changed'
   ) {
-    void load();
+    reloadDays();
   }
-  if (ev.type.startsWith('issue.')) {
-    void loadMine();
-    void loadStarred();
-  }
-  if (ev.type === 'favourite.changed' && ev.by === session.me.value?.login) void loadStarred();
+  if (ev.type.startsWith('issue.') || ev.type === 'favourite.changed') reloadLists();
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadNotices();
 });
 

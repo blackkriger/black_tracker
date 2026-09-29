@@ -14,7 +14,7 @@ import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/
 import { RIDGE_SMOOTH_KERNEL, smoothRidge } from '../lib/ridge';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
-import { useLive } from '../lib/live';
+import { settled, useLive } from '../lib/live';
 
 interface Where {
   key: string;
@@ -88,14 +88,21 @@ const statusChoices = computed(() =>
   (data.value?.statuses ?? []).map((s) => ({ value: s, label: s }))
 );
 
+// Each read is numbered, and only the latest one's answer is kept: a filter changed while a
+// slower read was still out must not be overwritten by it.
+let reads = 0;
+
 async function load(): Promise<void> {
   clear('numbers');
+  const mine = ++reads;
   try {
     const q = new URLSearchParams();
     if (project.value) q.set('project', project.value);
     if (status.value) q.set('status', status.value);
     const query = q.toString();
-    data.value = await api<Numbers>(`/analytics${query ? `?${query}` : ''}`);
+    const got = await api<Numbers>(`/analytics${query ? `?${query}` : ''}`);
+    if (mine !== reads) return;
+    data.value = got;
   } catch (err) {
     fail('numbers', err, 'Could not count anything.');
   } finally {
@@ -107,6 +114,7 @@ onMounted(async () => {
   await Promise.all([loadProjects(), load()]);
 });
 watch([project, status], () => void load());
+const reload = settled(() => void load());
 useLive((ev) => {
   if (
     ev.type.startsWith('issue.') ||
@@ -114,7 +122,7 @@ useLive((ev) => {
       ev.type
     )
   ) {
-    void load();
+    reload();
   }
 });
 
