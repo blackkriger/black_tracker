@@ -269,6 +269,8 @@ const issuePatch = z.object({
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
+const onDisk = (stored: string): string => path.join(env.uploadDir, stored);
+
 // Where the bytes are. This has to be asked before the issues are deleted: the rows cascade away with them, and afterwards nothing remembers the paths.
 export async function filesOfIssues(issueIds: string[]): Promise<string[]> {
   if (!issueIds.length) return [];
@@ -276,7 +278,7 @@ export async function filesOfIssues(issueIds: string[]): Promise<string[]> {
     'select storage_path from issue_attachments where issue_id = any($1::uuid[])',
     [issueIds]
   );
-  return res.rows.map((r) => r.storage_path);
+  return res.rows.map((r) => onDisk(r.storage_path));
 }
 
 // Rows go with their issue through the foreign keys; the bytes on disk are ours to sweep, whether one issue is deleted or a whole project's worth.
@@ -1186,7 +1188,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id]
     );
     await pool.query('delete from issue_comments where id = $1', [id]);
-    await Promise.all(files.rows.map((f) => unlink(f.storage_path).catch(() => {})));
+    await Promise.all(files.rows.map((f) => unlink(onDisk(f.storage_path)).catch(() => {})));
     const host = await issueById(owner.rows[0].issue_id);
     await writeHistory(pool, owner.rows[0].issue_id, auth.userId, 'comment deleted', null, null);
     void publish({
@@ -1222,11 +1224,12 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: 'Send a file.' });
 
-    const dir = path.join(env.uploadDir, found.issue.id.toLowerCase());
-    await mkdir(dir, { recursive: true });
+    const folder = found.issue.id.toLowerCase();
+    await mkdir(onDisk(folder), { recursive: true });
     // The name on disk is ours, not the one it arrived with: two screenshots called image.png do not collide, and nothing in the name can point out of the folder.
     const ext = path.extname(file.filename).slice(0, 12).replace(/[^a-zA-Z0-9.]/g, '');
-    const stored = path.join(dir, `${randomUUID()}${ext}`);
+    const name = `${folder}/${randomUUID()}${ext}`;
+    const stored = onDisk(name);
     try {
       await pipeline(file.file, createWriteStream(stored));
     } catch (err) {
@@ -1246,7 +1249,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         `insert into issue_attachments (issue_id, comment_id, filename, mime, size, storage_path, uploaded_by)
          values ($1, $2, $3, $4, $5, $6, $7)
          returning id, created_at`,
-        [id, comment ?? null, filename, file.mimetype, size, stored, found.auth.userId]
+        [id, comment ?? null, filename, file.mimetype, size, name, found.auth.userId]
       );
     } catch (err) {
       // The issue went away while the bytes were landing: take the bytes with it.
@@ -1300,7 +1303,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     reply.header('Content-Type', inline ? row.mime : 'application/octet-stream');
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('Content-Disposition', disposition(inline ? 'inline' : 'attachment', row.filename));
-    return reply.send(createReadStream(row.storage_path));
+    return reply.send(createReadStream(onDisk(row.storage_path)));
   });
 
   // Everything hanging off one thing, in one archive: the issue's own files, or one
@@ -1314,7 +1317,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     // archive halfway through, and a read that fails mid-stream would reject unheard.
     const present: typeof files = [];
     for (const file of files) {
-      if (await stat(file.storage_path).then(() => true, () => false)) present.push(file);
+      if (await stat(onDisk(file.storage_path)).then(() => true, () => false)) present.push(file);
     }
     if (!present.length) return reply.code(404).send({ error: 'Nothing is attached here.' });
     reply.header('Content-Type', 'application/zip');
@@ -1332,7 +1335,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         named = `${stem} (${n})${ext}`;
       }
       taken.add(named.toLowerCase());
-      zip.file(file.storage_path, { name: named });
+      zip.file(onDisk(file.storage_path), { name: named });
     }
     // A failure after the headers are gone can only end the stream; Fastify does that, and
     // the rejection is caught here so it does not end the process as well.
@@ -1400,7 +1403,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(415).send({ error: 'There is nothing to read in this kind of file.' });
     }
     const chunks: Buffer[] = [];
-    for await (const part of createReadStream(row.storage_path, { end: READ_MAX })) {
+    for await (const part of createReadStream(onDisk(row.storage_path), { end: READ_MAX })) {
       chunks.push(part as Buffer);
     }
     const read = Buffer.concat(chunks).subarray(0, READ_MAX);
@@ -1451,7 +1454,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         row.comment_id,
       ]);
     }
-    await unlink(row.storage_path).catch(() => {});
+    await unlink(onDisk(row.storage_path)).catch(() => {});
     const host = await issueById(row.issue_id);
     await writeHistory(pool, row.issue_id, auth.userId, 'file removed', null, row.filename);
     void publish({
