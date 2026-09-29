@@ -24,7 +24,8 @@ const emit = defineEmits<{
 
 const session = useSession();
 const { projects } = useProjects();
-const { nameOf } = usePeople();
+const { nameOf, load: loadPeople } = usePeople();
+void loadPeople();
 const { shown: notices, markRead } = useNotices();
 const { errors, fail, clear } = usePanelErrors();
 
