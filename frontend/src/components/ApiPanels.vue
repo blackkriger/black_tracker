@@ -190,7 +190,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
           </div>
           <span class="hint">
             Every answer is <code>{ data }</code> or <code>{ error }</code>, and a board you
-            cannot open answers 403, as it should
+            cannot open answers 403, as it should.
           </span>
         </div>
 
