@@ -86,14 +86,13 @@ const data = ref<Numbers | null>(null);
 const openPeople = ref<string[]>([]);
 const openIssues = ref<string[]>([]);
 
-const projectChoices = computed(() => [
-  { value: '', label: 'All projects' },
-  ...projects.value.map((p) => ({ value: p.shortName, label: p.name })),
-]);
-const statusChoices = computed(() => [
-  { value: '', label: 'Any status' },
-  ...(data.value?.statuses ?? []).map((s) => ({ value: s, label: s })),
-]);
+// The way back to everything is the picker's own placeholder, so it is not listed again.
+const projectChoices = computed(() =>
+  projects.value.map((p) => ({ value: p.shortName, label: p.name }))
+);
+const statusChoices = computed(() =>
+  (data.value?.statuses ?? []).map((s) => ({ value: s, label: s }))
+);
 
 async function load(): Promise<void> {
   clear('numbers');
@@ -137,16 +136,20 @@ const tallest = computed(() => {
   return Math.max(1, ...all);
 });
 
+// Narrowed to one status, every board wears that status's colour and counts what stands in
+// it — open or not, since Done is as much a status to look at as Review.
 const boardRows = computed<RidgeRow[]>(() => {
   const busiest = Math.max(0, ...(data.value?.boards ?? []).map((b) => b.open));
   return (data.value?.boards ?? []).map((b) => {
     const byName = new Map(b.states.map((s) => [s.name, s.count]));
+    const tint = status.value ? b.states.find((s) => s.name === status.value)?.color : undefined;
     return {
       key: b.id,
       label: b.name,
       profile: shape(axis.value.map((name) => byName.get(name) ?? 0)),
-      value: b.open,
-      highlight: b.open === busiest && busiest > 0,
+      value: status.value ? b.total : b.open,
+      highlight: !status.value && b.open === busiest && busiest > 0,
+      color: tint,
     };
   });
 });
