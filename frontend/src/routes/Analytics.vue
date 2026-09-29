@@ -258,7 +258,13 @@ async function openIssue(w: Where): Promise<void> {
             </span>
           </header>
           <div class="panel__b">
-            <div v-if="loading" class="hint faint">Counting…</div>
+            <div v-if="loading" class="skel">
+              <div v-for="n in 3" :key="n" class="skel__ridge">
+                <span class="sk sk--line" style="width: 72px"></span>
+                <span class="sk sk--line skel__hill"></span>
+                <span class="sk sk--line" style="width: 20px"></span>
+              </div>
+            </div>
             <div v-else-if="!boardRows.length" class="hint faint">No boards to count.</div>
             <RidgeRows v-else :rows="boardRows" :full="tallest">
               <template #axis>
@@ -277,6 +283,13 @@ async function openIssue(w: Where): Promise<void> {
               </span>
             </header>
             <div class="panel__b nums nums--table">
+              <template v-if="loading">
+                <div v-for="w in [62, 48, 70]" :key="w" class="line skel__line">
+                  <span class="sk sk--line" style="width: 46px"></span>
+                  <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
+                  <span class="sk sk--line" style="width: 64px"></span>
+                </div>
+              </template>
               <button
                 v-for="d in [...(data?.due.overdue ?? []), ...(data?.due.soon ?? [])]"
                 :key="d.key"
@@ -301,7 +314,14 @@ async function openIssue(w: Where): Promise<void> {
           <section class="panel">
             <header class="panel__h">Priorities</header>
             <div class="panel__b">
-              <RidgeRows :rows="priorityRows" :full="tallest">
+              <div v-if="loading" class="skel">
+                <div v-for="n in 4" :key="n" class="skel__ridge">
+                  <span class="sk sk--line" style="width: 64px"></span>
+                  <span class="sk sk--line skel__hill"></span>
+                  <span class="sk sk--line" style="width: 14px"></span>
+                </div>
+              </div>
+              <RidgeRows v-else :rows="priorityRows" :full="tallest">
                 <template #axis>
                   <span v-for="s in axis" :key="s">{{ s }}</span>
                 </template>
@@ -322,6 +342,15 @@ async function openIssue(w: Where): Promise<void> {
               </span>
             </header>
             <div class="panel__b nums nums--table">
+              <template v-if="loading">
+                <div v-for="w in [96, 78]" :key="w" class="who skel__who">
+                  <span class="sk sk--line" :style="{ width: `${w}px` }"></span>
+                  <span class="sk sk--line skel__n"></span>
+                  <span class="sk sk--line skel__n"></span>
+                  <span class="sk sk--line skel__n"></span>
+                  <span class="sk sk--line skel__n"></span>
+                </div>
+              </template>
               <template v-for="p in data?.people ?? []" :key="p.login">
                 <button class="who who--go" type="button" @click="togglePerson(p.login)">
                   <span class="who__name">
@@ -383,7 +412,15 @@ async function openIssue(w: Where): Promise<void> {
               <span class="panel__end">{{ data?.cycle.closed ?? 0 }}</span>
             </header>
             <div class="panel__b nums">
-              <div class="big">{{ days(data?.cycle.median ?? null) }}</div>
+              <template v-if="loading">
+                <span class="sk sk--line" style="width: 84px; height: 28px"></span>
+                <div v-for="n in 3" :key="n" class="pri">
+                  <span class="sk sk--line" style="width: 64px"></span>
+                  <span class="sk sk--line skel__hill"></span>
+                  <span class="sk sk--line" style="width: 36px"></span>
+                </div>
+              </template>
+              <div v-else class="big">{{ days(data?.cycle.median ?? null) }}</div>
               <div v-for="m in data?.cycle.months ?? []" :key="m.month" class="pri">
                 <span class="pri__name">{{ monthLabel(m.month) }}</span>
                 <span class="bar">
@@ -403,6 +440,13 @@ async function openIssue(w: Where): Promise<void> {
           <section class="panel">
             <header class="panel__h">Untouched</header>
             <div class="panel__b nums nums--table">
+              <template v-if="loading">
+                <div v-for="w in [56, 44]" :key="w" class="line skel__line">
+                  <span class="sk sk--line" style="width: 46px"></span>
+                  <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
+                  <span class="sk sk--line" style="width: 28px"></span>
+                </div>
+              </template>
               <button
                 v-for="s in data?.stale ?? []"
                 :key="s.key"
@@ -628,5 +672,41 @@ async function openIssue(w: Where): Promise<void> {
 .big {
   font: 28px/1 var(--font-num);
   color: var(--accent);
+}
+/* Placeholders drawn in the shape of what they stand for, so nothing moves when it lands. */
+.skel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 6px 2px 0;
+}
+.skel__ridge {
+  display: grid;
+  grid-template-columns: 96px 1fr 44px;
+  gap: 12px;
+  align-items: center;
+}
+.skel__ridge .sk:last-child {
+  justify-self: end;
+}
+.skel__hill {
+  flex: 1 1 auto;
+  height: 6px;
+}
+.skel__line {
+  cursor: default;
+}
+.skel__line:hover {
+  background: none;
+}
+.skel__line .sk:last-child {
+  justify-self: end;
+}
+.skel__who {
+  padding: 8px 0;
+}
+.skel__n {
+  justify-self: end;
+  width: 18px;
 }
 </style>

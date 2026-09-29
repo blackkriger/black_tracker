@@ -239,10 +239,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   color: var(--text);
   white-space: pre;
 }
-/* Folded, the file is as wide as the screen and nothing runs off the side of it. */
+/* Folded, the file keeps the width of its own lines; only a line wider than the screen is
+   broken, and the box stops at the edge instead of running off it. */
 .fv__code.is-folded {
-  width: 100%;
-  grid-template-columns: max-content minmax(0, 1fr);
+  max-width: 100%;
+  grid-template-columns: max-content minmax(0, max-content);
 }
 .fv__code.is-folded .fv__src {
   white-space: pre-wrap;
