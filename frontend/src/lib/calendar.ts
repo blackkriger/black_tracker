@@ -89,11 +89,8 @@ export function dayAndMonth(key: string): string {
 
 export function longDate(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
+  const weekday = new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long' });
+  return `${weekday}, ${dayAndMonth(key)}`;
 }
 
 export function monthGrid(year: number, month: number): Cell[] {
