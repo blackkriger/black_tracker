@@ -24,12 +24,22 @@ export function ridgePath(profile: number[], full = 4): { line: string; area: st
     return { line, area: `${line} L${RIDGE_W} ${BASE} L0 ${BASE} Z` };
   }
   const n = profile.length;
-  const pts: string[] = [];
-  for (let i = 0; i < n; i += 1) {
-    const x = ((i / Math.max(1, n - 1)) * RIDGE_W).toFixed(1);
-    const y = (BASE - Math.min(PEAK, (profile[i] * PEAK) / full)).toFixed(1);
-    pts.push(`${x} ${y}`);
+  const pts = profile.map((v, i) => ({
+    x: (i / Math.max(1, n - 1)) * RIDGE_W,
+    y: BASE - Math.min(PEAK, (v * PEAK) / full),
+  }));
+  // A Catmull-Rom curve through the same points, so the line bends where a polyline would break.
+  const at = (i: number) => pts[Math.max(0, Math.min(n - 1, i))];
+  const f = (v: number) => v.toFixed(1);
+  // The handles are kept between the baseline and the ceiling, so the curve never dips under
+  // the one or climbs over the other on its way between two points.
+  const hold = (y: number) => Math.max(BASE - PEAK, Math.min(BASE, y));
+  let line = `M${f(pts[0].x)} ${f(pts[0].y)}`;
+  for (let i = 0; i < n - 1; i += 1) {
+    const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: hold(p1.y + (p2.y - p0.y) / 6) };
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: hold(p2.y - (p3.y - p1.y) / 6) };
+    line += ` C${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(p2.x)} ${f(p2.y)}`;
   }
-  const line = `M${pts.join(' L')}`;
   return { line, area: `${line} L${RIDGE_W} ${BASE} L0 ${BASE} Z` };
 }
