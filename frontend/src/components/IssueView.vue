@@ -1476,6 +1476,9 @@ async function removeIssue(): Promise<void> {
                       >Delete</button>
                     </span>
                   </div>
+                  <span v-if="nameOf(c.author.login) !== c.author.login" class="cm__login">
+                    {{ c.author.login }}
+                  </span>
                   <template v-if="editingComment === c.id">
                     <RichText
                       v-model="commentEdit"
