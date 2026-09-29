@@ -413,10 +413,10 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
         stateName: r.state_name,
         priority: r.priority,
         due: r.due_date ? day(r.due_date) : null,
-        days: Math.round(mine.days * 10) / 10,
+        days: mine.days,
         hands: hands.map((h) => ({
           login: h.login,
-          days: Math.round(h.days * 10) / 10,
+          days: h.days,
           current: h.current,
         })),
       });
