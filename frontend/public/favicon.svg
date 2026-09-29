@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- A board seen from far enough away: three columns, the one in hand brightest. -->
-  <rect width="32" height="32" fill="#0d0e10"/>
-  <rect x="5" y="8" width="5" height="16" fill="#e8c267"/>
-  <rect x="13.5" y="8" width="5" height="11" fill="#e8c267" opacity=".55"/>
-  <rect x="22" y="8" width="5" height="7" fill="#e8c267" opacity=".3"/>
-</svg>
