@@ -22,6 +22,8 @@ export interface LiveEvent {
   by?: string;
   /** The tab that caused it: that one tab already shows the change and is told to ignore the echo. */
   origin?: string;
+  /** The one account this is for. Set, nobody else hears it at all — a private mark stays private. */
+  only?: string;
 }
 
 /** Which tab a request came from, when it said. */
@@ -72,7 +74,8 @@ function mayHear(denied: Denials, event: LiveEvent): boolean {
 
 export async function publish(event: LiveEvent): Promise<void> {
   if (!clients.size) return;
-  const line = `data: ${JSON.stringify({ ...event, at: new Date().toISOString() })}\n\n`;
+  const { only, ...told } = event;
+  const line = `data: ${JSON.stringify({ ...told, at: new Date().toISOString() })}\n\n`;
   // Listeners share roles, and a role's denials are the same for all of them: read once per role, not once per tab.
   const perRole = new Map<string, Denials | null>();
   for (const [id, client] of clients) {
@@ -81,6 +84,8 @@ export async function publish(event: LiveEvent): Promise<void> {
       clients.delete(id);
       continue;
     }
+    // Meant for one account: everyone else is passed over before anything is read for them.
+    if (only && client.auth.userId !== only) continue;
     let denied: Denials | null;
     const roleKey = `${client.auth.userId}`;
     try {

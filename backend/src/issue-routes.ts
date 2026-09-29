@@ -44,6 +44,20 @@ const READ_MAX = 512 * 1024;
 const readable = (filename: string): boolean =>
   READABLE.has(filename.split('.').pop()?.toLowerCase() ?? '');
 
+/**
+ * How a download is named. A name outside ASCII travels in `filename*`, the way RFC 6266 has
+ * it; the plain `filename` is its ASCII stand-in for a client that reads nothing else.
+ */
+function disposition(kind: 'inline' | 'attachment', name: string): string {
+  const plain = name.replace(/[^\x20-\x7e]|["\\]/g, '_');
+  // encodeURIComponent leaves these four alone, and the quote would end the value early.
+  const encoded = encodeURIComponent(name).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `${kind}; filename="${plain}"; filename*=UTF-8''${encoded}`;
+}
+
 interface IssueRow {
   id: string;
   readable_id: string;
@@ -784,17 +798,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         found.auth.userId,
       ]);
     }
-    // A star is private, but the announcement says only whose it was: the one person it
-    // concerns reads their own list again, and everyone else has nothing to read.
-    void publish({
-      type: 'favourite.changed',
-      boardId: found.issue.board_id,
-      projectId: found.issue.project_id,
-      issueId: id,
-      issueKey: found.issue.readable_id,
-      by: found.auth.login,
-      origin: tabOf(req),
-    });
+    // A star is private: only its owner's own tabs hear of it, and even they learn nothing
+    // but that their list changed.
+    void publish({ type: 'favourite.changed', only: found.auth.userId, origin: tabOf(req) });
     return reply.send({ data: { favourite: parsed.data.favourite } });
   });
 
@@ -1293,10 +1299,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const inline = INLINE_TYPES.has(row.mime);
     reply.header('Content-Type', inline ? row.mime : 'application/octet-stream');
     reply.header('X-Content-Type-Options', 'nosniff');
-    reply.header(
-      'Content-Disposition',
-      `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(row.filename)}"`
-    );
+    reply.header('Content-Disposition', disposition(inline ? 'inline' : 'attachment', row.filename));
     return reply.send(createReadStream(row.storage_path));
   });
 
@@ -1307,12 +1310,19 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     name: string,
     files: { filename: string; storage_path: string }[]
   ): Promise<void> {
+    // A row whose bytes are gone from disk is left out: one missing file must not fail the
+    // archive halfway through, and a read that fails mid-stream would reject unheard.
+    const present: typeof files = [];
+    for (const file of files) {
+      if (await stat(file.storage_path).then(() => true, () => false)) present.push(file);
+    }
+    if (!present.length) return reply.code(404).send({ error: 'Nothing is attached here.' });
     reply.header('Content-Type', 'application/zip');
     reply.header('X-Content-Type-Options', 'nosniff');
-    reply.header('Content-Disposition', `attachment; filename="${encodeURIComponent(name)}"`);
+    reply.header('Content-Disposition', disposition('attachment', name));
     const zip = new ZipArchive();
     const taken = new Set<string>();
-    for (const file of files) {
+    for (const file of present) {
       // Two screenshots are both called image.png; inside one folder only one of them can be.
       let named = file.filename;
       for (let n = 2; taken.has(named.toLowerCase()); n++) {
@@ -1324,7 +1334,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       taken.add(named.toLowerCase());
       zip.file(file.storage_path, { name: named });
     }
-    void zip.finalize();
+    // A failure after the headers are gone can only end the stream; Fastify does that, and
+    // the rejection is caught here so it does not end the process as well.
+    zip.finalize().catch(() => zip.destroy());
     return reply.send(zip);
   }
 
