@@ -280,7 +280,6 @@ async function openIssue(w: Where): Promise<void> {
           <header class="panel__h">
             Boards
             <span class="panel__end">
-              <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
               <Select
                 v-model="status"
                 :options="statusChoices"
@@ -297,6 +296,7 @@ async function openIssue(w: Where): Promise<void> {
                 small
                 label="Which project to count"
               />
+              <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
             </span>
           </header>
           <div class="panel__b">
