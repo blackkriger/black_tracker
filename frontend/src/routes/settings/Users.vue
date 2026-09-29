@@ -507,7 +507,7 @@ async function saveAccess(): Promise<void> {
               </td>
               <td class="stamp">
                 <span class="who__lines">
-                  {{ stampAt(i.createdAt) }}, {{ nameOf(i.createdBy) }}
+                  <span>{{ stampAt(i.createdAt) }}, <span class="who__by">{{ nameOf(i.createdBy) }}</span></span>
                   <span v-if="i.createdBy && nameOf(i.createdBy) !== i.createdBy" class="who__login">{{ i.createdBy }}</span>
                 </span>
               </td>
@@ -619,6 +619,9 @@ async function saveAccess(): Promise<void> {
 .who__login {
   font: 11px/1 var(--font-num);
   color: var(--text-muted);
+}
+.who__by {
+  color: var(--text-dim);
 }
 .c-role {
   width: 150px;
