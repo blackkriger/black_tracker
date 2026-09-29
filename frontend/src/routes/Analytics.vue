@@ -176,10 +176,10 @@ const longestMonth = computed(() =>
 function days(n: number | null): string {
   if (n === null) return '—';
   const seconds = n * 86400;
-  if (seconds < 60) return `${Math.round(seconds)} s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)} m`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)} h`;
-  return `${Math.round(n * 10) / 10} d`;
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  return `${Math.round(n * 10) / 10}d`;
 }
 const monthLabel = (month: string): string => {
   const [y, m] = month.split('-').map(Number);
@@ -460,7 +460,7 @@ async function openIssue(w: Where): Promise<void> {
               >
                 <span class="key" :style="{ color: s.color }">{{ s.key }}</span>
                 <span class="line__what">{{ s.summary }}</span>
-                <span class="stamp">{{ s.days }} d</span>
+                <span class="stamp">{{ s.days }}d</span>
               </button>
               <div v-if="!loading && !data?.stale.length" class="hint faint">
                 Everything has been looked at.
@@ -618,7 +618,7 @@ async function openIssue(w: Where): Promise<void> {
 .held__days {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex: none;
   color: var(--text-dim);
   font: 12px var(--font-num);
