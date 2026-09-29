@@ -1,14 +1,16 @@
 <script setup lang="ts">
 // The account's other half: the token scripts and agents speak with, and what they may say
 // with it. Every call made with the token is recorded as the person who minted it.
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Check, X } from 'lucide-vue-next';
 import { api } from '../lib/api';
 import { stamp } from '../lib/issues';
+import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
 
 const session = useSession();
 const me = session.me;
+const { projects } = useProjects();
 
 const tokenBusy = ref(false);
 // Held only until the page is left: the server keeps a hash, so this is the one moment the value exists anywhere readable.
@@ -61,6 +63,94 @@ async function copyToken(): Promise<void> {
 }
 
 const BASE = 'https://tracker.example.com/api';
+
+// The examples are written with the reader's own ids — an issue they hold, the board it
+// stands on and a status it is not in yet — so each one runs exactly as it is copied.
+interface Sample {
+  boardId: string;
+  boardName: string;
+  issueId: string | null;
+  issueKey: string | null;
+  stateId: string | null;
+  stateName: string | null;
+}
+const sample = ref<Sample | null>(null);
+
+type IssueHead = { id: string; key: string; boardId: string; stateId: string };
+
+async function loadSample(): Promise<void> {
+  const first = projects.value.find((p) => !p.archived)?.boards[0];
+  if (sample.value || !first) return;
+  try {
+    const mine = await api<{ key: string }[]>('/my-issues');
+    const issue: IssueHead | undefined = mine.length
+      ? await api<IssueHead>(`/issues/${mine[0].key}`)
+      : (await api<IssueHead[]>(`/boards/${first.id}/issues`))[0];
+    const board = await api<{ id: string; name: string; states: { id: string; name: string }[] }>(
+      `/boards/${issue?.boardId ?? first.id}`
+    );
+    const next = board.states.find((st) => st.id !== issue?.stateId) ?? null;
+    sample.value = {
+      boardId: board.id,
+      boardName: board.name,
+      issueId: issue?.id ?? null,
+      issueKey: issue?.key ?? null,
+      stateId: next?.id ?? null,
+      stateName: next?.name ?? null,
+    };
+  } catch {
+    // Without the ids the examples keep their placeholders; the page itself does not depend on them.
+  }
+}
+watch(projects, () => void loadSample(), { immediate: true });
+
+const examples = computed(() => {
+  const s = sample.value;
+  const auth = '-H "Authorization: Bearer $TRACKER_TOKEN"';
+  const json = '-H "Content-Type: application/json"';
+  const board = s?.boardId ?? '<board-uuid>';
+  const key = s?.issueKey ?? 'PROJ-1';
+  const list: { label: string; code: string; hint?: string }[] = [
+    {
+      label: 'Your token, set once for the terminal',
+      code: `export TRACKER_TOKEN="${freshToken.value ?? 'trk_…'}"`,
+      hint: freshToken.value
+        ? undefined
+        : 'The token is shown whole only when it is made; to have it again, Regenerate it above.',
+    },
+    { label: 'Your issues', code: `curl -s ${BASE}/my-issues \\\n  ${auth}` },
+    { label: `One issue, ${key}`, code: `curl -s ${BASE}/issues/${key} \\\n  ${auth}` },
+    {
+      label: `The ${s?.boardName ?? ''} board and its statuses`.replace('  ', ' '),
+      code: `curl -s ${BASE}/boards/${board} \\\n  ${auth}`,
+    },
+    {
+      label: 'Writing an issue',
+      code: `curl -s -X POST ${BASE}/boards/${board}/issues \\\n  ${auth} \\\n  ${json} \\\n  -d '{"summary":"Written from the API","priority":"Minor"}'`,
+      hint: 'Everything but the summary is optional; with no status named, the issue lands in the board\'s default one.',
+    },
+  ];
+  if (s?.issueId && s.stateId) {
+    list.push({
+      label: `Moving ${key} to ${s.stateName}`,
+      code: `curl -s -X PATCH ${BASE}/issues/${s.issueId} \\\n  ${auth} \\\n  ${json} \\\n  -d '{"stateId":"${s.stateId}"}'`,
+    });
+  }
+  return list;
+});
+
+const copiedAt = ref<number | null>(null);
+async function copyExample(i: number, code: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(code);
+    copiedAt.value = i;
+    setTimeout(() => {
+      if (copiedAt.value === i) copiedAt.value = null;
+    }, 1500);
+  } catch {
+    copiedAt.value = null;
+  }
+}
 
 const CALLS: { verb: string; path: string; what: string }[] = [
   { verb: 'GET', path: '/projects', what: 'Every project open to you, with its boards' },
@@ -152,35 +242,15 @@ const CALLS: { verb: string; path: string; what: string }[] = [
           </span>
         </div>
 
-        <div class="field">
-          <span class="label">A call to try it with</span>
-          <pre class="api__code">curl -s {{ BASE }}/my-issues \
-  -H "Authorization: Bearer $TRACKER_TOKEN"</pre>
-        </div>
-
-        <div class="field">
-          <span class="label">Writing an issue</span>
-          <pre class="api__code">curl -s -X POST {{ BASE }}/boards/$BOARD/issues \
-  -H "Authorization: Bearer $TRACKER_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"summary":"Search ignores the second word","priority":"Major"}'</pre>
-          <span class="hint">
-            The board's uuid comes from <code>GET /projects</code>. Everything but the
-            summary is optional; with no status named, the issue lands in the board's default one.
-          </span>
-        </div>
-
-        <div class="field">
-          <span class="label">Moving one along</span>
-          <pre class="api__code">curl -s -X PATCH {{ BASE }}/issues/$ISSUE \
-  -H "Authorization: Bearer $TRACKER_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"stateId\":\"$STATE\",\"dueDate\":\"2026-10-31\"}"</pre>
-          <span class="hint">
-            Here the issue is its uuid, which <code>GET /issues/PROJ-4</code> hands back as
-            <code>id</code>; the uuid of the status to move it to comes from
-            <code>GET /boards/:boardId</code>.
-          </span>
+        <div v-for="(ex, i) in examples" :key="ex.label" class="field">
+          <div class="api__ex-h">
+            <span class="label">{{ ex.label }}</span>
+            <button class="btn btn--sm btn--ghost" type="button" @click="copyExample(i, ex.code)">
+              {{ copiedAt === i ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
+          <pre class="api__code">{{ ex.code }}</pre>
+          <span v-if="ex.hint" class="hint">{{ ex.hint }}</span>
         </div>
       </div>
     </section>
@@ -291,5 +361,12 @@ const CALLS: { verb: string; path: string; what: string }[] = [
 }
 .api__line {
   display: block;
+}
+/* An example's name on the left, the way to take it on the right. */
+.api__ex-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 </style>
