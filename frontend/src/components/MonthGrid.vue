@@ -23,9 +23,20 @@ const props = defineProps<{
   /** The busiest day in view; every other day is shaded against it. */
   peak?: number;
   compact?: boolean;
+  range?: { from: string; to: string };
 }>();
 
-const emit = defineEmits<{ (e: 'pick', key: string): void }>();
+const emit = defineEmits<{
+  (e: 'pick', key: string): void;
+  (e: 'down', key: string): void;
+}>();
+
+function picked(key?: string): boolean {
+  return !!key && !!props.range && key >= props.range.from && key <= props.range.to;
+}
+function edge(key?: string): boolean {
+  return !!key && !!props.range && (key === props.range.from || key === props.range.to);
+}
 
 const session = useSession();
 const mine = computed(() => session.me.value?.role?.color ?? undefined);
@@ -69,7 +80,7 @@ function onEnter(ev: MouseEvent, c: Cell): void {
 </script>
 
 <template>
-  <div class="cal" :class="{ 'cal--compact': compact }">
+  <div class="cal" :class="{ 'cal--compact': compact, 'cal--range': range }">
     <span v-for="w in WEEKDAYS" :key="w" class="cal__wd">{{ w }}</span>
     <button
       v-for="(c, i) in cells"
@@ -82,11 +93,15 @@ function onEnter(ev: MouseEvent, c: Cell): void {
           'is-weekend': c.weekend,
           'is-today': c.today,
           [`heat-${heat(c.key)}`]: heat(c.key) > 0,
+          'is-picked': picked(c.key),
+          'is-edge': edge(c.key),
         },
       ]"
       type="button"
       :disabled="!c.day"
+      :data-key="c.key"
       @click="c.key && emit('pick', c.key)"
+      @pointerdown="c.key && range && emit('down', c.key)"
       @mouseenter="onEnter($event, c)"
       @mouseleave="hover = null"
     >
@@ -218,6 +233,18 @@ function onEnter(ev: MouseEvent, c: Cell): void {
 .cal__day.heat-3 { background: color-mix(in srgb, var(--accent) 32%, transparent); }
 .cal__day.heat-4 { background: color-mix(in srgb, var(--accent) 46%, transparent); }
 .cal__day.heat-5 { background: color-mix(in srgb, var(--accent) 62%, transparent); }
+.cal--range {
+  user-select: none;
+}
+.cal--range .cal__day {
+  touch-action: none;
+}
+.cal__day.is-picked {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 55%, transparent);
+}
+.cal__day.is-edge {
+  box-shadow: inset 0 0 0 1px var(--text);
+}
 .cal__pop {
   flex-direction: column;
   gap: 3px;

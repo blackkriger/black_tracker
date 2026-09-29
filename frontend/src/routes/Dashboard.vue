@@ -2,7 +2,7 @@
 // Where the tracker opens: what is on your own hands, and under it the calendar — three
 // months of it by default, the whole year when it is asked for. The days somebody marked,
 // the deadlines the issues carry, and how much work went through each day.
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   AtSign,
@@ -16,7 +16,6 @@ import {
 } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
-import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import Select from '../components/Select.vue';
 import { api } from '../lib/api';
@@ -27,6 +26,7 @@ import {
   dayKey,
   daysInMonth,
   monthName,
+  spanLabel,
   type Activity,
   type DayInfo,
   type DayMentions,
@@ -51,14 +51,7 @@ const { people, nameOf, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 const { ask } = useFocus();
-const {
-  shown: notices,
-  loaded: noticesLoaded,
-  off,
-  load: loadNotices,
-  markRead,
-  toggleKind,
-} = useNotices();
+const { off, markRead, toggleKind } = useNotices();
 
 const now = new Date();
 const year = ref(now.getFullYear());
@@ -109,6 +102,63 @@ async function loadStarred(): Promise<void> {
   }
 }
 const today = dayKey(now.getFullYear(), now.getMonth(), now.getDate());
+
+const feedDays = ref({ from: today, to: today });
+const dragging = ref<{ start: string; end: string } | null>(null);
+const feed = ref<Notice[]>([]);
+const feedLoaded = ref(false);
+const shownFeed = computed(() => feed.value.filter((n) => !off.value.includes(n.kind)));
+
+function ordered(a: string, b: string): { from: string; to: string } {
+  return a <= b ? { from: a, to: b } : { from: b, to: a };
+}
+const pickedDays = computed(() =>
+  dragging.value ? ordered(dragging.value.start, dragging.value.end) : feedDays.value
+);
+
+function midnightOf(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+let feedReads = 0;
+
+async function loadFeed(): Promise<void> {
+  const mine = ++feedReads;
+  const { from, to } = feedDays.value;
+  const end = midnightOf(to);
+  end.setDate(end.getDate() + 1);
+  const range = `from=${encodeURIComponent(midnightOf(from).toISOString())}&to=${encodeURIComponent(end.toISOString())}`;
+  try {
+    const got = await api<Notice[]>(`/notices?${range}`);
+    if (mine === feedReads) feed.value = got;
+  } catch {
+    if (mine === feedReads) feed.value = [];
+  } finally {
+    if (mine === feedReads) feedLoaded.value = true;
+  }
+}
+
+function pickDay(key: string): void {
+  feedDays.value = { from: key, to: key };
+}
+function pickFrom(key: string): void {
+  dragging.value = { start: key, end: key };
+}
+function onPickMove(ev: PointerEvent): void {
+  if (!dragging.value) return;
+  const cell = document
+    .elementFromPoint(ev.clientX, ev.clientY)
+    ?.closest<HTMLElement>('.cal--range .cal__day');
+  const key = cell?.dataset.key;
+  if (key && key !== dragging.value.end) dragging.value = { ...dragging.value, end: key };
+}
+function onPickUp(): void {
+  if (!dragging.value) return;
+  feedDays.value = ordered(dragging.value.start, dragging.value.end);
+  dragging.value = null;
+}
+watch(feedDays, () => void loadFeed());
 
 async function loadMine(): Promise<void> {
   try {
@@ -191,17 +241,23 @@ function fromAddress(): void {
   const day = String(route.query.day ?? '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
   year.value = Number(day.slice(0, 4));
-  openDay(day);
+  pickDay(day);
 }
 
 onMounted(() => {
   void loadPeople();
   void loadProjects();
-  void loadNotices();
+  void loadFeed();
   void load();
   void loadMine();
   void loadStarred();
   fromAddress();
+  window.addEventListener('pointermove', onPickMove);
+  window.addEventListener('pointerup', onPickUp);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('pointermove', onPickMove);
+  window.removeEventListener('pointerup', onPickUp);
 });
 watch(() => route.query.day, fromAddress);
 watch(
@@ -225,18 +281,11 @@ useLive((ev) => {
     reloadDays();
   }
   if (ev.type.startsWith('issue.') || ev.type === 'favourite.changed') reloadLists();
-  if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadNotices();
+  if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadFeed();
 });
 
 function step(by: number): void {
   year.value += by;
-}
-
-// ── one day, opened ──
-const picked = ref<string | null>(null);
-
-function openDay(key: string): void {
-  picked.value = key;
 }
 
 // The window wants the board it sits on and the tags its project can wear; neither is
@@ -256,7 +305,10 @@ const openBoards = computed(
 
 // A notice points at an issue by its board's slug; the window wants the board itself.
 async function openNotice(n: Notice): Promise<void> {
-  if (!n.read) await markRead(n.id);
+  if (!n.read) {
+    await markRead(n.id);
+    feed.value = feed.value.map((f) => (f.id === n.id ? { ...f, read: true } : f));
+  }
   const board = projects.value
     .find((p) => p.shortName === n.projectShort)
     ?.boards.find((b) => b.slug === n.boardSlug);
@@ -285,7 +337,6 @@ async function openFromDay(where: {
     ?.boards.find((b) => b.slug === where.boardSlug);
   if (!board) return;
   if (where.comment) ask(where.comment);
-  picked.value = null;
   await openIssue({
     key: where.key,
     summary: '',
@@ -308,7 +359,6 @@ async function openIssue(d: Due): Promise<void> {
     openTags.value = tags;
     open.value = { key: d.key, project: d.projectShort, board, comment: lookAt.value };
     lookAt.value = undefined;
-    picked.value = null;
   } catch (err) {
     fail('day', err, 'Could not open the issue.');
   }
@@ -414,7 +464,8 @@ function closeIssue(): void {
                     :days="days"
                     :peak="peak"
                     compact
-                    @pick="openDay"
+                    :range="pickedDays"
+                    @down="pickFrom"
                   />
                 </div>
               </template>
@@ -434,7 +485,7 @@ function closeIssue(): void {
                   :key="m.id"
                   class="day"
                   type="button"
-                  @click="openDay(m.day)"
+                  @click="pickDay(m.day)"
                 >
                   <span class="stamp">{{ longDate(m.day) }}</span>
                   <span class="day__what">
@@ -514,16 +565,21 @@ function closeIssue(): void {
                 ><ContactRound class="ic" /></button>
                 <span class="selbar kind__what">Assigned to you</span>
               </span>
+              <span class="panel__end">
+                <button class="btn btn--sm btn--ghost" type="button" @click="pickDay(today)">
+                  {{ spanLabel(pickedDays.from, pickedDays.to) }}
+                </button>
+              </span>
             </header>
             <div class="panel__b days">
-              <template v-if="!noticesLoaded">
+              <template v-if="!feedLoaded">
                 <div v-for="w in [74, 58, 66]" :key="w" class="day day--sk">
                   <span class="sk sk--line" style="width: 96px"></span>
                   <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
                 </div>
               </template>
               <button
-                v-for="n in notices"
+                v-for="n in shownFeed"
                 :key="n.id"
                 class="day note"
                 :class="{ 'is-new': !n.read }"
@@ -546,7 +602,7 @@ function closeIssue(): void {
                   </span>
                 </span>
               </button>
-              <div v-if="noticesLoaded && !notices.length" class="empty empty--sm">
+              <div v-if="feedLoaded && !shownFeed.length" class="empty empty--sm">
                 <span class="empty__g">◇</span>Nothing for you yet.
               </div>
             </div>
@@ -556,14 +612,6 @@ function closeIssue(): void {
         </div>
       </div>
     </div>
-
-    <DayWindow
-      v-if="picked"
-      :day="picked"
-      @close="picked = null"
-      @changed="refresh"
-      @open="openFromDay"
-    />
 
     <IssueView
       v-if="open"

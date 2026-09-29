@@ -87,6 +87,19 @@ export function dayAndMonth(key: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
 }
 
+export function shortDate(key: string): string {
+  return new Date(`${key}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+    timeZone: 'UTC',
+  });
+}
+
+export function spanLabel(from: string, to: string): string {
+  return from === to ? shortDate(from) : `${shortDate(from)} – ${shortDate(to)}`;
+}
+
 export function longDate(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   const weekday = new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long' });

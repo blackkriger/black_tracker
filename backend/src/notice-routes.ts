@@ -98,9 +98,16 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
   app.get('/notices', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
+    const q = req.query as { from?: string; to?: string };
+    const from = q.from ? new Date(q.from) : null;
+    const to = q.to ? new Date(q.to) : null;
+    if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) {
+      return reply.code(400).send({ error: 'A bound is a moment in ISO 8601.' });
+    }
     const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
     if (denied.everything) return reply.send({ data: [] });
 
+    const within = from || to;
     const res = await pool.query<NoticeRow>(
       `select n.id, n.kind, n.detail, n.comment_id, c.text, i.summary, n.created_at, n.read_at,
               u.login as by_login, i.readable_id, p.short_name, b.slug, st.color as state_color
@@ -114,9 +121,11 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
         where n.user_id = $1
           and i.project_id <> all($2::uuid[])
           and i.board_id <> all($3::uuid[])
-        order by n.read_at is not null, n.created_at desc
-        limit 40`,
-      [auth.userId, [...denied.projects], [...denied.boards]]
+          and ($4::timestamptz is null or n.created_at >= $4)
+          and ($5::timestamptz is null or n.created_at < $5)
+        order by ${within ? '' : 'n.read_at is not null, '}n.created_at desc
+        limit ${within ? 500 : 40}`,
+      [auth.userId, [...denied.projects], [...denied.boards], from, to]
     );
 
     return reply.send({ data: res.rows.map((r) => publicNotice(r, auth.login)) });

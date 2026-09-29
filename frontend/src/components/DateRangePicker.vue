@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { CalendarDays } from 'lucide-vue-next';
+import { shortDate as fmt, spanLabel } from '../lib/calendar';
 
 const props = withDefaults(defineProps<{ from?: string; to?: string }>(), { from: '', to: '' });
 const emit = defineEmits<{
@@ -25,15 +26,6 @@ function todayYmd(): string {
   const now = new Date();
   return ymdOf(now.getFullYear(), now.getMonth(), now.getDate());
 }
-function fmt(d: string): string {
-  const dt = new Date(`${d}T00:00:00Z`);
-  return dt.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: '2-digit',
-    timeZone: 'UTC',
-  });
-}
 
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
@@ -48,9 +40,7 @@ const moved = ref(false);
 const hasRange = computed(() => !!props.from || !!props.to);
 
 const triggerLabel = computed(() => {
-  if (props.from && props.to) {
-    return props.from === props.to ? fmt(props.from) : `${fmt(props.from)} – ${fmt(props.to)}`;
-  }
+  if (props.from && props.to) return spanLabel(props.from, props.to);
   if (props.from) return `From ${fmt(props.from)}`;
   if (props.to) return `Until ${fmt(props.to)}`;
   return 'Any time';
