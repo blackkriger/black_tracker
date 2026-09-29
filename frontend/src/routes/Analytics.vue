@@ -164,12 +164,13 @@ const longestMonth = computed(() =>
   Math.max(1, ...(data.value?.cycle.months ?? []).map((m) => m.median ?? 0))
 );
 
-/** However long it lasted, in the unit that says it plainly: minutes, hours, then days. */
+/** However long it lasted, in the unit that says it plainly, from seconds up to days. */
 function days(n: number | null): string {
   if (n === null) return '—';
-  const minutes = n * 1440;
-  if (minutes < 60) return `${Math.round(minutes)} m`;
-  if (minutes < 1440) return `${Math.round(minutes / 60)} h`;
+  const seconds = n * 86400;
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} h`;
   return `${Math.round(n * 10) / 10} d`;
 }
 const monthLabel = (month: string): string => {
