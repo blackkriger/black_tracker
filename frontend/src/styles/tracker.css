@@ -65,7 +65,8 @@ svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor;
 button { font-family: var(--font-ui); }
 
 /* ---------- top bar: project, boards, view, actions ---------- */
-.top { position: relative; z-index: 3; flex: none; display: flex; align-items: center; gap: 16px; height: var(--top-h); padding: 0 24px; border-bottom: 1px solid var(--line); }
+/* The bar stays in view however far a page is scrolled, so it needs a ground of its own to hide what passes under it. */
+.top { position: sticky; top: 0; z-index: 3; flex: none; display: flex; align-items: center; gap: 16px; height: var(--top-h); padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--bg); }
 .proj { display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px 0 0; border: 0; background: none; color: var(--text); font: 600 14px var(--font-ui); cursor: pointer; }
 .proj:hover .proj__name { color: var(--accent-bright); }
 .proj__k { font: 15.5px/1 var(--font-num); color: var(--accent); letter-spacing: .04em; }

@@ -92,14 +92,18 @@ useLive((ev) => {
   justify-content: center;
   min-height: 0;
 }
-/* The list runs the height of the screen so its last line, the date the service was last
-   updated, sits at the very bottom rather than under the links. */
+/* The list travels with the page under the bar and is exactly the height the screen leaves
+   it, so its last line, the date the service was last updated, sits at the bottom without
+   ever making the page itself taller. */
 .settings__side {
+  position: sticky;
+  top: calc(var(--top-h) + var(--space-5));
   display: flex;
   flex-direction: column;
   width: 220px;
   flex: none;
-  min-height: calc(100vh - 48px - var(--space-5) * 2);
+  height: calc(100vh - var(--top-h) - var(--space-5) * 2);
+  overflow-y: auto;
 }
 .side__foot {
   margin-top: auto;
@@ -115,7 +119,9 @@ useLive((ev) => {
     flex-direction: column;
   }
   .settings__side {
+    position: static;
     width: 100%;
+    height: auto;
   }
 }
 </style>
