@@ -52,6 +52,7 @@ interface PersonRow {
 interface HeldRow {
   login: string;
   id: string;
+  board_id: string;
   readable_id: string;
   summary: string;
   priority: string;
@@ -65,16 +66,26 @@ interface HeldRow {
 
 interface HandRow {
   issue_id: string;
+  field: 'assignee' | 'status';
   old_value: string | null;
   new_value: string | null;
   created_at: Date;
 }
 
-/** One stretch of an issue's life, in one person's hands — or in nobody's. */
+/** One stretch of an issue's life, in one person's hands — or in nobody's — and how that
+ *  stretch divided between the statuses the issue stood in while it lasted. */
 interface Hand {
   login: string | null;
   days: number;
   current: boolean;
+  states: { name: string; color: string | null; days: number }[];
+}
+
+/** A run of time during which one thing — a holder, or a status — stayed the same. */
+interface Stretch {
+  from: number;
+  to: number;
+  name: string | null;
 }
 
 interface StaleRow {
@@ -93,23 +104,48 @@ const day = (d: Date | string): string =>
 const DAY_MS = 86_400_000;
 
 /**
- * Who has held an issue, and for how long. The history writes a row per change of hands,
- * so the stretches are the gaps between those rows: the first begins when the issue was
- * written, and the last is still running.
+ * The gaps between the changes of one kind. The history writes a row per change, so what
+ * held before the first change is that change's old value — or, when nothing ever changed,
+ * what holds now, which then held from the moment the issue was written.
  */
-function handsOf(born: Date, changes: HandRow[]): Hand[] {
-  const now = Date.now();
-  const spans: Hand[] = [];
-  let since = born.getTime();
-  let who = changes.length ? changes[0].old_value : null;
+function stretchesOf(born: number, now: string | null, changes: HandRow[]): Stretch[] {
+  const out: Stretch[] = [];
+  let since = born;
+  let what = changes.length ? changes[0].old_value : now;
   for (const change of changes) {
     const at = change.created_at.getTime();
-    spans.push({ login: who, days: (at - since) / DAY_MS, current: false });
-    who = change.new_value;
+    out.push({ from: since, to: at, name: what });
+    what = change.new_value;
     since = at;
   }
-  spans.push({ login: who, days: (now - since) / DAY_MS, current: true });
-  return spans;
+  out.push({ from: since, to: Date.now(), name: what });
+  return out;
+}
+
+/** Who has held an issue and for how long, each stretch divided between the statuses it saw. */
+function handsOf(
+  born: Date,
+  holder: string,
+  state: string,
+  changes: HandRow[],
+  colorOf: (name: string) => string | null
+): Hand[] {
+  const start = born.getTime();
+  const hands = stretchesOf(start, holder, changes.filter((c) => c.field === 'assignee'));
+  const states = stretchesOf(start, state, changes.filter((c) => c.field === 'status'));
+  return hands.map((h, i) => {
+    const split = new Map<string, number>();
+    for (const st of states) {
+      const overlap = Math.min(h.to, st.to) - Math.max(h.from, st.from);
+      if (overlap > 0 && st.name) split.set(st.name, (split.get(st.name) ?? 0) + overlap);
+    }
+    return {
+      login: h.name,
+      days: (h.to - h.from) / DAY_MS,
+      current: i === hands.length - 1,
+      states: [...split].map(([name, ms]) => ({ name, color: colorOf(name), days: ms / DAY_MS })),
+    };
+  });
 }
 
 function median(all: number[]): number | null {
@@ -261,7 +297,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       // What each of them is holding right now, one row per issue rather than per person.
       pool.query<HeldRow>(
         `select u.login, i.id, i.readable_id, i.summary, i.priority, i.due_date, i.created_at,
-                p.short_name, b.slug, s.name as state_name, s.color
+                i.board_id, p.short_name, b.slug, s.name as state_name, s.color
            from issues i
            join users u on u.id = i.assignee_id
            join projects p on p.id = i.project_id
@@ -347,16 +383,24 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       ),
     ]);
 
-    // Every change of hands for the issues just listed, read in one go rather than per issue.
-    const handRows = held.rows.length
-      ? await pool.query<HandRow>(
-          `select issue_id, old_value, new_value, created_at
-             from issue_history
-            where issue_id = any($1::uuid[]) and field = 'assignee'
-            order by issue_id, created_at`,
-          [held.rows.map((r) => r.id)]
-        )
-      : { rows: [] as HandRow[] };
+    // Every change of hands and of status for the issues just listed, and the colours their
+    // boards give each status, read in one go rather than per issue.
+    const [handRows, palette] = held.rows.length
+      ? await Promise.all([
+          pool.query<HandRow>(
+            `select issue_id, field, old_value, new_value, created_at
+               from issue_history
+              where issue_id = any($1::uuid[]) and field in ('assignee', 'status')
+              order by issue_id, created_at`,
+            [held.rows.map((r) => r.id)]
+          ),
+          pool.query<{ board_id: string; name: string; color: string }>(
+            'select board_id, name, color from states where board_id = any($1::uuid[])',
+            [[...new Set(held.rows.map((r) => r.board_id))]]
+          ),
+        ])
+      : [{ rows: [] as HandRow[] }, { rows: [] as { board_id: string; name: string; color: string }[] }];
+    const colors = new Map(palette.rows.map((r) => [`${r.board_id}:${r.name}`, r.color]));
     const changes = new Map<string, HandRow[]>();
     for (const row of handRows.rows) {
       const list = changes.get(row.issue_id);
@@ -401,7 +445,13 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
         stateName: string; priority: string; due: string | null; days: number; hands: Hand[] }[]
     >();
     for (const r of held.rows) {
-      const hands = handsOf(r.created_at, changes.get(r.id) ?? []);
+      const hands = handsOf(
+        r.created_at,
+        r.login,
+        r.state_name,
+        changes.get(r.id) ?? [],
+        (name) => colors.get(`${r.board_id}:${name}`) ?? null
+      );
       const mine = hands[hands.length - 1];
       const list = holding.get(r.login) ?? [];
       list.push({
@@ -414,11 +464,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
         priority: r.priority,
         due: r.due_date ? day(r.due_date) : null,
         days: mine.days,
-        hands: hands.map((h) => ({
-          login: h.login,
-          days: h.days,
-          current: h.current,
-        })),
+        hands,
       });
       holding.set(r.login, list);
     }

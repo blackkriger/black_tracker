@@ -37,7 +37,12 @@ interface Held extends Where {
   priority: string;
   due: string | null;
   days: number;
-  hands: { login: string | null; days: number; current: boolean }[];
+  hands: {
+    login: string | null;
+    days: number;
+    current: boolean;
+    states: { name: string; color: string | null; days: number }[];
+  }[];
 }
 interface Person {
   login: string;
@@ -342,12 +347,22 @@ async function openIssue(w: Where): Promise<void> {
                         {{ days(i.days) }}
                       </button>
                     </div>
+                    <!-- The latest hands first. Each past stretch says which statuses it saw; the
+                         current one does not, its status is already on the line above. -->
                     <div v-if="openIssues.includes(i.key)" class="hands">
-                      <div v-for="(h, n) in i.hands" :key="n" class="hands__row">
-                        <span :class="{ faint: !h.login }">{{ h.login ?? 'Nobody' }}</span>
-                        <span class="n">{{ days(h.days) }}</span>
-                        <span class="stamp">{{ h.current ? 'still' : '' }}</span>
-                      </div>
+                      <template v-for="(h, n) in [...i.hands].reverse()" :key="n">
+                        <div class="hands__row">
+                          <span :class="{ faint: !h.login }">{{ h.login ?? 'Nobody' }}</span>
+                          <span class="n">{{ days(h.days) }}</span>
+                          <span class="stamp">{{ h.current ? 'still' : '' }}</span>
+                        </div>
+                        <div v-if="!h.current && h.states.length" class="hands__states">
+                          <span v-for="st in [...h.states].reverse()" :key="st.name" class="hands__state">
+                            <span :style="{ color: st.color ?? undefined }">{{ st.name }}</span>
+                            {{ days(st.days) }}
+                          </span>
+                        </div>
+                      </template>
                     </div>
                   </template>
                 </div>
@@ -584,6 +599,18 @@ async function openIssue(w: Where): Promise<void> {
 }
 .hands__row .n {
   text-align: right;
+}
+.hands__states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.hands__state {
+  display: inline-flex;
+  gap: 5px;
 }
 .pri {
   display: flex;
