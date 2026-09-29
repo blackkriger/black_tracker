@@ -164,9 +164,14 @@ const longestMonth = computed(() =>
   Math.max(1, ...(data.value?.cycle.months ?? []).map((m) => m.median ?? 0))
 );
 
-const days = (n: number | null): string => (n === null ? '—' : `${Math.round(n * 10) / 10} d`);
-/** A stretch measured in minutes is still a stretch; it just cannot be written in days. */
-const spanDays = (n: number): string => (n > 0 && n < 0.05 ? '< 0.1 d' : days(n));
+/** However long it lasted, in the unit that says it plainly: minutes, hours, then days. */
+function days(n: number | null): string {
+  if (n === null) return '—';
+  const minutes = n * 1440;
+  if (minutes < 60) return `${Math.round(minutes)} m`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)} h`;
+  return `${Math.round(n * 10) / 10} d`;
+}
 const monthLabel = (month: string): string => {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
@@ -259,36 +264,27 @@ async function openIssue(w: Where): Promise<void> {
 
         <div class="stack">
           <section class="panel">
-            <header class="panel__h">Deadlines</header>
+            <header class="panel__h">
+              Deadlines
+              <span v-if="data?.due.overdue.length" class="panel__end is-late">
+                {{ data.due.overdue.length }} late
+              </span>
+            </header>
             <div class="panel__b nums nums--table">
-              <template v-if="data?.due.overdue.length">
-                <div class="sec-h">Overdue</div>
-                <button
-                  v-for="d in data.due.overdue"
-                  :key="d.key"
-                  class="line"
-                  type="button"
-                  @click="openIssue(d)"
-                >
-                  <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
-                  <span class="line__what">{{ d.summary }}</span>
-                  <span class="stamp is-late">{{ dayAndMonth(d.day) }}</span>
-                </button>
-              </template>
-              <template v-if="data?.due.soon.length">
-                <div class="sec-h">This week</div>
-                <button
-                  v-for="d in data.due.soon"
-                  :key="d.key"
-                  class="line"
-                  type="button"
-                  @click="openIssue(d)"
-                >
-                  <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
-                  <span class="line__what">{{ d.summary }}</span>
-                  <span class="stamp">{{ dayAndMonth(d.day) }}</span>
-                </button>
-              </template>
+              <button
+                v-for="d in [...(data?.due.overdue ?? []), ...(data?.due.soon ?? [])]"
+                :key="d.key"
+                class="line"
+                type="button"
+                @click="openIssue(d)"
+              >
+                <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
+                <span class="line__what">{{ d.summary }}</span>
+                <span
+                  class="stamp"
+                  :class="{ 'is-late': data?.due.overdue.includes(d) }"
+                >{{ dayAndMonth(d.day) }}</span>
+              </button>
               <div
                 v-if="!loading && !data?.due.overdue.length && !data?.due.soon.length"
                 class="hint faint"
@@ -348,7 +344,7 @@ async function openIssue(w: Where): Promise<void> {
                     <div v-if="openIssues.includes(i.key)" class="hands">
                       <div v-for="(h, n) in i.hands" :key="n" class="hands__row">
                         <span :class="{ faint: !h.login }">{{ h.login ?? 'Nobody' }}</span>
-                        <span class="n">{{ spanDays(h.days) }}</span>
+                        <span class="n">{{ days(h.days) }}</span>
                         <span class="stamp">{{ h.current ? 'still' : '' }}</span>
                       </div>
                     </div>
@@ -475,13 +471,6 @@ async function openIssue(w: Where): Promise<void> {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-/* The group a run of rows belongs to; the first one needs no room above it. */
-.nums--table .sec-h {
-  margin-top: 8px;
-}
-.nums--table > .sec-h:first-child {
-  margin-top: 0;
 }
 .who {
   display: grid;
