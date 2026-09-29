@@ -8,8 +8,7 @@ import { requireAuth, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 
 const ZONE = 'Europe/Moscow';
-/** A deadline further off than this is not news yet. */
-const SOON_DAYS = 7;
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function shutOut(auth: Auth): Promise<{ all: boolean; projects: string[]; boards: string[] }> {
   const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
@@ -226,9 +225,14 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
   app.get('/analytics', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const q = req.query as { project?: string; status?: string };
+    const q = req.query as { project?: string; status?: string; from?: string; to?: string };
     const only = (q.project ?? '').trim() || null;
     const inState = (q.status ?? '').trim() || null;
+    const from = (q.from ?? '').trim() || null;
+    const to = (q.to ?? '').trim() || null;
+    if ((from && !DAY_RE.test(from)) || (to && !DAY_RE.test(to))) {
+      return reply.code(400).send({ error: 'Dates go as YYYY-MM-DD.' });
+    }
     const denied = await shutOut(auth);
     if (denied.all) {
       return reply.send({
@@ -252,6 +256,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       only,
       inState,
     ];
+    const within = [...seen, from, to];
 
     const [statuses, cells, dues, people, held, loose, priorities, cycle, months] =
       await Promise.all([
@@ -275,13 +280,14 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
            join projects p on p.id = b.project_id
            join states s on s.board_id = b.id
            left join issues i on i.board_id = b.id and i.state_id = s.id
+            and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
           where b.id <> all($1::uuid[]) and b.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
           group by b.id, b.name, b.slug, b.position, p.short_name, p.position,
                    s.id, s.name, s.color, s.is_resolved, s.position
           order by p.position, p.short_name, b.position, s.position`,
-        seen
+        within
       ),
       pool.query<DueRow>(
         `select i.readable_id, i.summary, i.due_date, p.short_name, b.slug, s.color,
@@ -293,20 +299,23 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
            join states s on s.id = i.state_id
            left join users u on u.id = i.assignee_id
           where i.resolved_at is null and i.due_date is not null
-            and i.due_date <= (now() at time zone '${ZONE}')::date + ${SOON_DAYS}
+            and i.due_date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
           order by i.due_date, i.readable_id`,
-        seen
+        within
       ),
       pool.query<PersonRow>(
         `select u.login, r.color as role_color,
-                count(i.id) filter (where i.resolved_at is null) as open,
+                count(i.id) filter (
+                  where i.resolved_at is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+                ) as open,
                 count(i.id) filter (
                   where i.resolved_at is null and i.due_date < (now() at time zone '${ZONE}')::date
+                    and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
                 ) as late,
-                count(i.id) filter (where i.resolved_at > now() - interval '30 days') as closed
+                count(i.id) filter (where (i.resolved_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')) as closed
            from users u
            left join roles r on r.id = u.role_id
            left join issues i on i.assignee_id = u.id
@@ -315,8 +324,10 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             and ($4::text is null or i.state_id in (select id from states where name = $4))
           where u.active
           group by u.login, r.color
-          order by count(i.id) filter (where i.resolved_at is null) desc, lower(u.login)`,
-        seen
+          order by count(i.id) filter (
+                     where i.resolved_at is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+                   ) desc, lower(u.login)`,
+        within
       ),
       // What each of them is holding right now, one row per issue rather than per person.
       pool.query<HeldRow>(
@@ -327,35 +338,35 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
            join projects p on p.id = i.project_id
            join boards b on b.id = i.board_id
            join states s on s.id = i.state_id
-          where i.resolved_at is null
+          where i.resolved_at is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
           order by lower(u.login), i.due_date nulls last, i.readable_id`,
-        seen
+        within
       ),
       pool.query<{ n: string }>(
         `select count(*) as n
            from issues i
            join projects p on p.id = i.project_id
           join states s on s.id = i.state_id
-          where i.resolved_at is null and i.assignee_id is null
+          where i.resolved_at is null and i.assignee_id is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)`,
-        seen
+        within
       ),
       pool.query<{ priority: string; state_name: string; n: string }>(
         `select i.priority, s.name as state_name, count(*) as n
            from issues i
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
-          where i.resolved_at is null
+          where i.resolved_at is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
           group by i.priority, s.name`,
-        seen
+        within
       ),
       pool.query<{ median: string | null; closed: string }>(
         `select percentile_cont(0.5) within group (
@@ -365,11 +376,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
            from issues i
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
-          where i.resolved_at is not null
+          where i.resolved_at is not null and (i.resolved_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)`,
-        seen
+        within
       ),
       pool.query<{ month: string; median: string | null; closed: string }>(
         `select to_char(date_trunc('month', i.resolved_at at time zone '${ZONE}'), 'YYYY-MM') as month,
@@ -380,14 +391,13 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
            from issues i
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
-          where i.resolved_at is not null
-            and i.resolved_at > (now() at time zone '${ZONE}') - interval '6 months'
+          where i.resolved_at is not null and (i.resolved_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
           group by 1
           order by 1`,
-        seen
+        within
       ),
     ]);
 

@@ -8,6 +8,7 @@ import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import Select from '../components/Select.vue';
+import DateRangePicker from '../components/DateRangePicker.vue';
 import { api } from '../lib/api';
 import { dayAndMonth } from '../lib/calendar';
 import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/issues';
@@ -76,8 +77,17 @@ const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 const { nameOf, load: loadPeople } = usePeople();
 
+function thisMonth(): { from: string; to: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const last = new Date(y, now.getMonth() + 1, 0).getDate();
+  return { from: `${y}-${m}-01`, to: `${y}-${m}-${last}` };
+}
+
 const project = ref('');
 const status = ref('');
+const period = ref(thisMonth());
 const loading = ref(true);
 const data = ref<Numbers | null>(null);
 const openPeople = ref<string[]>([]);
@@ -102,6 +112,8 @@ async function load(): Promise<void> {
     const q = new URLSearchParams();
     if (project.value) q.set('project', project.value);
     if (status.value) q.set('status', status.value);
+    if (period.value.from) q.set('from', period.value.from);
+    if (period.value.to) q.set('to', period.value.to);
     const query = q.toString();
     const got = await api<Numbers>(`/analytics${query ? `?${query}` : ''}`);
     if (mine !== reads) return;
@@ -117,7 +129,7 @@ onMounted(async () => {
   void loadPeople();
   await Promise.all([loadProjects(), load()]);
 });
-watch([project, status], () => void load());
+watch([project, status, period], () => void load());
 const reload = settled(() => void load());
 useLive((ev) => {
   if (
@@ -268,6 +280,7 @@ async function openIssue(w: Where): Promise<void> {
           <header class="panel__h">
             Boards
             <span class="panel__end">
+              <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
               <Select
                 v-model="status"
                 :options="statusChoices"
@@ -336,7 +349,7 @@ async function openIssue(w: Where): Promise<void> {
               <div
                 v-if="!loading && !data?.due.overdue.length && !data?.due.soon.length"
                 class="hint faint"
-              >Nothing is due this week.</div>
+              >Nothing is due in this period.</div>
             </div>
           </section>
 
@@ -474,7 +487,7 @@ async function openIssue(w: Where): Promise<void> {
                 <span class="n" :title="exact(m.median)">{{ days(m.median) }}</span>
               </div>
               <div v-if="!loading && !data?.cycle.closed" class="hint faint">
-                Nothing has been closed yet.
+                Nothing was closed in this period.
               </div>
             </div>
           </section>
