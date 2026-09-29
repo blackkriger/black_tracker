@@ -185,6 +185,44 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
     });
   });
 
+  // The issues the reader has starred, the latest star first. A star is a private mark, so
+  // this is the one place anyone sees their own list of them.
+  app.get('/my-favourites', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const denied = await shutOut(auth);
+    if (denied.all) return reply.send({ data: [] });
+    const res = await pool.query<{
+      readable_id: string;
+      summary: string;
+      short_name: string;
+      slug: string;
+      state_name: string;
+      color: string;
+    }>(
+      `select i.readable_id, i.summary, p.short_name, b.slug, s.name as state_name, s.color
+         from issue_favourites f
+         join issues i on i.id = f.issue_id
+         join projects p on p.id = i.project_id
+         join boards b on b.id = i.board_id
+         join states s on s.id = i.state_id
+        where f.user_id = $3
+          and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
+        order by f.created_at desc`,
+      [denied.boards, denied.projects, auth.userId]
+    );
+    return reply.send({
+      data: res.rows.map((r) => ({
+        key: r.readable_id,
+        summary: r.summary,
+        projectShort: r.short_name,
+        boardSlug: r.slug,
+        stateName: r.state_name,
+        color: r.color,
+      })),
+    });
+  });
+
   app.get('/analytics', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;

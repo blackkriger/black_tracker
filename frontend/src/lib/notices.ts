@@ -28,6 +28,8 @@ export interface Notice {
 const OFF = 'tracker:notices:off';
 
 const notices = ref<Notice[]>([]);
+// Set once the first read has come back, so a screen can tell an empty feed from one still on its way.
+const loaded = ref(false);
 const off = ref<NoticeKind[]>(read());
 let inflight: Promise<void> | null = null;
 
@@ -53,6 +55,7 @@ export function useNotices() {
     notices,
     shown,
     off,
+    loaded,
     unread: computed(() => shown.value.filter((n) => !n.read).length),
     /** A kind switched off is simply not shown; nothing stops being recorded. */
     toggleKind(kind: NoticeKind): void {
@@ -75,6 +78,7 @@ export function useNotices() {
         })
         .finally(() => {
           inflight = null;
+          loaded.value = true;
         });
       await inflight;
     },

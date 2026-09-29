@@ -12,6 +12,7 @@ import {
   ChevronsUpDown,
   ContactRound,
   Smile,
+  Star,
 } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
@@ -51,6 +52,7 @@ const { errors, fail, clear } = usePanelErrors();
 const { ask } = useFocus();
 const {
   shown: notices,
+  loaded: noticesLoaded,
   off,
   load: loadNotices,
   markRead,
@@ -74,6 +76,29 @@ interface Mine {
   color: string;
 }
 const mine = ref<Mine[]>([]);
+const mineLoading = ref(true);
+
+/** The issues you have starred, the latest star first. */
+interface Starred {
+  key: string;
+  summary: string;
+  projectShort: string;
+  boardSlug: string;
+  stateName: string;
+  color: string;
+}
+const starred = ref<Starred[]>([]);
+const starredLoading = ref(true);
+
+async function loadStarred(): Promise<void> {
+  try {
+    starred.value = await api<Starred[]>('/my-favourites');
+  } catch (err) {
+    fail('starred', err, 'Could not read your starred issues.');
+  } finally {
+    starredLoading.value = false;
+  }
+}
 const today = dayKey(now.getFullYear(), now.getMonth(), now.getDate());
 
 async function loadMine(): Promise<void> {
@@ -81,6 +106,8 @@ async function loadMine(): Promise<void> {
     mine.value = await api<Mine[]>('/my-issues');
   } catch (err) {
     fail('mine', err, 'Could not read your issues.');
+  } finally {
+    mineLoading.value = false;
   }
 }
 
@@ -158,6 +185,7 @@ onMounted(() => {
   void loadNotices();
   void load();
   void loadMine();
+  void loadStarred();
   fromAddress();
 });
 watch(() => route.query.day, fromAddress);
@@ -176,7 +204,10 @@ useLive((ev) => {
   ) {
     void load();
   }
-  if (ev.type.startsWith('issue.')) void loadMine();
+  if (ev.type.startsWith('issue.')) {
+    void loadMine();
+    void loadStarred();
+  }
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadNotices();
 });
 
@@ -283,6 +314,15 @@ function closeIssue(): void {
               <span class="panel__end">{{ mine.length }}</span>
             </header>
             <div class="panel__b mine">
+              <template v-if="mineLoading">
+                <div v-for="w in [58, 44, 66]" :key="w" class="mine__row mine__sk">
+                  <span class="sk sk--line" style="width: 46px"></span>
+                  <span class="sk sk--line" style="width: 44px"></span>
+                  <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
+                  <span class="sk sk--line" style="width: 64px"></span>
+                  <span class="sk sk--line mine__due" style="width: 72px"></span>
+                </div>
+              </template>
               <button
                 v-for="i in mine"
                 :key="i.key"
@@ -301,11 +341,12 @@ function closeIssue(): void {
                   :class="{ 'is-late': i.due && i.due < today }"
                 >{{ i.due ? dayAndMonth(i.due) : '—' }}</span>
               </button>
-              <div v-if="!mine.length" class="hint faint">Nothing is on you.</div>
+              <div v-if="!mineLoading && !mine.length" class="hint faint">Nothing is on you.</div>
             </div>
           </section>
           <div v-if="errors.mine" class="err panel__err sheet__wide">{{ errors.mine }}</div>
 
+        <div class="stack">
           <section class="panel">
             <header class="panel__h">
               <span class="key year">{{ wide ? year : monthName(now.getFullYear(), now.getMonth()) }}</span>
@@ -362,9 +403,68 @@ function closeIssue(): void {
               </template>
             </div>
           </section>
-          <div v-if="errors.month" class="err panel__err sheet__wide">{{ errors.month }}</div>
+          <div v-if="errors.month" class="err panel__err">{{ errors.month }}</div>
+
+          <section class="panel">
+            <header class="panel__h">Marked days</header>
+            <div class="panel__b days">
+              <template v-if="loading">
+                <span v-for="n in 2" :key="n" class="sk sk--line"></span>
+              </template>
+              <template v-else>
+                <button
+                  v-for="m in yearMarks"
+                  :key="m.id"
+                  class="day"
+                  type="button"
+                  @click="openDay(m.day)"
+                >
+                  <span class="stamp">{{ longDate(m.day) }}</span>
+                  <span class="day__what">
+                    <span v-if="m.project" class="key">{{ m.project.shortName }}</span>
+                    {{ m.title }}
+                  </span>
+                </button>
+                <div v-if="!yearMarks.length" class="empty empty--sm">
+                  <span class="empty__g">◇</span>Nothing marked this year.
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
 
         <div class="stack">
+          <section class="panel">
+            <header class="panel__h">
+              <Star class="ic star" aria-label="Starred" />
+              <span class="panel__end">{{ starredLoading ? '' : starred.length }}</span>
+            </header>
+            <div class="panel__b days">
+              <template v-if="starredLoading">
+                <div v-for="w in [70, 52]" :key="w" class="day day--sk">
+                  <span class="sk sk--line" style="width: 46px"></span>
+                  <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
+                </div>
+              </template>
+              <button
+                v-for="f in starred"
+                :key="f.key"
+                class="day"
+                type="button"
+                @click="openFromDay({ key: f.key, projectShort: f.projectShort, boardSlug: f.boardSlug })"
+              >
+                <span class="day__what">
+                  <span class="key" :style="{ color: f.color }">{{ f.key }}</span>
+                  <span class="note__said">{{ f.summary }}</span>
+                </span>
+              </button>
+              <div v-if="!starredLoading && !starred.length" class="empty empty--sm">
+                <span class="empty__g">◇</span>Nothing starred.
+              </div>
+            </div>
+          </section>
+          <div v-if="errors.starred" class="err panel__err">{{ errors.starred }}</div>
+
           <section class="panel">
             <header class="panel__h">
               <span class="kind__hold">
@@ -399,6 +499,12 @@ function closeIssue(): void {
               </span>
             </header>
             <div class="panel__b days">
+              <template v-if="!noticesLoaded">
+                <div v-for="w in [74, 58, 66]" :key="w" class="day day--sk">
+                  <span class="sk sk--line" style="width: 96px"></span>
+                  <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
+                </div>
+              </template>
               <button
                 v-for="n in notices"
                 :key="n.id"
@@ -423,38 +529,13 @@ function closeIssue(): void {
                   </span>
                 </span>
               </button>
-              <div v-if="!notices.length" class="empty empty--sm">
+              <div v-if="noticesLoaded && !notices.length" class="empty empty--sm">
                 <span class="empty__g">◇</span>Nothing for you yet.
               </div>
             </div>
           </section>
 
-          <section class="panel">
-            <header class="panel__h">Marked days</header>
-            <div class="panel__b days">
-              <template v-if="loading">
-                <span v-for="n in 2" :key="n" class="sk sk--line"></span>
-              </template>
-              <template v-else>
-                <button
-                  v-for="m in yearMarks"
-                  :key="m.id"
-                  class="day"
-                  type="button"
-                  @click="openDay(m.day)"
-                >
-                  <span class="stamp">{{ longDate(m.day) }}</span>
-                  <span class="day__what">
-                    <span v-if="m.project" class="key">{{ m.project.shortName }}</span>
-                    {{ m.title }}
-                  </span>
-                </button>
-                <div v-if="!yearMarks.length" class="empty empty--sm">
-                  <span class="empty__g">◇</span>Nothing marked this year.
-                </div>
-              </template>
-            </div>
-          </section>
+
         </div>
       </div>
     </div>
@@ -608,6 +689,24 @@ function closeIssue(): void {
 .day:hover {
   background: var(--card-hover);
   color: var(--text);
+}
+/* A placeholder row keeps the two lines of a real one and answers nothing. */
+.day--sk {
+  width: 100%;
+  cursor: default;
+}
+.day--sk:hover {
+  background: none;
+}
+.mine__sk {
+  cursor: default;
+}
+.mine__sk:hover {
+  border-color: var(--line);
+}
+/* The starred list is named by its star alone, in the colour a star wears when it is on. */
+.star {
+  color: var(--accent);
 }
 .marks {
   display: flex;

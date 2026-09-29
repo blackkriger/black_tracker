@@ -644,11 +644,13 @@ async function openIssue(w: Where): Promise<void> {
 .hands__row .n {
   text-align: right;
 }
+/* Nested under the person it belongs to, one step in like every level above it. */
 .hands__states {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 12px;
   margin-bottom: 4px;
+  padding-left: 14px;
   color: var(--text-muted);
   font-size: 11.5px;
 }
