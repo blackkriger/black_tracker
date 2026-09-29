@@ -6,6 +6,7 @@ import { computed, ref } from 'vue';
 import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { commentOrder, stamp, type CommentOrder } from '../lib/issues';
+import { setWrapLines, wrapLines } from '../lib/files';
 import { useNotices, type NoticeKind } from '../lib/notices';
 import { useSession, type Me } from '../lib/session';
 
@@ -145,6 +146,17 @@ async function changePassword(): Promise<void> {
               @click="setOrder('newest')"
             >Newest first</button>
           </div>
+        </div>
+        <div class="field">
+          <span class="label">Files</span>
+          <label class="flag">
+            <input
+              type="checkbox"
+              :checked="wrapLines"
+              @change="setWrapLines(($event.target as HTMLInputElement).checked)"
+            />
+            Wrap long lines
+          </label>
         </div>
         <div class="field">
           <span class="label">Notices shown</span>

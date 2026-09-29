@@ -6,7 +6,7 @@ import { computed, ref, watch, onUnmounted } from 'vue';
 import { FileDown, WrapText, X } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
 import { api } from '../lib/api';
-import { langOf } from '../lib/files';
+import { langOf, setWrapLines, wrapLines as wrapped } from '../lib/files';
 
 const props = defineProps<{ file: { id: string; name: string } | null }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
@@ -18,9 +18,6 @@ const error = ref('');
 const marked_ = ref('');
 const code = ref('');
 
-// Long lines run off the side until they are told to fold, the way Alt+Z folds them in an
-// editor. Whoever asks for it keeps it for every file they open after this one.
-const wrapped = ref(false);
 
 const lang = computed(() => (props.file ? langOf(props.file.name) : 'plaintext'));
 const isMd = computed(() => lang.value === 'markdown');
@@ -109,7 +106,7 @@ function onKey(ev: KeyboardEvent): void {
     emit('close');
   } else if (ev.altKey && (ev.key === 'z' || ev.key === 'Z' || ev.code === 'KeyZ')) {
     ev.preventDefault();
-    wrapped.value = !wrapped.value;
+    setWrapLines(!wrapped.value);
   }
 }
 
@@ -161,7 +158,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
             type="button"
             :aria-pressed="wrapped"
             title="Fold long lines (Alt+Z)"
-            @click="wrapped = !wrapped"
+            @click="setWrapLines(!wrapped)"
           >
             <WrapText class="ic" />
             Wrap
