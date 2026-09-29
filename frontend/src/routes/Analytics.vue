@@ -165,6 +165,8 @@ const longestMonth = computed(() =>
 );
 
 const days = (n: number | null): string => (n === null ? '—' : `${Math.round(n * 10) / 10} d`);
+/** A stretch measured in minutes is still a stretch; it just cannot be written in days. */
+const spanDays = (n: number): string => (n > 0 && n < 0.05 ? '< 0.1 d' : days(n));
 const monthLabel = (month: string): string => {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
@@ -346,7 +348,7 @@ async function openIssue(w: Where): Promise<void> {
                     <div v-if="openIssues.includes(i.key)" class="hands">
                       <div v-for="(h, n) in i.hands" :key="n" class="hands__row">
                         <span :class="{ faint: !h.login }">{{ h.login ?? 'Nobody' }}</span>
-                        <span class="n">{{ days(h.days) }}</span>
+                        <span class="n">{{ spanDays(h.days) }}</span>
                         <span class="stamp">{{ h.current ? 'still' : '' }}</span>
                       </div>
                     </div>

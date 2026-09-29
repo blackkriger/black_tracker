@@ -109,9 +109,7 @@ function handsOf(born: Date, changes: HandRow[]): Hand[] {
     since = at;
   }
   spans.push({ login: who, days: (now - since) / DAY_MS, current: true });
-  // A stretch in nobody's hands is real, but a zero-length one is only the record of a
-  // change and says nothing about where the time went.
-  return spans.filter((h) => h.days >= 0.5 || h.current);
+  return spans;
 }
 
 function median(all: number[]): number | null {
