@@ -45,9 +45,9 @@ npm run dev               # 127.0.0.1:5174, proxies /api to 127.0.0.1:3100
 
 ## Server
 
-Until the move to its own Debian 13 server behind `tracker.example.com`, it runs on `server.example`, and the names below are that server's. nginx terminates HTTPS for `tracker.example.com` and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The backend lives in `/opt/issues_tracker` and runs under PM2 as `tracker-api`. Postgres role and database `tracker`. Uploads land in `/var/lib/tracker/uploads`, 10 MB a file, served by the API behind the same board check as the issue they hang off.
+`server.example`, Debian 13, 1 GB of memory plus 1 GB of swap, ufw open on 22, 80 and 443 only. `tracker.example.com` is an A record. nginx terminates HTTPS for it with a Let's Encrypt certificate that `certbot.timer` renews, and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The backend lives in `/opt/issues_tracker` and runs on Node 24 under PM2 as `tracker-api`, brought up at boot by `pm2-root.service`. PostgreSQL 18 from PGDG, role and database `tracker`. Uploads land in `/var/lib/tracker/uploads`, 10 MB a file, served by the API behind the same board check as the issue they hang off.
 
-`https://tracker.example.com/db/` is a **pgweb** on the tracker database (`pgweb-tracker.service`, `127.0.0.1:8082`) behind its own nginx basic auth — `/etc/nginx/htpasswd-tracker`, not another project's credentials. The tracker's own sign-in does not guard it.
+`https://tracker.example.com/db/` is a **pgweb** on the tracker database (`pgweb-tracker.service`, `127.0.0.1:8082`, connection string in `/etc/pgweb-tracker.env`) behind its own nginx basic auth — `/etc/nginx/htpasswd-tracker`. The tracker's own sign-in does not guard it.
 
 `./deploy.sh` from the repo root does the whole round: push, build the SPA, ship `dist` to the docroot, then `git pull` + `npm install` + `npm run migrate` + pm2 restart on the server, and poll `/health`. Commit first — the server pulls.
 
@@ -57,5 +57,5 @@ cd /opt/issues_tracker/backend
 npm run create-user -- <login> <password> admin "Full name"   # also resets a password
 pm2 logs tracker-api --lines 50
 pm2 restart tracker-api --update-env
-sudo -u postgres psql -d tracker
+runuser -u postgres -- psql -d tracker
 ```
