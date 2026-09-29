@@ -1,6 +1,5 @@
 // One screenful of numbers about the work itself: what stands on each board, what is late,
-// who carries what, how long a finished issue took, and what nobody has touched in a
-// fortnight. Everything is read behind the same denials the boards themselves are read
+// who carries what, and how long a finished issue took. Everything is read behind the same denials the boards themselves are read
 // behind, so a role that cannot open a board never counts its issues either.
 
 import type { FastifyInstance } from 'fastify';
@@ -9,8 +8,6 @@ import { requireAuth, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 
 const ZONE = 'Europe/Moscow';
-/** Untouched this long and an open issue is worth naming. */
-const STALE_DAYS = 14;
 /** A deadline further off than this is not news yet. */
 const SOON_DAYS = 7;
 
@@ -86,16 +83,6 @@ interface Stretch {
   from: number;
   to: number;
   name: string | null;
-}
-
-interface StaleRow {
-  readable_id: string;
-  summary: string;
-  short_name: string;
-  slug: string;
-  state_name: string;
-  color: string;
-  days: string;
 }
 
 const day = (d: Date | string): string =>
@@ -215,8 +202,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           unassigned: 0,
           priorities: [],
           cycle: { median: null, closed: 0, months: [] },
-          stale: [],
-          staleDays: STALE_DAYS,
         },
       });
     }
@@ -230,7 +215,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       inState,
     ];
 
-    const [statuses, cells, dues, people, held, loose, priorities, cycle, months, stale] =
+    const [statuses, cells, dues, people, held, loose, priorities, cycle, months] =
       await Promise.all([
       pool.query<{ name: string }>(
         `select s.name
@@ -366,22 +351,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           order by 1`,
         seen
       ),
-      pool.query<StaleRow>(
-        `select i.readable_id, i.summary, p.short_name, b.slug, s.name as state_name, s.color,
-                extract(epoch from (now() - i.updated_at)) / 86400 as days
-           from issues i
-           join projects p on p.id = i.project_id
-           join boards b on b.id = i.board_id
-           join states s on s.id = i.state_id
-          where i.resolved_at is null
-            and i.updated_at < now() - interval '${STALE_DAYS} days'
-            and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
-            and ($3::text is null or p.short_name = $3)
-            and ($4::text is null or s.name = $4)
-          order by i.updated_at
-          limit 20`,
-        seen
-      ),
     ]);
 
     // Every change of hands and of status for the issues just listed, and the colours their
@@ -470,7 +439,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       holding.set(r.login, list);
     }
 
-    const where = (r: DueRow | StaleRow) => ({
+    const where = (r: DueRow) => ({
       key: r.readable_id,
       summary: r.summary,
       projectShort: r.short_name,
@@ -520,12 +489,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             closed: Number(r.closed),
           })),
         },
-        staleDays: STALE_DAYS,
-        stale: stale.rows.map((r) => ({
-          ...where(r),
-          stateName: r.state_name,
-          days: Number(r.days),
-        })),
       },
     });
   });

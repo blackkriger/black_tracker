@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // The work itself, counted: the shape of every board and every priority across the same
-// run of statuses, what is late, who carries what and for how long, how long a finished
-// issue took, and what nobody has touched in a fortnight. Every key opens its issue, so a
-// number is never a dead end.
+// run of statuses, what is late, who carries what and for how long, and how long a finished
+// issue took. Every key opens its issue, so a number is never a dead end.
 import { computed, onMounted, ref, watch } from 'vue';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
@@ -27,10 +26,6 @@ interface Where {
 interface Dated extends Where {
   day: string;
   assignee: string | null;
-}
-interface Stale extends Where {
-  stateName: string;
-  days: number;
 }
 interface Held extends Where {
   stateName: string;
@@ -73,9 +68,6 @@ interface Numbers {
     closed: number;
     months: { month: string; median: number | null; closed: number }[];
   };
-  stale: Stale[];
-  /** How long an open issue sits unchanged before it is counted here. */
-  staleDays: number;
 }
 
 const { projects, load: loadProjects } = useProjects();
@@ -468,35 +460,6 @@ async function openIssue(w: Where): Promise<void> {
             </div>
           </section>
 
-          <section class="panel">
-            <header class="panel__h">
-              Untouched
-              <span v-if="data" class="panel__end">Open, no change in {{ data.staleDays }}+ days</span>
-            </header>
-            <div class="panel__b nums nums--table">
-              <template v-if="loading">
-                <div v-for="w in [56, 44]" :key="w" class="line skel__line">
-                  <span class="sk sk--line" style="width: 46px"></span>
-                  <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
-                  <span class="sk sk--line" style="width: 28px"></span>
-                </div>
-              </template>
-              <button
-                v-for="s in data?.stale ?? []"
-                :key="s.key"
-                class="line"
-                type="button"
-                @click="openIssue(s)"
-              >
-                <span class="key" :style="{ color: s.color }">{{ s.key }}</span>
-                <span class="line__what">{{ s.summary }}</span>
-                <span class="stamp" :title="exact(s.days)">{{ days(s.days) }}</span>
-              </button>
-              <div v-if="!loading && !data?.stale.length" class="hint faint">
-                Everything has been looked at.
-              </div>
-            </div>
-          </section>
         </div>
 
         <div v-if="errors.numbers" class="err sheet__wide">{{ errors.numbers }}</div>
