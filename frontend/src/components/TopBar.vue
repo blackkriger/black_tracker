@@ -203,13 +203,15 @@ async function signOut(): Promise<void> {
           <span class="topitem__name">{{ p.name }}</span>
         </RouterLink>
 
-        <RouterLink
-          v-for="b in p.boards"
-          :key="b.id"
-          class="topitem topitem__board"
-          :class="{ 'is-here': p.shortName === currentShort && b.slug === board?.slug }"
-          :to="`/${p.shortName}/${b.slug}`"
-        >{{ b.name }}</RouterLink>
+        <span class="topboards" :class="{ 'is-one': p.boards.length < 2 }">
+          <RouterLink
+            v-for="b in p.boards"
+            :key="b.id"
+            class="topitem topitem__board"
+            :class="{ 'is-here': p.shortName === currentShort && b.slug === board?.slug }"
+            :to="`/${p.shortName}/${b.slug}`"
+          >{{ b.name }}</RouterLink>
+        </span>
       </span>
     </nav>
 
@@ -382,9 +384,22 @@ async function signOut(): Promise<void> {
   gap: 6px;
   padding: 0 6px;
 }
+/* The boards stand two to a column, the way the date stands over the countdown: the bar
+   keeps its height however many boards a project has, and each name is its own link. */
+.topboards {
+  display: grid;
+  grid-template-rows: repeat(2, 16px);
+  grid-auto-flow: column;
+  justify-items: start;
+  column-gap: 4px;
+}
+.topboards.is-one {
+  grid-template-rows: 32px;
+}
 .topitem__board {
+  height: 100%;
   padding: 0 6px;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 /* A board is not a project: it stands out in plain bright, the way the account links do. */
 .topitem__board.is-here {
