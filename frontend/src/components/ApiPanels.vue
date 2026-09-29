@@ -63,6 +63,8 @@ async function copyToken(): Promise<void> {
 }
 
 const BASE = 'https://tracker.example.com/api';
+const WHERE = `${BASE}
+Authorization: Bearer trk_…`;
 
 // The examples are written with the reader's own ids — an issue they hold, the board it
 // stands on and a status it is not in yet — so each one runs exactly as it is copied.
@@ -222,9 +224,13 @@ const CALLS: { verb: string; path: string; what: string }[] = [
       <header class="panel__h">Using it</header>
       <div class="panel__b form">
         <div class="field">
-          <span class="label">Where to send it</span>
-          <code class="api__line">{{ BASE }}</code>
-          <code class="api__line">Authorization: Bearer trk_…</code>
+          <div class="api__ex-h">
+            <span class="label">Where to send it</span>
+            <button class="btn btn--sm btn--ghost" type="button" @click="copyExample(-1, WHERE)">
+              {{ copiedAt === -1 ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
+          <pre class="api__code">{{ WHERE }}</pre>
         </div>
 
         <div class="field">
@@ -348,7 +354,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
 .api__what {
   color: var(--text-dim);
 }
-.api__line,
 .api__code {
   margin: 0;
   padding: 8px 10px;
@@ -358,9 +363,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   font: 12.5px/1.6 var(--font-mono);
   overflow-x: auto;
   white-space: pre;
-}
-.api__line {
-  display: block;
 }
 /* An example's name on the left, the way to take it on the right. */
 .api__ex-h {
