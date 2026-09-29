@@ -783,6 +783,17 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         found.auth.userId,
       ]);
     }
+    // A star is private, but the announcement says only whose it was: the one person it
+    // concerns reads their own list again, and everyone else has nothing to read.
+    void publish({
+      type: 'favourite.changed',
+      boardId: found.issue.board_id,
+      projectId: found.issue.project_id,
+      issueId: id,
+      issueKey: found.issue.readable_id,
+      by: found.auth.login,
+      origin: tabOf(req),
+    });
     return reply.send({ data: { favourite: parsed.data.favourite } });
   });
 

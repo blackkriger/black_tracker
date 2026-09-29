@@ -108,7 +108,14 @@ onMounted(async () => {
 });
 watch([project, status], () => void load());
 useLive((ev) => {
-  if (ev.type.startsWith('issue.') || ev.type.startsWith('state.')) void load();
+  if (
+    ev.type.startsWith('issue.') ||
+    ['state.changed', 'board.changed', 'project.changed', 'role.changed', 'user.changed'].includes(
+      ev.type
+    )
+  ) {
+    void load();
+  }
 });
 
 // ── the two stacks, both read against the same run of statuses ──

@@ -90,6 +90,14 @@ interface Starred {
 const starred = ref<Starred[]>([]);
 const starredLoading = ref(true);
 
+// A change made in a window opened from here comes back as this tab's own echo, which the
+// live channel drops; so whatever the window changed, everything this screen lists is re-read.
+function refresh(): void {
+  void load();
+  void loadMine();
+  void loadStarred();
+}
+
 async function loadStarred(): Promise<void> {
   try {
     starred.value = await api<Starred[]>('/my-favourites');
@@ -208,6 +216,7 @@ useLive((ev) => {
     void loadMine();
     void loadStarred();
   }
+  if (ev.type === 'favourite.changed' && ev.by === session.me.value?.login) void loadStarred();
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadNotices();
 });
 
@@ -436,20 +445,22 @@ function closeIssue(): void {
         <div class="stack">
           <section class="panel">
             <header class="panel__h">
-              <Star class="ic star" aria-label="Starred" />
+              <Star class="ic star" fill="currentColor" aria-label="Starred" />
               <span class="panel__end">{{ starredLoading ? '' : starred.length }}</span>
             </header>
-            <div class="panel__b days">
+            <div class="panel__b days days--starred">
               <template v-if="starredLoading">
-                <div v-for="w in [70, 52]" :key="w" class="day day--sk">
-                  <span class="sk sk--line" style="width: 46px"></span>
-                  <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
+                <div v-for="w in [70, 52]" :key="w" class="day day--one day--sk">
+                  <span class="day__what">
+                    <span class="sk sk--line" style="width: 46px"></span>
+                    <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
+                  </span>
                 </div>
               </template>
               <button
                 v-for="f in starred"
                 :key="f.key"
-                class="day"
+                class="day day--one"
                 type="button"
                 @click="openFromDay({ key: f.key, projectShort: f.projectShort, boardSlug: f.boardSlug })"
               >
@@ -544,7 +555,7 @@ function closeIssue(): void {
       v-if="picked"
       :day="picked"
       @close="picked = null"
-      @changed="load"
+      @changed="refresh"
       @open="openFromDay"
     />
 
@@ -558,7 +569,7 @@ function closeIssue(): void {
       :project="open.project"
       :focus-comment="open.comment"
       @close="open = null"
-      @changed="load"
+      @changed="refresh"
       @deleted="closeIssue"
       @moved="closeIssue"
       @tag-created="openTags = [...openTags, $event]"
@@ -707,6 +718,19 @@ function closeIssue(): void {
 /* The starred list is named by its star alone, in the colour a star wears when it is on. */
 .star {
   color: var(--accent);
+}
+/* The starred list is a shortcut, not a feed: one line a row, and never taller than the
+   feed under it — past five it scrolls in place. */
+.days--starred {
+  max-height: 176px;
+  overflow-y: auto;
+}
+.day--one {
+  padding: 4px 8px;
+}
+.day--one .day__what {
+  width: 100%;
+  align-items: center;
 }
 .marks {
   display: flex;
