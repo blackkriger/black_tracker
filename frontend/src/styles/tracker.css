@@ -2,8 +2,8 @@
    tracker.example.com — the whole visual system, one file.
    Palette "Slate": neutral near-black with a trace of cool, no frames, sans
    body. Kept from another project's family: gold as the single accent, square
-   swatches, radius 0 everywhere. Cinzel appears on the sign-in screen alone —
-   everywhere else the tracker speaks IBM Plex, not another project's canon.
+   swatches, radius 0 everywhere. The tracker speaks IBM Plex throughout, not
+   another project's canon.
    Class names map 1:1 to the Vue components under src/components.
    ========================================================================== */
 
@@ -35,7 +35,6 @@
   --font-ui: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
   --font-num: 'IBM Plex Mono', 'Consolas', monospace;     /* issue keys, counts, dates */
   --font-mono: 'IBM Plex Mono', 'Consolas', monospace;    /* code in markdown */
-  --font-display: 'Cinzel', 'Times New Roman', serif;     /* sign-in only */
   /* spacing (another project scale) */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-8: 48px;

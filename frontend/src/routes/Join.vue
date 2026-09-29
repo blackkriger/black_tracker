@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ApiError, api } from '../lib/api';
 import { useSession } from '../lib/session';
+import banner from '../assets/banner.png';
 
 const route = useRoute();
 const router = useRouter();
@@ -72,9 +73,7 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <div class="signin">
-    <div class="signin__mark">
-      <span class="signin__brand">TRACKER<span class="signin__cursor">_</span></span>
-    </div>
+    <img class="signin__banner" :src="banner" alt="" width="462" height="174" />
 
     <section class="panel signin__panel" aria-labelledby="join-title">
       <header id="join-title" class="panel__h">
@@ -152,29 +151,11 @@ async function onSubmit(): Promise<void> {
   gap: var(--space-6);
   padding: var(--space-5);
 }
-.signin__mark {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-}
-.signin__brand {
-  font: 700 34px/1 var(--font-display);
-  letter-spacing: 0.06em;
-  color: var(--accent);
-}
-.signin__cursor {
-  color: var(--text);
-  animation: cursor-blink 1.2s steps(2, end) infinite;
-}
-@keyframes cursor-blink {
-  0%,
-  60% {
-    opacity: 1;
-  }
-  61%,
-  100% {
-    opacity: 0;
-  }
+.signin__banner {
+  display: block;
+  width: 360px;
+  max-width: 100%;
+  height: auto;
 }
 .signin__panel {
   width: 360px;

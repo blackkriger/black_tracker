@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useSession } from '../lib/session';
+import banner from '../assets/banner.png';
 
 const login = ref('');
 const password = ref('');
@@ -33,9 +34,7 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <div class="signin">
-    <div class="signin__mark">
-      <span class="signin__brand">TRACKER<span class="signin__cursor">_</span></span>
-    </div>
+    <img class="signin__banner" :src="banner" alt="" width="462" height="174" />
 
     <section class="panel signin__panel" aria-labelledby="signin-title">
       <header class="panel__h" id="signin-title">Sign in</header>
@@ -74,30 +73,11 @@ async function onSubmit(): Promise<void> {
   gap: var(--space-6);
   padding: var(--space-5);
 }
-.signin__mark {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-}
-.signin__brand {
-  font: 700 34px/1 var(--font-display);
-  letter-spacing: 0.06em;
-  color: var(--accent);
-}
-/* The same cursor another project's header blinks: steps(2, end) so it snaps on and off rather than fading. */
-.signin__cursor {
-  color: var(--text);
-  animation: cursor-blink 1.2s steps(2, end) infinite;
-}
-@keyframes cursor-blink {
-  0%,
-  60% {
-    opacity: 1;
-  }
-  61%,
-  100% {
-    opacity: 0;
-  }
+.signin__banner {
+  display: block;
+  width: 360px;
+  max-width: 100%;
+  height: auto;
 }
 .signin__panel {
   width: 360px;
