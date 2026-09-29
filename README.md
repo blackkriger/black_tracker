@@ -1,6 +1,6 @@
-# tracker.example.com
+# tracker
 
-A small issue tracker with boards for our own projects. Private instance, no sign-up: an admin mints an invite link and whoever opens it picks their own login and password. Separate from another project in every way that matters — own database, own subdomain, own accounts — and related to it only by looks.
+A small issue tracker with boards for our own projects. Private instance, no sign-up: an admin mints an invite link and whoever opens it picks their own login and password.
 
 ## Stack
 
@@ -45,7 +45,7 @@ npm run dev               # 127.0.0.1:5174, proxies /api to 127.0.0.1:3100
 
 ## Server
 
-`server.example`. nginx terminates HTTPS for `tracker.example.com` and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The backend lives in `/opt/issues_tracker` and runs under PM2 as `tracker-api`. Postgres role and database `tracker`. Uploads land in `/var/lib/tracker/uploads`, 10 MB a file, served by the API behind the same board check as the issue they hang off.
+Until the move to its own Debian 13 server behind `tracker.example.com`, it runs on `server.example`, and the names below are that server's. nginx terminates HTTPS for `tracker.example.com` and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The backend lives in `/opt/issues_tracker` and runs under PM2 as `tracker-api`. Postgres role and database `tracker`. Uploads land in `/var/lib/tracker/uploads`, 10 MB a file, served by the API behind the same board check as the issue they hang off.
 
 `https://tracker.example.com/db/` is a **pgweb** on the tracker database (`pgweb-tracker.service`, `127.0.0.1:8082`) behind its own nginx basic auth — `/etc/nginx/htpasswd-tracker`, not another project's credentials. The tracker's own sign-in does not guard it.
 

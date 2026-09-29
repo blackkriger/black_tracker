@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy for tracker.example.com, the same shape as another project's one: build the SPA locally, ship dist to the nginx docroot, then on the server git pull + npm install + migrate + pm2 restart, and wait for /health.
+# Deploy for tracker: build the SPA locally, ship dist to the nginx docroot, then on the server git pull + npm install + migrate + pm2 restart, and wait for /health.
 #
 # Prerequisites:
 #  - Local: Node + npm, push rights on the repo.
