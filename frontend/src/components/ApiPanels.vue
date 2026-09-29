@@ -63,7 +63,7 @@ async function copyToken(): Promise<void> {
 }
 
 const BASE = 'https://tracker.example.com/api';
-const HEADER = 'Authorization: Bearer trk_…';
+const HEADER = '-H "Authorization: Bearer trk_…"';
 
 // The examples are written with the reader's own ids — an issue they hold, the board it
 // stands on and a status it is not in yet — so each one runs exactly as it is copied.
