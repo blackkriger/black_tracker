@@ -113,7 +113,7 @@ const examples = computed(() => {
   const key = s?.issueKey ?? 'PROJ-1';
   const list: { label: string; code: string; hint?: string }[] = [
     {
-      label: 'Your token, set once for the terminal',
+      label: 'Your token, set once per terminal session',
       code: `export TRACKER_TOKEN="${freshToken.value ?? 'trk_…'}"`,
     },
     { label: 'Your issues', code: `curl -s ${BASE}/my-issues \\\n  ${auth}` },
