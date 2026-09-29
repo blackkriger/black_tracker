@@ -14,6 +14,7 @@ import {
   type Cell,
   type DayInfo,
 } from '../lib/calendar';
+import { ink } from '../lib/theme';
 
 const props = defineProps<{
   year: number;
@@ -94,17 +95,17 @@ function onEnter(ev: MouseEvent, c: Cell): void {
         <AtSign
           v-if="markOf(c.key) === 'mention'"
           class="ic ic--sm cal__at"
-          :style="{ color: mine }"
+          :style="{ color: ink(mine) }"
         />
         <ContactRound
           v-else-if="markOf(c.key) === 'assigned'"
           class="ic ic--sm cal__at"
-          :style="{ color: mine }"
+          :style="{ color: ink(mine) }"
         />
         <Smile
           v-else-if="markOf(c.key) === 'reaction'"
           class="ic ic--sm cal__at"
-          :style="{ color: mine }"
+          :style="{ color: ink(mine) }"
         />
         <Bell v-else-if="markOf(c.key) === 'marked'" class="ic ic--sm cal__bell" />
         <span v-else>{{ c.day }}</span>
@@ -122,10 +123,10 @@ function onEnter(ev: MouseEvent, c: Cell): void {
         {{ m.title }}
       </span>
       <span v-for="d in hovered.dues" :key="d.key" class="cal__pop-due">
-        <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
+        <span class="key" :style="{ color: ink(d.color) }">{{ d.key }}</span>
         {{ d.summary }}
       </span>
-      <span v-if="hovered.said" class="cal__pop-at" :style="{ color: mine }">
+      <span v-if="hovered.said" class="cal__pop-at" :style="{ color: ink(mine) }">
         {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
       </span>
       <span v-if="hovered.worked" class="cal__pop-work">

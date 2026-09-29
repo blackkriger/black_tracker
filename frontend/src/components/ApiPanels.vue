@@ -253,7 +253,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   gap: 10px;
   padding: 14px 16px;
   border: 1px solid var(--line-2);
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg);
 }
 .token__can-h {
   color: var(--accent);
@@ -277,7 +277,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   margin-top: 3px;
 }
 .token__yes {
-  color: #8effa9;
+  color: var(--ok);
 }
 .token__no {
   color: var(--danger-text);

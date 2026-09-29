@@ -27,6 +27,7 @@ import {
 import { stamp } from '../lib/issues';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { ArrowRight, AtSign, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ink } from '../lib/theme';
 
 const props = defineProps<{
   /** The project this screen belongs to, when it belongs to one. */
@@ -228,7 +229,7 @@ async function signOut(): Promise<void> {
         >
           <span v-if="countdown" class="stamp topcount">{{ countdown }}</span>
           <span class="datechip__now">
-            <span v-if="unread" class="stamp topat" :style="{ color: mine }">
+            <span v-if="unread" class="stamp topat" :style="{ color: ink(mine) }">
               <AtSign class="ic ic--sm" />{{ unread }}
             </span>
             <span class="stamp">{{ today }}</span>
@@ -299,7 +300,7 @@ async function signOut(): Promise<void> {
               type="button"
               @click="openNotice(n)"
             >
-              <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
+              <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
               <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
               <span class="men__said">
                 <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
@@ -338,7 +339,7 @@ async function signOut(): Promise<void> {
 </template>
 
 <style scoped>
-/* Nothing in the bar takes a background: the text itself does the talking. It brightens on hover, turns gold on a project — the bright gold, a shade up from the key beside it — and red on the one action you would not want to hit by accident. */
+/* Nothing in the bar takes a background: the text itself does the talking. It brightens on hover, turns violet on a project — the bright violet, a shade up from the key beside it — and red on the one action you would not want to hit by accident. */
 .topitems {
   display: flex;
   align-items: center;

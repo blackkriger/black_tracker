@@ -7,8 +7,10 @@ import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { commentOrder, stamp, type CommentOrder } from '../lib/issues';
 import { setWrapLines, wrapLines } from '../lib/files';
+import { setTheme, theme, type Theme } from '../lib/theme';
 import { useNotices, type NoticeKind } from '../lib/notices';
 import { useSession, type Me } from '../lib/session';
+import { ink } from '../lib/theme';
 
 const session = useSession();
 const me = session.me;
@@ -41,6 +43,12 @@ const since = computed(() => stamp(me.value?.createdAt ?? null));
 const role = computed(() => me.value?.role ?? null);
 
 // ── what the tracker remembers about how you like to read it ──
+const THEMES: { value: Theme; label: string }[] = [
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+  { value: 'system', label: 'System' },
+];
+
 const order = ref<CommentOrder>(commentOrder.get());
 function setOrder(next: CommentOrder): void {
   order.value = next;
@@ -100,7 +108,7 @@ async function changePassword(): Promise<void> {
           <span class="av av--xl" :style="buddyAvatarStyle(me?.login ?? '')"></span>
           <div class="who__lines">
             <!-- The name and the login are both in the fields below, so this line carries the role; with no role it is the date alone. -->
-            <span v-if="role" class="who__role" :style="{ color: role.color }">{{ role.name }}</span>
+            <span v-if="role" class="who__role" :style="{ color: ink(role.color) }">{{ role.name }}</span>
             <span class="stamp">SINCE {{ since }}</span>
           </div>
         </div>
@@ -166,6 +174,13 @@ async function changePassword(): Promise<void> {
   <section class="panel">
     <header class="panel__h">Preferences</header>
     <div class="panel__b form">
+      <div class="field">
+        <span class="label">Theme</span>
+        <label v-for="t in THEMES" :key="t.value" class="flag">
+          <input type="radio" name="theme" :checked="theme === t.value" @change="setTheme(t.value)" />
+          {{ t.label }}
+        </label>
+      </div>
       <div class="field">
         <span class="label">Comments read</span>
         <label class="flag">

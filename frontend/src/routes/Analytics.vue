@@ -15,6 +15,7 @@ import { RIDGE_SMOOTH_KERNEL, smoothRidge } from '../lib/ridge';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { settled, useLive } from '../lib/live';
+import { ink } from '../lib/theme';
 
 interface Where {
   key: string;
@@ -322,7 +323,7 @@ async function openIssue(w: Where): Promise<void> {
                 type="button"
                 @click="openIssue(d)"
               >
-                <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
+                <span class="key" :style="{ color: ink(d.color) }">{{ d.key }}</span>
                 <span class="line__what">{{ d.summary }}</span>
                 <span
                   class="stamp"
@@ -381,7 +382,7 @@ async function openIssue(w: Where): Promise<void> {
                   <span class="who__name">
                     <ChevronDown v-if="openPeople.includes(p.login)" class="ic ic--sm" />
                     <ChevronRight v-else class="ic ic--sm" />
-                    <span :style="{ color: p.color ?? undefined }">{{ p.login }}</span>
+                    <span :style="{ color: ink(p.color) }">{{ p.login }}</span>
                   </span>
                   <span class="n">{{ p.open }}</span>
                   <span class="n" :class="{ 'is-late': p.late }">{{ p.late }}</span>
@@ -393,10 +394,10 @@ async function openIssue(w: Where): Promise<void> {
                   <template v-for="i in p.issues" :key="i.key">
                     <div class="held__row">
                       <button class="key held__key" type="button" @click="openIssue(i)">
-                        <span :style="{ color: i.color }">{{ i.key }}</span>
+                        <span :style="{ color: ink(i.color) }">{{ i.key }}</span>
                       </button>
                       <span class="held__what">{{ i.summary }}</span>
-                      <span class="stamp" :style="{ color: i.color }">{{ i.stateName }}</span>
+                      <span class="stamp" :style="{ color: ink(i.color) }">{{ i.stateName }}</span>
                       <button
                         class="held__days"
                         type="button"
@@ -423,7 +424,7 @@ async function openIssue(w: Where): Promise<void> {
                             class="hands__state"
                             :title="exact(st.days)"
                           >
-                            <span :style="{ color: st.color ?? undefined }">{{ st.name }}</span>
+                            <span :style="{ color: ink(st.color) }">{{ st.name }}</span>
                             {{ days(st.days) }}
                           </span>
                         </div>

@@ -17,6 +17,7 @@ import {
 import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { Plus, Search, Star } from 'lucide-vue-next';
+import { ink } from '../lib/theme';
 
 interface State {
   id: string;
@@ -483,7 +484,7 @@ watch(
                 <span
                   v-if="i.assignee"
                   class="card__who"
-                  :style="{ color: colorOf(i.assignee.login) }"
+                  :style="{ color: ink(colorOf(i.assignee.login)) }"
                 >{{ i.assignee.login }}</span>
                 <div class="sp"></div>
                 <span

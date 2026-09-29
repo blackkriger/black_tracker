@@ -4,6 +4,7 @@
 // The empty option is a label, not a choice — it is out of the list unless it is the way
 // back to no filter at all.
 import { computed, ref } from 'vue';
+import { ink } from '../lib/theme';
 
 export interface Choice {
   value: string;
@@ -44,7 +45,7 @@ function onChange(): void {
     class="input"
     :class="{ 'input--sm': small }"
     :value="modelValue"
-    :style="{ color: current?.color ?? undefined }"
+    :style="{ color: ink(current?.color) }"
     :disabled="disabled"
     :aria-label="label"
     @change="onChange"
@@ -58,7 +59,7 @@ function onChange(): void {
       v-for="o in options"
       :key="o.value"
       :value="o.value"
-      :style="{ color: o.color ?? undefined }"
+      :style="{ color: ink(o.color) }"
     >{{ o.label }}</option>
   </select>
 </template>

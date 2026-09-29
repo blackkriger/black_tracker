@@ -42,6 +42,7 @@ import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
 import { settled, useLive } from '../lib/live';
+import { ink } from '../lib/theme';
 
 const route = useRoute();
 const router = useRouter();
@@ -346,12 +347,12 @@ function closeIssue(): void {
                 type="button"
                 @click="openFromDay({ key: i.key, projectShort: i.projectShort, boardSlug: i.boardSlug })"
               >
-                <span class="key" :style="{ color: i.color }">{{ i.key }}</span>
+                <span class="key" :style="{ color: ink(i.color) }">{{ i.key }}</span>
                 <span class="mine__pri" :style="{ color: priorityColor(i.priority as Priority) }">
                   {{ i.priority }}
                 </span>
                 <span class="mine__what">{{ i.summary }}</span>
-                <span class="stamp" :style="{ color: i.color }">{{ i.stateName }}</span>
+                <span class="stamp" :style="{ color: ink(i.color) }">{{ i.stateName }}</span>
                 <span
                   class="stamp mine__due"
                   :class="{ 'is-late': i.due && i.due < today }"
@@ -472,7 +473,7 @@ function closeIssue(): void {
                 @click="openFromDay({ key: f.key, projectShort: f.projectShort, boardSlug: f.boardSlug })"
               >
                 <span class="day__what">
-                  <span class="key" :style="{ color: f.color }">{{ f.key }}</span>
+                  <span class="key" :style="{ color: ink(f.color) }">{{ f.key }}</span>
                   <span class="note__said">{{ f.summary }}</span>
                 </span>
               </button>
@@ -531,7 +532,7 @@ function closeIssue(): void {
               >
                 <span class="stamp">{{ stampAt(n.at) }}</span>
                 <span class="day__what">
-                  <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
+                  <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
                   <span v-if="n.emoji">{{ n.emoji }}</span>
                   <span class="note__said">
                     <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>

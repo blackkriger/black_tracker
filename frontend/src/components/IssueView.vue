@@ -49,6 +49,7 @@ import {
   type Priority,
   type Shot,
 } from '../lib/issues';
+import { ink } from '../lib/theme';
 
 interface State {
   id: string;
@@ -1294,7 +1295,7 @@ async function removeIssue(): Promise<void> {
                   :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
                   :title="`${l.summary} — ${l.stateName}`"
                 >
-                  <span class="key lk__key" :style="{ color: l.stateColor }">{{ l.key }}</span>
+                  <span class="key lk__key" :style="{ color: ink(l.stateColor) }">{{ l.key }}</span>
                 </RouterLink>
                 <span v-if="!shownLinks.length" class="hint faint">No links yet.</span>
                 <div class="sp"></div>
@@ -1427,7 +1428,7 @@ async function removeIssue(): Promise<void> {
                 <span class="av av--lg" :style="buddyAvatarStyle(c.author.login)"></span>
                 <div>
                   <div class="cm__head">
-                    <span class="cm__who" :style="{ color: colorOf(c.author.login) }">
+                    <span class="cm__who" :style="{ color: ink(colorOf(c.author.login)) }">
                       {{ c.author.login }}
                     </span>
                     <time class="stamp">{{ stampAt(c.createdAt) }}</time>
@@ -1620,7 +1621,7 @@ async function removeIssue(): Promise<void> {
             <div v-else-if="issue" class="hist">
               <div v-for="h in issue.history" :key="h.id" class="hi">
                 <time>{{ stampAt(h.at) }}</time>
-                <span class="hi__who" :style="{ color: colorOf(h.by) }">{{ h.by }}</span>
+                <span class="hi__who" :style="{ color: ink(colorOf(h.by)) }">{{ h.by }}</span>
                 <span class="hi__what">
                   <span class="hi__f">{{ h.field }}</span>
                   <!-- Nothing before it means there is nothing to point away from: the value stands alone. -->
@@ -1728,7 +1729,7 @@ async function removeIssue(): Promise<void> {
 
               <div class="prop">
                 <span class="prop__k">Author</span>
-                <span class="pv pv--ro" :style="{ color: colorOfId(issue.author?.id) }">
+                <span class="pv pv--ro" :style="{ color: ink(colorOfId(issue.author?.id)) }">
                   {{ issue.author?.login ?? '—' }}
                 </span>
               </div>
@@ -1771,7 +1772,7 @@ async function removeIssue(): Promise<void> {
           >
             <span class="key">{{ r.key }}</span>
             <span class="pick__sum">{{ r.summary }}</span>
-            <span class="pick__state" :style="{ color: r.stateColor }">{{ r.stateName }}</span>
+            <span class="pick__state" :style="{ color: ink(r.stateColor) }">{{ r.stateName }}</span>
           </button>
           <p v-if="searching" class="hint">Searching…</p>
           <p v-else-if="linkQuery.trim() && !linkResults.length" class="hint">Nothing found.</p>
@@ -2134,7 +2135,7 @@ async function removeIssue(): Promise<void> {
 .react:hover {
   color: var(--text);
 }
-/* Yours is the one written in gold; nothing is framed. */
+/* Yours is the one written in violet; nothing is framed. */
 .react.is-mine .react__n {
   color: var(--accent);
 }

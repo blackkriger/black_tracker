@@ -90,8 +90,8 @@ async function onSubmit(): Promise<void> {
 }
 .signin__err {
   padding: 10px 12px;
-  background: rgba(255, 80, 102, 0.08);
-  border: 1px solid rgba(255, 80, 102, 0.35);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
   color: var(--danger-text);
   font-size: 12.5px;
 }

@@ -3,6 +3,7 @@
 // text is drawn, so renaming a role recolours every comment that ever named it.
 import { usePeople } from './people';
 import { useRoles } from './roles';
+import { ink } from './theme';
 
 /** Every name that may follow an `@`, longest first so `@Game designer` wins over `@Game`. */
 export function knownNames(): { name: string; color: string | null }[] {
@@ -60,7 +61,7 @@ export function paintNames(html: string): string {
       parts.append(text.slice(at, i));
       const span = document.createElement('span');
       span.className = 'mention';
-      if (found.color) span.style.color = found.color;
+      if (found.color) span.style.color = ink(found.color) ?? '';
       span.textContent = `@${text.slice(i + 1, i + 1 + found.name.length)}`;
       parts.append(span);
       at = i + 1 + found.name.length;

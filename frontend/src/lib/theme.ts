@@ -1,0 +1,39 @@
+import { ref } from 'vue';
+
+export type Theme = 'dark' | 'light' | 'system';
+
+const KEY = 'tracker:theme';
+const THEMES: Theme[] = ['dark', 'light', 'system'];
+const prefersLight = window.matchMedia('(prefers-color-scheme: light)');
+
+function readTheme(): Theme {
+  try {
+    const saved = localStorage.getItem(KEY) as Theme | null;
+    return saved && THEMES.includes(saved) ? saved : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+export const theme = ref<Theme>(readTheme());
+export const shownTheme = ref<'dark' | 'light'>('dark');
+
+function applyTheme(): void {
+  const light = theme.value === 'light' || (theme.value === 'system' && prefersLight.matches);
+  shownTheme.value = light ? 'light' : 'dark';
+  document.documentElement.dataset.theme = shownTheme.value;
+}
+
+export function setTheme(next: Theme): void {
+  theme.value = next;
+  try {
+    localStorage.setItem(KEY, next);
+  } catch {}
+  applyTheme();
+}
+
+prefersLight.addEventListener('change', applyTheme);
+applyTheme();
+
+export const ink = (color: string | null | undefined): string | undefined =>
+  color ? `color-mix(in oklab, ${color}, #000 var(--ink-shade))` : undefined;

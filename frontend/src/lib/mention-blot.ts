@@ -3,6 +3,7 @@
 // reader's side paints the names again from the text itself.
 import Quill from 'quill';
 import { colorOfName } from './mentions';
+import { ink } from './theme';
 
 // Quill hands its blots back untyped; this is the shape the one below needs from it.
 const Inline = Quill.import('blots/inline') as {
@@ -19,7 +20,7 @@ class Mention extends Inline {
     const node = Inline.create(value);
     node.setAttribute('data-name', value);
     const color = colorOfName(value);
-    if (color) node.style.color = color;
+    if (color) node.style.color = ink(color) ?? '';
     return node;
   }
 

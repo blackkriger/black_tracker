@@ -11,6 +11,7 @@ import { dayOf, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
+import { ink } from '../lib/theme';
 
 const props = defineProps<{ day: string }>();
 const emit = defineEmits<{
@@ -118,7 +119,7 @@ async function openNotice(n: Notice): Promise<void> {
         type="button"
         @click="openNotice(n)"
       >
-        <span class="key" :style="{ color: n.color ?? undefined }">{{ n.key }}</span>
+        <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
         <span v-if="n.emoji">{{ n.emoji }}</span>
         <span class="mark__title">
           <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
@@ -169,7 +170,7 @@ async function openNotice(n: Notice): Promise<void> {
         type="button"
         @click="emit('open', { key: d.key, projectShort: d.projectShort, boardSlug: d.boardSlug })"
       >
-        <span class="key" :style="{ color: d.color }">{{ d.key }}</span>
+        <span class="key" :style="{ color: ink(d.color) }">{{ d.key }}</span>
         <span class="mark__title">{{ d.summary }}</span>
       </button>
     </div>

@@ -11,6 +11,7 @@ import { usePanelErrors } from '../../lib/panelErrors';
 import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
 import { GripVertical, X } from 'lucide-vue-next';
+import { ink } from '../../lib/theme';
 
 interface State {
   id: string;
@@ -377,7 +378,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
                   <input
                     class="input input--sm status-name"
                     :value="s.name"
-                    :style="{ color: s.color }"
+                    :style="{ color: ink(s.color) }"
                     maxlength="60"
                     @change="patchStatus(b, s, { name: ($event.target as HTMLInputElement).value })"
                   />

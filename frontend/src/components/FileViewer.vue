@@ -7,6 +7,7 @@ import { FileDown, WrapText, X } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
 import { api } from '../lib/api';
 import { langOf, setWrapLines, wrapLines as wrapped } from '../lib/files';
+import { shownTheme } from '../lib/theme';
 
 const props = defineProps<{ file: { id: string; name: string } | null }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
@@ -34,7 +35,17 @@ const frameSize = ref<{ width: number; height: number } | null>(null);
 
 function feedFrame(): void {
   if (!isDrawio.value || !frameReady.value || !text.value) return;
-  frame.value?.contentWindow?.postMessage({ type: 'drawio', xml: text.value }, '*');
+  const tokens = getComputedStyle(document.documentElement);
+  frame.value?.contentWindow?.postMessage(
+    {
+      type: 'drawio',
+      xml: text.value,
+      theme: shownTheme.value,
+      background: tokens.getPropertyValue('--surface').trim(),
+      highlight: tokens.getPropertyValue('--accent').trim(),
+    },
+    '*'
+  );
 }
 
 function onFrameMessage(ev: MessageEvent): void {
@@ -52,7 +63,7 @@ function onFrameMessage(ev: MessageEvent): void {
 }
 
 window.addEventListener('message', onFrameMessage);
-watch(text, feedFrame);
+watch([text, shownTheme], feedFrame);
 const lines = computed(() => (code.value ? byLines(code.value) : []));
 
 // The highlighter paints the file in one pass and a span may run over several lines, so the
@@ -376,25 +387,25 @@ onUnmounted(() => {
 .fv__page :deep(.hljs-tag),
 .fv__page :deep(.hljs-literal),
 .fv__page :deep(.hljs-type) {
-  color: #c98eff;
+  color: var(--code-keyword);
 }
 .fv__page :deep(.hljs-string),
 .fv__page :deep(.hljs-addition),
 .fv__page :deep(.hljs-regexp) {
-  color: #8effa9;
+  color: var(--code-string);
 }
 .fv__page :deep(.hljs-number),
 .fv__page :deep(.hljs-attr),
 .fv__page :deep(.hljs-attribute),
 .fv__page :deep(.hljs-property),
 .fv__page :deep(.hljs-variable) {
-  color: #6cdcff;
+  color: var(--code-number);
 }
 .fv__page :deep(.hljs-title),
 .fv__page :deep(.hljs-section),
 .fv__page :deep(.hljs-name),
 .fv__page :deep(.hljs-built_in) {
-  color: var(--accent);
+  color: var(--code-title);
 }
 .fv__page :deep(.hljs-comment),
 .fv__page :deep(.hljs-quote),

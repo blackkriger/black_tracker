@@ -12,6 +12,7 @@ import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
 import { useSession } from '../../lib/session';
 import { X } from 'lucide-vue-next';
+import { ink } from '../../lib/theme';
 
 interface Role {
   id: string;
@@ -370,7 +371,7 @@ async function saveAccess(): Promise<void> {
                 <input
                   class="input input--sm role-name"
                   :value="r.name"
-                  :style="{ color: r.color }"
+                  :style="{ color: ink(r.color) }"
                   maxlength="40"
                   :readonly="!isAdmin"
                   :tabindex="isAdmin ? undefined : -1"

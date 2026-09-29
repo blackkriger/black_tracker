@@ -20,6 +20,7 @@ import {
   Quote,
   Strikethrough,
 } from 'lucide-vue-next';
+import { ink } from '../lib/theme';
 
 const body = defineModel<string>({ required: true });
 const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?: boolean }>();
@@ -407,7 +408,7 @@ function addLink(): void {
           type="button"
           @mousedown.prevent="pickName(n.label)"
         >
-          <span :style="{ color: n.color ?? undefined }">{{ n.label }}</span>
+          <span :style="{ color: ink(n.color) }">{{ n.label }}</span>
           <span v-if="n.hint" class="rt__full">{{ n.hint }}</span>
           <ChevronLeft class="ic ic--sm rt__at" :class="{ 'is-off': i !== chosen }" />
         </button>

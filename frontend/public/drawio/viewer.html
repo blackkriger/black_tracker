@@ -14,8 +14,6 @@
       body {
         height: 100%;
         margin: 0;
-        background: #141618;
-        color-scheme: dark;
       }
     </style>
   </head>
@@ -59,6 +57,9 @@
       window.addEventListener('message', function (ev) {
         var data = ev.data;
         if (!data || data.type !== 'drawio' || typeof data.xml !== 'string') return;
+        var light = data.theme === 'light';
+        document.documentElement.style.colorScheme = light ? 'light' : 'dark';
+        document.body.style.background = String(data.background || '');
         var host = document.getElementById('graph');
         host.innerHTML = '';
         var el = document.createElement('div');
@@ -67,7 +68,7 @@
           'data-mxgraph',
           JSON.stringify({
             xml: data.xml,
-            highlight: '#e8c267',
+            highlight: String(data.highlight || ''),
             nav: true,
             resize: true,
             center: true,
@@ -76,7 +77,7 @@
             toolbar: 'pages zoom layers',
             'toolbar-position': 'top',
             'toolbar-nohide': true,
-            'dark-mode': 'dark',
+            'dark-mode': light ? 'light' : 'dark',
           })
         );
         host.appendChild(el);
