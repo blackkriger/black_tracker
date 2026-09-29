@@ -31,7 +31,8 @@ const INLINE_TYPES = new Set([
 // What the reader may open. A file listed here is still never served as a document: its
 // bytes come back as a string in a JSON body, so nothing in it is ever parsed by the browser.
 const READABLE = new Set([
-  'bat', 'c', 'cfg', 'cmd', 'conf', 'cpp', 'cs', 'css', 'csv', 'diff', 'env', 'gd', 'go',
+  'bat', 'c', 'cfg', 'cmd', 'conf', 'cpp', 'cs', 'css', 'csv', 'dio', 'diff', 'drawio', 'env',
+  'gd', 'go',
   'godot', 'gradle', 'h', 'hpp', 'htm', 'html', 'import', 'ini', 'java', 'js', 'json',
   'jsx', 'kt', 'less', 'log', 'lua', 'md', 'patch', 'php', 'pl', 'properties', 'ps1',
   'py', 'rb', 'rs', 'scss', 'sh', 'sql', 'svg', 'swift', 'toml', 'tres', 'ts', 'tscn',

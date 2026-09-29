@@ -21,6 +21,27 @@ const code = ref('');
 
 const lang = computed(() => (props.file ? langOf(props.file.name) : 'plaintext'));
 const isMd = computed(() => lang.value === 'markdown');
+const isDrawio = computed(() => lang.value === 'drawio');
+
+// A diagram is drawn by draw.io's own viewer, in a frame sandboxed without an origin of its
+// own: its code can reach neither the session nor this page. It says when it is listening,
+// and the text is handed over then — whichever of the two arrives second sends it.
+const frame = ref<HTMLIFrameElement | null>(null);
+const frameReady = ref(false);
+
+function feedFrame(): void {
+  if (!isDrawio.value || !frameReady.value || !text.value) return;
+  frame.value?.contentWindow?.postMessage({ type: 'drawio', xml: text.value }, '*');
+}
+
+function onFrameMessage(ev: MessageEvent): void {
+  if (ev.source !== frame.value?.contentWindow || ev.data?.type !== 'drawio-ready') return;
+  frameReady.value = true;
+  feedFrame();
+}
+
+window.addEventListener('message', onFrameMessage);
+watch(text, feedFrame);
 const lines = computed(() => (code.value ? byLines(code.value) : []));
 
 // The highlighter paints the file in one pass and a span may run over several lines, so the
@@ -58,6 +79,7 @@ async function colour(src: string, language: string): Promise<string> {
 }
 
 async function paint(): Promise<void> {
+  if (isDrawio.value) return;
   if (isMd.value) {
     const { marked } = await import('marked');
     const doc = new DOMParser().parseFromString(
@@ -86,6 +108,7 @@ async function read(): Promise<void> {
   text.value = '';
   marked_.value = '';
   code.value = '';
+  frameReady.value = false;
   try {
     const got = await api<{ text: string; truncated: boolean }>(`/attachments/${file.id}/text`);
     if (props.file?.id !== file.id) return;
@@ -128,7 +151,10 @@ watch(
     }
   }
 );
-onUnmounted(() => window.removeEventListener('keydown', onKey, true));
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey, true);
+  window.removeEventListener('message', onFrameMessage);
+});
 </script>
 
 <template>
@@ -138,6 +164,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
         <div v-if="loading" class="fv__said">Reading…</div>
         <div v-else-if="error" class="err fv__said">{{ error }}</div>
         <div v-else-if="isMd" class="md fv__md" v-html="marked_"></div>
+        <iframe
+          v-else-if="isDrawio"
+          :key="file.id"
+          ref="frame"
+          class="fv__drawio"
+          src="/drawio/viewer.html"
+          sandbox="allow-scripts"
+          title="Diagram"
+        ></iframe>
         <div v-else class="fv__code" :class="{ 'is-folded': wrapped }">
           <template v-for="(line, i) in lines" :key="i">
             <span class="fv__num" aria-hidden="true">{{ i + 1 }}</span>
@@ -153,7 +188,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
         <span class="iviewer__name">{{ file.name }}</span>
         <div class="iviewer__nav">
           <button
-            v-if="!isMd && !loading && !error"
+            v-if="!isMd && !isDrawio && !loading && !error"
             class="btn btn--sm"
             type="button"
             :aria-pressed="wrapped"
@@ -251,6 +286,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 }
 .fv__md {
   color: var(--text);
+}
+/* A diagram takes the whole page: it is drawn on the white it was drawn on, whatever the theme. */
+.fv__drawio {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
 }
 /* A document carries more than a comment ever does: .md draws the rest, these are the parts
    Quill has no button for. */

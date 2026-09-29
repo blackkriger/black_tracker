@@ -1,0 +1,86 @@
+<!doctype html>
+<!--
+  The draw.io reader. It is opened inside a frame sandboxed without allow-same-origin, so
+  although it is served from the tracker's own domain it runs with an opaque origin: the
+  diagram's code cannot reach the session or the page around it. The diagram arrives as
+  text by postMessage from the tracker, never by a request of its own.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Diagram</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="graph"></div>
+    <script>
+      // With no origin of its own the frame has no storage, and reading it throws; the
+      // viewer only keeps settings there, so a store that forgets is enough.
+      ['localStorage', 'sessionStorage'].forEach(function (name) {
+        try {
+          window[name].length;
+        } catch (e) {
+          var kept = {};
+          Object.defineProperty(window, name, {
+            value: {
+              getItem: function (k) {
+                return k in kept ? kept[k] : null;
+              },
+              setItem: function (k, v) {
+                kept[k] = String(v);
+              },
+              removeItem: function (k) {
+                delete kept[k];
+              },
+              clear: function () {
+                kept = {};
+              },
+              key: function (i) {
+                return Object.keys(kept)[i] || null;
+              },
+              get length() {
+                return Object.keys(kept).length;
+              },
+            },
+          });
+        }
+      });
+    </script>
+    <script src="viewer-static.min.js"></script>
+    <script>
+      window.addEventListener('message', function (ev) {
+        var data = ev.data;
+        if (!data || data.type !== 'drawio' || typeof data.xml !== 'string') return;
+        var host = document.getElementById('graph');
+        host.innerHTML = '';
+        var el = document.createElement('div');
+        el.className = 'mxgraph';
+        el.setAttribute(
+          'data-mxgraph',
+          JSON.stringify({
+            xml: data.xml,
+            highlight: '#e8c267',
+            nav: true,
+            resize: true,
+            center: true,
+            border: 24,
+            lightbox: false,
+            toolbar: 'pages zoom layers',
+            'toolbar-position': 'top',
+            'toolbar-nohide': true,
+          })
+        );
+        host.appendChild(el);
+        GraphViewer.processElements();
+      });
+      parent.postMessage({ type: 'drawio-ready' }, '*');
+    </script>
+  </body>
+</html>

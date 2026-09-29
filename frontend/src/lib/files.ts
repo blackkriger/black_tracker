@@ -14,6 +14,8 @@ const READS: Record<string, string> = {
   css: 'css',
   csv: 'plaintext',
   diff: 'diff',
+  dio: 'drawio',
+  drawio: 'drawio',
   env: 'ini',
   gd: 'python',
   go: 'go',
