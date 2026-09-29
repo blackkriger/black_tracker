@@ -74,7 +74,7 @@ interface Numbers {
 
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
-const { nameOf } = usePeople();
+const { nameOf, load: loadPeople } = usePeople();
 
 const project = ref('');
 const status = ref('');
@@ -114,6 +114,7 @@ async function load(): Promise<void> {
 }
 
 onMounted(async () => {
+  void loadPeople();
   await Promise.all([loadProjects(), load()]);
 });
 watch([project, status], () => void load());

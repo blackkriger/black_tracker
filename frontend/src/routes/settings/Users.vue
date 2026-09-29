@@ -57,7 +57,7 @@ const roles = ref<Role[]>([]);
 const removingRole = ref<Role | null>(null);
 const loading = ref(true);
 const { errors, fail, clear } = usePanelErrors();
-const { nameOf } = usePeople();
+const { nameOf, load: loadPeople } = usePeople();
 
 const inviteRole = ref('');
 // A role is picked by its name in its own colour, the same way it is shown everywhere else.
@@ -91,6 +91,7 @@ const projectDenied = (id: string) => deniedProjects.value.includes(id);
 const boardDenied = (id: string) => deniedBoards.value.includes(id);
 
 onMounted(async () => {
+  void loadPeople();
   await loadProjects();
   await Promise.all([
     api<User[]>('/users')
