@@ -108,7 +108,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   { verb: 'GET', path: '/projects', what: 'Every project open to you, with its boards' },
   { verb: 'GET', path: '/boards/:boardId', what: 'One board with its statuses and their uuids' },
   { verb: 'GET', path: '/boards/:boardId/issues', what: 'The tasks on one board' },
-  { verb: 'GET', path: '/issues/:key', what: 'One issue whole — PROJ-4, not its uuid' },
+  { verb: 'GET', path: '/issues/:key', what: 'One issue whole, not its uuid' },
   { verb: 'GET', path: '/issues/search?q=text', what: 'Issues whose summary carries the text' },
   { verb: 'POST', path: '/boards/:boardId/issues', what: 'Write a new issue onto that board' },
   { verb: 'PATCH', path: '/issues/:id', what: 'Change status, priority, assignee, due date, tags' },
@@ -189,7 +189,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
           </div>
           <span class="hint">
             Every answer is <code>{ data }</code> or <code>{ error }</code>, and a board you
-            cannot open answers 403
+            cannot open answers 403, as it should
           </span>
         </div>
 
