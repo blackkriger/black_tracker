@@ -316,7 +316,7 @@ async function signOut(): Promise<void> {
           </button>
         </div>
       </span>
-      <RouterLink class="topitem" :to="{ name: 'home', query: { calendar: 'full' } }">
+      <RouterLink class="topitem" :to="{ name: 'home' }">
         <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
         {{ session.me.value?.login }}
       </RouterLink>
