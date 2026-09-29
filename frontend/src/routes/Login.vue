@@ -75,7 +75,7 @@ async function onSubmit(): Promise<void> {
 }
 .signin__banner {
   display: block;
-  width: 360px;
+  width: 462px;
   max-width: 100%;
   height: auto;
 }
