@@ -44,10 +44,10 @@ useLive((ev) => {
         <div class="side__h">Projects</div>
         <span v-for="n in loaded ? 0 : 3" :key="n" class="sk sk--row side__sk"></span>
         <RouterLink v-for="p in live" :key="p.id" :to="`/settings/${p.shortName}`">
-          {{ p.shortName }} {{ p.name }}
+          <span><span class="proj__k">{{ p.shortName }}</span> {{ p.name }}</span>
         </RouterLink>
         <RouterLink v-for="p in archived" :key="p.id" :to="`/settings/${p.shortName}`">
-          {{ p.shortName }} {{ p.name }} (archived)
+          <span><span class="proj__k">{{ p.shortName }}</span> {{ p.name }} (archived)</span>
         </RouterLink>
         <RouterLink to="/settings/new">New project…</RouterLink>
 
@@ -73,6 +73,9 @@ useLive((ev) => {
 </template>
 
 <style scoped>
+.side .proj__k {
+  font-size: 13px;
+}
 /* The links sit at 32px with a 2px gap; the placeholders stand in the same rhythm. */
 .side__sk {
   margin: 0 10px;
