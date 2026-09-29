@@ -63,8 +63,7 @@ async function copyToken(): Promise<void> {
 }
 
 const BASE = 'https://tracker.example.com/api';
-const WHERE = `${BASE}
-Authorization: Bearer trk_…`;
+const HEADER = 'Authorization: Bearer trk_…';
 
 // The examples are written with the reader's own ids — an issue they hold, the board it
 // stands on and a status it is not in yet — so each one runs exactly as it is copied.
@@ -226,11 +225,11 @@ const CALLS: { verb: string; path: string; what: string }[] = [
         <div class="field">
           <div class="api__ex-h">
             <span class="label">Where to send it</span>
-            <button class="btn btn--sm btn--ghost" type="button" @click="copyExample(-1, WHERE)">
+            <button class="btn btn--sm btn--ghost" type="button" @click="copyExample(-1, BASE)">
               {{ copiedAt === -1 ? 'Copied' : 'Copy' }}
             </button>
           </div>
-          <pre class="api__code">{{ WHERE }}</pre>
+          <pre class="api__code">{{ BASE }}</pre>
         </div>
 
         <div class="field">
@@ -246,6 +245,16 @@ const CALLS: { verb: string; path: string; what: string }[] = [
             Every answer is <code>{ data }</code> or <code>{ error }</code>, and a board you
             cannot open answers 403 rather than pretending to be empty.
           </span>
+        </div>
+
+        <div class="field">
+          <div class="api__ex-h">
+            <span class="label">Authorization header</span>
+            <button class="btn btn--sm btn--ghost" type="button" @click="copyExample(-2, HEADER)">
+              {{ copiedAt === -2 ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
+          <pre class="api__code">{{ HEADER }}</pre>
         </div>
 
         <div v-for="(ex, i) in examples" :key="ex.label" class="field">
