@@ -74,6 +74,8 @@ interface Numbers {
     months: { month: string; median: number | null; closed: number }[];
   };
   stale: Stale[];
+  /** How long an open issue sits unchanged before it is counted here. */
+  staleDays: number;
 }
 
 const { projects, load: loadProjects } = useProjects();
@@ -180,6 +182,19 @@ function days(n: number | null): string {
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
   if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
   return `${Math.round(n * 10) / 10}d`;
+}
+
+/** The whole of a duration down to the second, for the hover over its rounded figure. */
+function exact(n: number | null): string | undefined {
+  if (n === null) return undefined;
+  let rest = Math.round(n * 86400);
+  const parts: string[] = [];
+  for (const [unit, size] of [['d', 86400], ['h', 3600], ['m', 60], ['s', 1]] as const) {
+    const whole = Math.floor(rest / size);
+    rest -= whole * size;
+    if (whole || (unit === 's' && !parts.length)) parts.push(`${whole}${unit}`);
+  }
+  return parts.join(' ');
 }
 const monthLabel = (month: string): string => {
   const [y, m] = month.split('-').map(Number);
@@ -364,7 +379,7 @@ async function openIssue(w: Where): Promise<void> {
                   <span class="n">{{ p.open }}</span>
                   <span class="n" :class="{ 'is-late': p.late }">{{ p.late }}</span>
                   <span class="n">{{ p.closed }}</span>
-                  <span class="n">{{ days(p.held) }}</span>
+                  <span class="n" :title="exact(p.held)">{{ days(p.held) }}</span>
                 </button>
                 <div v-if="openPeople.includes(p.login)" class="held">
                   <div v-if="!p.issues.length" class="hint faint">Holding nothing.</div>
@@ -375,7 +390,12 @@ async function openIssue(w: Where): Promise<void> {
                       </button>
                       <span class="held__what">{{ i.summary }}</span>
                       <span class="stamp" :style="{ color: i.color }">{{ i.stateName }}</span>
-                      <button class="held__days" type="button" @click="toggleIssue(i.key)">
+                      <button
+                        class="held__days"
+                        type="button"
+                        :title="exact(i.days)"
+                        @click="toggleIssue(i.key)"
+                      >
                         <Clock class="ic ic--sm" />
                         {{ days(i.days) }}
                       </button>
@@ -386,11 +406,16 @@ async function openIssue(w: Where): Promise<void> {
                       <template v-for="(h, n) in [...i.hands].reverse()" :key="n">
                         <div class="hands__row">
                           <span :class="{ faint: !h.login }">{{ h.login ?? 'Nobody' }}</span>
-                          <span class="n">{{ days(h.days) }}</span>
+                          <span class="n" :title="exact(h.days)">{{ days(h.days) }}</span>
                           <span class="stamp">{{ h.current ? 'still' : '' }}</span>
                         </div>
                         <div v-if="!h.current && h.states.length" class="hands__states">
-                          <span v-for="st in [...h.states].reverse()" :key="st.name" class="hands__state">
+                          <span
+                            v-for="st in [...h.states].reverse()"
+                            :key="st.name"
+                            class="hands__state"
+                            :title="exact(st.days)"
+                          >
                             <span :style="{ color: st.color ?? undefined }">{{ st.name }}</span>
                             {{ days(st.days) }}
                           </span>
@@ -424,7 +449,9 @@ async function openIssue(w: Where): Promise<void> {
                   <span class="sk sk--line" style="width: 36px"></span>
                 </div>
               </template>
-              <div v-else class="big">{{ days(data?.cycle.median ?? null) }}</div>
+              <div v-else class="big" :title="exact(data?.cycle.median ?? null)">
+                {{ days(data?.cycle.median ?? null) }}
+              </div>
               <div v-for="m in data?.cycle.months ?? []" :key="m.month" class="pri">
                 <span class="pri__name">{{ monthLabel(m.month) }}</span>
                 <span class="bar">
@@ -433,7 +460,7 @@ async function openIssue(w: Where): Promise<void> {
                     :style="{ width: `${((m.median ?? 0) / longestMonth) * 100}%` }"
                   ></span>
                 </span>
-                <span class="n">{{ days(m.median) }}</span>
+                <span class="n" :title="exact(m.median)">{{ days(m.median) }}</span>
               </div>
               <div v-if="!loading && !data?.cycle.closed" class="hint faint">
                 Nothing has been closed yet.
@@ -442,7 +469,10 @@ async function openIssue(w: Where): Promise<void> {
           </section>
 
           <section class="panel">
-            <header class="panel__h">Untouched</header>
+            <header class="panel__h">
+              Untouched
+              <span v-if="data" class="panel__end">Open, no change in {{ data.staleDays }}+ days</span>
+            </header>
             <div class="panel__b nums nums--table">
               <template v-if="loading">
                 <div v-for="w in [56, 44]" :key="w" class="line skel__line">
@@ -460,7 +490,7 @@ async function openIssue(w: Where): Promise<void> {
               >
                 <span class="key" :style="{ color: s.color }">{{ s.key }}</span>
                 <span class="line__what">{{ s.summary }}</span>
-                <span class="stamp">{{ s.days }}d</span>
+                <span class="stamp" :title="exact(s.days)">{{ days(s.days) }}</span>
               </button>
               <div v-if="!loading && !data?.stale.length" class="hint faint">
                 Everything has been looked at.

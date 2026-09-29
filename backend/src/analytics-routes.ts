@@ -216,6 +216,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           priorities: [],
           cycle: { median: null, closed: 0, months: [] },
           stale: [],
+          staleDays: STALE_DAYS,
         },
       });
     }
@@ -367,7 +368,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       ),
       pool.query<StaleRow>(
         `select i.readable_id, i.summary, p.short_name, b.slug, s.name as state_name, s.color,
-                floor(extract(epoch from (now() - i.updated_at)) / 86400) as days
+                extract(epoch from (now() - i.updated_at)) / 86400 as days
            from issues i
            join projects p on p.id = i.project_id
            join boards b on b.id = i.board_id
@@ -519,6 +520,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             closed: Number(r.closed),
           })),
         },
+        staleDays: STALE_DAYS,
         stale: stale.rows.map((r) => ({
           ...where(r),
           stateName: r.state_name,
