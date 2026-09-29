@@ -1476,7 +1476,7 @@ async function removeIssue(): Promise<void> {
                       >Delete</button>
                     </span>
                   </div>
-                  <span v-if="nameOf(c.author.login) !== c.author.login" class="cm__login">
+                  <span v-if="nameOf(c.author.login) !== c.author.login" class="nick">
                     {{ c.author.login }}
                   </span>
                   <template v-if="editingComment === c.id">
@@ -1732,8 +1732,16 @@ async function removeIssue(): Promise<void> {
 
               <div class="prop">
                 <span class="prop__k">Author</span>
-                <span class="pv pv--ro" :style="{ color: ink(colorOfId(issue.author?.id)) }">
-                  {{ issue.author ? nameOf(issue.author.login) : '—' }}
+                <span class="pv pv--ro">
+                  <span>
+                    <span :style="{ color: ink(colorOfId(issue.author?.id)) }">
+                      {{ issue.author ? nameOf(issue.author.login) : '—' }}
+                    </span>
+                    <span
+                      v-if="issue.author && nameOf(issue.author.login) !== issue.author.login"
+                      class="nick"
+                    >{{ issue.author.login }}</span>
+                  </span>
                 </span>
               </div>
               <div class="prop">
