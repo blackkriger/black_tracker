@@ -174,33 +174,35 @@ async function changePassword(): Promise<void> {
   <section class="panel">
     <header class="panel__h">Preferences</header>
     <div class="panel__b form">
-      <div class="field">
-        <span class="label">Theme</span>
-        <label v-for="t in THEMES" :key="t.value" class="flag">
-          <input type="radio" name="theme" :checked="theme === t.value" @change="setTheme(t.value)" />
-          {{ t.label }}
-        </label>
-      </div>
-      <div class="field">
-        <span class="label">Comments read</span>
-        <label class="flag">
-          <input
-            type="radio"
-            name="comment-order"
-            :checked="order === 'oldest'"
-            @change="setOrder('oldest')"
-          />
-          Oldest first
-        </label>
-        <label class="flag">
-          <input
-            type="radio"
-            name="comment-order"
-            :checked="order === 'newest'"
-            @change="setOrder('newest')"
-          />
-          Newest first
-        </label>
+      <div class="pairs">
+        <div class="field">
+          <span class="label">Theme</span>
+          <label v-for="t in THEMES" :key="t.value" class="flag">
+            <input type="radio" name="theme" :checked="theme === t.value" @change="setTheme(t.value)" />
+            {{ t.label }}
+          </label>
+        </div>
+        <div class="field">
+          <span class="label">Comments read</span>
+          <label class="flag">
+            <input
+              type="radio"
+              name="comment-order"
+              :checked="order === 'oldest'"
+              @change="setOrder('oldest')"
+            />
+            Oldest first
+          </label>
+          <label class="flag">
+            <input
+              type="radio"
+              name="comment-order"
+              :checked="order === 'newest'"
+              @change="setOrder('newest')"
+            />
+            Newest first
+          </label>
+        </div>
       </div>
       <div class="pairs">
         <div class="field">
