@@ -1,16 +1,14 @@
 <script setup lang="ts">
 // The account's other half: the token scripts and agents speak with, and what they may say
 // with it. Every call made with the token is recorded as the person who minted it.
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { Check, X } from 'lucide-vue-next';
 import { api } from '../lib/api';
 import { stamp } from '../lib/issues';
-import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
 
 const session = useSession();
 const me = session.me;
-const { projects } = useProjects();
 
 const tokenBusy = ref(false);
 // Held only until the page is left: the server keeps a hash, so this is the one moment the value exists anywhere readable.
@@ -65,53 +63,12 @@ async function copyToken(): Promise<void> {
 const BASE = 'https://tracker.example.com/api';
 const HEADER = '-H "Authorization: Bearer trk_…"';
 
-// The examples are written with the reader's own ids — an issue they hold, the board it
-// stands on and a status it is not in yet — so each one runs exactly as it is copied.
-interface Sample {
-  boardId: string;
-  boardName: string;
-  issueId: string | null;
-  issueKey: string | null;
-  stateId: string | null;
-  stateName: string | null;
-}
-const sample = ref<Sample | null>(null);
-
-type IssueHead = { id: string; key: string; boardId: string; stateId: string };
-
-async function loadSample(): Promise<void> {
-  const first = projects.value.find((p) => !p.archived)?.boards[0];
-  if (sample.value || !first) return;
-  try {
-    const mine = await api<{ key: string }[]>('/my-issues');
-    const issue: IssueHead | undefined = mine.length
-      ? await api<IssueHead>(`/issues/${mine[0].key}`)
-      : (await api<IssueHead[]>(`/boards/${first.id}/issues`))[0];
-    const board = await api<{ id: string; name: string; states: { id: string; name: string }[] }>(
-      `/boards/${issue?.boardId ?? first.id}`
-    );
-    const next = board.states.find((st) => st.id !== issue?.stateId) ?? null;
-    sample.value = {
-      boardId: board.id,
-      boardName: board.name,
-      issueId: issue?.id ?? null,
-      issueKey: issue?.key ?? null,
-      stateId: next?.id ?? null,
-      stateName: next?.name ?? null,
-    };
-  } catch {
-    // Without the ids the examples keep their placeholders; the page itself does not depend on them.
-  }
-}
-watch(projects, () => void loadSample(), { immediate: true });
-
+// The examples name what the reader fills in, in capitals, rather than borrowing one of
+// their own ids: a real key or uuid reads as part of the call when it is only a stand-in.
 const examples = computed(() => {
-  const s = sample.value;
   const auth = '-H "Authorization: Bearer $TRACKER_TOKEN"';
   const json = '-H "Content-Type: application/json"';
-  const board = s?.boardId ?? '<board-uuid>';
-  const key = s?.issueKey ?? 'PROJ-1';
-  const list: { label: string; code: string; hint?: string }[] = [
+  return [
     {
       label: 'Your token, set once per terminal session',
       code: `export TRACKER_TOKEN="${freshToken.value ?? 'trk_…'}"`,
@@ -119,22 +76,19 @@ const examples = computed(() => {
     { label: 'Your issues', code: `curl -s ${BASE}/my-issues \\\n  ${auth}` },
     { label: 'One issue by its key', code: `curl -s ${BASE}/issues/ISSUE-KEY \\\n  ${auth}` },
     {
-      label: `The ${s?.boardName ?? ''} board and its statuses`.replace('  ', ' '),
-      code: `curl -s ${BASE}/boards/${board} \\\n  ${auth}`,
+      label: 'A board and its statuses',
+      code: `curl -s ${BASE}/boards/BOARD-UUID \\\n  ${auth}`,
     },
     {
       label: 'Writing an issue',
-      code: `curl -s -X POST ${BASE}/boards/${board}/issues \\\n  ${auth} \\\n  ${json} \\\n  -d '{"summary":"Written from the API","priority":"Minor"}'`,
-      hint: 'Everything but the summary is optional; with no status named, the issue lands in the board\'s default one.',
+      code: `curl -s -X POST ${BASE}/boards/BOARD-UUID/issues \\\n  ${auth} \\\n  ${json} \\\n  -d '{"summary":"Written from the API","priority":"Minor"}'`,
+      hint: "Everything but the summary is optional; with no status named, the issue lands in the board's default one.",
     },
-  ];
-  if (s?.issueId && s.stateId) {
-    list.push({
-      label: `Moving ${key} to ${s.stateName}`,
-      code: `curl -s -X PATCH ${BASE}/issues/${s.issueId} \\\n  ${auth} \\\n  ${json} \\\n  -d '{"stateId":"${s.stateId}"}'`,
-    });
-  }
-  return list;
+    {
+      label: 'Moving an issue to another status',
+      code: `curl -s -X PATCH ${BASE}/issues/ISSUE-UUID \\\n  ${auth} \\\n  ${json} \\\n  -d '{"stateId":"STATE-UUID"}'`,
+    },
+  ] as { label: string; code: string; hint?: string }[];
 });
 
 const copiedAt = ref<number | null>(null);
