@@ -1,20 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useSession } from './lib/session';
 import Login from './routes/Login.vue';
-import Board from './routes/Board.vue';
-import Profile from './routes/Profile.vue';
-import NotFound from './routes/NotFound.vue';
-import SettingsIndex from './routes/settings/Index.vue';
-import SettingsProfile from './routes/settings/Profile.vue';
-import SettingsApi from './routes/settings/Api.vue';
-import SettingsProject from './routes/settings/Project.vue';
-import SettingsNewProject from './routes/settings/NewProject.vue';
-import SettingsTags from './routes/settings/Tags.vue';
-import SettingsUsers from './routes/settings/Users.vue';
-import Join from './routes/Join.vue';
 import Home from './routes/Home.vue';
-import Dashboard from './routes/Dashboard.vue';
-import Analytics from './routes/Analytics.vue';
+
+// The two screens a visit starts on ride in the first bundle; every other screen, and the
+// editor, the charts and the readers it pulls in, is fetched the first time it is opened.
+const Board = () => import('./routes/Board.vue');
+const Profile = () => import('./routes/Profile.vue');
+const NotFound = () => import('./routes/NotFound.vue');
+const SettingsIndex = () => import('./routes/settings/Index.vue');
+const SettingsProfile = () => import('./routes/settings/Profile.vue');
+const SettingsApi = () => import('./routes/settings/Api.vue');
+const SettingsProject = () => import('./routes/settings/Project.vue');
+const SettingsNewProject = () => import('./routes/settings/NewProject.vue');
+const SettingsTags = () => import('./routes/settings/Tags.vue');
+const SettingsUsers = () => import('./routes/settings/Users.vue');
+const Join = () => import('./routes/Join.vue');
+const Dashboard = () => import('./routes/Dashboard.vue');
+const Analytics = () => import('./routes/Analytics.vue');
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -63,4 +66,27 @@ router.beforeEach(async (to) => {
   const roleless = !session.me.value.isAdmin && !session.me.value.role;
   if (roleless && to.name !== 'profile') return { name: 'profile' };
   return true;
+});
+
+// A screen is fetched the first time it is opened, and a deploy replaces those files: a tab
+// opened before it still names the old ones and the fetch fails. The page is then loaded
+// afresh at the address it was going to — once, so a file that is truly missing cannot loop.
+const RETRIED = 'tracker:chunk-retry';
+router.onError((error, to) => {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!/dynamically imported module|Importing a module script failed/i.test(message)) return;
+  try {
+    if (sessionStorage.getItem(RETRIED) === to.fullPath) return;
+    sessionStorage.setItem(RETRIED, to.fullPath);
+  } catch {
+    // Without storage there is no way to tell a second failure from the first; try once anyway.
+  }
+  window.location.assign(to.fullPath);
+});
+router.afterEach(() => {
+  try {
+    sessionStorage.removeItem(RETRIED);
+  } catch {
+    // Nothing was kept, so nothing needs clearing.
+  }
 });
