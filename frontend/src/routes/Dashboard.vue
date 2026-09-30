@@ -87,6 +87,7 @@ function refresh(): void {
 }
 
 async function loadStarred(): Promise<void> {
+  clear('starred');
   try {
     starred.value = await api<Starred[]>('/my-favourites');
   } catch (err) {
@@ -147,6 +148,7 @@ function onPickUp(): void {
 watch(feedDays, () => void loadFeed());
 
 async function loadMine(): Promise<void> {
+  clear('mine');
   try {
     mine.value = await api<Mine[]>('/my-issues');
   } catch (err) {
@@ -219,13 +221,6 @@ async function load(): Promise<void> {
   }
 }
 
-function fromAddress(): void {
-  const day = String(route.query.day ?? '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
-  year.value = Number(day.slice(0, 4));
-  pickDay(day);
-}
-
 onMounted(() => {
   void loadPeople();
   void loadProjects();
@@ -233,7 +228,6 @@ onMounted(() => {
   void load();
   void loadMine();
   void loadStarred();
-  fromAddress();
   window.addEventListener('pointermove', onPickMove);
   window.addEventListener('pointerup', onPickUp);
 });
@@ -241,7 +235,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onPickMove);
   window.removeEventListener('pointerup', onPickUp);
 });
-watch(() => route.query.day, fromAddress);
 watch(
   () => route.query.calendar,
   (asked) => (wide.value = asked === 'full')
@@ -352,7 +345,7 @@ async function openIssue(d: Due): Promise<void> {
 
 function closeIssue(): void {
   open.value = null;
-  void load();
+  refresh();
 }
 </script>
 
@@ -398,6 +391,7 @@ function closeIssue(): void {
             </div>
           </section>
           <div v-if="errors.mine" class="err panel__err sheet__wide">{{ errors.mine }}</div>
+          <div v-if="errors.day" class="err panel__err sheet__wide">{{ errors.day }}</div>
 
         <div class="stack">
           <section class="panel">
@@ -452,6 +446,7 @@ function closeIssue(): void {
                     compact
                     :range="pickedDays"
                     @down="pickFrom"
+                    @pick="pickDay"
                   />
                 </div>
               </template>
@@ -663,6 +658,11 @@ function closeIssue(): void {
 }
 .sheet--cal {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+@media (max-width: 880px) {
+  .sheet--cal {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .year-grid {
   display: grid;

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { Check, X } from 'lucide-vue-next';
 import { api } from '../lib/api';
 import { stamp } from '../lib/issues';
+import { usePanelErrors } from '../lib/panelErrors';
 import { useSession } from '../lib/session';
 
 const session = useSession();
@@ -11,7 +12,7 @@ const me = session.me;
 const tokenBusy = ref(false);
 const freshToken = ref<string | null>(null);
 const copied = ref(false);
-const tokenError = ref<string | null>(null);
+const { errors, fail, clear } = usePanelErrors();
 
 const tokenCreated = computed(() => stamp(me.value?.token?.createdAt ?? null));
 const tokenUsed = computed(() => stamp(me.value?.token?.lastUsedAt ?? null));
@@ -19,14 +20,14 @@ const tokenUsed = computed(() => stamp(me.value?.token?.lastUsedAt ?? null));
 async function regenerate(): Promise<void> {
   if (tokenBusy.value) return;
   tokenBusy.value = true;
-  tokenError.value = null;
+  clear('token');
   copied.value = false;
   try {
     const res = await api<{ token: string }>('/me/regenerate-token', { method: 'POST' });
     freshToken.value = res.token;
     await session.refresh();
   } catch (err) {
-    tokenError.value = err instanceof Error ? err.message : 'Could not issue a token.';
+    fail('token', err, 'Could not issue a token.');
   } finally {
     tokenBusy.value = false;
   }
@@ -35,13 +36,13 @@ async function regenerate(): Promise<void> {
 async function revoke(): Promise<void> {
   if (tokenBusy.value) return;
   tokenBusy.value = true;
-  tokenError.value = null;
+  clear('token');
   try {
     await api('/me/token', { method: 'DELETE' });
     freshToken.value = null;
     await session.refresh();
   } catch (err) {
-    tokenError.value = err instanceof Error ? err.message : 'Could not revoke the token.';
+    fail('token', err, 'Could not revoke the token.');
   } finally {
     tokenBusy.value = false;
   }
@@ -152,8 +153,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
           </ul>
         </div>
 
-        <div v-if="tokenError" class="err">{{ tokenError }}</div>
-
         <div class="token__foot">
           <div class="sp"></div>
           <button v-if="me?.token" class="btn btn--danger" type="button" :disabled="tokenBusy" @click="revoke">
@@ -165,6 +164,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
         </div>
       </div>
     </section>
+    <div v-if="errors.token" class="err panel__err sheet__wide">{{ errors.token }}</div>
 
     <section class="panel sheet__wide">
       <header class="panel__h">Using it</header>

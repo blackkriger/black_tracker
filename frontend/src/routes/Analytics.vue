@@ -492,8 +492,8 @@ async function openIssue(w: Where): Promise<void> {
       :project="open.project"
       @close="open = null"
       @changed="load"
-      @deleted="open = null"
-      @moved="open = null"
+      @deleted="open = null; load()"
+      @moved="open = null; load()"
     />
   </div>
 </template>

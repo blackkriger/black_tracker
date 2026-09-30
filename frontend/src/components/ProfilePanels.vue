@@ -4,26 +4,27 @@ import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { commentOrder, stamp, type CommentOrder } from '../lib/issues';
 import { setWrapLines, wrapLines } from '../lib/files';
-import { setTheme, theme, type Theme } from '../lib/theme';
+import { ink, setTheme, theme, type Theme } from '../lib/theme';
 import { useNotices, type NoticeKind } from '../lib/notices';
+import { usePanelErrors } from '../lib/panelErrors';
+import { usePeople } from '../lib/people';
 import { useSession, type Me } from '../lib/session';
-import { ink } from '../lib/theme';
 
 const session = useSession();
+const { errors, fail, clear } = usePanelErrors();
+const { load: loadPeople } = usePeople();
 const me = session.me;
 const { off, toggleKind } = useNotices();
 
 const fullName = ref(me.value?.fullName ?? '');
 const nameBusy = ref(false);
 const nameSaved = ref(false);
-const nameError = ref<string | null>(null);
 
 const currentPassword = ref('');
 const newPassword = ref('');
 const repeatPassword = ref('');
 const passwordBusy = ref(false);
 const passwordDone = ref(false);
-const passwordError = ref<string | null>(null);
 
 const mismatch = computed(
   () => repeatPassword.value.length > 0 && repeatPassword.value !== newPassword.value
@@ -60,14 +61,15 @@ const KINDS: { kind: NoticeKind; label: string }[] = [
 async function saveName(): Promise<void> {
   if (nameBusy.value) return;
   nameBusy.value = true;
-  nameError.value = null;
+  clear('name');
   nameSaved.value = false;
   try {
     const updated = await api<Me>('/me', { method: 'PATCH', body: { fullName: fullName.value } });
     me.value = { ...(me.value as Me), ...updated };
     nameSaved.value = true;
+    void loadPeople(true);
   } catch (err) {
-    nameError.value = err instanceof Error ? err.message : 'Could not save the name.';
+    fail('name', err, 'Could not save the name.');
   } finally {
     nameBusy.value = false;
   }
@@ -76,7 +78,7 @@ async function saveName(): Promise<void> {
 async function changePassword(): Promise<void> {
   if (!canChangePassword.value) return;
   passwordBusy.value = true;
-  passwordError.value = null;
+  clear('password');
   passwordDone.value = false;
   try {
     await api('/me/password', {
@@ -88,7 +90,7 @@ async function changePassword(): Promise<void> {
     repeatPassword.value = '';
     passwordDone.value = true;
   } catch (err) {
-    passwordError.value = err instanceof Error ? err.message : 'Could not change the password.';
+    fail('password', err, 'Could not change the password.');
   } finally {
     passwordBusy.value = false;
   }
@@ -121,13 +123,13 @@ async function changePassword(): Promise<void> {
           <label class="label" for="login">Login</label>
           <input id="login" class="input" :value="me?.login" tabindex="-1" readonly />
         </div>
-        <div v-if="nameError" class="err">{{ nameError }}</div>
         <div class="row-end">
           <span v-if="nameSaved" class="hint">Saved.</span>
           <button class="btn btn--primary" type="submit" :disabled="nameBusy">Save</button>
         </div>
       </form>
     </section>
+    <div v-if="errors.name" class="err panel__err">{{ errors.name }}</div>
 
 
     <section class="panel">
@@ -154,7 +156,6 @@ async function changePassword(): Promise<void> {
           />
           <span v-if="mismatch" class="err">Doesn't match the new password.</span>
         </div>
-        <div v-if="passwordError" class="err">{{ passwordError }}</div>
         <div class="row-end">
           <span v-if="passwordDone" class="hint">Password changed.</span>
           <button class="btn btn--primary" type="submit" :disabled="!canChangePassword">
@@ -163,6 +164,7 @@ async function changePassword(): Promise<void> {
         </div>
       </form>
     </section>
+    <div v-if="errors.password" class="err panel__err">{{ errors.password }}</div>
   </div>
 
   <section class="panel">

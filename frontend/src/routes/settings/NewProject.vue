@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import { api } from '../../lib/api';
+import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
 
 const router = useRouter();
@@ -11,7 +12,7 @@ const projects = useProjects();
 const shortName = ref('');
 const name = ref('');
 const busy = ref(false);
-const error = ref<string | null>(null);
+const { errors, fail, clear } = usePanelErrors();
 
 const keyLooksRight = computed(() => /^[A-Z][A-Z0-9]*$/.test(shortName.value.trim()));
 const canCreate = computed(() => keyLooksRight.value && name.value.trim().length > 0 && !busy.value);
@@ -19,7 +20,7 @@ const canCreate = computed(() => keyLooksRight.value && name.value.trim().length
 async function create(): Promise<void> {
   if (!canCreate.value) return;
   busy.value = true;
-  error.value = null;
+  clear('create');
   try {
     const created = await api<{ shortName: string }>('/projects', {
       method: 'POST',
@@ -28,7 +29,7 @@ async function create(): Promise<void> {
     await projects.load(true);
     await router.push(`/settings/${created.shortName}`);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not create the project.';
+    fail('create', err, 'Could not create the project.');
   } finally {
     busy.value = false;
   }
@@ -56,12 +57,12 @@ async function create(): Promise<void> {
           <label class="label" for="name">Name</label>
           <input id="name" v-model="name" class="input" maxlength="200" placeholder="Project" />
         </div>
-        <div v-if="error" class="err">{{ error }}</div>
         <div class="row-end">
           <button class="btn btn--primary" type="submit" :disabled="!canCreate">Create project</button>
         </div>
       </form>
     </section>
+    <div v-if="errors.create" class="err panel__err sheet__wide">{{ errors.create }}</div>
   </SettingsLayout>
 </template>
 
