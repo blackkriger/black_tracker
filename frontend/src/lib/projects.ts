@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { api } from './api';
+import { latestRead } from './api';
 
 export interface ProjectMini {
   id: string;
@@ -11,24 +11,23 @@ export interface ProjectMini {
 
 const projects = ref<ProjectMini[]>([]);
 const loaded = ref(false);
-let inflight: Promise<void> | null = null;
+const failed = ref(false);
+const read = latestRead<ProjectMini[]>('/projects', (rows) => {
+  projects.value = rows;
+  loaded.value = true;
+  failed.value = false;
+});
 
 export function useProjects() {
   return {
     projects,
     loaded,
+    failed,
     async load(force = false): Promise<void> {
       if (loaded.value && !force) return;
-      inflight ??= api<ProjectMini[]>('/projects')
-        .then((rows) => {
-          projects.value = rows;
-          loaded.value = true;
-        })
-        .catch(() => {})
-        .finally(() => {
-          inflight = null;
-        });
-      await inflight;
+      await read(force).catch(() => {
+        failed.value = true;
+      });
     },
   };
 }

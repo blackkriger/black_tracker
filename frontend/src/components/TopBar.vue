@@ -53,8 +53,11 @@ const calMonth = ref(now.getMonth());
 const calDays = ref(new Map<string, DayInfo>());
 const calPeak = ref(1);
 
+let monthReads = 0;
+
 async function readMonth(): Promise<void> {
   const { from, to } = monthRange(calYear.value, calMonth.value);
+  const mine = ++monthReads;
   try {
     const got = await api<{
       marks: Mark[];
@@ -62,6 +65,7 @@ async function readMonth(): Promise<void> {
       activity: Activity[];
       mentions: DayMentions[];
     }>(`/calendar?from=${from}&to=${to}`);
+    if (mine !== monthReads) return;
     calDays.value = byDay(got.marks, got.dues, got.activity, got.mentions);
     calPeak.value = Math.max(1, ...[...calDays.value.values()].map((d) => d.worked));
   } catch {}

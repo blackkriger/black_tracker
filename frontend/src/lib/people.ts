@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import { api } from './api';
+import { latestRead } from './api';
 
 export interface Person {
   id: string;
@@ -10,7 +10,10 @@ export interface Person {
 
 const people = ref<Person[]>([]);
 const loaded = ref(false);
-let inflight: Promise<void> | null = null;
+const read = latestRead<Person[]>('/people', (rows) => {
+  people.value = rows;
+  loaded.value = true;
+});
 
 const byLogin = computed(() => new Map(people.value.map((p) => [p.login, p])));
 const byId = computed(() => new Map(people.value.map((p) => [p.id, p])));
@@ -32,16 +35,7 @@ export function usePeople() {
     },
     async load(force = false): Promise<void> {
       if (loaded.value && !force) return;
-      inflight ??= api<Person[]>('/people')
-        .then((rows) => {
-          people.value = rows;
-          loaded.value = true;
-        })
-        .catch(() => {})
-        .finally(() => {
-          inflight = null;
-        });
-      await inflight;
+      await read(force).catch(() => {});
     },
   };
 }

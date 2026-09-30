@@ -127,6 +127,7 @@ const searching = ref(false);
 const linking = ref(false);
 const pendingLinks = ref<IssueLink[]>([]);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let searches = 0;
 
 const shownLinks = computed(() => (creating.value ? pendingLinks.value : (issue.value?.links ?? [])));
 
@@ -138,17 +139,19 @@ watch(linkQuery, (term) => {
     return;
   }
   searchTimer = setTimeout(async () => {
+    const mine = ++searches;
     searching.value = true;
     try {
       const rows = await api<IssueLink[]>(
         `/issues/search?q=${encodeURIComponent(q)}&exclude=${issue.value?.id ?? ''}`
       );
+      if (mine !== searches) return;
       const already = new Set(shownLinks.value.map((l) => l.id));
       linkResults.value = rows.filter((r) => !already.has(r.id));
     } catch {
-      linkResults.value = [];
+      if (mine === searches) linkResults.value = [];
     } finally {
-      searching.value = false;
+      if (mine === searches) searching.value = false;
     }
   }, 200);
 });
@@ -408,8 +411,23 @@ const gallery = computed(() => [
     .map((f) => ({ src: previewOf(f) ?? '', name: f.name })),
 ]);
 
+const hostStates = ref<State[] | null>(null);
+watch(
+  () => issue.value?.boardId,
+  async (id) => {
+    if (!id || id === props.board.id) {
+      hostStates.value = null;
+      return;
+    }
+    try {
+      const host = await api<{ states: State[] }>(`/boards/${id}`);
+      if (issue.value?.boardId === id) hostStates.value = host.states;
+    } catch {}
+  }
+);
+
 const stateChoices = computed(() =>
-  props.board.states.map((s) => ({ value: s.id, label: s.name, color: s.color }))
+  (hostStates.value ?? props.board.states).map((s) => ({ value: s.id, label: s.name, color: s.color }))
 );
 const priorityChoices = PRIORITIES.map((p) => ({ value: p, label: p, color: priorityColor(p) }));
 const assigneeChoices = computed(() => [
@@ -542,10 +560,14 @@ useLive((ev) => {
   });
 });
 
+let issueReads = 0;
+
 async function reload(): Promise<void> {
   if (!props.issueKey) return;
+  const mine = ++issueReads;
   try {
-    issue.value = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
+    const got = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
+    if (mine === issueReads) issue.value = got;
   } catch {}
 }
 
@@ -569,8 +591,11 @@ async function load(): Promise<void> {
   }
   loading.value = true;
   error.value = null;
+  const mine = ++issueReads;
   try {
-    issue.value = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
+    const got = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
+    if (mine !== issueReads) return;
+    issue.value = got;
     keptDraft = readDraft();
     if (keptDraft) commentDraft.value = keptDraft;
     void lookAtComment(askedFor() ?? props.focusComment);

@@ -36,3 +36,21 @@ export async function api<T>(
   }
   return payload.data as T;
 }
+
+export function latestRead<T>(path: string, apply: (data: T) => void): (fresh?: boolean) => Promise<void> {
+  let inflight: Promise<void> | null = null;
+  let reads = 0;
+  return (fresh = false) => {
+    if (inflight && !fresh) return inflight;
+    const mine = ++reads;
+    const request: Promise<void> = api<T>(path)
+      .then((data) => {
+        if (mine === reads) apply(data);
+      })
+      .finally(() => {
+        if (inflight === request) inflight = null;
+      });
+    inflight = request;
+    return request;
+  };
+}

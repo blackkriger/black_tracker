@@ -52,19 +52,24 @@ const confirmKey = ref('');
 const deletingBoard = ref<Board | null>(null);
 const newStatus = ref<Record<string, string>>({});
 
+let projectReads = 0;
+
 async function load(quiet = false): Promise<void> {
   if (!quiet) loading.value = true;
   loadError.value = null;
+  const mine = ++projectReads;
   try {
     const short = String(route.params.short ?? '');
     const p = await api<Project>(`/projects/${encodeURIComponent(short)}`);
+    if (mine !== projectReads) return;
     project.value = p;
     boards.value = [...p.boards].sort((a, b) => a.position - b.position);
   } catch (err) {
+    if (mine !== projectReads) return;
     project.value = null;
     loadError.value = err instanceof Error ? err.message : 'Could not load the project.';
   } finally {
-    loading.value = false;
+    if (mine === projectReads) loading.value = false;
   }
 }
 

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import { api } from './api';
+import { api, latestRead } from './api';
 
 export type NoticeKind = 'mention' | 'reaction' | 'assigned';
 
@@ -23,7 +23,9 @@ const OFF = 'tracker:notices:off';
 const notices = ref<Notice[]>([]);
 const loaded = ref(false);
 const off = ref<NoticeKind[]>(read());
-let inflight: Promise<void> | null = null;
+const readNotices = latestRead<Notice[]>('/notices', (rows) => {
+  notices.value = rows;
+});
 
 function read(): NoticeKind[] {
   try {
@@ -57,16 +59,8 @@ export function useNotices() {
       } catch {}
     },
     async load(): Promise<void> {
-      inflight ??= api<Notice[]>('/notices')
-        .then((rows) => {
-          notices.value = rows;
-        })
-        .catch(() => {})
-        .finally(() => {
-          inflight = null;
-          loaded.value = true;
-        });
-      await inflight;
+      await readNotices(true).catch(() => {});
+      loaded.value = true;
     },
     async markRead(id?: string): Promise<void> {
       await api('/notices/read', { method: 'POST', body: { id } }).catch(() => {});

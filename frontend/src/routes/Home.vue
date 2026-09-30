@@ -6,13 +6,14 @@ import { lastProject } from '../lib/lastProject';
 import { useProjects } from '../lib/projects';
 
 const router = useRouter();
-const { projects, load } = useProjects();
+const { projects, failed, load } = useProjects();
 const loading = ref(true);
 const error = ref<string | null>(null);
 
 onMounted(async () => {
   try {
     await load();
+    if (failed.value) throw new Error('Could not load projects.');
     const open = projects.value.filter((p) => !p.archived);
     const remembered = open.find((p) => p.shortName === lastProject.get());
     const target = remembered ?? open[0];
