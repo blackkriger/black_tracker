@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { X } from 'lucide-vue-next';
 
 defineProps<{ title: string; width?: number }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
+const pressedScrim = ref(false);
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key === 'Escape') emit('close');
@@ -15,7 +16,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 <template>
   <Teleport to="body">
-    <div class="dialog__scrim" @click.self="emit('close')">
+    <div
+      class="dialog__scrim"
+      @pointerdown="pressedScrim = $event.target === $event.currentTarget"
+      @click.self="pressedScrim && emit('close')"
+    >
       <section class="dlg dialog" role="dialog" aria-modal="true" :style="{ width: `${width ?? 360}px` }">
         <header class="dlg__h">
           <span>{{ title }}</span>

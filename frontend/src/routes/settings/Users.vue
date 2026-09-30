@@ -72,6 +72,8 @@ const copied = ref(false);
 
 const newRole = ref('');
 const accessFor = ref<Role | null>(null);
+const accessRead = ref(false);
+let accessReads = 0;
 const accessCanDelete = ref(false);
 const accessCanManageRoles = ref(false);
 const deniedProjects = ref<string[]>([]);
@@ -209,14 +211,19 @@ async function openAccess(role: Role): Promise<void> {
   accessCanManageRoles.value = role.canManageRoles;
   deniedProjects.value = [];
   deniedBoards.value = [];
+  accessRead.value = false;
   clear('access');
+  const mine = ++accessReads;
   try {
     const res = await api<{ deniedProjects: string[]; deniedBoards: string[] }>(
       `/roles/${role.id}/access`
     );
+    if (mine !== accessReads) return;
     deniedProjects.value = res.deniedProjects;
     deniedBoards.value = res.deniedBoards;
+    accessRead.value = true;
   } catch (err) {
+    if (mine !== accessReads) return;
     fail('access', err, 'Could not read what this role can open.');
   }
 }
@@ -235,7 +242,7 @@ function toggleBoard(boardId: string, allowed: boolean): void {
 
 async function saveAccess(): Promise<void> {
   const role = accessFor.value;
-  if (!role || accessBusy.value) return;
+  if (!role || accessBusy.value || !accessRead.value) return;
   accessBusy.value = true;
   clear('access');
   try {
@@ -543,7 +550,7 @@ async function saveAccess(): Promise<void> {
     >
       <label class="check access__right">
         <input v-model="accessCanDelete" type="checkbox" />
-        May delete projects, boards, statuses and tags
+        May delete anything people made
       </label>
       <label class="check access__right">
         <input v-model="accessCanManageRoles" type="checkbox" />
@@ -583,7 +590,7 @@ async function saveAccess(): Promise<void> {
         <button
           class="btn btn--primary"
           type="button"
-          :disabled="accessBusy"
+          :disabled="accessBusy || !accessRead"
           @click="saveAccess"
         >
           Save

@@ -77,6 +77,7 @@ const emit = defineEmits<{
 }>();
 
 const session = useSession();
+const pressedScrim = ref(false);
 
 const creating = computed(() => !props.issueKey);
 const draft = ref({
@@ -1070,7 +1071,11 @@ async function removeIssue(): Promise<void> {
 
 <template>
   <Teleport to="body">
-    <div class="iv__scrim" @click.self="emit('close')">
+    <div
+      class="iv__scrim"
+      @pointerdown="pressedScrim = $event.target === $event.currentTarget"
+      @click.self="pressedScrim && emit('close')"
+    >
       <section class="dlg iv__win" role="dialog" aria-modal="true">
         <header class="dlg__h">
           <button
@@ -2150,9 +2155,6 @@ async function removeIssue(): Promise<void> {
   height: 56px;
   margin-top: 8px;
   cursor: pointer;
-}
-.is-late {
-  color: var(--danger-text);
 }
 .prop--tall {
   align-items: start;

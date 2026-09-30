@@ -74,8 +74,10 @@ function onPointerUp(ev: PointerEvent): void {
 
 function onKey(ev: KeyboardEvent): void {
   if (!open.value) return;
-  if (ev.key === 'Escape') close();
-  else if (ev.key === 'ArrowLeft') go(-1);
+  if (ev.key === 'Escape') {
+    ev.stopPropagation();
+    close();
+  } else if (ev.key === 'ArrowLeft') go(-1);
   else if (ev.key === 'ArrowRight') go(1);
 }
 

@@ -35,7 +35,7 @@ export function isBlank(html: string): boolean {
 export function fromPlain(text: string): string {
   return text
     .split(/\n{2,}/)
-    .map((block) => `<p>${block.replace(/\n/g, '<br>').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c] as string)}</p>`)
+    .map((block) => `<p>${block.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c] as string).replace(/\n/g, '<br>')}</p>`)
     .join('');
 }
 

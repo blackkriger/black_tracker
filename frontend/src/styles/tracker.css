@@ -199,6 +199,7 @@ button { font-family: var(--font-ui); }
 .taglabels { display: flex; flex-wrap: wrap; gap: 8px; }
 .due { font: 11px/1 var(--font-num); color: var(--text-muted); white-space: nowrap; }
 .due--late { color: var(--danger-text); }
+.is-late { color: var(--danger-text); }
 .cnt { display: inline-flex; align-items: center; gap: 3px; font: 11px/1 var(--font-num); color: var(--text-muted); }
 .cnt svg.i { width: 12px; height: 12px; }
 .av { display: inline-grid; place-items: center; width: 20px; height: 20px; flex: none; font: 10.5px/1 var(--font-num); color: #fff; background: var(--c, var(--mono-c0)); }

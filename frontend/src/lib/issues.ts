@@ -1,3 +1,5 @@
+import { todayKey } from './calendar';
+
 export interface Person {
   id: string;
   login: string;
@@ -138,7 +140,7 @@ export function stamp(iso: string | null): string {
 
 export function dueLabel(date: string | null): { text: string; late: boolean } | null {
   if (!date) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayKey();
   return {
     text: new Date(`${date}T00:00:00`)
       .toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })

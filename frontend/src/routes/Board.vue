@@ -145,6 +145,7 @@ useLive((ev) => {
   if (!board) return;
   if (['state.changed', 'board.changed', 'project.changed', 'tag.changed'].includes(ev.type)) {
     void load(String(route.params.short), true);
+    if (ev.type === 'tag.changed') void loadIssues(board.id, true);
     return;
   }
   if (!ev.type.startsWith('issue.') || ev.boardId !== board.id) return;
@@ -214,6 +215,8 @@ async function onDrop(): Promise<void> {
   dropAt.value = null;
   const board = current.value;
   if (!target || !moved || !board) return;
+  if (target.beforeId === moved.id) return;
+  issuesRead += 1;
 
   // Send the whole column, not the filtered view, or hidden cards get renumbered out of place.
   const column = issues.value
