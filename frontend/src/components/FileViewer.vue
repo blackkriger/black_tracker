@@ -251,6 +251,9 @@ onUnmounted(() => {
 .fv__cut {
   max-width: 900px;
   margin: 0 auto;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
 }
 /* One scroller only: a nested one would catch middle-click autoscroll and move only sideways. */
 .fv__code {
@@ -258,12 +261,11 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 .fv__said {
+  width: fit-content;
   color: var(--text-dim);
 }
 .fv__cut {
   margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
   color: var(--text-muted);
   font-size: 12px;
 }
