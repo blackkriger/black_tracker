@@ -62,28 +62,11 @@ const BASE = `${window.location.origin}/api`;
 const HEADER = '-H "Authorization: Bearer trk_…"';
 
 const examples = computed(() => {
-  const auth = '-H "Authorization: Bearer $TRACKER_TOKEN"';
-  const json = '-H "Content-Type: application/json"';
   return [
     {
       label: 'Your token, set once per terminal session',
       code: `export TRACKER_TOKEN="${freshToken.value ?? 'trk_…'}"`,
       bare: true,
-    },
-    { label: 'Your issues', code: `curl -s ${BASE}/my-issues \\\n  ${auth}` },
-    { label: 'One issue by its key', code: `curl -s ${BASE}/issues/ISSUE-KEY \\\n  ${auth}` },
-    {
-      label: 'A board and its statuses',
-      code: `curl -s ${BASE}/boards/BOARD-UUID \\\n  ${auth}`,
-    },
-    {
-      label: 'Writing an issue',
-      code: `curl -s -X POST ${BASE}/boards/BOARD-UUID/issues \\\n  ${auth} \\\n  ${json} \\\n  -d '{"summary":"Written from the API","priority":"Minor"}'`,
-      hint: "Everything but the summary is optional; with no status named, the issue lands in the board's default one.",
-    },
-    {
-      label: 'Moving an issue to another status',
-      code: `curl -s -X PATCH ${BASE}/issues/ISSUE-UUID \\\n  ${auth} \\\n  ${json} \\\n  -d '{"stateId":"STATE-UUID"}'`,
     },
   ] as { label: string; code: string; hint?: string; bare?: boolean }[];
 });
