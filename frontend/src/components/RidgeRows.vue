@@ -117,13 +117,17 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
   font: 10px var(--font-ui);
 }
 .rg-axis {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 10px 44px 0 108px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 10px 58px 0 110px;
+  text-align: center;
   color: var(--text-dim);
   font: 10.5px var(--font-ui);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+.rg-axis :slotted(*) {
+  padding: 0 5px;
 }
 </style>

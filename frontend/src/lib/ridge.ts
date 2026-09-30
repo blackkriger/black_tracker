@@ -21,11 +21,16 @@ export function ridgePath(profile: number[], full = 4): { line: string; area: st
     const line = `M0 ${BASE} L${RIDGE_W} ${BASE}`;
     return { line, area: `${line} L${RIDGE_W} ${BASE} L0 ${BASE} Z` };
   }
-  const n = profile.length;
-  const pts = profile.map((v, i) => ({
-    x: (i / Math.max(1, n - 1)) * RIDGE_W,
+  const centred = profile.map((v, i) => ({
+    x: ((i + 0.5) / profile.length) * RIDGE_W,
     y: BASE - Math.min(PEAK, (v * PEAK) / full),
   }));
+  const pts = [
+    { x: 0, y: centred[0].y },
+    ...centred,
+    { x: RIDGE_W, y: centred[centred.length - 1].y },
+  ];
+  const n = pts.length;
   const at = (i: number) => pts[Math.max(0, Math.min(n - 1, i))];
   const f = (v: number) => v.toFixed(1);
   const hold = (y: number) => Math.max(BASE - PEAK, Math.min(BASE, y));
