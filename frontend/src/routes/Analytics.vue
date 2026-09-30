@@ -355,6 +355,39 @@ async function openIssue(w: Where): Promise<void> {
               >Nothing is due in this period.</div>
             </div>
           </section>
+
+          <section class="panel">
+            <header class="panel__h">
+              Time to close
+              <span class="panel__end">{{ data?.cycle.closed ?? 0 }}</span>
+            </header>
+            <div class="panel__b nums">
+              <template v-if="loading">
+                <span class="sk sk--line" style="width: 84px; height: 28px"></span>
+                <div v-for="n in 3" :key="n" class="pri">
+                  <span class="sk sk--line" style="width: 64px"></span>
+                  <span class="sk sk--line skel__hill"></span>
+                  <span class="sk sk--line" style="width: 36px"></span>
+                </div>
+              </template>
+              <div v-else class="big" :title="exact(data?.cycle.median ?? null)">
+                {{ days(data?.cycle.median ?? null) }}
+              </div>
+              <div v-for="m in data?.cycle.months ?? []" :key="m.month" class="pri">
+                <span class="pri__name">{{ monthLabel(m.month) }}</span>
+                <span class="bar">
+                  <span
+                    class="bar__part"
+                    :style="{ width: `${((m.median ?? 0) / longestMonth) * 100}%` }"
+                  ></span>
+                </span>
+                <span class="n" :title="exact(m.median)">{{ days(m.median) }}</span>
+              </div>
+              <div v-if="!loading && !data?.cycle.closed" class="hint faint">
+                Nothing was closed in this period.
+              </div>
+            </div>
+          </section>
         </div>
 
         <div class="stack">
@@ -439,39 +472,6 @@ async function openIssue(w: Where): Promise<void> {
                 <span></span>
                 <span></span>
                 <span></span>
-              </div>
-            </div>
-          </section>
-
-          <section class="panel">
-            <header class="panel__h">
-              Time to close
-              <span class="panel__end">{{ data?.cycle.closed ?? 0 }}</span>
-            </header>
-            <div class="panel__b nums">
-              <template v-if="loading">
-                <span class="sk sk--line" style="width: 84px; height: 28px"></span>
-                <div v-for="n in 3" :key="n" class="pri">
-                  <span class="sk sk--line" style="width: 64px"></span>
-                  <span class="sk sk--line skel__hill"></span>
-                  <span class="sk sk--line" style="width: 36px"></span>
-                </div>
-              </template>
-              <div v-else class="big" :title="exact(data?.cycle.median ?? null)">
-                {{ days(data?.cycle.median ?? null) }}
-              </div>
-              <div v-for="m in data?.cycle.months ?? []" :key="m.month" class="pri">
-                <span class="pri__name">{{ monthLabel(m.month) }}</span>
-                <span class="bar">
-                  <span
-                    class="bar__part"
-                    :style="{ width: `${((m.median ?? 0) / longestMonth) * 100}%` }"
-                  ></span>
-                </span>
-                <span class="n" :title="exact(m.median)">{{ days(m.median) }}</span>
-              </div>
-              <div v-if="!loading && !data?.cycle.closed" class="hint faint">
-                Nothing was closed in this period.
               </div>
             </div>
           </section>
