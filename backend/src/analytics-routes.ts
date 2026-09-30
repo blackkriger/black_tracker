@@ -241,8 +241,8 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
 
     const [statuses, cells, dues, people, held, loose, priorities, cycle, months] =
       await Promise.all([
-      pool.query<{ name: string }>(
-        `select s.name
+      pool.query<{ name: string; color: string }>(
+        `select s.name, (array_agg(s.color order by p.position, p.short_name, b.position))[1] as color
            from states s
            join boards b on b.id = s.board_id
            join projects p on p.id = b.project_id
@@ -489,7 +489,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             .filter((r) => !r.late)
             .map((r) => ({ ...where(r), day: day(r.due_date), assignee: r.assignee })),
         },
-        statuses: statuses.rows.map((r) => r.name),
+        statuses: statuses.rows.map((r) => ({ name: r.name, color: r.color })),
         people: people.rows.map((r) => {
           const issues = holding.get(r.login) ?? [];
           return {

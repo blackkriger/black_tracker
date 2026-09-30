@@ -54,7 +54,7 @@ interface TagOption {
   boardIds: string[];
 }
 interface Numbers {
-  statuses: string[];
+  statuses: { name: string; color: string }[];
   boards: {
     id: string;
     name: string;
@@ -101,7 +101,7 @@ const projectChoices = computed(() =>
   projects.value.map((p) => ({ value: p.shortName, label: p.name }))
 );
 const statusChoices = computed(() =>
-  (data.value?.statuses ?? []).map((s) => ({ value: s, label: s }))
+  (data.value?.statuses ?? []).map((s) => ({ value: s.name, label: s.name, color: s.color }))
 );
 const tagChoices = computed(() => {
   const chosen = projects.value.find((p) => p.shortName === project.value);
@@ -161,7 +161,7 @@ useLive((ev) => {
   }
 });
 
-const axis = computed(() => data.value?.statuses ?? []);
+const axis = computed(() => (data.value?.statuses ?? []).map((s) => s.name));
 
 const WEIGHT = RIDGE_SMOOTH_KERNEL.reduce((all, k) => all + k, 0);
 function shape(counts: number[]): number[] {
