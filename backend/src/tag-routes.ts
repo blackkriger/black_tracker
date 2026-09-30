@@ -1,8 +1,8 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { pool } from './db.js';
 import { requireAuth, requireDeleter, type Auth } from './auth.js';
-import { deniedFor, mayOpenBoard } from './board-service.js';
+import { DENIES_NOTHING, deniedFor, mayOpenBoard } from './board-service.js';
 import { pickColor } from './colors.js';
 
 interface TagRow {
@@ -12,11 +12,12 @@ interface TagRow {
   used: number;
 }
 
-const publicTag = (r: TagRow) => ({
+const publicTag = (r: TagRow, boardIds: string[] = []) => ({
   id: r.id,
   name: r.name,
   color: r.color,
   used: r.used,
+  boardIds,
 });
 
 const tagCreate = z.object({
@@ -42,13 +43,37 @@ async function boardFor(auth: Auth, boardId: string): Promise<boolean> {
   return !!res.rowCount && (await mayOpenBoard(auth, boardId, res.rows[0].project_id));
 }
 
+async function boardsOfTags(auth: Auth, tagIds: string[]): Promise<Map<string, string[]>> {
+  const byTag = new Map<string, string[]>();
+  if (!tagIds.length) return byTag;
+  const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+  const res = await pool.query<{ tag_id: string; board_id: string; project_id: string }>(
+    `select bt.tag_id, bt.board_id, b.project_id
+       from board_tags bt join boards b on b.id = bt.board_id
+      where bt.tag_id = any($1::uuid[])`,
+    [tagIds]
+  );
+  for (const row of res.rows) {
+    if (denied.boards.has(row.board_id) || denied.projects.has(row.project_id)) continue;
+    const list = byTag.get(row.tag_id) ?? [];
+    list.push(row.board_id);
+    byTag.set(row.tag_id, list);
+  }
+  return byTag;
+}
+
+async function withBoards(auth: Auth, rows: TagRow[]) {
+  const byTag = await boardsOfTags(auth, rows.map((r) => r.id));
+  return rows.map((r) => publicTag(r, byTag.get(r.id) ?? []));
+}
+
 export function registerTagRoutes(app: FastifyInstance): void {
   app.get('/tags', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     if (!(await reachesTags(auth))) return reply.send({ data: [] });
     const res = await pool.query<TagRow>(`select ${TAG_COLUMNS} from tags order by lower(name)`);
-    return reply.send({ data: res.rows.map(publicTag) });
+    return reply.send({ data: await withBoards(auth, res.rows) });
   });
 
   app.post('/tags', async (req, reply) => {
@@ -88,8 +113,30 @@ export function registerTagRoutes(app: FastifyInstance): void {
         [boardId, tag.id]
       );
     }
-    return reply.code(twin.rowCount ? 200 : 201).send({ data: publicTag(tag) });
+    const [data] = await withBoards(auth, [tag]);
+    return reply.code(twin.rowCount ? 200 : 201).send({ data });
   });
+
+  async function setOnBoard(req: FastifyRequest, reply: FastifyReply, on: boolean) {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const { id, boardId } = req.params as { id: string; boardId: string };
+    if (!(await reachesTags(auth))) return reply.code(404).send({ error: 'No such tag.' });
+    if (!(await boardFor(auth, boardId))) return reply.code(404).send({ error: 'No such board.' });
+    const res = await pool.query<TagRow>(`select ${TAG_COLUMNS} from tags where id = $1`, [id]);
+    if (!res.rowCount) return reply.code(404).send({ error: 'No such tag.' });
+    await pool.query(
+      on
+        ? 'insert into board_tags (board_id, tag_id) values ($1, $2) on conflict do nothing'
+        : 'delete from board_tags where board_id = $1 and tag_id = $2',
+      [boardId, id]
+    );
+    const [data] = await withBoards(auth, res.rows);
+    return reply.send({ data });
+  }
+
+  app.put('/tags/:id/boards/:boardId', (req, reply) => setOnBoard(req, reply, true));
+  app.delete('/tags/:id/boards/:boardId', (req, reply) => setOnBoard(req, reply, false));
 
   app.patch('/tags/:id', async (req, reply) => {
     const auth = await requireAuth(req, reply);
@@ -110,7 +157,8 @@ export function registerTagRoutes(app: FastifyInstance): void {
       [id, parsed.data.name]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'No such tag.' });
-    return reply.send({ data: publicTag(res.rows[0]) });
+    const [data] = await withBoards(auth, res.rows);
+    return reply.send({ data });
   });
 
   app.delete('/tags/:id', async (req, reply) => {

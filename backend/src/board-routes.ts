@@ -182,28 +182,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     return reply.send({ data: publicBoard(res.rows[0], await statesOf(id), [], tags.get(id) ?? []) });
   });
 
-  app.put('/boards/:id/tags', async (req, reply) => {
-    const auth = await requireAuth(req, reply);
-    if (!auth) return;
-    const { id } = req.params as { id: string };
-    const parsed = z.object({ tagIds: z.array(z.string().uuid()).max(200) }).safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: 'Send the list of tag ids.' });
-    const board = await boardById(id);
-    if (!board || !(await mayOpenBoard(auth, id, board.project_id))) {
-      return reply.code(404).send({ error: 'No such board.' });
-    }
-    await inTransaction(async (client) => {
-      await client.query('delete from board_tags where board_id = $1', [id]);
-      await client.query(
-        `insert into board_tags (board_id, tag_id)
-         select $1, t.id from tags t where t.id = any($2::uuid[])`,
-        [id, parsed.data.tagIds]
-      );
-    });
-    const tags = await tagIdsByBoard([id]);
-    return reply.send({ data: { tagIds: tags.get(id) ?? [] } });
-  });
-
   app.post('/projects/:short/boards/order', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;

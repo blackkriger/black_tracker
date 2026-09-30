@@ -27,12 +27,6 @@ interface Board {
   defaultStateId: string | null;
   position: number;
   states: State[];
-  tagIds: string[];
-}
-interface Tag {
-  id: string;
-  name: string;
-  color: string;
 }
 interface Project {
   id: string;
@@ -57,7 +51,6 @@ const deleting = ref(false);
 const confirmKey = ref('');
 const deletingBoard = ref<Board | null>(null);
 const newStatus = ref<Record<string, string>>({});
-const allTags = ref<Tag[]>([]);
 
 let projectReads = 0;
 
@@ -67,14 +60,10 @@ async function load(quiet = false): Promise<void> {
   const mine = ++projectReads;
   try {
     const short = String(route.params.short ?? '');
-    const [p, tagRows] = await Promise.all([
-      api<Project>(`/projects/${encodeURIComponent(short)}`),
-      api<Tag[]>('/tags'),
-    ]);
+    const p = await api<Project>(`/projects/${encodeURIComponent(short)}`);
     if (mine !== projectReads) return;
     project.value = p;
     boards.value = [...p.boards].sort((a, b) => a.position - b.position);
-    allTags.value = tagRows;
   } catch (err) {
     if (mine !== projectReads) return;
     project.value = null;
@@ -91,29 +80,11 @@ watch(
 );
 
 useLive((ev) => {
-  if (['project.changed', 'board.changed', 'state.changed', 'tag.changed'].includes(ev.type)) {
-    void load(true);
-  }
+  if (['project.changed', 'board.changed', 'state.changed'].includes(ev.type)) void load(true);
 });
 
 function replaceBoard(next: Board): void {
   boards.value = boards.value.map((b) => (b.id === next.id ? { ...b, ...next } : b));
-}
-
-async function toggleBoardTag(b: Board, tagId: string, on: boolean): Promise<void> {
-  clear(b.id);
-  const tagIds = on ? [...b.tagIds, tagId] : b.tagIds.filter((id) => id !== tagId);
-  replaceBoard({ ...b, tagIds });
-  try {
-    const saved = await api<{ tagIds: string[] }>(`/boards/${b.id}/tags`, {
-      method: 'PUT',
-      body: { tagIds },
-    });
-    replaceBoard({ ...b, tagIds: saved.tagIds });
-  } catch (err) {
-    replaceBoard(b);
-    fail(b.id, err);
-  }
 }
 
 async function toggleArchived(): Promise<void> {
@@ -452,20 +423,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
             />
             <button class="btn" type="submit" :disabled="!(newStatus[b.id] ?? '').trim()">Add</button>
           </form>
-
-          <div v-if="allTags.length" class="field board-tags">
-            <span class="label">Tags</span>
-            <div class="board-tags__list">
-              <label v-for="t in allTags" :key="t.id" class="check">
-                <input
-                  type="checkbox"
-                  :checked="b.tagIds.includes(t.id)"
-                  @change="toggleBoardTag(b, t.id, ($event.target as HTMLInputElement).checked)"
-                />
-                <span class="taglabel taglabel--sm taglabel--plain" :style="{ '--c': t.color }">{{ t.name }}</span>
-              </label>
-            </div>
-          </div>
         </div>
       </section>
       <div v-if="errors[b.id]" class="err sheet__wide panel__err">{{ errors[b.id] }}</div>
@@ -547,14 +504,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
 }
 .p-btn {
   height: 34px;
-}
-.board-tags {
-  margin: 16px 4px 4px;
-}
-.board-tags__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
 }
 .board-name {
   width: 220px;

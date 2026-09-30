@@ -1,22 +1,32 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
 import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
+import { useProjects } from '../../lib/projects';
 import { useSession } from '../../lib/session';
 
-const { canDelete } = useSession();
+interface Tag extends TagItem {
+  boardIds: string[];
+}
 
-const tags = ref<TagItem[]>([]);
+const { canDelete } = useSession();
+const { projects, load: loadProjects } = useProjects();
+
+const tags = ref<Tag[]>([]);
 const loading = ref(true);
 const { errors, fail, clear } = usePanelErrors();
 
 const byName = (a: TagItem, b: TagItem) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 
+const boards = computed(() =>
+  projects.value.flatMap((p) => p.boards.map((b) => ({ id: b.id, label: `${p.shortName}, ${b.name}` })))
+);
+
 async function reload(): Promise<void> {
-  tags.value = await api<TagItem[]>('/tags');
+  tags.value = await api<Tag[]>('/tags');
 }
 
 useLive((ev) => {
@@ -25,7 +35,7 @@ useLive((ev) => {
 
 onMounted(async () => {
   try {
-    await reload();
+    await Promise.all([reload(), loadProjects()]);
   } catch (err) {
     fail('tags', err, 'Could not load tags.');
   } finally {
@@ -36,7 +46,7 @@ onMounted(async () => {
 async function add(name: string): Promise<void> {
   clear('tags');
   try {
-    const created = await api<TagItem>('/tags', { method: 'POST', body: { name } });
+    const created = await api<Tag>('/tags', { method: 'POST', body: { name } });
     tags.value = [...tags.value, created].sort(byName);
   } catch (err) {
     fail('tags', err);
@@ -46,7 +56,7 @@ async function add(name: string): Promise<void> {
 async function rename(tag: TagItem, name: string): Promise<void> {
   clear('tags');
   try {
-    const updated = await api<TagItem>(`/tags/${tag.id}`, { method: 'PATCH', body: { name } });
+    const updated = await api<Tag>(`/tags/${tag.id}`, { method: 'PATCH', body: { name } });
     tags.value = tags.value.map((row) => (row.id === tag.id ? updated : row)).sort(byName);
   } catch (err) {
     fail('tags', err);
@@ -60,6 +70,26 @@ async function remove(tag: TagItem): Promise<void> {
     tags.value = tags.value.filter((row) => row.id !== tag.id);
   } catch (err) {
     fail('tags', err);
+  }
+}
+
+function setOnBoard(tagId: string, boardId: string, on: boolean): void {
+  tags.value = tags.value.map((t) => {
+    if (t.id !== tagId) return t;
+    const rest = t.boardIds.filter((id) => id !== boardId);
+    return { ...t, boardIds: on ? [...rest, boardId] : rest };
+  });
+}
+
+async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
+  clear('boards');
+  const on = !tag.boardIds.includes(boardId);
+  setOnBoard(tag.id, boardId, on);
+  try {
+    await api(`/tags/${tag.id}/boards/${boardId}`, { method: on ? 'PUT' : 'DELETE' });
+  } catch (err) {
+    setOnBoard(tag.id, boardId, !on);
+    fail('boards', err);
   }
 }
 </script>
@@ -78,6 +108,23 @@ async function remove(tag: TagItem): Promise<void> {
         </div>
       </div>
     </section>
+    <section v-if="loading" class="panel sheet__wide">
+      <header class="panel__h">Boards</header>
+      <div class="panel__table">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th v-for="w in [120, 96]" :key="w"><span class="sk sk--line" :style="{ width: `${w}px` }"></span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="n in 2" :key="n">
+              <td v-for="w in [52, 64]" :key="w"><span class="sk tag-sk" :style="{ width: `${w}px` }"></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <section v-else class="panel sheet__wide">
       <header class="panel__h">Tags</header>
@@ -93,6 +140,34 @@ async function remove(tag: TagItem): Promise<void> {
       </div>
     </section>
     <div v-if="errors.tags" class="err sheet__wide panel__err">{{ errors.tags }}</div>
+
+    <section v-if="!loading && boards.length && tags.length" class="panel sheet__wide">
+      <header class="panel__h">Boards</header>
+      <div class="panel__table">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th v-for="b in boards" :key="b.id">{{ b.label }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in tags" :key="t.id">
+              <td v-for="b in boards" :key="b.id">
+                <button
+                  class="taglabel taglabel--plain taglabel--pick"
+                  :class="{ 'is-off': !t.boardIds.includes(b.id) }"
+                  type="button"
+                  :aria-pressed="t.boardIds.includes(b.id)"
+                  :style="{ '--c': t.color }"
+                  @click="toggleOnBoard(t, b.id)"
+                >{{ t.name }}</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <div v-if="errors.boards" class="err sheet__wide panel__err">{{ errors.boards }}</div>
   </SettingsLayout>
 </template>
 
@@ -110,5 +185,13 @@ async function remove(tag: TagItem): Promise<void> {
   display: block;
   flex: 0 0 56px;
   height: 34px;
+}
+.taglabel--pick {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.taglabel--pick.is-off {
+  opacity: 0.35;
 }
 </style>
