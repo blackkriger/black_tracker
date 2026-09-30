@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
-import { pool } from './db.js';
+import { DAY_RE, pool, ZONE } from './db.js';
 import { requireAuth, requireSession } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 
@@ -86,10 +86,10 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const q = req.query as { from?: string; to?: string };
-    const from = q.from ? new Date(q.from) : null;
-    const to = q.to ? new Date(q.to) : null;
-    if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) {
-      return reply.code(400).send({ error: 'A bound is a moment in ISO 8601.' });
+    const from = q.from?.trim() || null;
+    const to = q.to?.trim() || null;
+    if ((from && !DAY_RE.test(from)) || (to && !DAY_RE.test(to))) {
+      return reply.code(400).send({ error: 'Dates go as YYYY-MM-DD.' });
     }
     const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
     if (denied.everything) return reply.send({ data: [] });
@@ -108,8 +108,8 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
         where n.user_id = $1
           and i.project_id <> all($2::uuid[])
           and i.board_id <> all($3::uuid[])
-          and ($4::timestamptz is null or n.created_at >= $4)
-          and ($5::timestamptz is null or n.created_at < $5)
+          and ($4::date is null or (n.created_at at time zone '${ZONE}')::date >= $4)
+          and ($5::date is null or (n.created_at at time zone '${ZONE}')::date <= $5)
         order by ${within ? '' : 'n.read_at is not null, '}n.created_at desc
         limit ${within ? 500 : 40}`,
       [auth.userId, [...denied.projects], [...denied.boards], from, to]

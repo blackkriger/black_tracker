@@ -273,16 +273,27 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const flags = settleFlags(p, before.rows[0]);
     let res;
     try {
-      res = await pool.query<StateRow>(
-        `update states
-            set name = coalesce($2, name),
-                is_open = $3,
-                is_resolved = $4,
-                position = coalesce($5, position)
-          where id = $1
-          returning *`,
-        [id, p.name ?? null, flags.isOpen, flags.isResolved, p.position ?? null]
-      );
+      res = await inTransaction(async (client) => {
+        const updated = await client.query<StateRow>(
+          `update states
+              set name = coalesce($2, name),
+                  is_open = $3,
+                  is_resolved = $4,
+                  position = coalesce($5, position)
+            where id = $1
+            returning *`,
+          [id, p.name ?? null, flags.isOpen, flags.isResolved, p.position ?? null]
+        );
+        if (flags.isResolved !== before.rows[0].is_resolved) {
+          await client.query(
+            `update issues
+                set resolved_at = case when $2 then coalesce(resolved_at, now()) else null end
+              where state_id = $1`,
+            [id, flags.isResolved]
+          );
+        }
+        return updated;
+      });
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {
         return reply.code(409).send({ error: 'That board already has a status with this name.' });
@@ -339,7 +350,18 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         error: `Move the ${used.rows[0].n} issue(s) out of this status first.`,
       });
     }
-    const res = await pool.query('delete from states where id = $1', [id]);
+    const res = await inTransaction(async (client) => {
+      const gone = await client.query('delete from states where id = $1', [id]);
+      await client.query(
+        `update boards
+            set default_state_id = (
+              select id from states where board_id = $1 order by position limit 1
+            )
+          where id = $1 and default_state_id is null`,
+        [onBoard.rows[0].board_id]
+      );
+      return gone;
+    });
     if (!res.rowCount) return reply.code(404).send({ error: 'No such status.' });
     return reply.send({ data: { ok: true } });
   });

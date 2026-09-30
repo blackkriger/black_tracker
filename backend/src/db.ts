@@ -32,3 +32,6 @@ export async function inTransaction<T>(
     client.release();
   }
 }
+
+export const ZONE = 'Europe/Moscow';
+export const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;

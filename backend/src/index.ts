@@ -57,7 +57,13 @@ registerEventRoutes(app);
 registerChangeFeed(app);
 
 app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found.' }));
-app.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
+const PG_BAD_INPUT = new Set(['22P02', '22007', '22008', '23503']);
+
+app.setErrorHandler((err: Error & { statusCode?: number; code?: string }, _req, reply) => {
+  if (err.code && PG_BAD_INPUT.has(err.code)) {
+    return reply.code(400).send({ error: 'Bad request.' });
+  }
+  if (err.code === '23505') return reply.code(409).send({ error: 'That already exists.' });
   app.log.error(err);
   const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
   reply.code(status).send({ error: status === 500 ? 'Something went wrong.' : err.message });

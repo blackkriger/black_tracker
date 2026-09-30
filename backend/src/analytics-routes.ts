@@ -1,10 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { pool } from './db.js';
+import { DAY_RE, pool, ZONE } from './db.js';
 import { requireAuth, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
-
-const ZONE = 'Europe/Moscow';
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function shutOut(auth: Auth): Promise<{ all: boolean; projects: string[]; boards: string[] }> {
   const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);

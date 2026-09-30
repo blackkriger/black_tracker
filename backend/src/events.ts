@@ -108,6 +108,7 @@ const TOPICS: [RegExp, string][] = [
   [/^\/tags/, 'tag'],
   [/^\/roles/, 'role'],
   [/^\/users/, 'user'],
+  [/^\/me$/, 'user'],
   [/^\/invites/, 'invite'],
   [/^\/key-dates/, 'key-date'],
   [/^\/notices/, 'notice'],

@@ -1,11 +1,10 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { pool } from './db.js';
+import { pool, ZONE } from './db.js';
 import { requireAuth, requireDeleter, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor, mayOpenProject } from './board-service.js';
 import { projectByShort } from './project-routes.js';
 
-const ZONE = 'Europe/Moscow';
 
 const range = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -125,9 +124,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
                 count(distinct h.issue_id)::int as worked,
                 count(distinct h.issue_id) filter (where h.field = 'created')::int as created,
                 count(distinct h.issue_id) filter (
-                  where h.field = 'status'
-                    and (i.resolved_at at time zone '${ZONE}')::date
-                      = (h.created_at at time zone '${ZONE}')::date
+                  where h.field = 'status' and h.created_at = i.resolved_at
                 )::int as resolved
            from issue_history h
            join issues i on i.id = h.issue_id
@@ -146,8 +143,8 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
                 count(*)::int as said,
                 count(*) filter (where n.read_at is null)::int as unread
            from notices n
-           join issue_comments c on c.id = n.comment_id
-           join issues i on i.id = c.issue_id
+           left join issue_comments c on c.id = n.comment_id
+           join issues i on i.id = coalesce(c.issue_id, n.issue_id)
           where n.user_id = $1
             and (n.created_at at time zone '${ZONE}')::date between $2::date and $3::date
             and i.project_id <> all($4::uuid[])

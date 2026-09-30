@@ -110,21 +110,13 @@ const pickedDays = computed(() =>
   dragging.value ? ordered(dragging.value.start, dragging.value.end) : feedDays.value
 );
 
-function midnightOf(key: string): Date {
-  const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
 let feedReads = 0;
 
 async function loadFeed(): Promise<void> {
   const mine = ++feedReads;
   const { from, to } = feedDays.value;
-  const end = midnightOf(to);
-  end.setDate(end.getDate() + 1);
-  const range = `from=${encodeURIComponent(midnightOf(from).toISOString())}&to=${encodeURIComponent(end.toISOString())}`;
   try {
-    const got = await api<Notice[]>(`/notices?${range}`);
+    const got = await api<Notice[]>(`/notices?from=${from}&to=${to}`);
     if (mine === feedReads) feed.value = got;
   } catch {
     if (mine === feedReads) feed.value = [];

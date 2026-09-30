@@ -405,6 +405,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Send the column and its order.' });
     const { issueId, stateId, ids } = parsed.data;
+    if (!ids.some((one) => one.toLowerCase() === issueId.toLowerCase())) {
+      return reply.code(400).send({ error: 'Send the column and its order.' });
+    }
 
     const moved = await issueById(issueId);
     if (!moved || moved.board_id !== id) {
