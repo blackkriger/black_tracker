@@ -15,7 +15,6 @@ import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
-import Select from '../components/Select.vue';
 import { api } from '../lib/api';
 import {
   byDay,
@@ -45,7 +44,7 @@ import { ink } from '../lib/theme';
 const route = useRoute();
 const router = useRouter();
 const session = useSession();
-const { people, nameOf, load: loadPeople } = usePeople();
+const { nameOf, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 const { ask } = useFocus();
@@ -53,7 +52,6 @@ const { off, markRead, toggleKind } = useNotices();
 
 const now = new Date();
 const year = ref(now.getFullYear());
-const who = ref('');
 const loading = ref(true);
 
 interface Mine {
@@ -188,10 +186,6 @@ const days = computed<Map<string, DayInfo>>(() =>
 const peak = computed(() => Math.max(1, ...[...days.value.values()].map((d) => d.worked)));
 const yearMarks = computed(() => [...marks.value].sort((a, b) => a.day.localeCompare(b.day)));
 
-const personChoices = computed(() =>
-  people.value.map((p) => ({ value: p.login, label: p.fullName || p.login, color: p.roleColor }))
-);
-
 let reads = 0;
 
 async function load(): Promise<void> {
@@ -201,7 +195,8 @@ async function load(): Promise<void> {
   const last = shownMonths.value[shownMonths.value.length - 1];
   const from = dayKey(first.year, first.month, 1);
   const to = dayKey(last.year, last.month, daysInMonth(last.year, last.month));
-  const user = who.value ? `&user=${encodeURIComponent(who.value)}` : '';
+  const login = session.me.value?.login;
+  const user = login ? `&user=${encodeURIComponent(login)}` : '';
   try {
     const got = await api<{
       marks: Mark[];
@@ -239,7 +234,7 @@ watch(
   () => route.query.calendar,
   (asked) => (wide.value = asked === 'full')
 );
-watch([year, who, wide], () => void load());
+watch([year, wide], () => void load());
 const reloadDays = settled(() => void load());
 const reloadLists = settled(() => {
   void loadMine();
@@ -420,14 +415,6 @@ function closeIssue(): void {
                   <ChevronsDownUp v-if="wide" class="ic" />
                   <ChevronsUpDown v-else class="ic" />
                 </button>
-                <Select
-                  v-model="who"
-                  :options="personChoices"
-                  placeholder="Everyone"
-                  keep-placeholder
-                  small
-                  label="Whose work to shade"
-                />
               </span>
             </header>
             <div class="panel__b year-grid">
