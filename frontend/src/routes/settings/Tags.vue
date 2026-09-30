@@ -22,7 +22,9 @@ const { errors, fail, clear } = usePanelErrors();
 const byName = (a: TagItem, b: TagItem) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 
 const boards = computed(() =>
-  projects.value.flatMap((p) => p.boards.map((b) => ({ id: b.id, label: `${p.shortName}, ${b.name}` })))
+  projects.value
+    .filter((p) => !p.archived)
+    .flatMap((p) => p.boards.map((b) => ({ id: b.id, label: `${p.shortName}, ${b.name}` })))
 );
 
 async function reload(): Promise<void> {
