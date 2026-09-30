@@ -14,6 +14,7 @@ const SettingsNewProject = () => import('./routes/settings/NewProject.vue');
 const SettingsTags = () => import('./routes/settings/Tags.vue');
 const SettingsUsers = () => import('./routes/settings/Users.vue');
 const Join = () => import('./routes/Join.vue');
+const Reset = () => import('./routes/Reset.vue');
 const Dashboard = () => import('./routes/Dashboard.vue');
 const Analytics = () => import('./routes/Analytics.vue');
 
@@ -24,6 +25,7 @@ export const router = createRouter({
     { path: '/me', name: 'me', component: Dashboard },
     { path: '/login', name: 'login', component: Login, meta: { public: true } },
     { path: '/join/:token', name: 'join', component: Join, meta: { public: true } },
+    { path: '/reset/:token', name: 'reset', component: Reset, meta: { public: true } },
     { path: '/:short([A-Z][A-Z0-9]*)', name: 'project-board', component: Board },
     { path: '/:short([A-Z][A-Z0-9]*)/:slug', name: 'board', component: Board },
     { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
