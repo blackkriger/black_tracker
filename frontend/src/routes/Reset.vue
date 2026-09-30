@@ -24,9 +24,10 @@ const canSubmit = computed(() => password.value.length >= 8 && !mismatch.value &
 
 onMounted(async () => {
   try {
-    const found = await api<{ login: string; fullName: string }>(
-      `/password-resets/${encodeURIComponent(token)}/check`
+    const found = await api<{ kind: 'invite' | 'reset'; login: string | null }>(
+      `/invites/${encodeURIComponent(token)}/check`
     );
+    if (found.kind !== 'reset' || !found.login) throw new Error('This link is no longer valid.');
     login.value = found.login;
     valid.value = true;
   } catch (err) {
@@ -41,7 +42,7 @@ async function onSubmit(): Promise<void> {
   busy.value = true;
   error.value = null;
   try {
-    await api(`/password-resets/${encodeURIComponent(token)}/accept`, {
+    await api(`/invites/${encodeURIComponent(token)}/accept`, {
       method: 'POST',
       body: { password: password.value },
     });

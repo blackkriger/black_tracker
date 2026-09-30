@@ -1,21 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { inTransaction, pool } from './db.js';
+import { pool } from './db.js';
 import {
   USER_SELECT,
   hashPassword,
-  hashToken,
   mayManageRoles,
-  newRawToken,
   publicUser,
   requireAdmin,
   requireAuth,
-  requireRoleManager,
-  startSession,
   userById,
 } from './auth.js';
-
-const RESET_HOURS = 24;
 
 export const accountCredentials = z.object({
   login: z
@@ -153,74 +147,5 @@ export function registerUserRoutes(app: FastifyInstance): void {
     if (!res.rowCount) return reply.code(404).send({ error: 'No such account.' });
     await pool.query('delete from sessions where user_id = $1', [id]);
     return reply.send({ data: { ok: true } });
-  });
-
-  app.post('/users/:id/reset-link', async (req, reply) => {
-    const auth = await requireRoleManager(req, reply);
-    if (!auth) return;
-    const { id } = req.params as { id: string };
-    const target = await pool.query<{ is_admin: boolean; active: boolean }>(
-      'select is_admin, active from users where id = $1',
-      [id]
-    );
-    if (!target.rowCount) return reply.code(404).send({ error: 'No such account.' });
-    if (target.rows[0].is_admin && !auth.isAdmin) {
-      return reply.code(403).send({ error: "Only an admin can reset an admin's password." });
-    }
-    if (!target.rows[0].active) return reply.code(409).send({ error: 'This account is switched off.' });
-    const raw = newRawToken();
-    const expiresAt = await inTransaction(async (client) => {
-      await client.query('delete from password_resets where user_id = $1 and used_at is null', [id]);
-      const made = await client.query<{ expires_at: Date }>(
-        `insert into password_resets (user_id, token_hash, created_by, expires_at)
-         values ($1, $2, $3, now() + make_interval(hours => $4::int))
-         returning expires_at`,
-        [id, hashToken(raw), auth.userId, RESET_HOURS]
-      );
-      return made.rows[0].expires_at;
-    });
-    return reply.code(201).send({ data: { token: raw, expiresAt: expiresAt.toISOString() } });
-  });
-
-  app.get('/password-resets/:token/check', async (req, reply) => {
-    const { token } = req.params as { token: string };
-    const res = await pool.query<{ login: string; full_name: string }>(
-      `select u.login, u.full_name
-         from password_resets r
-         join users u on u.id = r.user_id and u.active
-        where r.token_hash = $1 and r.used_at is null and r.expires_at > now()`,
-      [hashToken(token)]
-    );
-    if (!res.rowCount) return reply.code(404).send({ error: 'This link is no longer valid.' });
-    return reply.send({ data: { login: res.rows[0].login, fullName: res.rows[0].full_name } });
-  });
-
-  app.post('/password-resets/:token/accept', async (req, reply) => {
-    const { token } = req.params as { token: string };
-    const parsed = z.object({ password: z.string().min(8).max(200) }).safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: 'The password must be at least 8 characters.' });
-    }
-    const hash = await hashPassword(parsed.data.password);
-    const userId = await inTransaction(async (client) => {
-      const link = await client.query<{ id: string; user_id: string }>(
-        `select r.id, r.user_id
-           from password_resets r
-           join users u on u.id = r.user_id and u.active
-          where r.token_hash = $1 and r.used_at is null and r.expires_at > now()
-          for update of r`,
-        [hashToken(token)]
-      );
-      if (!link.rowCount) return null;
-      const { id, user_id: owner } = link.rows[0];
-      await client.query('update users set password_hash = $1 where id = $2', [hash, owner]);
-      await client.query('update password_resets set used_at = now() where id = $1', [id]);
-      await client.query('delete from sessions where user_id = $1', [owner]);
-      return owner;
-    });
-    if (!userId) return reply.code(404).send({ error: 'This link is no longer valid.' });
-    const row = await userById(userId);
-    await startSession(reply, userId);
-    return reply.send({ data: publicUser(row as NonNullable<typeof row>) });
   });
 }

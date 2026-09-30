@@ -29,9 +29,11 @@ const canSubmit = computed(
 
 onMounted(async () => {
   try {
-    const invite = await api<{ ok: true; role: { name: string; color: string } | null }>(
-      `/invites/${encodeURIComponent(token)}/check`
-    );
+    const invite = await api<{
+      kind: 'invite' | 'reset';
+      role: { name: string; color: string } | null;
+    }>(`/invites/${encodeURIComponent(token)}/check`);
+    if (invite.kind !== 'invite') throw new Error('This invite link is no longer valid.');
     role.value = invite.role;
     valid.value = true;
   } catch (err) {

@@ -34,6 +34,8 @@ interface User {
 
 interface Invite {
   id: string;
+  kind: 'invite' | 'reset';
+  forUser: string | null;
   hint: string;
   createdAt: string;
   createdBy: string | null;
@@ -57,6 +59,17 @@ const { errors, fail, clear } = usePanelErrors();
 const { nameOf, load: loadPeople } = usePeople();
 
 const inviteRole = ref('');
+const linkKind = ref('invite');
+const resetUser = ref('');
+const KIND_CHOICES = [
+  { value: 'invite', label: 'Invite' },
+  { value: 'reset', label: 'Password reset' },
+];
+const personChoices = computed(() =>
+  users.value
+    .filter((u) => u.active)
+    .map((u) => ({ value: u.id, label: u.fullName || u.login, color: u.role?.color ?? null }))
+);
 const roleChoices = computed(() => [
   { value: '', label: '—' },
   ...roles.value.map((r) => ({ value: r.id, label: r.name, color: r.color })),
@@ -165,60 +178,29 @@ async function removeRole(): Promise<void> {
 }
 
 async function createInvite(): Promise<void> {
-  if (inviteBusy.value) return;
+  const reset = linkKind.value === 'reset';
+  if (inviteBusy.value || (reset && !resetUser.value)) return;
   inviteBusy.value = true;
   clear('invites');
   copied.value = false;
   try {
     const created = await api<Invite & { token: string }>('/invites', {
       method: 'POST',
-      body: { roleId: inviteRole.value || null },
+      body: reset ? { forUserId: resetUser.value } : { roleId: inviteRole.value || null },
     });
     const { token, ...row } = created;
-    freshLink.value = `${location.origin}/join/${token}`;
-    invites.value = [row, ...invites.value];
+    freshLink.value = `${location.origin}/${reset ? 'reset' : 'join'}/${token}`;
+    invites.value = [
+      row,
+      ...invites.value.filter((i) => !(reset && i.kind === 'reset' && i.forUser === row.forUser && !i.usedAt)),
+    ];
     inviteRole.value = '';
+    resetUser.value = '';
+    if (reset) await copyLink();
   } catch (err) {
     fail('invites', err);
   } finally {
     inviteBusy.value = false;
-  }
-}
-
-const resetFor = ref<User | null>(null);
-const resetLink = ref<string | null>(null);
-const resetBusy = ref(false);
-const resetCopied = ref(false);
-const resetError = ref<string | null>(null);
-
-async function makeResetLink(u: User): Promise<void> {
-  resetFor.value = u;
-  resetLink.value = null;
-  resetCopied.value = false;
-  resetError.value = null;
-  resetBusy.value = true;
-  try {
-    const made = await api<{ token: string }>(`/users/${u.id}/reset-link`, { method: 'POST' });
-    if (resetFor.value?.id === u.id) {
-      resetLink.value = `${location.origin}/reset/${made.token}`;
-      await copyResetLink();
-    }
-  } catch (err) {
-    if (resetFor.value?.id === u.id) {
-      resetError.value = err instanceof Error ? err.message : 'Could not make the link.';
-    }
-  } finally {
-    resetBusy.value = false;
-  }
-}
-
-async function copyResetLink(): Promise<void> {
-  if (!resetLink.value) return;
-  try {
-    await navigator.clipboard.writeText(resetLink.value);
-    resetCopied.value = true;
-  } catch {
-    resetCopied.value = false;
   }
 }
 
@@ -327,7 +309,6 @@ async function saveAccess(): Promise<void> {
               <th class="c-flag">Active</th>
               <th class="c-when">Joined</th>
               <th class="c-when">Last seen</th>
-              <th v-if="canManageRoles" class="c-reset"><span class="sr">Reset password</span></th>
             </tr>
           </thead>
           <tbody v-if="loading">
@@ -342,7 +323,6 @@ async function saveAccess(): Promise<void> {
               <td><span class="sk sk--box"></span></td>
               <td class="c-when"><span class="sk sk--line" style="width: 88px"></span></td>
               <td class="c-when"><span class="sk sk--line" style="width: 88px"></span></td>
-              <td v-if="canManageRoles" class="c-reset"><span class="sk sk--ctl sk--right" style="width: 110px"></span></td>
             </tr>
           </tbody>
           <tbody v-else>
@@ -377,9 +357,6 @@ async function saveAccess(): Promise<void> {
               </td>
               <td class="stamp">{{ stamp(u.createdAt) }}</td>
               <td class="stamp">{{ stamp(u.lastSeenAt) || '—' }}</td>
-              <td v-if="canManageRoles" class="c-reset">
-                <button class="btn btn--sm" type="button" @click="makeResetLink(u)">Reset password</button>
-              </td>
             </tr>
           </tbody>
         </table>
@@ -470,7 +447,7 @@ async function saveAccess(): Promise<void> {
     <div v-if="errors.roles" class="err sheet__wide panel__err">{{ errors.roles }}</div>
 
     <section v-if="canManageRoles" class="panel sheet__wide">
-      <header class="panel__h">Invite links</header>
+      <header class="panel__h">Links</header>
       <div class="panel__b">
         <div v-if="freshLink" class="field">
           <span class="label">The link — copy it now</span>
@@ -495,9 +472,27 @@ async function saveAccess(): Promise<void> {
           <span class="sk sk--field" style="flex: 0 0 96px"></span>
         </div>
         <div v-else-if="!freshLink" class="addrow">
-          <Select v-model="inviteRole" class="invite__role" :options="inviteChoices" />
+          <Select v-model="linkKind" class="invite__role" :options="KIND_CHOICES" />
+          <Select
+            v-if="linkKind === 'invite'"
+            v-model="inviteRole"
+            class="invite__role"
+            :options="inviteChoices"
+          />
+          <Select
+            v-else
+            v-model="resetUser"
+            class="invite__role"
+            :options="personChoices"
+            placeholder="—"
+          />
           <div class="sp"></div>
-          <button class="btn" type="button" :disabled="inviteBusy" @click="createInvite">
+          <button
+            class="btn"
+            type="button"
+            :disabled="inviteBusy || (linkKind === 'reset' && !resetUser)"
+            @click="createInvite"
+          >
             Create link
           </button>
         </div>
@@ -508,7 +503,8 @@ async function saveAccess(): Promise<void> {
           <thead>
             <tr>
               <th>Link</th>
-              <th class="c-role">Role</th>
+              <th class="c-kind">Kind</th>
+              <th class="c-role">For</th>
               <th>Status</th>
               <th class="c-when">Created</th>
               <th class="c-act"><span class="sr">Revoke</span></th>
@@ -517,6 +513,7 @@ async function saveAccess(): Promise<void> {
           <tbody>
             <tr v-for="n in 2" :key="n">
               <td><span class="sk sk--line" style="width: 64px"></span></td>
+              <td class="c-kind"><span class="sk sk--line" style="width: 90px"></span></td>
               <td class="c-role"><span class="sk sk--line" style="width: 80px; height: 24px"></span></td>
               <td><span class="sk sk--line" style="width: 150px"></span></td>
               <td class="c-when"><span class="sk sk--line" style="width: 130px"></span></td>
@@ -530,7 +527,8 @@ async function saveAccess(): Promise<void> {
           <thead>
             <tr>
               <th>Link</th>
-              <th class="c-role">Role</th>
+              <th class="c-kind">Kind</th>
+              <th class="c-role">For</th>
               <th>Status</th>
               <th class="c-when">Created</th>
               <th class="c-act"><span class="sr">Revoke</span></th>
@@ -539,8 +537,13 @@ async function saveAccess(): Promise<void> {
           <tbody>
             <tr v-for="i in invites" :key="i.id">
               <td class="key">…{{ i.hint }}</td>
+              <td class="c-kind">{{ i.kind === 'reset' ? 'Password reset' : 'Invite' }}</td>
               <td class="c-role">
-                <span v-if="i.role" class="taglabel taglabel--plain" :style="{ '--c': i.role.color }">
+                <span v-if="i.kind === 'reset'" class="who__lines">
+                  {{ nameOf(i.forUser) }}
+                  <span v-if="i.forUser && nameOf(i.forUser) !== i.forUser" class="who__login">{{ i.forUser }}</span>
+                </span>
+                <span v-else-if="i.role" class="taglabel taglabel--plain" :style="{ '--c': i.role.color }">
                   {{ i.role.name }}
                 </span>
               </td>
@@ -564,7 +567,7 @@ async function saveAccess(): Promise<void> {
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
                   aria-label="Delete link"
-                  @click="revokingInvite = i"
+                  @click="i.kind === 'reset' ? revokeInvite(i) : (revokingInvite = i)"
                 >
                   <X class="ic ic--sm" />
                 </button>
@@ -577,20 +580,6 @@ async function saveAccess(): Promise<void> {
     <div v-if="canManageRoles && errors.invites" class="err sheet__wide panel__err">
       {{ errors.invites }}
     </div>
-
-    <Dialog
-      v-if="resetFor"
-      :title="`Reset password — ${resetFor.fullName || resetFor.login}`"
-      :width="460"
-      @close="resetFor = null"
-    >
-      <span v-if="resetBusy" class="sk sk--field"></span>
-      <div v-else-if="resetLink" class="link__row">
-        <code class="input link__value">{{ resetLink }}</code>
-        <button class="btn" type="button" @click="copyResetLink">{{ resetCopied ? 'Copied' : 'Copy' }}</button>
-      </div>
-      <div v-if="resetError" class="err">{{ resetError }}</div>
-    </Dialog>
 
     <Dialog v-if="revokingInvite" title="Delete invite link" @close="revokingInvite = null">
       <p>Nobody can join with it any more. This cannot be undone.</p>
@@ -704,9 +693,8 @@ async function saveAccess(): Promise<void> {
 .c-act2 {
   width: 92px;
 }
-.c-reset {
-  width: 140px;
-  text-align: right;
+.c-kind {
+  width: 130px;
 }
 .sk--right {
   margin-left: auto;
