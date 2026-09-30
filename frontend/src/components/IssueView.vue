@@ -1693,9 +1693,9 @@ async function removeIssue(): Promise<void> {
                 <span class="prop__k">Author</span>
                 <span class="pv pv--ro">
                   <span>
-                    <span :style="{ color: ink(colorOfId(issue.author?.id)) }">
-                      {{ issue.author ? nameOf(issue.author.login) : '—' }}
-                    </span>
+                    <span :style="{ color: ink(colorOfId(issue.author?.id)) }">{{
+                      issue.author ? nameOf(issue.author.login) : '—'
+                    }}</span>
                     <span
                       v-if="issue.author && nameOf(issue.author.login) !== issue.author.login"
                       class="nick"
