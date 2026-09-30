@@ -164,7 +164,12 @@ export const publicState = (r: StateRow) => ({
   color: r.color,
 });
 
-export const publicBoard = (r: BoardRow, states: StateRow[] = [], deniedRoles: string[] = []) => ({
+export const publicBoard = (
+  r: BoardRow,
+  states: StateRow[] = [],
+  deniedRoles: string[] = [],
+  tagIds: string[] = []
+) => ({
   id: r.id,
   projectId: r.project_id,
   name: r.name,
@@ -173,4 +178,20 @@ export const publicBoard = (r: BoardRow, states: StateRow[] = [], deniedRoles: s
   position: r.position,
   states: states.map(publicState),
   deniedRoles,
+  tagIds,
 });
+
+export async function tagIdsByBoard(boardIds: string[]): Promise<Map<string, string[]>> {
+  const byBoard = new Map<string, string[]>();
+  if (!boardIds.length) return byBoard;
+  const res = await pool.query<{ board_id: string; tag_id: string }>(
+    'select board_id, tag_id from board_tags where board_id = any($1::uuid[])',
+    [boardIds]
+  );
+  for (const row of res.rows) {
+    const list = byBoard.get(row.board_id) ?? [];
+    list.push(row.tag_id);
+    byBoard.set(row.board_id, list);
+  }
+  return byBoard;
+}

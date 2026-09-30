@@ -32,12 +32,12 @@ interface Board {
   slug: string;
   position: number;
   states: State[];
+  tagIds: string[];
 }
 interface Tag {
   id: string;
   name: string;
   color: string;
-  projectId?: string | null;
 }
 interface Project {
   id: string;
@@ -121,12 +121,13 @@ const filtered = computed(() => {
 });
 
 function tagCreated(tag: Tag): void {
-  if (tags.value.some((t) => t.id === tag.id)) return;
-  tags.value = [...tags.value, tag].sort(
-    (a, b) =>
-      Number(!!a.projectId) - Number(!!b.projectId) ||
+  if (!tags.value.some((t) => t.id === tag.id)) {
+    tags.value = [...tags.value, tag].sort((a, b) =>
       a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-  );
+    );
+  }
+  const board = current.value;
+  if (board && !board.tagIds.includes(tag.id)) board.tagIds = [...board.tagIds, tag.id];
 }
 
 const fresh = ref<Set<string>>(new Set());
@@ -172,6 +173,8 @@ const current = computed(() => {
   const remembered = short ? boards.value.find((b) => b.slug === lastBoard.get(short)) : null;
   return remembered ?? boards.value[0] ?? null;
 });
+
+const boardTags = computed(() => tags.value.filter((t) => current.value?.tagIds.includes(t.id)));
 
 const openKey = computed(() => String(route.params.key ?? ''));
 
@@ -292,7 +295,7 @@ async function load(short: string, quiet = false): Promise<void> {
   try {
     const [loaded, tagRows] = await Promise.all([
       api<Project>(`/projects/${encodeURIComponent(short)}`),
-      api<Tag[]>(`/tags?project=${encodeURIComponent(short)}`),
+      api<Tag[]>('/tags'),
     ]);
     if (mine !== projectRead) return;
     project.value = loaded;
@@ -374,7 +377,7 @@ watch(
       />
 
       <button
-        v-for="t in tags"
+        v-for="t in boardTags"
         :key="t.id"
         class="taglabel taglabel--plain taglabel--pick"
         :class="{ 'is-off': byTags.length && !byTags.includes(t.id) }"
@@ -499,7 +502,7 @@ watch(
       :create-in="creatingIn"
       :board="current"
       :boards="boards"
-      :tags="tags"
+      :tags="boardTags"
       :project="project?.shortName ?? ''"
       :next-key="project?.nextKey ?? ''"
       :focus-comment="String(route.query.c ?? '') || undefined"

@@ -724,7 +724,6 @@ async function saveText(): Promise<void> {
 
 const makingTag = ref(false);
 const newTagName = ref('');
-const newTagScope = ref('project');
 const tagBusy = ref(false);
 const tagError = ref<string | null>(null);
 
@@ -735,7 +734,6 @@ function pickTag(chosen: string): void {
     return;
   }
   newTagName.value = '';
-  newTagScope.value = 'project';
   tagError.value = null;
   makingTag.value = true;
 }
@@ -748,7 +746,7 @@ async function createTag(): Promise<void> {
   try {
     const created = await api<IssueTag>('/tags', {
       method: 'POST',
-      body: newTagScope.value === 'global' ? { name } : { name, project: props.project },
+      body: { name, boardId: props.board.id },
     });
     emit('tagCreated', created);
     makingTag.value = false;
@@ -1759,17 +1757,6 @@ async function removeIssue(): Promise<void> {
             maxlength="40"
             autofocus
             @keydown.enter.prevent="createTag"
-          />
-        </div>
-        <div class="field">
-          <label class="label" for="tag-scope">Scope</label>
-          <Select
-            id="tag-scope"
-            v-model="newTagScope"
-            :options="[
-              { value: 'project', label: `${project} only` },
-              { value: 'global', label: 'Global' },
-            ]"
           />
         </div>
         <div v-if="tagError" class="err">{{ tagError }}</div>

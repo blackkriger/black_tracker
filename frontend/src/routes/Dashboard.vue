@@ -267,7 +267,12 @@ interface OpenIssue {
   key: string;
   project: string;
   comment?: string;
-  board: { id: string; name: string; states: { id: string; name: string; color: string }[] };
+  board: {
+    id: string;
+    name: string;
+    states: { id: string; name: string; color: string }[];
+    tagIds: string[];
+  };
 }
 const open = ref<OpenIssue | null>(null);
 const lookAt = ref<string | undefined>(undefined);
@@ -327,9 +332,9 @@ async function openIssue(d: Due): Promise<void> {
   try {
     const [board, tags] = await Promise.all([
       api<OpenIssue['board']>(`/boards/${d.boardId}`),
-      api<IssueTag[]>(`/tags?project=${encodeURIComponent(d.projectShort)}`),
+      api<IssueTag[]>('/tags'),
     ]);
-    openTags.value = tags;
+    openTags.value = tags.filter((t) => board.tagIds.includes(t.id));
     open.value = { key: d.key, project: d.projectShort, board, comment: lookAt.value };
     lookAt.value = undefined;
     picked.value = null;

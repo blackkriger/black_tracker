@@ -14,6 +14,7 @@ import {
   mayOpenProject,
   publicBoard,
   publicState,
+  tagIdsByBoard,
   type BoardRow,
   type StateRow,
 } from './board-service.js';
@@ -85,12 +86,17 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     if (denied.everything || denied.projects.has(project.id)) {
       return reply.code(404).send({ error: 'No such project.' });
     }
-    const { rows, statesByBoard } = await boardsOfProject(project.id);
+    const { rows, statesByBoard, tagsByBoard } = await boardsOfProject(project.id);
     const denials = await denialsFor(rows.map((r) => r.id));
     const visible = auth.isAdmin ? rows : rows.filter((r) => !denied.boards.has(r.id));
     return reply.send({
       data: visible.map((r) =>
-        publicBoard(r, statesByBoard.get(r.id) ?? [], auth.isAdmin ? denials.get(r.id) ?? [] : [])
+        publicBoard(
+          r,
+          statesByBoard.get(r.id) ?? [],
+          auth.isAdmin ? denials.get(r.id) ?? [] : [],
+          tagsByBoard.get(r.id) ?? []
+        )
       ),
     });
   });
@@ -108,8 +114,14 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         return reply.code(403).send({ error: 'This board is not open to you.' });
       }
     }
+    const tags = await tagIdsByBoard([id]);
     return reply.send({
-      data: publicBoard(board, await statesOf(id), auth.isAdmin ? denials.get(id) ?? [] : []),
+      data: publicBoard(
+        board,
+        await statesOf(id),
+        auth.isAdmin ? denials.get(id) ?? [] : [],
+        tags.get(id) ?? []
+      ),
     });
   });
 
@@ -166,7 +178,30 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         returning id, project_id, name, slug, default_state_id, position`,
       [id, p.name ?? null, slug, p.defaultStateId ?? null, p.position ?? null]
     );
-    return reply.send({ data: publicBoard(res.rows[0], await statesOf(id)) });
+    const tags = await tagIdsByBoard([id]);
+    return reply.send({ data: publicBoard(res.rows[0], await statesOf(id), [], tags.get(id) ?? []) });
+  });
+
+  app.put('/boards/:id/tags', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const { id } = req.params as { id: string };
+    const parsed = z.object({ tagIds: z.array(z.string().uuid()).max(200) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Send the list of tag ids.' });
+    const board = await boardById(id);
+    if (!board || !(await mayOpenBoard(auth, id, board.project_id))) {
+      return reply.code(404).send({ error: 'No such board.' });
+    }
+    await inTransaction(async (client) => {
+      await client.query('delete from board_tags where board_id = $1', [id]);
+      await client.query(
+        `insert into board_tags (board_id, tag_id)
+         select $1, t.id from tags t where t.id = any($2::uuid[])`,
+        [id, parsed.data.tagIds]
+      );
+    });
+    const tags = await tagIdsByBoard([id]);
+    return reply.send({ data: { tagIds: tags.get(id) ?? [] } });
   });
 
   app.post('/projects/:short/boards/order', async (req, reply) => {
@@ -186,8 +221,10 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         where b.id = o.id and b.project_id = $1`,
       [project.id, parsed.data.ids]
     );
-    const { rows, statesByBoard } = await boardsOfProject(project.id);
-    return reply.send({ data: rows.map((r) => publicBoard(r, statesByBoard.get(r.id) ?? [])) });
+    const { rows, statesByBoard, tagsByBoard } = await boardsOfProject(project.id);
+    return reply.send({
+      data: rows.map((r) => publicBoard(r, statesByBoard.get(r.id) ?? [], [], tagsByBoard.get(r.id) ?? [])),
+    });
   });
 
   app.delete('/boards/:id', async (req, reply) => {

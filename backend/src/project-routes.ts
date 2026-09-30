@@ -8,6 +8,7 @@ import {
   deniedFor,
   mayOpenProject,
   publicBoard,
+  tagIdsByBoard,
   type BoardRow,
   type StateRow,
 } from './board-service.js';
@@ -80,7 +81,8 @@ export async function boardsOfProject(projectId: string) {
     list.push(s);
     byBoard.set(s.board_id, list);
   }
-  return { rows: boards.rows, statesByBoard: byBoard };
+  const tagsByBoard = await tagIdsByBoard(boards.rows.map((b) => b.id));
+  return { rows: boards.rows, statesByBoard: byBoard, tagsByBoard };
 }
 
 export function registerProjectRoutes(app: FastifyInstance): void {
@@ -119,13 +121,13 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     if (denied.everything || denied.projects.has(project.id)) {
       return reply.code(404).send({ error: 'No such project.' });
     }
-    const { rows, statesByBoard } = await boardsOfProject(project.id);
+    const { rows, statesByBoard, tagsByBoard } = await boardsOfProject(project.id);
     return reply.send({
       data: {
         ...publicProject(project),
         boards: rows
           .filter((b) => !denied.boards.has(b.id))
-          .map((b) => publicBoard(b, statesByBoard.get(b.id) ?? [])),
+          .map((b) => publicBoard(b, statesByBoard.get(b.id) ?? [], [], tagsByBoard.get(b.id) ?? [])),
       },
     });
   });

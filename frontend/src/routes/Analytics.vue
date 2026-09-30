@@ -229,6 +229,7 @@ interface OpenIssue {
     name: string;
     slug: string;
     states: { id: string; name: string; color: string }[];
+    tagIds: string[];
   };
 }
 const open = ref<OpenIssue | null>(null);
@@ -246,9 +247,9 @@ async function openIssue(w: Where): Promise<void> {
   try {
     const [full, tags] = await Promise.all([
       api<OpenIssue['board']>(`/boards/${board.id}`),
-      api<IssueTag[]>(`/tags?project=${encodeURIComponent(w.projectShort)}`),
+      api<IssueTag[]>('/tags'),
     ]);
-    openTags.value = tags;
+    openTags.value = tags.filter((t) => full.tagIds.includes(t.id));
     open.value = { key: w.key, project: w.projectShort, board: full };
   } catch (err) {
     fail('numbers', err, 'Could not open the issue.');
