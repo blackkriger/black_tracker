@@ -91,6 +91,7 @@ const draft = ref({
 });
 
 const issue = ref<IssueFull | null>(null);
+let issueReads = 0;
 const loading = ref(true);
 const error = ref<string | null>(null);
 const { people, colorOf, colorOfId, nameOf, load: loadPeople } = usePeople();
@@ -559,8 +560,6 @@ useLive((ev) => {
     else flash((ev.fields ?? []).map((f) => FIELD_OF[f] ?? f));
   });
 });
-
-let issueReads = 0;
 
 async function reload(): Promise<void> {
   if (!props.issueKey) return;
