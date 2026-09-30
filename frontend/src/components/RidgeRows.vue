@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// The ridgeline stack from another project, brought over and dressed in this theme: every row is
-// one thing's shape across the same axis, and the rows overlap like a range of hills so the
-// whole set is read at once. The axis itself is named under the stack by whoever draws it.
 import { RIDGE_H, RIDGE_W, ridgePath } from '../lib/ridge';
 
 export interface RidgeRow {
@@ -43,13 +40,9 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
 .rg {
   display: flex;
   flex-direction: column;
-  /* How tall a hill is drawn, and how far the next row stands below it. The difference
-     between the two is the overlap: less of it gives every row more room of its own. */
   --rg-h: 44px;
   --rg-step: 36px;
   --rg-line: color-mix(in srgb, var(--text) 55%, transparent);
-  /* What the area is filled with hides the rows behind each row, so it has to be the very
-     colour of the panel the stack stands on. */
   --rg-area: var(--surface);
   --rg-shadow: color-mix(in srgb, var(--text) 22%, transparent);
 }
@@ -57,8 +50,6 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
   display: flex;
   flex-direction: column;
   padding: 6px 2px 0;
-  /* The first row's headroom is empty by design; the stack is pulled up so that emptiness
-     falls behind the chrome above rather than reading as a gap. */
   margin-top: calc(var(--rg-step) - var(--rg-h));
 }
 .rg-row {
@@ -125,7 +116,6 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
   color: var(--text-muted);
   font: 10px var(--font-ui);
 }
-/* The axis the rows share, named once under the whole stack. */
 .rg-axis {
   display: flex;
   justify-content: space-between;

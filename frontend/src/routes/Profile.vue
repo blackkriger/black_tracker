@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// The account on its own page. Settings hold the same panels, but somebody with no role
-// cannot open settings at all, and this is the one screen left to them.
 import TopBar from '../components/TopBar.vue';
 import ProfilePanels from '../components/ProfilePanels.vue';
 </script>

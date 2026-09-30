@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// Where the tracker opens: what is on your own hands, and under it the calendar — three
-// months of it by default, the whole year when it is asked for. The days somebody marked,
-// the deadlines the issues carry, and how much work went through each day.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -59,7 +56,6 @@ const year = ref(now.getFullYear());
 const who = ref('');
 const loading = ref(true);
 
-/** What is on your own hands, nearest deadline first and the undated ones after them. */
 interface Mine {
   key: string;
   summary: string;
@@ -73,7 +69,6 @@ interface Mine {
 const mine = ref<Mine[]>([]);
 const mineLoading = ref(true);
 
-/** The issues you have starred, the latest star first. */
 interface Starred {
   key: string;
   summary: string;
@@ -85,8 +80,6 @@ interface Starred {
 const starred = ref<Starred[]>([]);
 const starredLoading = ref(true);
 
-// A change made in a window opened from here comes back as this tab's own echo, which the
-// live channel drops; so whatever the window changed, everything this screen lists is re-read.
 function refresh(): void {
   void load();
   void loadMine();
@@ -171,7 +164,6 @@ async function loadMine(): Promise<void> {
   }
 }
 
-// Folded, the calendar is the month before, this one and the next; opened, it is the year.
 const wide = ref(route.query.calendar === 'full');
 
 const shownMonths = computed<{ year: number; month: number }[]>(() => {
@@ -206,8 +198,6 @@ const personChoices = computed(() =>
   people.value.map((p) => ({ value: p.login, label: p.fullName || p.login, color: p.roleColor }))
 );
 
-// Only the latest read's answer is kept: the year or the person changed while a slower read
-// was still out must not be overwritten by it.
 let reads = 0;
 
 async function load(): Promise<void> {
@@ -237,7 +227,6 @@ async function load(): Promise<void> {
   }
 }
 
-// The top bar hands a day over in the address; the screen opens on it.
 function fromAddress(): void {
   const day = String(route.query.day ?? '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
@@ -266,7 +255,6 @@ watch(
   (asked) => (wide.value = asked === 'full')
 );
 watch([year, who, wide], () => void load());
-// The whole screen is made of what other people are doing, so almost everything redraws it.
 const reloadDays = settled(() => void load());
 const reloadLists = settled(() => {
   void loadMine();
@@ -289,15 +277,12 @@ function step(by: number): void {
   year.value += by;
 }
 
-// ── one day, opened ──
 const picked = ref<string | null>(null);
 
 function openDay(key: string): void {
   picked.value = key;
 }
 
-// The window wants the board it sits on and the tags its project can wear; neither is
-// on this screen, so both are read when a deadline is opened.
 interface OpenIssue {
   key: string;
   project: string;
@@ -311,7 +296,6 @@ const openBoards = computed(
   () => projects.value.find((p) => p.shortName === open.value?.project)?.boards ?? []
 );
 
-// A notice points at an issue by its board's slug; the window wants the board itself.
 async function openNotice(n: Notice): Promise<void> {
   if (!n.read) {
     await markRead(n.id);
@@ -646,7 +630,6 @@ function closeIssue(): void {
 </template>
 
 <style scoped>
-/* What is on your own hands: one row per issue, the summary taking whatever is left. */
 .mine {
   display: flex;
   flex-direction: column;
@@ -686,11 +669,9 @@ function closeIssue(): void {
   padding: var(--space-6) var(--space-5);
   overflow-y: auto;
 }
-/* The year takes two thirds of the measure and what is marked on it stands beside it. */
 .sheet--cal {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 }
-/* Three months across, a quarter of the year to a row. */
 .year-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -714,7 +695,6 @@ function closeIssue(): void {
   flex-direction: column;
   gap: 2px;
 }
-/* Two lines, because the column beside the year is a narrow one. */
 .day {
   display: flex;
   flex-direction: column;
@@ -733,7 +713,6 @@ function closeIssue(): void {
   gap: 8px;
   min-width: 0;
 }
-/* A line of the feed: who said what, cut where the column ends. */
 .note__said {
   overflow: hidden;
   white-space: nowrap;
@@ -742,11 +721,9 @@ function closeIssue(): void {
 .note.is-new {
   color: var(--text);
 }
-/* A kind switched off is still there, just not listened to. */
 .kind.is-off {
   opacity: 0.35;
 }
-/* What the icon stands for, held over it until the pointer leaves. */
 .kind__hold {
   position: relative;
   display: inline-flex;
@@ -769,7 +746,6 @@ function closeIssue(): void {
   background: var(--card-hover);
   color: var(--text);
 }
-/* A placeholder row keeps the two lines of a real one and answers nothing. */
 .day--sk {
   width: 100%;
   cursor: default;
@@ -783,12 +759,9 @@ function closeIssue(): void {
 .mine__sk:hover {
   border-color: var(--line);
 }
-/* The starred list is named by its star alone, in the colour a star wears when it is on. */
 .star {
   color: var(--accent);
 }
-/* The starred list is a shortcut, not a feed: one line a row, and never taller than the
-   feed under it — past five it scrolls in place. */
 .days--starred {
   max-height: 176px;
   overflow-y: auto;
@@ -817,7 +790,6 @@ function closeIssue(): void {
   font-size: 13px;
   text-align: left;
 }
-/* A marked day can carry the event's picture, and the picture is the way to it. */
 .mark--kept {
   flex-direction: column;
   align-items: stretch;

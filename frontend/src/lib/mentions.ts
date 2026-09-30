@@ -1,11 +1,8 @@
-// A name written in a comment is shown in the colour of whoever it belongs to: a person's
-// role, or the role itself. Nothing about that colour is stored — it is looked up when the
-// text is drawn, so renaming a role recolours every comment that ever named it.
 import { usePeople } from './people';
 import { useRoles } from './roles';
 import { ink } from './theme';
 
-/** Every name that may follow an `@`, longest first so `@Game designer` wins over `@Game`. */
+// Longest first, so `@Game designer` matches before `@Game`.
 export function knownNames(): { name: string; color: string | null }[] {
   const { people } = usePeople();
   const { roles } = useRoles();
@@ -20,7 +17,6 @@ export function colorOfName(name: string): string | null {
   return knownNames().find((n) => n.name.toLowerCase() === low)?.color ?? null;
 }
 
-/** The name standing at `from` in `text`, if any, and what colour it is written in. */
 export function nameAt(text: string, from: number): { name: string; color: string | null } | null {
   const rest = text.slice(from).toLowerCase();
   return (
@@ -32,11 +28,7 @@ export function nameAt(text: string, from: number): { name: string; color: strin
   );
 }
 
-/**
- * Paints the names inside a piece of already-sanitised markup. It walks the text rather
- * than the markup, so an address inside an href is never touched, and the spans it adds
- * are built here rather than taken from what somebody wrote.
- */
+// Input must already be sanitised; only text nodes are rewritten, so hrefs and markup stay untouched.
 export function paintNames(html: string): string {
   if (!html.includes('@')) return html;
   const box = document.createElement('div');

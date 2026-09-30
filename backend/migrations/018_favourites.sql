@@ -1,5 +1,3 @@
--- Starring an issue is a private mark: whose star it is matters, and nobody else sees it. One row per person per issue.
-
 create table if not exists issue_favourites (
   issue_id   uuid not null references issues (id) on delete cascade,
   user_id    uuid not null references users (id) on delete cascade,

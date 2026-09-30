@@ -9,14 +9,12 @@ function required(key: string): string {
 export const env = {
   port: Number(process.env.PORT ?? 3100),
   databaseUrl: required('DATABASE_URL'),
-  // Signs nothing on its own — it salts the session-token hash kept in the database, so a dump of the sessions table is not a set of usable cookies.
+  // Salts every stored token hash (sessions, API tokens, invites); rotating it voids them all.
   sessionSecret: required('SESSION_SECRET'),
   corsOrigins: (process.env.CORS_ORIGIN ?? 'http://127.0.0.1:5174')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
-  // Attachments live on disk; only their metadata is in the database.
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
-  // Set on prod, where nginx terminates HTTPS: it puts `Secure` on the session cookie.
   secureCookies: process.env.SECURE_COOKIES === 'true',
 };

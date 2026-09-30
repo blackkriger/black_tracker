@@ -1,8 +1,6 @@
 import { ref } from 'vue';
 
-// What a click on a file's name does. The server keeps the same list and is the gate; this
-// side only decides whether to open the reader or let the download happen, and what to call
-// the language while highlighting it.
+// Mirrors READABLE in backend issue-routes.ts, which is the real gate; change both together.
 const READS: Record<string, string> = {
   bat: 'plaintext',
   c: 'c',
@@ -67,8 +65,6 @@ export const canRead = (name: string): boolean => extOf(name) in READS;
 
 export const langOf = (name: string): string => READS[extOf(name)] ?? 'plaintext';
 
-// Whether the reader folds long lines. A habit, like the order comments read in, so it is
-// kept per browser and shared by the reader and the preferences that name it.
 const WRAP = 'tracker:wrap-lines';
 
 function readWrap(): boolean {
@@ -85,7 +81,5 @@ export function setWrapLines(on: boolean): void {
   wrapLines.value = on;
   try {
     localStorage.setItem(WRAP, on ? '1' : '0');
-  } catch {
-    /* private mode — the reader simply starts unfolded next time */
-  }
+  } catch {}
 }

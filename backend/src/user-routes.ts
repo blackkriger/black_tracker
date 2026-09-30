@@ -1,5 +1,3 @@
-// Accounts: there is no sign-up, so this is where people come from. Nobody is ever deleted — an account carries authorship of issues, comments and history — it is switched off instead. Who someone is on the team is handed out by a role right; the account itself — its name, its switch, the creator's key — stays with the creator.
-
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { pool } from './db.js';
@@ -13,7 +11,6 @@ import {
   userById,
 } from './auth.js';
 
-// What it takes to become an account, wherever the account comes from: an admin filling this in, or someone filling it in themselves behind an invite link.
 export const accountCredentials = z.object({
   login: z
     .string()
@@ -31,12 +28,10 @@ const userPatch = z.object({
   fullName: z.string().trim().max(120).optional(),
   isAdmin: z.boolean().optional(),
   active: z.boolean().optional(),
-  /** Null takes the role off; leaving it out keeps whatever they wear. */
   roleId: z.string().uuid().nullable().optional(),
 });
 
 export function registerUserRoutes(app: FastifyInstance): void {
-  // The settings view of the accounts: who there is, what they wear and when they were last seen. A token's tail and the creator's key are the account's own business, so they only travel to the person they belong to.
   app.get('/users', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -53,7 +48,6 @@ export function registerUserRoutes(app: FastifyInstance): void {
     });
   });
 
-  // Everyone signed in needs the names: an assignee picker, a comment's author, a mention later. It carries no dates, no token and no flags — just who there is, and the colour their name is written in.
   app.get('/people', async (req, reply) => {
     if (!(await requireAuth(req, reply))) return;
     const res = await pool.query<{
@@ -106,7 +100,6 @@ export function registerUserRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     const p = parsed.data;
-    // Handing out a role is a right a role can carry; changing the account behind it is not.
     const touchesAccount =
       p.fullName !== undefined || p.isAdmin !== undefined || p.active !== undefined;
     if (touchesAccount && !auth.isAdmin) {
@@ -115,7 +108,6 @@ export function registerUserRoutes(app: FastifyInstance): void {
     if (!touchesAccount && !(await mayManageRoles(auth))) {
       return reply.code(403).send({ error: 'Handing out roles is not open to your role.' });
     }
-    // Locking yourself out is the one mistake this screen can make that nobody in the browser can undo, so both halves of it are refused.
     if (id === auth.userId && (p.isAdmin === false || p.active === false)) {
       return reply.code(409).send({ error: 'You cannot take your own access away.' });
     }
@@ -137,12 +129,10 @@ export function registerUserRoutes(app: FastifyInstance): void {
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'No such account.' });
     const row = await userById(id);
-    // Switching an account off has to end its sessions, or the tab it is open in keeps working until the cookie expires.
     if (p.active === false) await pool.query('delete from sessions where user_id = $1', [id]);
     return reply.send({ data: publicUser(row as NonNullable<typeof row>) });
   });
 
-  // An admin setting a password for someone else: the person changes it themselves from their profile, this is for handing out the first one and for rescues.
   app.post('/users/:id/password', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };

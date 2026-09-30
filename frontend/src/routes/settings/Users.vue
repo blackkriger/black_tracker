@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Who can get in, and what they cannot open. Accounts are never deleted — an account carries authorship of issues, comments and history — so the switch here is on and off. The screen is open to everyone: handing out a role needs the right for it, and what a role itself may do stays with the creator.
 import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
@@ -19,9 +18,7 @@ interface Role {
   id: string;
   name: string;
   color: string;
-  /** May delete projects, boards, statuses and tags. The creator's own key is elsewhere and is not a role. */
   canDelete: boolean;
-  /** May hand this role, or any other, to someone. */
   canManageRoles: boolean;
 }
 
@@ -60,7 +57,6 @@ const { errors, fail, clear } = usePanelErrors();
 const { nameOf, load: loadPeople } = usePeople();
 
 const inviteRole = ref('');
-// A role is picked by its name in its own colour, the same way it is shown everywhere else.
 const roleChoices = computed(() => [
   { value: '', label: '—' },
   ...roles.value.map((r) => ({ value: r.id, label: r.name, color: r.color })),
@@ -71,7 +67,6 @@ const inviteChoices = computed(() => [
 ]);
 
 const inviteBusy = ref(false);
-// Held only until the page is left: the server keeps a hash, so this is the one moment the link exists anywhere readable.
 const freshLink = ref<string | null>(null);
 const copied = ref(false);
 
@@ -79,12 +74,10 @@ const newRole = ref('');
 const accessFor = ref<Role | null>(null);
 const accessCanDelete = ref(false);
 const accessCanManageRoles = ref(false);
-// Two kinds of denial: a whole project, or single boards inside one the role does have.
 const deniedProjects = ref<string[]>([]);
 const deniedBoards = ref<string[]>([]);
 const accessBusy = ref(false);
 
-// Every project, boards or not: a project with nothing on it yet can still be closed to a role.
 const accessProjects = computed(() => projects.value);
 
 const projectDenied = (id: string) => deniedProjects.value.includes(id);
@@ -147,7 +140,6 @@ async function patchRole(role: Role, body: Record<string, unknown>, panel = 'rol
   clear(panel);
   const updated = await api<Role>(`/roles/${role.id}`, { method: 'PATCH', body });
   roles.value = roles.value.map((r) => (r.id === role.id ? updated : r));
-  // Whoever wears it is holding the old name on this screen until it is read again.
   users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: updated } : u));
 }
 
@@ -166,7 +158,6 @@ async function removeRole(): Promise<void> {
     users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: null } : u));
     removingRole.value = null;
   } catch (err) {
-    // The dialog stays open with the reason in it rather than closing on a failure nobody read.
     fail('removeRole', err);
   }
 }
@@ -230,7 +221,6 @@ async function openAccess(role: Role): Promise<void> {
   }
 }
 
-// Closing a project leaves its board denials alone, so re-opening it gives back exactly the picture it had.
 function toggleProject(projectId: string, allowed: boolean): void {
   deniedProjects.value = allowed
     ? deniedProjects.value.filter((id) => id !== projectId)
@@ -512,7 +502,6 @@ async function saveAccess(): Promise<void> {
                 </span>
               </td>
               <td class="c-act">
-                <!-- A used link is the record of how an account came to be, so only an unused one can go. -->
                 <button
                   v-if="i.status !== 'used'"
                   class="btn btn--sm btn--icon btn--ghost"
@@ -605,7 +594,7 @@ async function saveAccess(): Promise<void> {
 </template>
 
 <style scoped>
-/* A block flex row rather than an inline one: an inline box sits on the text baseline, which drops the avatar below the middle of the row. */
+/* display:flex, not inline-flex: an inline box aligns to the text baseline and knocks the avatar off centre. */
 .who {
   display: flex;
   align-items: center;

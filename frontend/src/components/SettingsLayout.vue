@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The frame every admin screen sits in: the top bar, the section list on the left, and whatever the screen puts in the slot.
 import { computed, onMounted, ref } from 'vue';
 import TopBar from './TopBar.vue';
 import { ExternalLink } from 'lucide-vue-next';
@@ -10,7 +9,6 @@ import { useProjects } from '../lib/projects';
 
 const { projects, loaded, load } = useProjects();
 
-// When the running code was last changed, read from the commit the server stands on.
 const updated = ref<string | null>(null);
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
@@ -21,9 +19,7 @@ onMounted(async () => {
   try {
     const got = await api<{ updatedAt: string }>('/version');
     updated.value = got.updatedAt;
-  } catch {
-    // The date is a footnote; the settings themselves do not depend on it.
-  }
+  } catch {}
 });
 
 useLive((ev) => {
@@ -54,7 +50,6 @@ useLive((ev) => {
         <div class="side__h">Workspace</div>
         <RouterLink to="/settings/tags">Tags</RouterLink>
         <RouterLink to="/settings/users">Users &amp; access</RouterLink>
-        <!-- pgweb on the same host, behind its own basic auth: the tracker's session does not open it. -->
         <a href="/db/" target="_blank" rel="noopener noreferrer">
           DB
           <ExternalLink class="ic ic--sm" />
@@ -76,7 +71,6 @@ useLive((ev) => {
 .side .proj__k {
   font-size: 13px;
 }
-/* The links sit at 32px with a 2px gap; the placeholders stand in the same rhythm. */
 .side__sk {
   margin: 0 10px;
 }
@@ -85,7 +79,6 @@ useLive((ev) => {
   display: flex;
   flex-direction: column;
 }
-/* The section list plus the sheet travel as one block, centred: the sheet stays the same 960px it is everywhere else. */
 .page__body {
   flex: 1 1 auto;
   display: flex;
@@ -95,9 +88,6 @@ useLive((ev) => {
   justify-content: center;
   min-height: 0;
 }
-/* The list travels with the page under the bar and is exactly the height the screen leaves
-   it, so its last line, the date the service was last updated, sits at the bottom without
-   ever making the page itself taller. */
 .settings__side {
   position: sticky;
   top: calc(var(--top-h) + var(--space-5));

@@ -1,11 +1,8 @@
-// The shape of an issue as the API hands it over, shared by the board's cards and the view that opens on one.
-
 export interface Person {
   id: string;
   login: string;
 }
 
-/** One picture on the wall, whether it is already uploaded or still waiting to go up. */
 export interface Shot {
   key: string;
   src: string;
@@ -37,12 +34,11 @@ export interface Issue {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
-  /** Starred by whoever is reading it; nobody else's star is visible. */
   favourite: boolean;
   tags: IssueTag[];
 }
 
-/** The reactions a comment may carry, in the order they are offered. The server keeps the same list. */
+// Must match REACTIONS in backend issue-routes.ts; the server rejects anything else.
 export const REACTIONS = [
   '\u{1F44D}',
   '\u{1F44C}',
@@ -62,7 +58,6 @@ export interface Comment {
   reactions: { emoji: string; by: string }[];
   createdAt: string;
   editedAt: string | null;
-  /** Pinned comments sit at the head of the thread. */
   pinnedAt: string | null;
   pinnedBy: string | null;
 }
@@ -86,7 +81,6 @@ export interface Attachment {
   createdAt: string;
 }
 
-/** The other issue of a pair. A link says nothing but "these two are related". */
 export interface IssueLink {
   id: string;
   key: string;
@@ -106,7 +100,6 @@ export interface IssueFull extends Issue {
 
 export const PRIORITIES: Priority[] = ['Critical', 'Major', 'Normal', 'Minor'];
 
-// Which way a thread reads is a habit, not a property of the issue: it is remembered per browser.
 const ORDER_KEY = 'tracker:comment-order';
 export type CommentOrder = 'oldest' | 'newest';
 
@@ -121,13 +114,10 @@ export const commentOrder = {
   set(order: CommentOrder): void {
     try {
       localStorage.setItem(ORDER_KEY, order);
-    } catch {
-      /* private mode — the thread just reads oldest first next time */
-    }
+    } catch {}
   },
 };
 
-/** The colour a priority speaks in, from loudest to quietest. */
 export const priorityColor = (p: Priority): string =>
   ({
     Critical: 'var(--danger-text)',
@@ -136,7 +126,6 @@ export const priorityColor = (p: Priority): string =>
     Minor: 'var(--text-muted)',
   })[p];
 
-/** How many of the four bars are lit, which is how priority reads on a card without relying on hue alone. */
 export const priorityClass = (p: Priority): string =>
   ({ Critical: 'p4', Major: 'p3', Normal: 'p2', Minor: 'p1' })[p];
 
@@ -147,7 +136,6 @@ export function stamp(iso: string | null): string {
     .toUpperCase();
 }
 
-/** A due date reads as the day itself, and turns red once it is behind us. */
 export function dueLabel(date: string | null): { text: string; late: boolean } | null {
   if (!date) return null;
   const today = new Date().toISOString().slice(0, 10);
@@ -159,7 +147,6 @@ export function dueLabel(date: string | null): { text: string; late: boolean } |
   };
 }
 
-/** History is read to answer "when exactly", so it carries the clock as well as the day. */
 export function stampAt(iso: string): string {
   const d = new Date(iso);
   const day = d
@@ -168,7 +155,7 @@ export function stampAt(iso: string): string {
   return `${day} ${d.toLocaleTimeString('en-GB', { hour12: false })}`;
 }
 
-/** One file, ten megabytes. The server holds the same ceiling; this one is here so nobody waits for an upload that was never going to land. */
+// Mirrors the multipart fileSize limit in backend index.ts; change both together.
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 export function fileSize(bytes: number): string {

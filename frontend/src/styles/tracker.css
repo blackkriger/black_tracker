@@ -1,17 +1,6 @@
-/* ==========================================================================
-   tracker — the whole visual system, one file.
-   Palette: near-black with a
-   trace of plum, violet as the single accent, the blade's red for danger and
-   its embers for warnings and focus, with a light twin under
-   [data-theme="light"]. Square swatches, radius 0 everywhere, IBM Plex
-   throughout.
-   Class names map 1:1 to the Vue components under src/components.
-   ========================================================================== */
-
 :root {
   color-scheme: dark;
   accent-color: var(--accent-fill);
-  /* surfaces */
   --bg: #0f0f0f;
   --surface: #161416;
   --card: #1c191c;
@@ -20,18 +9,16 @@
   --line-2: #3b353b;
   --line-3: #4a434a;
   --wash: #fff;
-  /* text */
   --text: #eee9ee;
   --text-dim: #aaa1aa;
   --text-muted: #7b727b;
-  --text-faint: #625a62;   /* an empty line under a label: quieter than the label itself */
-  /* accents */
-  --accent: #c28bcc;          /* violet — active state, links, keys */
+  --text-faint: #625a62;
+  --accent: #c28bcc;
   --accent-bright: #dcb3e3;
-  --accent-fill: #93509f;     /* violet as a surface — primary action */
+  --accent-fill: #93509f;
   --accent-fill-hover: #a562b1;
   --on-accent: #fff;
-  --focus: #faa457;           /* keyboard focus + drop targets only */
+  --focus: #faa457;
   --danger: #d52027;
   --danger-text: #f2624a;
   --warn: #faa457;
@@ -44,17 +31,13 @@
   --shadow-sm: 0 8px 24px rgba(0, 0, 0, .5);
   --shadow-md: 0 12px 32px rgba(0, 0, 0, .6);
   --shadow-lg: 0 24px 64px rgba(0, 0, 0, .7);
-  /* avatar palette (from another project --mono-cN) */
   --mono-c0: #3f6fb0; --mono-c1: #b8763a; --mono-c2: #4a6a8c; --mono-c3: #9c4848;
   --mono-c4: #3c5a96; --mono-c5: #3a7ca8; --mono-c6: #5a6a4a; --mono-c7: #7a4a8c;
-  /* type */
   --font-ui: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
-  --font-num: 'IBM Plex Mono', 'Consolas', monospace;     /* issue keys, counts, dates */
-  --font-mono: 'IBM Plex Mono', 'Consolas', monospace;    /* code in markdown */
-  /* spacing (another project scale) */
+  --font-num: 'IBM Plex Mono', 'Consolas', monospace;
+  --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-8: 48px;
-  /* layout */
   --top-h: 56px;
   --col-w: 272px;
   --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
@@ -94,8 +77,6 @@
   --shadow-lg: 0 24px 64px rgba(29, 23, 29, .22);
 }
 
-/* ---------- base ---------- */
-/* The artboards carried the background on `.app` because each one was a fixed-size box; a real page needs it on the document, or a short screen like sign-in shows white below the fold. */
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font-ui); }
 *, *::before, *::after { box-sizing: border-box; }
 #app { min-height: 100vh; }
@@ -105,7 +86,6 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 .num { font-family: var(--font-num); }
 .sp { flex: 1 1 auto; }
 a { color: var(--accent); } a:hover { color: var(--accent-bright); }
-/* Every icon is drawn at the same weight and sits on the text's own colour. */
 .ic { flex: none; width: 14px; height: 14px; stroke-width: 1.5; }
 .ic--sm { width: 12px; height: 12px; }
 
@@ -113,8 +93,6 @@ a { color: var(--accent); } a:hover { color: var(--accent-bright); }
 svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
 button { font-family: var(--font-ui); }
 
-/* ---------- top bar: project, boards, view, actions ---------- */
-/* The bar stays in view however far a page is scrolled, so it needs a ground of its own to hide what passes under it. */
 .top { position: sticky; top: 0; z-index: 3; flex: none; display: flex; align-items: center; gap: 16px; height: var(--top-h); padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--bg); }
 .proj { display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px 0 0; border: 0; background: none; color: var(--text); font: 600 14px var(--font-ui); cursor: pointer; }
 .proj:hover .proj__name { color: var(--accent-bright); }
@@ -134,7 +112,6 @@ button { font-family: var(--font-ui); }
 .user { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; background: none; text-decoration: none; cursor: pointer; }
 .user:hover, .user[aria-current] { border-color: var(--line-2); }
 
-/* ---------- tag bar: tags in a row under the top bar ---------- */
 .tagbar { position: relative; z-index: 2; flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 24px; }
 .tf { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid transparent; background: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer; white-space: nowrap; }
 .tf b { width: 7px; height: 7px; background: var(--c); flex: none; }
@@ -143,23 +120,17 @@ button { font-family: var(--font-ui); }
 .tf:focus-visible, .tf.is-focus { outline: none; box-shadow: var(--focus-ring); }
 .tf .n { font: 11px/1 var(--font-num); color: var(--text-muted); }
 
-/* ---------- sheet: the one measure every screen lays panels on ----------
-   960px across, split into two equal columns. A panel takes one column, or
-   the whole row with `.sheet__wide`. Nothing sets its own width. */
 .sheet { width: 960px; max-width: 100%; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .sheet__wide { grid-column: 1 / -1; }
-/* Panels stacked inside one column of the sheet. */
 .stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 @media (max-width: 880px) {
   .sheet { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* A row that adds something to the list above it: the field takes the width, the button sits beside it at the same height. */
 .addrow { display: flex; gap: 6px; align-items: stretch; margin-top: 12px; }
 .addrow .input { flex: 1 1 auto; height: 34px; }
 .addrow .btn { height: 34px; }
 
-/* ---------- panel (replaces the PSone window inside the tracker) ---------- */
 .panel { position: relative; background: var(--surface); border: 1px solid var(--line); }
 .panel__h { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--line); font: 600 14px var(--font-ui); color: var(--text); }
 .panel__end { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 400; color: var(--text-muted); }
@@ -168,7 +139,6 @@ button { font-family: var(--font-ui); }
 .group { background: var(--bg); border: 1px solid var(--line); }
 .group__h { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--text-dim); }
 
-/* ---------- board ---------- */
 .board-wrap { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .board { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; gap: 12px; padding: 16px 24px; overflow-x: auto; }
 .col { flex: 0 0 var(--col-w); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); }
@@ -184,13 +154,11 @@ button { font-family: var(--font-ui); }
 .more { display: flex; align-items: center; justify-content: center; height: 30px; border: 0; background: none; color: var(--text-muted); font-size: 12.5px; cursor: pointer; }
 .more:hover { color: var(--text); background: color-mix(in srgb, var(--wash) 3%, transparent); }
 
-/* "Add issue…" — never "+ Add" */
 .add { display: flex; align-items: center; width: 100%; height: 32px; padding: 0 8px; border: 0; background: none; color: var(--text-muted); font-size: 13px; text-align: left; cursor: pointer; }
 .add:hover, .add.is-hover { color: var(--text); background: color-mix(in srgb, var(--wash) 3%, transparent); }
 .add:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .composer__row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 
-/* ---------- card ---------- */
 .card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); color: var(--text); text-decoration: none; cursor: grab; transition: border-color .12s, background-color .12s; }
 .card:hover, .card.is-hover { background: var(--card-hover); border-color: var(--line-2); color: var(--text); }
 .card:focus-visible, .card.is-focus { outline: none; box-shadow: var(--focus-ring); }
@@ -207,7 +175,6 @@ button { font-family: var(--font-ui); }
 .drop-line::before, .drop-line::after { content: ""; position: absolute; top: -2px; width: 6px; height: 6px; background: var(--focus); }
 .drop-line::before { left: -2px; } .drop-line::after { right: -2px; }
 
-/* priority = number of lit bars (shape, not only hue) */
 .prio { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; margin-left: auto; flex: none; }
 .prio i { width: 3px; background: color-mix(in srgb, var(--wash) 10%, transparent); }
 .prio i:nth-child(1) { height: 4px; } .prio i:nth-child(2) { height: 7px; }
@@ -222,13 +189,11 @@ button { font-family: var(--font-ui); }
 .tag { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 6px; background: color-mix(in srgb, var(--wash) 5%, transparent); font-size: 11.5px; line-height: 1; color: var(--text-dim); white-space: nowrap; }
 .tag b { width: 6px; height: 6px; background: var(--c); flex: none; }
 .tag--more { background: none; color: var(--text-muted); }
-/* A tag as a label in its own colour: square corners, dark text, the way a tag reads on a board card and in settings alike. */
 .taglabel { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px 0 9px; background: var(--c); color: #12131a; font-size: 12.5px; font-weight: 500; }
 .taglabel--plain { padding: 0 9px; }
 .taglabel--sm { height: 18px; padding: 0 6px; font-size: 11px; }
 .taglabel__x { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: 0; background: none; color: inherit; opacity: .55; cursor: pointer; font-size: 12px; }
 .taglabel__x:hover:enabled { opacity: 1; background: rgba(0, 0, 0, .18); }
-/* The cross on a tag has no border to dash, so a closed one simply goes quiet. */
 .taglabel__x:disabled { opacity: .3; cursor: not-allowed; }
 .taglabel__input { height: 20px; padding: 0 4px; border: 0; background: rgba(0, 0, 0, .22); color: inherit; font: 500 12.5px var(--font-ui); }
 .taglabels { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -241,13 +206,11 @@ button { font-family: var(--font-ui); }
 .av--none { background: none; border: 1px dashed var(--line-2); color: var(--text-muted); }
 .api { font: 10px/1 var(--font-num); letter-spacing: .06em; color: var(--focus); border: 1px solid color-mix(in srgb, var(--focus) 35%, transparent); padding: 1px 3px 0; }
 
-/* ---------- buttons ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--line-2); background: none; color: var(--text); font: 500 13px/1 var(--font-ui); white-space: nowrap; cursor: pointer; text-decoration: none; }
 .btn:hover, .btn.is-hover { background: var(--surface); border-color: var(--line-3); color: var(--text); }
 .btn:active, .btn.is-active { background: var(--bg); transform: translate(0, 1px); }
 .btn:focus-visible, .btn.is-focus { outline: none; box-shadow: var(--focus-ring); }
 .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; background: none; border-color: var(--line-2); }
-/* Not missing, not broken — closed to you. A dashed outline reads as a button that is there but will not act. */
 .btn:disabled, .btn--icon:disabled { border-style: dashed; }
 .btn--primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 .btn--primary:hover, .btn--primary.is-hover { background: var(--accent-fill-hover); border-color: var(--accent-fill-hover); color: var(--on-accent); }
@@ -258,17 +221,14 @@ button { font-family: var(--font-ui); }
 .btn--danger:active, .btn--danger.is-active { background: color-mix(in srgb, var(--danger) 85%, #000); border-color: color-mix(in srgb, var(--danger) 85%, #000); color: var(--on-accent); }
 .btn--danger:disabled { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .btn--ghost { border-color: transparent; color: var(--text-dim); }
-/* A ghost button lights up the way the top bar's links do: the mark itself, no plate behind it. */
 .btn--ghost:hover, .btn--ghost.is-hover { background: none; border-color: transparent; color: var(--text); }
 .btn--sm { height: 26px; padding: 0 8px; font-size: 12px; }
 .btn--icon { width: 32px; padding: 0; }
 .btn--sm.btn--icon { width: 26px; }
 
-/* ---------- inputs ---------- */
 .field { display: flex; flex-direction: column; gap: 6px; }
 .label { font-size: 12px; color: var(--text-dim); }
 .input { width: 100%; height: 34px; padding: 0 10px; background: var(--bg); border: 1px solid var(--line-2); color: var(--text); font: 13px var(--font-ui); outline: none; }
-/* A field that cannot be changed is not a place to put the caret: no focus, no ring, nothing to select. It still reads as a field, because it is one — it just shows a value. */
 input.input[readonly] { color: var(--text-dim); pointer-events: none; user-select: none; }
 textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertical; }
 .input::placeholder { color: var(--text-muted); }
@@ -289,7 +249,7 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .check input:checked { border-color: var(--accent-fill); background: var(--accent-fill); }
 .check input:checked::after { content: ""; width: 8px; height: 4px; border-left: 2px solid var(--on-accent); border-bottom: 2px solid var(--on-accent); transform: rotate(-45deg) translate(1px, -1px); }
 .check input[type="radio"]:checked::after { width: 6px; height: 6px; border: 0; background: var(--on-accent); transform: none; }
-/* Half of what is below it is off: a dash, not a tick. After the checked rules, because the box is both at once. */
+/* Keep after the :checked rules: an indeterminate box can also match :checked. */
 .check input:indeterminate { border-color: var(--accent-fill); background: var(--accent-fill); }
 .check input:indeterminate::after { content: ""; width: 8px; height: 2px; border: 0; background: var(--on-accent); transform: none; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; color: var(--text-dim); cursor: pointer; font-size: 12px; }
@@ -301,7 +261,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .select:hover { border-color: var(--line-3); }
 .select:disabled { color: var(--text-muted); cursor: default; }
 
-/* ---------- filter chips (issue list) ---------- */
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid transparent; background: none; color: var(--text-dim); font-size: 13px; white-space: nowrap; cursor: pointer; }
 .chip:hover, .chip.is-hover { background: var(--surface); color: var(--text); }
 .chip.on { background: var(--surface); border-color: var(--line-2); color: var(--text); }
@@ -309,7 +268,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .chip .n { font: 12px/1 var(--font-num); color: var(--accent); }
 .fcount { font: 12px/1 var(--font-num); background: var(--accent-fill); color: var(--on-accent); padding: 2px 6px 1px; }
 
-/* ---------- table ---------- */
 .tbl { width: 100%; border-collapse: collapse; }
 .tbl th { height: 36px; padding: 0 12px; text-align: left; font-weight: 500; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--line); white-space: nowrap; }
 .tbl th button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
@@ -325,7 +283,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .st { display: inline-flex; align-items: center; gap: 7px; }
 .st b { width: 8px; height: 8px; background: var(--c); flex: none; }
 
-/* ---------- menus / popovers ---------- */
 .menu { min-width: 200px; padding: 4px 0; background: var(--card); border: 1px solid var(--line-2); box-shadow: var(--shadow-md); }
 .menu__h { padding: 8px 12px 4px; font-size: 11.5px; color: var(--text-muted); }
 .menu__i { display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; padding: 0 12px; border: 0; background: none; color: var(--text); font-size: 13px; text-align: left; cursor: pointer; }
@@ -335,7 +292,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .menu__i--danger { color: var(--danger-text); }
 .menu__i--danger:hover, .menu__i--danger.is-hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
-/* A small box held over what it speaks about, with a pointer under it: the selection bar, the time a comment was edited, a day on the calendar. */
 .selbar { position: fixed; z-index: 50; display: flex; transform: translate(-50%, calc(-100% - 8px)); background: var(--card); border: 1px solid var(--line-2); box-shadow: var(--shadow-sm); transition: opacity .12s ease-out; }
 .selbar::before, .selbar::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px; border: 6px solid transparent; }
 .selbar::before { border-top-color: var(--line-2); }
@@ -343,15 +299,12 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .selbar button { height: 28px; padding: 0 14px; border: 0; background: none; color: var(--text-dim); font: 13px var(--font-ui); cursor: pointer; }
 .selbar button:hover { color: var(--text); }
 
-/* ---------- full-screen viewer (a picture, a file) ---------- */
 .iviewer { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: rgba(0, 0, 0, .88); user-select: none; }
-/* Three columns of equal weight on the outside: the name reads from the left edge, the close sits on the right, and whatever the middle carries stays in the middle of the screen however long the name is. */
 .iviewer__bar { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--line); }
 .iviewer__nav { display: flex; align-items: center; gap: 8px; }
 .iviewer__close { justify-self: end; }
 .iviewer__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-muted); }
 
-/* ---------- dialog (forms & confirmations) ---------- */
 .dlg { background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow-lg); }
 .dlg__h { flex: none; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 8px 0 20px; border-bottom: 1px solid var(--line); font: 600 14px var(--font-ui); }
 .dlg__h span { flex: 1; }
@@ -359,7 +312,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .dlg__f { flex: none; display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 20px; }
 .scrim { position: absolute; inset: 0; z-index: 6; background: rgba(0, 0, 0, .7); }
 
-/* ---------- side nav (admin) ---------- */
 .side { display: flex; flex-direction: column; gap: 2px; }
 .side__h { padding: 12px 10px 6px; font-size: 11.5px; color: var(--text-muted); }
 .side a { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 32px; padding: 0 10px; color: var(--text-dim); text-decoration: none; font-size: 13px; }
@@ -367,8 +319,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .side a[aria-current] { color: var(--text); background: var(--surface); }
 .side a .num { font-size: 16px; color: var(--text-muted); }
 
-/* Something changed under you: the field or the card holds a tint for two seconds and lets go. */
-/* Working: the control is disabled and breathing, so nobody presses it twice. */
 @keyframes busy {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
@@ -381,10 +331,8 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 }
 .is-fresh { animation: fresh 2s ease-out; }
 
-/* ---------- skeleton / empty ---------- */
 .sk { background: linear-gradient(90deg, color-mix(in srgb, var(--wash) 4%, transparent) 0%, color-mix(in srgb, var(--wash) 9%, transparent) 50%, color-mix(in srgb, var(--wash) 4%, transparent) 100%); background-size: 200% 100%; animation: sk 1.4s linear infinite; }
 @keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-/* Each shape is the height of the real control it waits for, so nothing moves when the data lands. */
 .sk--line { display: block; height: 12px; }
 .sk--field { display: block; height: 34px; }
 .sk--ctl { display: block; height: 26px; }
@@ -396,7 +344,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .empty--sm { padding: 20px 12px; gap: 6px; font-size: 12.5px; }
 .empty--sm .empty__g { font-size: 26px; }
 
-/* ---------- issue view ---------- */
 .iv { display: grid; grid-template-columns: minmax(0, 1fr) 304px; min-height: 0; }
 .iv__main { display: flex; flex-direction: column; gap: 22px; padding: 20px 24px 24px; border-right: 1px solid var(--line); min-width: 0; }
 .iv__title { margin: -5px -7px; padding: 4px 6px; border: 1px solid transparent; font: 600 22px/1.3 var(--font-ui); color: var(--text); cursor: text; }
@@ -410,7 +357,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .md h4 { font-size: 13.5px; }
 .md blockquote { margin: 0 0 10px; padding-left: 10px; border-left: 2px solid var(--line-2); color: var(--text-dim); }
 .md pre { margin: 0 0 10px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); font: 12.5px var(--font-mono); overflow-x: auto; }
-/* A bulleted list is an <ol> with data-list="bullet" — Quill's doing, and the reader has to honour it. */
 .md ol li[data-list="bullet"] { list-style-type: disc; }
 .md ol li[data-list="ordered"] { list-style-type: decimal; }
 .md code { font: 12.5px var(--font-mono); padding: 1px 5px; background: var(--bg); border: 1px solid var(--line); }
@@ -418,7 +364,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .itabs { display: flex; border-bottom: 1px solid var(--line); }
 .itab { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 0; background: none; color: var(--text-dim); font-size: 13px; cursor: pointer; }
 .itab:hover { color: var(--text); }
-/* The tab you are on says so in violet, like everything else that is current here: no bar under it. */
 .itab[aria-selected="true"] { color: var(--text); }
 .itab .n { font: 12px/1 var(--font-num); color: var(--text-muted); }
 .props { display: flex; flex-direction: column; padding: 14px 16px; gap: 2px; }
@@ -430,23 +375,19 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .pv--ro { cursor: default; }
 .pv--ro:hover { border-color: transparent; background: none; }
 .stamp { font: 11px/1.2 var(--font-num); color: var(--text-muted); }
-/* A name written in a comment, in the colour of whoever it belongs to. */
 .mention { font-weight: 500; }
 .hr { height: 1px; background: var(--line); margin: 8px 0; }
 
-/* attachments */
 .att__cap { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 8px; font-size: 12px; color: var(--text-dim); }
 .att__cap span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .drop { display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px dashed var(--focus); background: color-mix(in srgb, var(--focus) 6%, transparent); color: var(--focus); font-size: 13px; }
 .drop--idle { border-color: var(--line-2); background: none; color: var(--text-muted); }
-/* painted placeholders for screenshots (no real assets in the mock) */
 .shot-a { background: linear-gradient(180deg, #1a1450 0%, #2c2170 52%, #4a3418 52%, #2a1c0c 100%); }
 .shot-a::after { content: ""; position: absolute; left: 38%; bottom: 44%; width: 10%; height: 18%; background: #e8c267; box-shadow: 30px 6px 0 -2px #ff5066; }
 .shot-b { background: linear-gradient(180deg, #0f2a3a 0%, #1d4d4a 58%, #1c3a1c 58%, #0f220f 100%); }
 .shot-b::after { content: ""; position: absolute; left: 20%; bottom: 36%; width: 60%; height: 3px; background: var(--focus); box-shadow: 0 -10px 0 var(--focus), 0 10px 0 color-mix(in srgb, var(--focus) 40%, transparent); }
 .shot-d { background: repeating-linear-gradient(90deg, #2a1f6a 0 12px, #231a5c 12px 24px); }
 
-/* comments */
 .cm { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
 .cm__head { display: flex; align-items: center; gap: 10px; height: 22px; font-size: 13px; }
 .cm__who { font-weight: 600; color: var(--text); }
@@ -457,10 +398,8 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .mdbar { display: flex; align-items: center; gap: 2px; height: 32px; padding: 0 4px; border: 1px solid var(--line-2); border-bottom: 0; background: var(--bg); }
 .mdbar button { height: 24px; min-width: 26px; padding: 0 8px; border: 0; background: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer; }
 .mdbar button:hover { color: var(--text); background: var(--surface); }
-/* An active format is violet, not underlined: the same rule the rest of the interface follows — the mark itself lights up. */
 .mdbar button[aria-pressed="true"] { color: var(--accent); }
 
-/* history */
 .hist { display: flex; flex-direction: column; }
 .hi { display: grid; grid-template-columns: 104px 56px minmax(0, 1fr); gap: 12px; align-items: center; min-height: 34px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .hi time { font: 11px/1 var(--font-num); color: var(--text-muted); }
@@ -470,7 +409,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .hi__t { color: var(--text); }
 .hi__arrow { color: var(--text-muted); }
 
-/* spec sheet helpers (annotation layer, not UI) */
 .spec { font: 10.5px/1.2 var(--font-num); color: var(--focus); letter-spacing: .02em; }
 .spec-h { margin: 0; font: 600 15px var(--font-ui); color: var(--text); }
 .state-l { font-size: 12px; color: var(--text-muted); }

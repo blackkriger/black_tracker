@@ -1,15 +1,11 @@
--- Statuses move from the project to the board. A board is no longer a saved filter over shared columns: it owns its columns, the way Kaiten and Trello do, so one project can run a dev board with four statuses beside an art board with seven. An issue therefore lives on one board, and its status is that board's.
-
 alter table boards add column if not exists default_state_id uuid;
 alter table states add column if not exists board_id uuid references boards(id) on delete cascade;
 
--- Every project that had statuses but no board gets one to hold them.
 insert into boards (project_id, name, position)
 select p.id, 'Board', 0
   from projects p
  where not exists (select 1 from boards b where b.project_id = p.id);
 
--- Existing statuses land on the project's first board, in the order they already had.
 update states s
    set board_id = (
      select b.id from boards b
@@ -21,7 +17,6 @@ update states s
 
 delete from states where board_id is null;
 
--- The board inherits the default the project used to carry, or its first status.
 update boards b
    set default_state_id = coalesce(
      (select p.default_state_id from projects p
@@ -42,9 +37,7 @@ alter table boards
   add constraint boards_default_state_fk
   foreign key (default_state_id) references states(id) on delete set null;
 
--- A board is a container now, not a stored query.
 alter table boards drop column if exists filter_json;
 
--- Which board an issue sits on. There are no issues yet, so the column lands filled-in-advance rather than backfilled.
 alter table issues add column if not exists board_id uuid references boards(id) on delete cascade;
 create index if not exists issues_board_idx on issues (board_id, state_id);

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The modal every confirmation and short form uses: a dimmed page, a panel in the middle, Esc and a click outside to leave. It teleports to <body> so no parent's stacking context can trap it.
 import { onMounted, onUnmounted } from 'vue';
 import { X } from 'lucide-vue-next';
 

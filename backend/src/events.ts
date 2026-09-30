@@ -1,32 +1,21 @@
-// One channel for the whole tracker. Every write that other people would want to know about is announced here, and every open tab is listening: a board redraws the moment someone else moves a card, and an issue someone is reading updates under them with the changed field lit up.
-//
-// Server-sent events rather than websockets: the traffic is one-way, it rides the same HTTPS the API does, and the browser reconnects on its own. A comment line every 25 seconds keeps the proxy from deciding an idle stream is a dead one.
-
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { requireAuth, type Auth } from './auth.js';
 import { pool } from './db.js';
 import { DENIES_NOTHING, deniedFor, type Denials } from './board-service.js';
 
 export interface LiveEvent {
-  /** 'issue.created', 'issue.moved', 'comment.added' — the noun and what happened to it. */
   type: string;
-  /** Who may hear it: a listener whose role cannot open this board is simply not told. */
   boardId?: string | null;
   projectId?: string | null;
   issueId?: string;
   issueKey?: string;
   commentId?: string;
-  /** Which fields changed, so the reader can light them up rather than guess. */
   fields?: string[];
-  /** The login behind the change, for the history line and for who to blame. */
   by?: string;
-  /** The tab that caused it: that one tab already shows the change and is told to ignore the echo. */
   origin?: string;
-  /** The one account this is for. Set, nobody else hears it at all — a private mark stays private. */
   only?: string;
 }
 
-/** Which tab a request came from, when it said. */
 export const tabOf = (req: { headers: Record<string, unknown> }): string =>
   typeof req.headers['x-tab-id'] === 'string' ? (req.headers['x-tab-id'] as string) : '';
 
@@ -37,7 +26,6 @@ interface Client {
   deniedAt: number;
 }
 
-/** Null when the account is gone or switched off, which ends the stream. */
 async function stillAllowed(client: Client): Promise<Denials | null> {
   const res = await pool.query<{ is_admin: boolean; role_id: string | null; active: boolean }>(
     'select is_admin, role_id, active from users where id = $1',
@@ -50,12 +38,12 @@ async function stillAllowed(client: Client): Promise<Denials | null> {
 }
 
 const DENIALS_TTL = 30_000;
+// Keep under nginx's proxy_read_timeout, or it closes streams that go quiet.
 const HEARTBEAT_MS = 25_000;
 
 const clients = new Map<number, Client>();
 let nextId = 1;
 
-// The connection outlives any single request, so what the listener is allowed to hear is re-read on a timer: a role swapped or an account switched off has to take effect without waiting for them to reload.
 async function denialsFresh(client: Client): Promise<Denials | null> {
   if (Date.now() - client.deniedAt <= DENIALS_TTL) return client.denied;
   const denied = await stillAllowed(client);
@@ -76,15 +64,12 @@ export async function publish(event: LiveEvent): Promise<void> {
   if (!clients.size) return;
   const { only, ...told } = event;
   const line = `data: ${JSON.stringify({ ...told, at: new Date().toISOString() })}\n\n`;
-  // Listeners share roles, and a role's denials are the same for all of them: read once per role, not once per tab.
   const perRole = new Map<string, Denials | null>();
   for (const [id, client] of clients) {
-    // A socket can die without the close handler running — a write to it would be swallowed and the client would sit in the map for good.
     if (client.reply.raw.destroyed || client.reply.raw.writableEnded) {
       clients.delete(id);
       continue;
     }
-    // Meant for one account: everyone else is passed over before anything is read for them.
     if (only && client.auth.userId !== only) continue;
     let denied: Denials | null;
     const roleKey = `${client.auth.userId}`;
@@ -92,11 +77,9 @@ export async function publish(event: LiveEvent): Promise<void> {
       if (!perRole.has(roleKey)) perRole.set(roleKey, await denialsFresh(client));
       denied = perRole.get(roleKey) ?? null;
     } catch {
-      // A blip reading the denials is not a reason to forget a listener: it keeps its stream and misses this one event.
       continue;
     }
     if (!denied) {
-      // The account is off. Ending the stream is what tells the browser to stop asking.
       client.reply.raw.end();
       clients.delete(id);
       continue;
@@ -106,9 +89,8 @@ export async function publish(event: LiveEvent): Promise<void> {
   }
 }
 
-// Everything that is not an issue — a project renamed, a status added, a tag merged, an account switched off — is announced by one hook rather than by twenty handlers that would drift apart. The screens hear the noun and read their own data again; the issue routes say more about themselves because a card needs to know which field to light up.
 const TOPICS: [RegExp, string][] = [
-  // Boards and statuses live under a project's path, so they are matched before it.
+  // First match wins, so a nested path must come before its parent.
   [/^\/projects\/[^/]+\/boards/, 'board'],
   [/^\/projects/, 'project'],
   [/^\/boards\/[^/]+\/states/, 'state'],
@@ -122,7 +104,6 @@ const TOPICS: [RegExp, string][] = [
   [/^\/notices/, 'notice'],
 ];
 
-// These say enough about themselves already.
 const SPOKEN_FOR = /^\/(issues|comments|attachments)|\/issues/;
 
 export function registerChangeFeed(app: FastifyInstance): void {
@@ -147,10 +128,10 @@ export function registerEventRoutes(app: FastifyInstance): void {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
-      // nginx honours this and stops buffering, which is what turns a stream into a stream.
+      // Stops nginx buffering the event stream.
       'X-Accel-Buffering': 'no',
     });
-    // Without a listener, an error on a socket that died mid-write is unhandled and takes the process with it.
+    // Without an 'error' listener, a socket dying mid-write crashes the process.
     reply.raw.on('error', () => {
       clients.delete(id);
     });

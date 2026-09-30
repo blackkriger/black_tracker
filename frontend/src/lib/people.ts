@@ -1,5 +1,3 @@
-// Who there is, read once per page load and shared: every screen that names somebody
-// needs the same list, and the colour a name is written in is the colour of their role.
 import { computed, ref } from 'vue';
 import { api } from './api';
 
@@ -7,7 +5,6 @@ export interface Person {
   id: string;
   login: string;
   fullName: string;
-  /** Their role's colour, or null while they wear none. */
   roleColor: string | null;
 }
 
@@ -22,7 +19,6 @@ export function usePeople() {
   return {
     people,
     loaded,
-    /** The colour a name is written in; undefined leaves it the plain text colour. */
     colorOf(login: string | null | undefined): string | undefined {
       return (login && byLogin.value.get(login)?.roleColor) || undefined;
     },
@@ -36,15 +32,12 @@ export function usePeople() {
     },
     async load(force = false): Promise<void> {
       if (loaded.value && !force) return;
-      // Several screens mount at once on a cold load; they all wait on the same request.
       inflight ??= api<Person[]>('/people')
         .then((rows) => {
           people.value = rows;
           loaded.value = true;
         })
-        .catch(() => {
-          /* a name simply stays uncoloured */
-        })
+        .catch(() => {})
         .finally(() => {
           inflight = null;
         });

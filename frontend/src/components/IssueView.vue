@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// One issue, opened over the board it lives on: the text on the left, what it is on the right, and underneath it everything that has been said and done about it. Every edit is its own small write — there is no Save for the issue as a whole.
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
@@ -58,19 +57,13 @@ interface State {
 }
 
 const props = defineProps<{
-  /** The issue being read. Absent means this window is writing a new one. */
   issueKey?: string;
-  /** The column a new issue starts in. */
   createIn?: string | null;
   board: { id: string; name: string; states: State[] };
-  /** Every board of the project, so an issue can be moved to another one. */
   boards: { id: string; name: string; slug: string }[];
   tags: IssueTag[];
-  /** The project's key, which is what a tag made here can be scoped to. */
   project: string;
-  /** What the issue being written will be called once it exists. */
   nextKey?: string;
-  /** A comment to scroll to and light up, when the window was opened by a notice. */
   focusComment?: string;
 }>();
 
@@ -86,7 +79,6 @@ const emit = defineEmits<{
 const session = useSession();
 
 const creating = computed(() => !props.issueKey);
-// What a new issue is so far. An existing one is written a field at a time; this one is written all at once, when it is saved.
 const draft = ref({
   summary: '',
   description: '',
@@ -107,7 +99,6 @@ const { wanted, pending: askedFor } = useFocus();
 const tab = ref<'comments' | 'history'>('comments');
 const order = ref<CommentOrder>(commentOrder.get());
 
-// Pinned first whichever way the rest reads.
 const thread = computed(() =>
   [...(issue.value?.comments ?? [])].sort(
     (a, b) =>
@@ -123,13 +114,11 @@ function flipOrder(): void {
   commentOrder.set(order.value);
 }
 
-// The title and the description are the issue's text: they are edited together, deliberately, and saved in one write.
 const editing = ref(false);
 const saving = ref(false);
 const titleDraft = ref('');
 const bodyDraft = ref('');
 
-// Linking: the chain opens a small window that searches by key or by title, and the pair is all that is stored.
 const picking = ref(false);
 const linkQuery = ref('');
 const linkResults = ref<IssueLink[]>([]);
@@ -138,7 +127,6 @@ const linking = ref(false);
 const pendingLinks = ref<IssueLink[]>([]);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-// What is shown beside the chain: the issue's links, or the ones a new issue will be given.
 const shownLinks = computed(() => (creating.value ? pendingLinks.value : (issue.value?.links ?? [])));
 
 watch(linkQuery, (term) => {
@@ -148,7 +136,6 @@ watch(linkQuery, (term) => {
     linkResults.value = [];
     return;
   }
-  // A keystroke is not a query: the search waits for the typing to stop.
   searchTimer = setTimeout(async () => {
     searching.value = true;
     try {
@@ -172,11 +159,7 @@ function openPicker(): void {
 }
 
 const commentDraft = ref('');
-// What was typed and not posted, kept per issue in this browser. It is a draft, not a
-// record: nobody else needs it and it never reaches the server.
 const DRAFTS = 'tracker:draft:';
-// An issue being written is kept the same way, one per board: what you were starting on
-// that board is what comes back when you open a new issue there again.
 const NEW_DRAFTS = 'tracker:new:';
 let keptDraft = '';
 const draftSaved = ref(false);
@@ -198,9 +181,7 @@ function writeNew(summary: string, description: string): void {
     } else {
       localStorage.removeItem(NEW_DRAFTS + props.board.id);
     }
-  } catch {
-    /* a browser that refuses storage simply keeps no draft */
-  }
+  } catch {}
 }
 
 function keepNew(): void {
@@ -222,12 +203,9 @@ function writeDraft(text: string): void {
   try {
     if (text) localStorage.setItem(DRAFTS + props.issueKey, text);
     else localStorage.removeItem(DRAFTS + props.issueKey);
-  } catch {
-    /* a browser that refuses storage simply keeps no draft */
-  }
+  } catch {}
 }
 
-// On the way out of the field, and only when there is something new to keep.
 function keepDraft(): void {
   if (!props.issueKey) return;
   const text = isBlank(commentDraft.value) ? '' : commentDraft.value;
@@ -244,7 +222,6 @@ function keepDraft(): void {
 }
 const composer = ref<InstanceType<typeof RichText> | null>(null);
 
-// Selecting text inside a comment raises a small bar over it: copy what is highlighted, or answer it with a quote. It fades when the cursor wanders off and is gone once the selection is.
 const popup = ref<{ x: number; y: number; commentId: string; above: boolean } | null>(null);
 const popupNear = ref(true);
 
@@ -258,7 +235,7 @@ function commentUnder(node: Node | null): string | null {
 }
 
 function onMouseUp(): void {
-  // After the mouse is up the browser still has the old selection for a tick.
+  // On mouseup the browser has not updated the selection yet, so read it a tick later.
   setTimeout(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
@@ -275,7 +252,6 @@ function onMouseUp(): void {
       popup.value = null;
       return;
     }
-    // Below the selection when there is no room above it, so it is never drawn off the top of the window.
     const above = box.top > 48;
     popup.value = {
       x: box.left + box.width / 2,
@@ -291,7 +267,7 @@ function onMouseDownAnywhere(ev: MouseEvent): void {
   if (reacting.value) {
     const set = document.getElementById('react-set');
     const inside = set && ev.target instanceof Node && set.contains(ev.target);
-    // The button that opened it handles its own press, so only the rest of the page closes it.
+    // Skip the opener: its click toggles the set, so closing it here on mousedown would reopen it.
     if (!inside && !(ev.target instanceof Element && ev.target.closest('.react__hold'))) {
       reacting.value = null;
     }
@@ -302,14 +278,12 @@ function onMouseDownAnywhere(ev: MouseEvent): void {
   popup.value = null;
 }
 
-/** How far the pointer is from a box, zero anywhere inside it. */
 function away(ev: MouseEvent, box: DOMRect): number {
   const dx = ev.clientX < box.left ? box.left - ev.clientX : Math.max(0, ev.clientX - box.right);
   const dy = ev.clientY < box.top ? box.top - ev.clientY : Math.max(0, ev.clientY - box.bottom);
   return Math.max(dx, dy);
 }
 
-// Walk away from it and it fades; come back and it returns. Distance to the box, with room around it.
 function onMouseMove(ev: MouseEvent): void {
   if (reacting.value) {
     const set = document.getElementById('react-set');
@@ -331,7 +305,6 @@ function copySelection(): void {
 const escapeHtml = (text: string): string =>
   text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
 
-// A reply is the quoted words, then the author's name, then room to write. Several replies stack in one comment rather than replacing each other.
 function replyToSelection(): void {
   const id = popup.value?.commentId;
   const c = issue.value?.comments.find((row) => row.id === id);
@@ -340,7 +313,7 @@ function replyToSelection(): void {
   const picked = window.getSelection()?.toString().trim() ?? '';
   const source = picked || c.text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
   const quote = escapeHtml(source).replace(/\n/g, '<br>');
-  // The quote, then who is being answered, then a space to carry on from — Quill drops a trailing empty paragraph, so the space is what holds the caret's place.
+  // The &nbsp; holds the caret's place: Quill drops a trailing empty paragraph.
   commentDraft.value = `${commentDraft.value}<blockquote>${quote}</blockquote><p>@${c.author.login}&nbsp;</p>`;
   window.getSelection()?.removeAllRanges();
   void nextTick().then(() => composer.value?.focus(true));
@@ -349,18 +322,14 @@ const posting = ref(false);
 const editingComment = ref<string | null>(null);
 const commentEdit = ref('');
 
-// Fields somebody else changed a moment ago, lit for as long as the animation runs.
 const fresh = ref<Set<string>>(new Set());
-// The comment a notice pointed at: shown, scrolled to and lit the same way a change is.
 const litComment = ref<string | null>(null);
 
 watch(() => props.focusComment, lookAtComment);
-// Asked for again while the window is already open: the same comment, a new asking.
 watch(wanted, (w) => {
   if (w) void lookAtComment(w.comment);
 });
 
-/** Waits for the pictures in the window, which land after the text and push it about. */
 function settled(): Promise<void> {
   const shots = [...document.querySelectorAll<HTMLImageElement>('.iv img')].filter(
     (img) => !img.complete
@@ -375,7 +344,6 @@ function settled(): Promise<void> {
       img.addEventListener('load', tick, { once: true });
       img.addEventListener('error', tick, { once: true });
     }
-    // However slow they are, the comment is reached in the end.
     setTimeout(done, 1500);
   });
 }
@@ -388,8 +356,7 @@ async function lookAtComment(id?: string): Promise<void> {
   await nextTick();
   const el = document.getElementById(`comment-${id}`);
   if (!el) return;
-  // The wall of files repacks a frame or two after the window draws, and a cached picture
-  // gives it no time to settle before this runs; the place is taken again as it moves.
+  // Scrolled again because the file wall repacks after draw; cached images give it no time first.
   const bring = (): void => el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   bring();
   setTimeout(bring, 150);
@@ -400,7 +367,6 @@ async function lookAtComment(id?: string): Promise<void> {
   }, 2000);
 }
 
-// The names the server sends for what changed, in the names this screen knows them by.
 const FIELD_OF: Record<string, string> = {
   summary: 'summary',
   description: 'description',
@@ -428,12 +394,9 @@ function flash(names: string[]): void {
 
 const uploading = ref(false);
 const dragOver = ref(false);
-// Files chosen before there is anything to attach them to: a new issue, or a comment that has not been posted. They are uploaded the moment their owner exists.
 const pending = ref<File[]>([]);
 const commentFiles = ref<File[]>([]);
 
-// The two walls of waiting files pack themselves: blocks keep their own heights and drop into whichever column is shortest.
-// Every picture on the issue, in the order they are shown, and which one the viewer has open.
 const shown = ref<number | null>(null);
 const gallery = computed(() => [
   ...(issue.value?.attachments ?? [])
@@ -448,13 +411,11 @@ const stateChoices = computed(() =>
   props.board.states.map((s) => ({ value: s.id, label: s.name, color: s.color }))
 );
 const priorityChoices = PRIORITIES.map((p) => ({ value: p, label: p, color: priorityColor(p) }));
-// A name is written in the colour of the role that wears it.
 const assigneeChoices = computed(() => [
   { value: '', label: '—' },
   ...people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor })),
 ]);
 const boardChoices = computed(() => props.boards.map((b) => ({ value: b.id, label: b.name })));
-// The last entry is not a tag but the way to make one.
 const tagChoices = computed(() => [
   ...freeTags.value.map((t) => ({ value: t.id, label: t.name, color: t.color })),
   { value: 'new', label: 'New tag…' },
@@ -481,7 +442,6 @@ const shotsOf = (commentId: string): Shot[] =>
     .filter((a) => a.mime.startsWith('image/'))
     .map(shotOfAttachment);
 
-// The walls hand back the key they were given; which list it belongs to is this side's business.
 function openPending(key: string, from: 'issue' | 'comment'): void {
   const file = (from === 'issue' ? pending.value : commentFiles.value).find(
     (f) => keyOf(f) === key
@@ -523,7 +483,6 @@ const wornTags = computed(() =>
 const freeTags = computed(() =>
   props.tags.filter((t) => !wornTags.value.some((w) => w.id === t.id))
 );
-// The issue's own files; anything hanging off a comment is shown under that comment instead.
 const own = computed(() => (issue.value?.attachments ?? []).filter((a) => !a.commentId));
 const ownBytes = computed(() => own.value.reduce((all, a) => all + a.size, 0));
 const images = computed(() => own.value.filter((a) => a.mime.startsWith('image/')));
@@ -533,8 +492,6 @@ const filesOf = (commentId: string) =>
 const bytesOf = (commentId: string) =>
   filesOf(commentId).reduce((all, a) => all + a.size, 0);
 
-// The file being read over the issue, if any: a name that can be read opens the reader,
-// and every other way of reaching it still downloads it.
 const reading = ref<{ id: string; name: string } | null>(null);
 
 function onFileClick(ev: MouseEvent, a: Attachment): void {
@@ -546,7 +503,6 @@ function onFileClick(ev: MouseEvent, a: Attachment): void {
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
-  // Anything opened over this window answers Escape first; only when nothing is does it close the issue.
   if (deleting.value || picking.value || makingTag.value || shown.value !== null) return;
   if (reading.value) return;
   if (creating.value || !editing.value) emit('close');
@@ -571,12 +527,10 @@ onUnmounted(() => {
 
 watch(() => props.issueKey, load, { immediate: true });
 
-// The issue is being read by more than one person: what they do to it lands here as it happens.
 useLive((ev) => {
   const current = issue.value;
   if (!current || ev.issueId !== current.id) return;
   if (ev.type === 'issue.deleted') {
-    // Someone deleted it while it was open; there is nothing left to read.
     emit('close');
     return;
   }
@@ -587,19 +541,15 @@ useLive((ev) => {
   });
 });
 
-// A second read of the same issue, without the skeleton: the window is already on screen.
 async function reload(): Promise<void> {
   if (!props.issueKey) return;
   try {
     issue.value = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
-  } catch {
-    /* the next event, or closing and opening it again, will do */
-  }
+  } catch {}
 }
 
 async function load(): Promise<void> {
   if (!props.issueKey) {
-    // A window opened on nothing starts in edit mode, in the column it was opened from.
     draft.value = {
       summary: '',
       description: '',
@@ -631,17 +581,15 @@ async function load(): Promise<void> {
   }
 }
 
-// Every property writes on its own and hands the card the new shape.
 async function patch(body: Record<string, unknown>): Promise<boolean> {
   const current = issue.value;
   if (!current) return false;
   error.value = null;
   try {
     const updated = await api<Issue>(`/issues/${current.id}`, { method: 'PATCH', body });
-    // Read from the ref again rather than the snapshot: an event may have replaced the issue while this was in flight.
+    // Merge into the live ref, not the snapshot: a live event may have replaced it mid-request.
     issue.value = { ...(issue.value ?? current), ...updated };
     emit('changed', updated);
-    // The answer carries the issue but not what it did to the record: history is read again so it grows as you work.
     await reload();
     return true;
   } catch (err) {
@@ -650,8 +598,6 @@ async function patch(body: Record<string, unknown>): Promise<boolean> {
   }
 }
 
-// Each property either goes straight to the server or into the draft, depending on which kind of window this is.
-// A board owns its columns, so an issue arriving on another one cannot keep the status it wore: it lands in that board's default column, and the window follows it there.
 async function moveBoard(boardId: string): Promise<void> {
   const current = issue.value;
   if (!current || boardId === current.boardId) return;
@@ -699,7 +645,6 @@ async function create(): Promise<void> {
       try {
         await sendFiles(made.id, pending.value);
       } catch (err) {
-        // The issue is made; only the files failed, and saying so is better than losing the issue with them.
         error.value = err instanceof Error ? err.message : 'The issue was created without the files.';
       }
       pending.value = [];
@@ -745,7 +690,6 @@ async function saveText(): Promise<void> {
   if (bodyDraft.value !== current.description) body.description = bodyDraft.value;
   saving.value = true;
   try {
-    // Leaving edit mode on a failed write would throw away what they just typed.
     if (Object.keys(body).length && !(await patch(body))) return;
     editing.value = false;
   } finally {
@@ -759,7 +703,6 @@ const newTagScope = ref('project');
 const tagBusy = ref(false);
 const tagError = ref<string | null>(null);
 
-// The picker never keeps what was picked: the tag it named is worn a moment later, or a dialog is open over it.
 function pickTag(chosen: string): void {
   if (!chosen) return;
   if (chosen !== 'new') {
@@ -782,7 +725,6 @@ async function createTag(): Promise<void> {
       method: 'POST',
       body: newTagScope.value === 'global' ? { name } : { name, project: props.project },
     });
-    // The board keeps the list this window reads from, so it hears about the new one before it is worn.
     emit('tagCreated', created);
     makingTag.value = false;
     toggleTag(created.id, true);
@@ -811,7 +753,6 @@ async function postComment(): Promise<void> {
       method: 'POST',
       body: { text },
     });
-    // The comment is posted first because a file has to hang off something, and nothing is shown until its files are up: half a comment on screen is worse than a moment's wait. If the files fail the comment still exists, so it is shown anyway and only the files are complained about.
     if (commentFiles.value.length) {
       try {
         await sendFiles(current.id, commentFiles.value, created.id);
@@ -827,9 +768,7 @@ async function postComment(): Promise<void> {
     commentDraft.value = '';
     keptDraft = '';
     writeDraft('');
-    // A name in what was just posted is waiting for somebody, this tab's own reader included.
     void readNotices();
-    // The record gained a line; the history tab is looking at the old one until it is read again.
     await reload();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not post the comment.';
@@ -862,7 +801,6 @@ async function saveComment(c: Comment): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    // The editor stays open with the text still in it; closing it would throw the words away.
     error.value = err instanceof Error ? err.message : 'Could not save the comment.';
   }
 }
@@ -870,7 +808,6 @@ async function saveComment(c: Comment): Promise<void> {
 async function addLink(key: string): Promise<void> {
   if (!key || linking.value) return;
   if (creating.value) {
-    // Nothing to link to yet: the pair is made the moment the issue is.
     const found = linkResults.value.find((r) => r.key === key);
     if (found) pendingLinks.value = [...pendingLinks.value, found];
     picking.value = false;
@@ -912,11 +849,8 @@ async function removeLink(link: IssueLink): Promise<void> {
   }
 }
 
-// A nod at what somebody wrote. Clicking one that is already yours takes it back.
 const reacting = ref<string | null>(null);
 const reactNear = ref(true);
-// Held over the whole page rather than inside the comment: the list of comments scrolls,
-// and anything hanging out of it would be cut off at the edge.
 const reactAt = ref({ x: 0, y: 0 });
 const reactingOn = computed(
   () => issue.value?.comments.find((c) => c.id === reacting.value) ?? null
@@ -1022,8 +956,6 @@ async function sendFiles(issueId: string, list: File[], commentId?: string): Pro
   }
 }
 
-// On an issue that exists the file goes straight up; on one being written it waits in the list until there is an issue to hang it on.
-/** Splits what was chosen into what will fit and what will not, and says so about the rest. */
 function accept(list: FileList | null): File[] {
   const chosen = list ? Array.from(list) : [];
   const tooBig = chosen.filter((f) => f.size > MAX_FILE_BYTES);
@@ -1052,7 +984,6 @@ async function upload(list: FileList | null): Promise<void> {
   }
 }
 
-// A preview lives as long as the window does: the url is made once per file and released when the window closes.
 const previewUrls = new Map<File, string>();
 
 function previewOf(file: File): string | null {
@@ -1073,7 +1004,7 @@ function forgetPreview(file: File): void {
   }
 }
 
-// Files are told apart by identity, not by name: two screenshots pasted a minute apart are both "image.png".
+// Keyed by identity, not name: every pasted screenshot is named image.png.
 const fileKeys = new WeakMap<File, string>();
 let nextFileKey = 1;
 
@@ -1097,7 +1028,6 @@ function pickCommentFiles(list: FileList | null): void {
   if (chosen.length) commentFiles.value = [...commentFiles.value, ...chosen];
 }
 
-// A comment being edited can be given more files; they belong to a comment that already exists, so they go straight up.
 async function addToComment(commentId: string, list: FileList | null): Promise<void> {
   const chosen = accept(list);
   if (!chosen.length || !issue.value) return;
@@ -1211,7 +1141,6 @@ async function removeIssue(): Promise<void> {
           </template>
         </header>
 
-        <!-- The same two columns, with a placeholder the size of every control that is coming. -->
         <div v-if="loading && !creating" class="iv">
           <div class="iv__main">
             <span class="sk sk--line" style="width: 46%; height: 29px"></span>
@@ -1344,7 +1273,6 @@ async function removeIssue(): Promise<void> {
                 @remove="removeAttachmentKey"
               />
 
-              <!-- Chosen, not yet uploaded: anything that takes the whole row is listed first, and the pictures pack themselves underneath. -->
               <div
                 v-for="f in pending.filter((x) => !previewOf(x))"
                 :key="keyOf(f)"
@@ -1624,7 +1552,6 @@ async function removeIssue(): Promise<void> {
                 <span class="hi__who" :style="{ color: ink(colorOf(h.by)) }">{{ nameOf(h.by) }}</span>
                 <span class="hi__what">
                   <span class="hi__f">{{ h.field }}</span>
-                  <!-- Nothing before it means there is nothing to point away from: the value stands alone. -->
                   <template v-if="h.from">
                     <span class="hi__f">{{ h.from }}</span>
                     <span class="hi__arrow">→</span>
@@ -1684,7 +1611,6 @@ async function removeIssue(): Promise<void> {
             </div>
             <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
               <span class="prop__k">Due</span>
-              <!-- A date that has gone by says so by being red; there is no word for it anywhere else. -->
               <input
                 class="input input--sm"
                 :class="{ 'is-late': dueLabel(shownDue)?.late }"
@@ -1696,7 +1622,6 @@ async function removeIssue(): Promise<void> {
 
             <div class="hr"></div>
 
-            <!-- Nothing to wear and nothing to choose from: the row would only say the word Tags. -->
             <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('tags') }">
               <span class="prop__k">Tags</span>
               <div class="prop__tags">
@@ -1881,7 +1806,6 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-direction: column;
   width: min(1100px, 100%);
-  /* The window is the screen, less the scrim's gutter: an issue with nothing in it yet is the same window as one with a year of history behind it. */
   height: 100%;
   overflow: hidden;
 }
@@ -1893,11 +1817,9 @@ async function removeIssue(): Promise<void> {
 .props {
   overflow-y: auto;
 }
-/* The theme lets a dialog's title span take the whole bar; here the key and the status are two labels that belong side by side. */
 .iv__star.is-on {
   color: var(--accent);
 }
-/* It sits with the pencil and the close, and only says what it is when reached for. */
 .iv__trash:hover:enabled {
   color: var(--danger-text);
 }
@@ -1905,7 +1827,6 @@ async function removeIssue(): Promise<void> {
 .iv__path {
   flex: 0 0 auto;
 }
-/* Where the issue lives, ahead of its key: the project, the board, then the card itself — one reading, so it keeps its own spacing rather than the header's. */
 .iv__path {
   display: flex;
   align-items: center;
@@ -1933,7 +1854,6 @@ async function removeIssue(): Promise<void> {
   height: 38px;
   font: 600 20px var(--font-ui);
 }
-/* Out of edit mode the text is text: nothing here invites a click that would change it. */
 .iv__title--ro:hover {
   border-color: transparent;
   background: none;
@@ -1941,15 +1861,12 @@ async function removeIssue(): Promise<void> {
 .iv__body :deep(p:last-child) {
   margin-bottom: 0;
 }
-/* The day and the clock ride together in the first column, so it is wider than the theme's default. */
 .hi {
   grid-template-columns: 152px 96px minmax(0, 1fr);
 }
-/* Newest first puts the box you write in at the head of the thread, where the next comment will appear. */
 .cm--lead {
   order: -1;
 }
-/* The one control in the tab row that is not a tab: it never carries the selected underline. */
 .itab--order {
   font-size: 14px;
 }
@@ -1958,7 +1875,6 @@ async function removeIssue(): Promise<void> {
   flex-direction: column;
   gap: 20px;
 }
-/* Over the selection, out of the flow: it follows the highlight rather than the layout. One plate with two words on it — no buttons drawn inside a box drawn inside a box. */
 .selbar.is-far {
   opacity: 0.25;
 }
@@ -1988,7 +1904,6 @@ async function removeIssue(): Promise<void> {
 .cm__body :deep(p:last-child) {
   margin-bottom: 0;
 }
-/* A pushpin drawn rather than written: the theme speaks in glyphs, and a word in the middle of a name line reads as part of the name. */
 .cm__pin {
   flex: none;
   color: var(--accent);
@@ -2011,8 +1926,6 @@ async function removeIssue(): Promise<void> {
 .att__row--wait {
   border-style: dashed;
 }
-/* What the whole set weighs stands in the middle of the line, the way the viewer's bar
-   holds its own middle: three columns of equal weight, the way out on the right. */
 .att__all {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -2027,8 +1940,6 @@ async function removeIssue(): Promise<void> {
   display: inline-flex;
   justify-self: end;
 }
-/* Held over the icon by its right edge, not its middle: the icon is already at the end of
-   the line, and a box centred on it would hang out past it. */
 .att__all__tip {
   position: absolute;
   right: 0;
@@ -2043,15 +1954,12 @@ async function removeIssue(): Promise<void> {
 .att__all__go:hover .att__all__tip {
   display: block;
 }
-/* The box hangs by its right edge, so its pointer stands over the middle of the icon
-   rather than the middle of the box. */
 .att__all__tip::before,
 .att__all__tip::after {
   left: auto;
   right: 7px;
   margin-left: 0;
 }
-/* One line: the chain, what it holds, and the way to add more. The keys are enough — the title rides in the tooltip. */
 .links {
   flex-wrap: wrap;
   gap: 6px;
@@ -2083,7 +1991,6 @@ async function removeIssue(): Promise<void> {
   height: 32px;
   padding: 0 8px;
 }
-/* The search answers in rows that look like what they will become. */
 .pick {
   display: flex;
   flex-direction: column;
@@ -2121,7 +2028,6 @@ async function removeIssue(): Promise<void> {
   display: flex;
   flex-direction: column;
 }
-/* The nods stand in the line that names the author, before what can be done to the comment. */
 .cm__react {
   display: flex;
   align-items: center;
@@ -2143,11 +2049,9 @@ async function removeIssue(): Promise<void> {
 .react:hover {
   color: var(--text);
 }
-/* Yours is the one written in violet; nothing is framed. */
 .react.is-mine .react__n {
   color: var(--accent);
 }
-/* Who nodded, held over the nod until the pointer leaves it. */
 .react__one {
   position: relative;
   display: inline-flex;
@@ -2173,7 +2077,6 @@ async function removeIssue(): Promise<void> {
   gap: 4px;
   padding: 4px;
 }
-/* Said once, quietly, and gone: it is a reassurance, not a state. */
 .composer__kept {
   color: var(--text-muted);
   font-size: 12px;
@@ -2188,11 +2091,9 @@ async function removeIssue(): Promise<void> {
     opacity: 0;
   }
 }
-/* Open for editing, the box stands off the name and the time above it. */
 .cm__edit {
   margin-top: 8px;
 }
-/* The same box the selection puts up, held over the word until the pointer leaves it. */
 .cm__edited {
   position: relative;
 }
@@ -2210,12 +2111,10 @@ async function removeIssue(): Promise<void> {
 .cm__edited:hover .cm__when {
   display: block;
 }
-/* Nothing answers while a file is on its way up, so the same one cannot be sent twice. */
 .drop.is-off {
   pointer-events: none;
   opacity: 0.6;
 }
-/* The pictures keep to themselves under the rows, each at thumbnail size. */
 .cm__shots {
   display: flex;
   flex-wrap: wrap;
@@ -2227,14 +2126,12 @@ async function removeIssue(): Promise<void> {
   position: relative;
   display: block;
 }
-/* Only while the comment is open for editing, and over the corner of the picture so the row keeps its shape. */
 .cm__pic-x {
   position: absolute;
   top: 3px;
   right: 3px;
   background: var(--card);
 }
-/* The clip sits among the toolbar's own buttons and behaves like one. */
 .rt__clip {
   display: inline-flex;
   align-items: center;

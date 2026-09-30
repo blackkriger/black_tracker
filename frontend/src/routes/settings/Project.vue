@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// One project's setup. Each board owns its columns, so the statuses live inside the board's panel rather than in one list for the whole project.
 import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
@@ -45,14 +44,11 @@ const { canDelete } = useSession();
 const project = ref<Project | null>(null);
 const boards = ref<Board[]>([]);
 const loading = ref(true);
-// The whole screen only fails as a whole while it is loading; after that every failure belongs to one panel.
 const loadError = ref<string | null>(null);
 const { errors, fail, clear } = usePanelErrors();
 const newBoard = ref('');
-// Deleting a project is the one action here nothing can undo, so the key has to be typed before the button appears.
 const deleting = ref(false);
 const confirmKey = ref('');
-// A board takes its statuses and its issues with it, so that one is asked about too — by name, not by typing.
 const deletingBoard = ref<Board | null>(null);
 const newStatus = ref<Record<string, string>>({});
 
@@ -116,7 +112,6 @@ async function deleteProject(): Promise<void> {
   }
 }
 
-// ── boards ───────────────────────────────────────────────────────
 async function addBoard(): Promise<void> {
   const name = newBoard.value.trim();
   if (!name || !project.value) return;
@@ -154,12 +149,10 @@ async function deleteBoard(): Promise<void> {
     deletingBoard.value = null;
     await projectsStore.load(true);
   } catch (err) {
-    // The dialog stays open with the reason in it rather than closing on a failure nobody read.
     fail('deleteBoard', err);
   }
 }
 
-// ── the columns of one board ─────────────────────────────────────
 async function addStatus(b: Board): Promise<void> {
   const name = (newStatus.value[b.id] ?? '').trim();
   if (!name) return;
@@ -197,7 +190,6 @@ async function deleteStatus(b: Board, s: State): Promise<void> {
   }
 }
 
-// Plain HTML5 drag between rows: the order is the list itself, and the server hears the whole sequence once a row lands.
 const dragging = ref<{ boardId: string; stateId: string } | null>(null);
 
 async function onDrop(b: Board, target: State): Promise<void> {
@@ -542,7 +534,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
   color: var(--text-dim);
   cursor: grab;
 }
-/* The status wears its colour in its own name, on the board and here alike. */
 .status-name {
   font-weight: 500;
 }

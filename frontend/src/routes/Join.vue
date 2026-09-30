@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The far end of an invite link: the one screen where an account is made, and the person makes their own. The same shell as sign-in, so it is recognisably the same instance.
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ApiError, api } from '../lib/api';
@@ -13,7 +12,6 @@ const session = useSession();
 const token = String(route.params.token ?? '');
 const checking = ref(true);
 const valid = ref(false);
-// The role the link carries, so whoever opens it knows what the account will be before making it.
 const role = ref<{ name: string; color: string } | null>(null);
 
 const login = ref('');
@@ -21,7 +19,6 @@ const password = ref('');
 const repeat = ref('');
 const busy = ref(false);
 const error = ref<string | null>(null);
-// A login that is taken is a fact about that field, so it is answered there rather than above the form.
 const loginError = ref<string | null>(null);
 watch(login, () => (loginError.value = null));
 
@@ -52,10 +49,8 @@ async function onSubmit(): Promise<void> {
   try {
     await api(`/invites/${encodeURIComponent(token)}/accept`, {
       method: 'POST',
-      // The display name is theirs to set later, in their own profile.
       body: { login: login.value.trim(), password: password.value },
     });
-    // Accepting signs the new account in, so the root can decide where it lands like any other visit.
     await session.refresh();
     await router.replace('/');
   } catch (err) {
@@ -141,7 +136,6 @@ async function onSubmit(): Promise<void> {
 </template>
 
 <style scoped>
-/* The sign-in screen's shell, kept in step with it by hand: two screens, one look. */
 .signin {
   min-height: 100vh;
   display: flex;

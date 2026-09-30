@@ -1,5 +1,3 @@
-// Issues, and everything hanging off one: comments, files and the record of what changed. An issue lives on exactly one board and wears that board's status. Its key — PROJ-12 — is minted from the project's own counter inside the transaction that inserts it, so two writers never land on one number.
-
 import { randomUUID } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import { createReadStream, createWriteStream } from 'node:fs';
@@ -17,7 +15,7 @@ import { publish, tabOf } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
 
-// What may be shown in the browser rather than saved to disk. The list is deliberately short: the type an upload claims is the uploader's word, and anything that can carry script — html, svg, pdf — would run on our own origin, where the session cookie lives. Everything else is handed over as a download with the type stripped.
+// Only these types render inline: html, svg, pdf and the like would run script on our origin.
 const INLINE_TYPES = new Set([
   'image/png',
   'image/jpeg',
@@ -28,8 +26,7 @@ const INLINE_TYPES = new Set([
   'video/webm',
 ]);
 
-// What the reader may open. A file listed here is still never served as a document: its
-// bytes come back as a string in a JSON body, so nothing in it is ever parsed by the browser.
+// html and svg are safe here: the text route returns bytes as a JSON string, never as a page.
 const READABLE = new Set([
   'bat', 'c', 'cfg', 'cmd', 'conf', 'cpp', 'cs', 'css', 'csv', 'dio', 'diff', 'drawio', 'env',
   'gd', 'go',
@@ -38,19 +35,14 @@ const READABLE = new Set([
   'py', 'rb', 'rs', 'scss', 'sh', 'sql', 'svg', 'swift', 'toml', 'tres', 'ts', 'tscn',
   'tsx', 'txt', 'vue', 'xml', 'yaml', 'yml',
 ]);
-// Enough for a README or a patch; past it the reader says so and offers the download.
 const READ_MAX = 512 * 1024;
 
 const readable = (filename: string): boolean =>
   READABLE.has(filename.split('.').pop()?.toLowerCase() ?? '');
 
-/**
- * How a download is named. A name outside ASCII travels in `filename*`, the way RFC 6266 has
- * it; the plain `filename` is its ASCII stand-in for a client that reads nothing else.
- */
 function disposition(kind: 'inline' | 'attachment', name: string): string {
   const plain = name.replace(/[^\x20-\x7e]|["\\]/g, '_');
-  // encodeURIComponent leaves these four alone, and the quote would end the value early.
+  // RFC 5987 needs ' ( ) * percent-encoded; encodeURIComponent leaves them as is.
   const encoded = encodeURIComponent(name).replace(
     /['()*]/g,
     (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
@@ -114,7 +106,6 @@ const ISSUE_SELECT = `
     left join users a on a.id = i.assignee_id
     left join users w on w.id = i.author_id`;
 
-// Tags for a set of issues in one query rather than one per card.
 async function tagsFor(issueIds: string[]): Promise<Map<string, TagRow[]>> {
   const out = new Map<string, TagRow[]>();
   if (!issueIds.length) return out;
@@ -145,7 +136,6 @@ interface LinkRow {
   project_id: string;
 }
 
-// The other issue of every pair this one is in. A link to something the reader's role cannot open is not shown at all — it would be a keyhole into a closed board.
 async function linksOf(issueId: string, auth: Auth): Promise<LinkRow[]> {
   const res = await pool.query<LinkRow>(
     `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
@@ -178,7 +168,6 @@ const publicLink = (r: LinkRow) => ({
   boardSlug: r.slug,
 });
 
-// Stars are personal, so they are read for whoever is asking and travel with the issue rather than inside it.
 async function starredBy(userId: string, issueIds: string[]): Promise<Set<string>> {
   if (!issueIds.length) return new Set();
   const res = await pool.query<{ issue_id: string }>(
@@ -193,8 +182,6 @@ async function issueById(id: string): Promise<IssueRow | null> {
   return res.rows[0] ?? null;
 }
 
-// The board decides who may see an issue, so every route about an issue asks the same question first.
-/** The same question `loadIssueFor` asks, for routes that start from a comment or a file rather than from the issue. */
 async function mayReachIssue(auth: Auth, issueId: string): Promise<boolean> {
   const host = await issueById(issueId);
   return !!host && (await mayOpenBoard(auth, host.board_id, host.project_id));
@@ -219,7 +206,6 @@ async function loadIssueFor(
   return { auth, issue };
 }
 
-// Every change worth asking about later: who moved it, what it was, what it became.
 async function writeHistory(
   client: { query: typeof pool.query },
   issueId: string,
@@ -244,7 +230,6 @@ const issueCreate = z.object({
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
-/** The reactions a comment may carry, in the order they are offered. */
 export const REACTIONS = [
   '\u{1F44D}',
   '\u{1F44C}',
@@ -259,7 +244,6 @@ export const REACTIONS = [
 
 const issuePatch = z.object({
   summary: z.string().trim().min(1).max(300).optional(),
-  /** Another board of the same project. The key is the project's, so moving never changes it. */
   boardId: z.string().uuid().optional(),
   description: z.string().max(20000).optional(),
   stateId: z.string().uuid().optional(),
@@ -271,7 +255,7 @@ const issuePatch = z.object({
 
 const onDisk = (stored: string): string => path.join(env.uploadDir, stored);
 
-// Where the bytes are. This has to be asked before the issues are deleted: the rows cascade away with them, and afterwards nothing remembers the paths.
+// Call before deleting the issues: their attachment rows cascade away with the paths.
 export async function filesOfIssues(issueIds: string[]): Promise<string[]> {
   if (!issueIds.length) return [];
   const res = await pool.query<{ storage_path: string }>(
@@ -281,10 +265,8 @@ export async function filesOfIssues(issueIds: string[]): Promise<string[]> {
   return res.rows.map((r) => onDisk(r.storage_path));
 }
 
-// Rows go with their issue through the foreign keys; the bytes on disk are ours to sweep, whether one issue is deleted or a whole project's worth.
 export async function sweepFiles(issueIds: string[], paths: string[]): Promise<void> {
   await Promise.all(paths.map((p) => unlink(p).catch(() => {})));
-  // Each issue keeps its own folder, which is empty once its files are gone.
   await Promise.all(
     issueIds.map((id) =>
       rm(path.join(env.uploadDir, id.toLowerCase()), { recursive: true, force: true }).catch(() => {})
@@ -293,7 +275,6 @@ export async function sweepFiles(issueIds: string[], paths: string[]): Promise<v
 }
 
 export function registerIssueRoutes(app: FastifyInstance): void {
-  // ── the board's cards ────────────────────────────────────────────
   app.get('/boards/:id/issues', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -347,7 +328,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!state.rowCount) return reply.code(400).send({ error: 'That status is on another board.' });
 
     const created = await inTransaction(async (client) => {
-      // The counter is bumped and read in one statement, inside the transaction that inserts the issue: two people creating at once get two numbers.
+      // Bump and read in one UPDATE ... RETURNING so concurrent creates never share a number.
       const counter = await client.query<{ short_name: string; next_issue_number: number }>(
         `update projects set next_issue_number = next_issue_number + 1
           where id = $1
@@ -388,7 +369,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         );
       }
       await writeHistory(client, row.rows[0].id, auth.userId, 'created', null, null);
-      // Written straight onto somebody: the same telling as handing it over later.
       if (p.assigneeId && p.assigneeId !== auth.userId) {
         await client.query(
           `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
@@ -412,7 +392,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.code(201).send({ data: publicIssue(row as IssueRow, tags.get(created) ?? []) });
   });
 
-  // A card landing in a column: the column is told its whole new order, and the card that moved says so itself.
   app.post('/boards/:id/issues/order', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -441,7 +420,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!state.rowCount) return reply.code(400).send({ error: 'That status is on another board.' });
 
     await inTransaction(async (client) => {
-      // A stale tab can send a list that still holds a card someone else has since moved away; only the card it says it dragged is allowed to change column.
+      // Only the dragged card changes status: a stale tab's list may hold cards moved elsewhere.
       await client.query(
         `update issues i
             set position = o.pos,
@@ -463,7 +442,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           was.rows[0]?.name ?? null,
           state.rows[0].name
         );
-        // Resolved is what "closed" means, and the stamp is what the reports will count.
         await client.query(
           `update issues set resolved_at = case when $2 then coalesce(resolved_at, now()) else null end
             where id = $1`,
@@ -485,7 +463,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
-  // ── one issue ────────────────────────────────────────────────────
   app.get('/issues/:key', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -581,7 +558,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     }
     const p = parsed.data;
 
-    // Where it is going, if it is going anywhere: a board of the same project, open to whoever is moving it, and with a column for the card to land in.
     let landing: { boardId: string; stateId: string; name: string } | null = null;
     if (p.boardId && p.boardId !== issue.board_id) {
       const dest = await pool.query<{
@@ -606,7 +582,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       landing = { boardId: to.id, stateId, name: to.name };
     }
 
-    // A status is a column of one board, so which board it has to belong to depends on whether this is a move.
     const home = landing?.boardId ?? issue.board_id;
     if (p.stateId) {
       const state = await pool.query('select 1 from states where id = $1 and board_id = $2', [
@@ -624,7 +599,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         await writeHistory(client, id, auth.userId, 'summary', issue.summary, p.summary);
       }
       if (p.description !== undefined && p.description !== issue.description) {
-        // The words themselves are not kept twice, so the line says what happened to them.
         await writeHistory(client, id, auth.userId, 'description edited', null, null);
       }
       if (p.priority !== undefined && p.priority !== issue.priority) {
@@ -648,7 +622,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           login(issue.assignee_id),
           login(p.assigneeId ?? null)
         );
-        // Handed to somebody else: they are told. Taking it yourself needs no telling.
         if (p.assigneeId && p.assigneeId !== auth.userId) {
           await client.query(
             `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
@@ -689,7 +662,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
             where id = $1`,
           [id, byId(nextState)?.is_resolved === true]
         );
-        // A card arriving in a column by the side door still lands at its head.
         const top = await client.query<{ pos: number }>(
           'select coalesce(min(position), 0) - 1 as pos from issues where board_id = $1 and state_id = $2',
           [home, nextState]
@@ -724,7 +696,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       );
 
       if (p.tagIds) {
-        // Which tag came and which went, by name: "tags" on its own says nothing a month later.
         const before = await client.query<{ tag_id: string; name: string }>(
           `select it.tag_id, t.name from issue_tags it join tags t on t.id = it.tag_id
             where it.issue_id = $1`,
@@ -766,7 +737,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       by: auth.login,
       origin: tabOf(req),
     });
-    // The board it left has to hear about it too, or the card sits there until something else happens.
     if (landing) {
       void publish({
         type: 'issue.moved',
@@ -782,7 +752,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: publicIssue(row as IssueRow, tags.get(id) ?? [], stars.has(id)) });
   });
 
-  // A star is one person's mark on one issue; nobody else is told and nothing goes into the history.
   app.put('/issues/:id/favourite', async (req, reply) => {
     const { id } = req.params as { id: string };
     const found = await loadIssueFor(req, reply, id);
@@ -800,8 +769,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         found.auth.userId,
       ]);
     }
-    // A star is private: only its owner's own tabs hear of it, and even they learn nothing
-    // but that their list changed.
     void publish({ type: 'favourite.changed', only: found.auth.userId, origin: tabOf(req) });
     return reply.send({ data: { favourite: parsed.data.favourite } });
   });
@@ -815,7 +782,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!(await mayOpenBoard(auth, issue.board_id, issue.project_id))) {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
-    // Read before the delete: the rows go with the issue, and afterwards there is nothing left to look up.
     const doomed = await filesOfIssues([id]);
     await pool.query('delete from issues where id = $1', [id]);
     await sweepFiles([id], doomed);
@@ -831,15 +797,12 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
-  // ── links ────────────────────────────────────────────────────────
-  // Finding the issue to link to: by the start of its key, or by anything in its title. The answer is shaped like a link row, because that is what it is about to become.
   app.get('/issues/search', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { q, exclude } = req.query as { q?: string; exclude?: string };
     const term = (q ?? '').trim().slice(0, 100);
     if (!term) return reply.send({ data: [] });
-    // Junk in the query string is an empty search, not a five hundred.
     const skip = exclude && /^[0-9a-fA-F-]{36}$/.test(exclude) ? exclude : null;
     const res = await pool.query<LinkRow>(
       `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
@@ -857,7 +820,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (auth.isAdmin) return reply.send({ data: res.rows.slice(0, 20).map(publicLink) });
     const denied = await deniedFor(auth.roleId);
     if (denied.everything) return reply.send({ data: [] });
-    // Read wide, then cut: twenty rows the reader may open, rather than twenty rows of which some are hidden.
     return reply.send({
       data: res.rows
         .filter((r) => !denied.boards.has(r.board_id) && !denied.projects.has(r.project_id))
@@ -884,7 +846,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'That issue is not open to you.' });
     }
 
-    // The pair is stored in one order, which is what makes a second link between the same two impossible. The ids are lower-cased first: the table's `a < b` check compares text, and a uuid written in capitals would sort the other way.
+    // Lower-case before sorting so JS string order matches Postgres uuid order in the a < b check.
     const [a, b] = [found.issue.id.toLowerCase(), target.id.toLowerCase()].sort();
     const linked = await inTransaction(async (client) => {
       const done = await client.query(
@@ -893,7 +855,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [a, b, found.auth.userId]
       );
       if (!done.rowCount) return false;
-      // Both sides remember it, in the same breath as the link itself.
       await writeHistory(client, id, found.auth.userId, 'link added', null, target.readable_id);
       await writeHistory(
         client,
@@ -969,8 +930,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
-  // ── comments ─────────────────────────────────────────────────────
-  // A comment speaks as a person, so a token cannot write one: an agent moves work along, it does not talk in someone's name.
   app.post('/issues/:id/comments', async (req, reply) => {
     const { id } = req.params as { id: string };
     const session = await requireSession(req, reply);
@@ -985,7 +944,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
          returning id, text, created_at, edited_at`,
         [id, session.userId, parsed.data.text]
       );
-      // Who was named in it is read out of the words themselves.
       await syncMentions(client, res.rows[0].id, parsed.data.text, session.userId);
       return res.rows[0];
     });
@@ -1013,7 +971,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     });
   });
 
-  // A short, fixed set: a reaction is a nod, not a conversation.
   app.put('/comments/:id/reactions', async (req, reply) => {
     const session = await requireSession(req, reply);
     if (!session) return;
@@ -1048,7 +1005,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         'insert into comment_reactions (comment_id, user_id, emoji) values ($1, $2, $3)',
         [id, session.userId, emoji]
       );
-      // Whoever wrote it is told, unless they are the one nodding at their own words.
       if (authorId !== session.userId) {
         await client.query(
           `insert into notices (user_id, kind, comment_id, by_id, detail)
@@ -1074,7 +1030,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: { on } });
   });
 
-  // Pinning says "read this one first". It changes nobody's words, so it is not the author's alone — anyone who can open the issue can pin and unpin.
   app.put('/comments/:id/pin', async (req, reply) => {
     const session = await requireSession(req, reply);
     if (!session) return;
@@ -1139,7 +1094,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!(await mayReachIssue(session, owner.rows[0].issue_id))) {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
-    // Editing is the author's alone: an admin can delete what should not stand, but not put words in someone's mouth.
     if (owner.rows[0].author_id !== session.userId) {
       return reply.code(403).send({ error: 'Only the author can edit a comment.' });
     }
@@ -1148,7 +1102,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         'update issue_comments set text = $2, edited_at = now() where id = $1 returning edited_at',
         [id, parsed.data.text]
       );
-      // A name taken out of a comment stops being a mention; one left alone keeps its place.
       await syncMentions(client, id, parsed.data.text, session.userId);
       return updated;
     });
@@ -1204,7 +1157,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
-  // ── attachments ──────────────────────────────────────────────────
   app.post('/issues/:id/attachments', async (req, reply) => {
     const { id } = req.params as { id: string };
     const found = await loadIssueFor(req, reply, id);
@@ -1216,7 +1168,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [comment, id]
       );
       if (!owns.rowCount) return reply.code(400).send({ error: 'That comment is on another issue.' });
-      // Giving a comment a file is editing it, and a comment is edited by whoever wrote it.
       if (owns.rows[0].author_id !== found.auth.userId) {
         return reply.code(403).send({ error: 'Only the author can edit a comment.' });
       }
@@ -1226,7 +1177,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
 
     const folder = found.issue.id.toLowerCase();
     await mkdir(onDisk(folder), { recursive: true });
-    // The name on disk is ours, not the one it arrived with: two screenshots called image.png do not collide, and nothing in the name can point out of the folder.
+    // Stored under our own name: the uploaded one may collide or carry a path out of the folder.
     const ext = path.extname(file.filename).slice(0, 12).replace(/[^a-zA-Z0-9.]/g, '');
     const name = `${folder}/${randomUUID()}${ext}`;
     const stored = onDisk(name);
@@ -1252,7 +1203,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [id, comment ?? null, filename, file.mimetype, size, name, found.auth.userId]
       );
     } catch (err) {
-      // The issue went away while the bytes were landing: take the bytes with it.
       await unlink(stored).catch(() => {});
       throw err;
     }
@@ -1282,7 +1232,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     });
   });
 
-  // Files are served by the API, not by nginx, because who may see them depends on the board they hang off.
   app.get('/attachments/:id', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -1306,15 +1255,11 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send(createReadStream(onDisk(row.storage_path)));
   });
 
-  // Everything hanging off one thing, in one archive: the issue's own files, or one
-  // comment's. Nothing is held in memory — the files are read into the stream as it is sent.
   async function sendZip(
     reply: FastifyReply,
     name: string,
     files: { filename: string; storage_path: string }[]
   ): Promise<void> {
-    // A row whose bytes are gone from disk is left out: one missing file must not fail the
-    // archive halfway through, and a read that fails mid-stream would reject unheard.
     const present: typeof files = [];
     for (const file of files) {
       if (await stat(onDisk(file.storage_path)).then(() => true, () => false)) present.push(file);
@@ -1326,7 +1271,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const zip = new ZipArchive();
     const taken = new Set<string>();
     for (const file of present) {
-      // Two screenshots are both called image.png; inside one folder only one of them can be.
       let named = file.filename;
       for (let n = 2; taken.has(named.toLowerCase()); n++) {
         const dot = file.filename.lastIndexOf('.');
@@ -1337,8 +1281,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       taken.add(named.toLowerCase());
       zip.file(onDisk(file.storage_path), { name: named });
     }
-    // A failure after the headers are gone can only end the stream; Fastify does that, and
-    // the rejection is caught here so it does not end the process as well.
     zip.finalize().catch(() => zip.destroy());
     return reply.send(zip);
   }
@@ -1361,8 +1303,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!auth) return;
     const { id } = req.params as { id: string };
     const owner = await pool.query<{ issue_id: string; readable_id: string; said_at: string }>(
-      // The hour it was written tells two archives from the same issue apart; a colon cannot
-      // be in a filename, so the clock is written with a dash like the rest of it.
+      // Dashes, not colons, in the time: a colon is not allowed in a Windows filename.
       `select c.issue_id, i.readable_id,
               to_char(c.created_at at time zone 'Europe/Moscow', 'YYYY-MM-DD-HH24-MI') as said_at
          from issue_comments c join issues i on i.id = c.issue_id where c.id = $1`,
@@ -1382,7 +1323,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return sendZip(reply, `${host.readable_id}-comment-${host.said_at}.zip`, res.rows);
   });
 
-  // The reader's own way in: the text as data, never as a page.
   app.get('/attachments/:id/text', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -1436,7 +1376,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'This file is not open to you.' });
     }
     if (row.comment_id) {
-      // Taking a file off a comment is editing it, so it follows the same rule the words do.
       const owner = await pool.query<{ author_id: string }>(
         'select author_id from issue_comments where id = $1',
         [row.comment_id]

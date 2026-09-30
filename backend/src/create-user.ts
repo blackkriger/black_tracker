@@ -1,10 +1,7 @@
-// Accounts are made here, not through a sign-up form: `npm run create-user -- <login> <password> [admin] ["Full name"]`. It is also the only way to get the first admin in, and it doubles as a password reset when the login already exists.
-
 import { hashPassword } from './auth.js';
 import { pool } from './db.js';
 
 const [login, password, admin = '', fullName = ''] = process.argv.slice(2);
-// Saying nothing about admin means saying nothing: a password reset leaves the flag as it stands.
 const setsAdmin = admin === 'admin';
 
 if (!login || !password) {

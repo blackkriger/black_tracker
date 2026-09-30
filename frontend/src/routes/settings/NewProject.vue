@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// A project starts empty: its boards are added from the project's own settings, each with the starting four statuses.
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';

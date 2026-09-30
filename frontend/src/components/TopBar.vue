@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The bar every screen but sign-in carries: the projects side by side with their boards beside them, and who you are.
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjects } from '../lib/projects';
@@ -30,29 +29,22 @@ import { ArrowRight, AtSign, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
 
 const props = defineProps<{
-  /** The project this screen belongs to, when it belongs to one. */
   project?: { shortName: string; name: string } | null;
-  /** The board being looked at, named beside its project so you can see where you are. */
   board?: { name: string; slug: string } | null;
 }>();
 
 const session = useSession();
 const router = useRouter();
 const { projects, load } = useProjects();
-// Kept fresh from here because this bar is on every screen; the lists themselves are shared.
 const { load: loadPeople } = usePeople();
-// What is waiting for you is written in the colour of your own role.
 const mine = computed(() => session.me.value?.role?.color ?? undefined);
 const { load: loadRoles } = useRoles();
 
-// No role is no access, so the one screen such a person has is not worth pointing at.
 const hasRole = computed(() => session.me.value?.isAdmin === true || !!session.me.value?.role);
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const currentShort = computed(() => props.project?.shortName ?? null);
 
-// Today, and the month behind it. The month is read the first time the chip is opened —
-// no screen needs it until then.
 const now = new Date();
 const today = stamp(now.toISOString());
 const dateOpen = ref(false);
@@ -72,12 +64,9 @@ async function readMonth(): Promise<void> {
     }>(`/calendar?from=${from}&to=${to}`);
     calDays.value = byDay(got.marks, got.dues, got.activity, got.mentions);
     calPeak.value = Math.max(1, ...[...calDays.value.values()].map((d) => d.worked));
-  } catch {
-    /* the chip still opens; it simply has nothing to shade */
-  }
+  } catch {}
 }
 
-// How far off the next marked day is, read once and kept in step with the live channel.
 const soon = ref<Mark | null>(null);
 const daysOff = computed(() => {
   if (!soon.value) return null;
@@ -94,8 +83,6 @@ const countdown = computed(() => {
   return `${left} days till ${what}`;
 });
 
-// Being named somewhere. The feed lives behind the same chip: what is waiting for you,
-// and which day it landed on, are the same question asked twice.
 const { shown: notices, unread, load: readNotices, markRead } = useNotices();
 const { ask } = useFocus();
 
@@ -112,14 +99,11 @@ async function openNotice(n: Notice): Promise<void> {
 async function readNext(): Promise<void> {
   try {
     soon.value = await api<Mark | null>('/calendar/next');
-  } catch {
-    /* the chip simply shows the date alone */
-  }
+  } catch {}
 }
 
 function toggleDate(): void {
   dateOpen.value = !dateOpen.value;
-  // Read again on every open: a day marked on the calendar screen is already old news here.
   if (dateOpen.value) void readMonth();
 }
 
@@ -135,7 +119,6 @@ async function toCalendar(): Promise<void> {
   await router.push({ name: 'me', query: { calendar: 'full' } });
 }
 
-// A day picked here opens where you are: the screen behind the bar is not disturbed.
 const pickedDay = ref<string | null>(null);
 
 function toDay(key: string): void {
@@ -173,11 +156,9 @@ function onKeydown(ev: KeyboardEvent): void {
   if (ev.key === 'Escape') dateOpen.value = false;
 }
 
-// Someone added a project or a board while this bar was on screen.
 useLive((ev) => {
   if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
   if (ev.type === 'key-date.changed') void readNext();
-  // A name is written in the colour of a role, so both lists follow whoever edits either.
   if (['role.changed', 'user.changed'].includes(ev.type)) {
     void loadPeople(true);
     void loadRoles(true);
@@ -262,7 +243,6 @@ async function signOut(): Promise<void> {
               @pick="toDay"
             />
           </div>
-          <!-- What the countdown counts to, under the month it falls in. -->
           <template v-if="soon">
             <hr v-if="!soon.banner" />
             <div class="soon" :class="{ 'soon--banner': soon.banner }">
@@ -285,7 +265,6 @@ async function signOut(): Promise<void> {
                   <span v-else class="soon__title">{{ soon.title }}</span>
                   <span class="stamp">{{ longDate(soon.day) }}</span>
                 </span>
-                <!-- A day that belongs to one project says which, against both lines. -->
                 <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
               </div>
             </div>
@@ -339,7 +318,6 @@ async function signOut(): Promise<void> {
 </template>
 
 <style scoped>
-/* Nothing in the bar takes a background: the text itself does the talking. It brightens on hover, turns violet on a project — the bright violet, a shade up from the key beside it — and red on the one action you would not want to hit by accident. */
 .topitems {
   display: flex;
   align-items: center;
@@ -377,7 +355,6 @@ async function signOut(): Promise<void> {
   display: inline-flex;
   align-items: center;
 }
-/* One project's boards must not run into the next project's key. */
 .topproj + .topproj {
   margin-left: 10px;
 }
@@ -385,8 +362,6 @@ async function signOut(): Promise<void> {
   gap: 6px;
   padding: 0 6px;
 }
-/* The boards stand two to a column, the way the date stands over the countdown: the bar
-   keeps its height however many boards a project has, and each name is its own link. */
 .topboards {
   display: grid;
   grid-template-rows: repeat(2, 16px);
@@ -402,7 +377,6 @@ async function signOut(): Promise<void> {
   padding: 0 6px;
   font-size: 12.5px;
 }
-/* A board is not a project: it stands out in plain bright, the way the account links do. */
 .topitem__board.is-here {
   color: var(--text);
 }
@@ -414,7 +388,6 @@ async function signOut(): Promise<void> {
   display: inline-flex;
   align-items: center;
 }
-/* Two lines: what is coming above, and what today is with what is waiting on it below. */
 .datechip {
   flex-direction: column;
   align-items: flex-end;
@@ -434,7 +407,6 @@ async function signOut(): Promise<void> {
 .men__emoji {
   font-size: 12px;
 }
-/* Who said it and what, cut where the menu ends. */
 .men__said {
   overflow: hidden;
   color: var(--text-muted);
@@ -444,7 +416,6 @@ async function signOut(): Promise<void> {
 .men--new .men__said {
   color: var(--text-dim);
 }
-/* A long name for an event cannot push the bar around, so it is cut where it runs out of room. */
 .topcount {
   max-width: 280px;
   overflow: hidden;
@@ -459,7 +430,6 @@ async function signOut(): Promise<void> {
   z-index: 20;
   width: 250px;
 }
-/* The same pointer the board menu has, kept over the chip on the right. */
 .datemenu::before,
 .datemenu::after {
   content: "";
@@ -528,7 +498,6 @@ async function signOut(): Promise<void> {
 a.soon__title:hover {
   color: var(--accent-bright);
 }
-/* The one line under the month reads like the bar above it: the text brightens, nothing fills. */
 .datemenu .menu__i {
   color: var(--text-dim);
 }

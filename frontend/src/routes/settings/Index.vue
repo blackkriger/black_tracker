@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// /settings is a junction like the root: it opens the first project's setup, or the workspace tags when there is no project yet.
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';

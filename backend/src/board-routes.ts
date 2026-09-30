@@ -1,5 +1,3 @@
-// Boards and the statuses that are their columns. A board owns its columns, so two boards in one project can run entirely different workflows; access is open by default and what gets stored is the exception — this person does not see this board.
-
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
@@ -50,7 +48,6 @@ async function boardById(id: string): Promise<BoardRow | null> {
   return res.rows[0] ?? null;
 }
 
-// Open and resolved are two ends of the same question, so setting one clears the other rather than leaving a status that is both.
 function settleFlags(
   next: { isOpen?: boolean; isResolved?: boolean },
   current: { is_open: boolean; is_resolved: boolean }
@@ -90,7 +87,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     }
     const { rows, statesByBoard } = await boardsOfProject(project.id);
     const denials = await denialsFor(rows.map((r) => r.id));
-    // An admin manages access, so they see every board and which roles are shut out; anyone else is simply not handed the boards their role cannot open.
     const visible = auth.isAdmin ? rows : rows.filter((r) => !denied.boards.has(r.id));
     return reply.send({
       data: visible.map((r) =>
@@ -129,7 +125,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     if (!project || !(await mayOpenProject(auth, project.id))) {
       return reply.code(404).send({ error: 'No such project.' });
     }
-    // A new board arrives with the starting four columns; from there they are edited per board.
     const board = await inTransaction((client) =>
       createBoardWithDefaults(client, project.id, parsed.data.name)
     );
@@ -149,7 +144,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     if (!board || !(await mayOpenBoard(auth, id, board.project_id))) {
       return reply.code(404).send({ error: 'No such board.' });
     }
-    // Renaming moves the address with the name, so a board is never reachable under a word it no longer wears.
     const slug = p.name
       ? await inTransaction((client) => freeSlug(client, board.project_id, p.name as string, id))
       : null;
@@ -208,7 +202,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         return reply.code(403).send({ error: 'This board is not open to you.' });
       }
     }
-    // The board's statuses and issues go with it, which is what the confirmation on the screen spells out — and their files go with them.
     const doomed = await pool.query<{ id: string }>('select id from issues where board_id = $1', [
       id,
     ]);
@@ -219,7 +212,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true, issues: doomed.rowCount ?? 0 } });
   });
 
-  // ── the board's columns ────────────────────────────────────────
   app.post('/boards/:id/states', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -248,7 +240,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
           p.name,
           flags.isOpen,
           flags.isResolved,
-          // A status everyone names the same way keeps its usual colour; anything else gets one no sibling wears.
           knownColor(p.name) ?? pickColor(taken.rows.map((r) => r.color)),
         ]
       );
@@ -293,7 +284,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         [id, p.name ?? null, flags.isOpen, flags.isResolved, p.position ?? null]
       );
     } catch (err) {
-      // The board's own unique index answers before we do; a renamed status that collides gets the same 409 a new one would.
       if ((err as { code?: string }).code === '23505') {
         return reply.code(409).send({ error: 'That board already has a status with this name.' });
       }
@@ -303,7 +293,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     return reply.send({ data: publicState(res.rows[0]) });
   });
 
-  // Column order, sent as the whole list: dragging one column moves the others, and one statement keeps them consistent.
   app.post('/boards/:id/states/order', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -341,7 +330,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         return reply.code(403).send({ error: 'This board is not open to you.' });
       }
     }
-    // Refusing while issues sit in the status is the point: moving them silently would lose where they were.
     const used = await pool.query<{ n: number }>(
       'select count(*)::int as n from issues where state_id = $1',
       [id]
@@ -356,7 +344,6 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
-  // The whole denial list for one board, replaced in one call: the access screen sends who is shut out after every tick.
   app.put('/boards/:id/access', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };

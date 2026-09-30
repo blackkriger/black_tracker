@@ -1,7 +1,3 @@
-// One screenful of numbers about the work itself: what stands on each board, what is late,
-// who carries what, and how long a finished issue took. Everything is read behind the same denials the boards themselves are read
-// behind, so a role that cannot open a board never counts its issues either.
-
 import type { FastifyInstance } from 'fastify';
 import { pool } from './db.js';
 import { requireAuth, type Auth } from './auth.js';
@@ -68,8 +64,6 @@ interface HandRow {
   created_at: Date;
 }
 
-/** One stretch of an issue's life, in one person's hands — or in nobody's — and how that
- *  stretch divided between the statuses the issue stood in while it lasted. */
 interface Hand {
   login: string | null;
   days: number;
@@ -77,7 +71,6 @@ interface Hand {
   states: { name: string; color: string | null; days: number }[];
 }
 
-/** A run of time during which one thing — a holder, or a status — stayed the same. */
 interface Stretch {
   from: number;
   to: number;
@@ -89,11 +82,6 @@ const day = (d: Date | string): string =>
 
 const DAY_MS = 86_400_000;
 
-/**
- * The gaps between the changes of one kind. The history writes a row per change, so what
- * held before the first change is that change's old value — or, when nothing ever changed,
- * what holds now, which then held from the moment the issue was written.
- */
 function stretchesOf(born: number, now: string | null, changes: HandRow[]): Stretch[] {
   const out: Stretch[] = [];
   let since = born;
@@ -108,7 +96,6 @@ function stretchesOf(born: number, now: string | null, changes: HandRow[]): Stre
   return out;
 }
 
-/** Who has held an issue and for how long, each stretch divided between the statuses it saw. */
 function handsOf(
   born: Date,
   holder: string,
@@ -142,8 +129,6 @@ function median(all: number[]): number | null {
 }
 
 export function registerAnalyticsRoutes(app: FastifyInstance): void {
-  // The dashboard's own list: everything on the reader's hands, nearest deadline first and
-  // the undated ones after them.
   app.get('/my-issues', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -184,8 +169,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
     });
   });
 
-  // The issues the reader has starred, the latest star first. A star is a private mark, so
-  // this is the one place anyone sees their own list of them.
   app.get('/my-favourites', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -248,8 +231,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       });
     }
 
-    // Every query stands on the same four: what is shut out, which project is being read,
-    // and which status the whole page is narrowed to.
     const seen: [string[], string[], string | null, string | null] = [
       denied.boards,
       denied.projects,
@@ -269,7 +250,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             and ($3::text is null or p.short_name = $3)
           group by s.name
           order by min(s.position), s.name`,
-        // The list of statuses is what the filter is chosen from, so it is never narrowed by it.
         seen.slice(0, 3)
       ),
       pool.query<Cell>(
@@ -329,7 +309,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
                    ) desc, lower(u.login)`,
         within
       ),
-      // What each of them is holding right now, one row per issue rather than per person.
       pool.query<HeldRow>(
         `select u.login, i.id, i.readable_id, i.summary, i.priority, i.due_date, i.created_at,
                 i.board_id, p.short_name, b.slug, s.name as state_name, s.color
@@ -401,8 +380,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       ),
     ]);
 
-    // Every change of hands and of status for the issues just listed, and the colours their
-    // boards give each status, read in one go rather than per issue.
     const [handRows, palette] = held.rows.length
       ? await Promise.all([
           pool.query<HandRow>(
@@ -426,7 +403,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       else changes.set(row.issue_id, [row]);
     }
 
-    // The cells come back one per column; the board they belong to is put back together here.
     const boards: {
       id: string;
       name: string;
@@ -456,7 +432,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       board.states.push({ name: c.state_name, color: c.color, count: n });
     }
 
-    // What each person is holding, with how long each issue has been in their hands.
     const holding = new Map<
       string,
       { key: string; summary: string; projectShort: string; boardSlug: string; color: string;

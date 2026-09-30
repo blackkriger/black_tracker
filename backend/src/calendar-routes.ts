@@ -1,7 +1,3 @@
-// The calendar: days somebody marked, deadlines the issues already carry, and how much
-// work went through each day. Nothing here is a new source of truth except the marks —
-// the rest is what the tracker already knows, read a month at a time.
-
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { pool } from './db.js';
@@ -9,8 +5,6 @@ import { requireAuth, requireDeleter, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor, mayOpenProject } from './board-service.js';
 import { projectByShort } from './project-routes.js';
 
-// The team's day, not the server's: Berlin midnight would put an hour of the evening's
-// work on the day before. Nothing else here is a moment in time — the rest are dates.
 const ZONE = 'Europe/Moscow';
 
 const range = z.object({
@@ -18,7 +12,7 @@ const range = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
-// Only http and https ever reach an href of ours: anything else is a way to run script.
+// Only http(s) links are stored: a javascript: URL in an href would run script.
 const address = z
   .string()
   .trim()
@@ -30,9 +24,7 @@ const address = z
 const markBody = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   title: z.string().trim().min(1).max(120),
-  /** A project's key, or absent for a day that belongs to the whole workshop. */
   project: z.string().trim().max(20).nullable().optional(),
-  /** The event's own page, and the picture it shows itself with. */
   url: address,
   banner: address,
 });
@@ -60,7 +52,6 @@ const publicMark = (r: MarkRow) => ({
   by: r.by_login,
 });
 
-/** A date column arrives as 'YYYY-MM-DD' already; a timestamp arrives as a Date. Both are wanted as the day alone. */
 function iso(d: Date | string): string {
   if (typeof d === 'string') return d.slice(0, 10);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -68,14 +59,12 @@ function iso(d: Date | string): string {
   ).padStart(2, '0')}`;
 }
 
-/** What this person cannot open, as two arrays the queries can test against. */
 async function shutOut(auth: Auth): Promise<{ all: boolean; projects: string[]; boards: string[] }> {
   const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
   return { all: denied.everything, projects: [...denied.projects], boards: [...denied.boards] };
 }
 
 export function registerCalendarRoutes(app: FastifyInstance): void {
-  // Everything one screenful of calendar needs, in one read.
   app.get('/calendar', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -124,9 +113,6 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
           order by i.due_date, i.readable_id`,
         [from, to, denied.projects, denied.boards]
       ),
-      // What a day of work looks like: the issues someone touched, opened and closed.
-      // The history is the only record of who did what and when, and time is not tracked
-      // here — an issue somebody touched at all is an issue they worked on.
       pool.query<{
         day: Date | string;
         login: string;
@@ -154,8 +140,6 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
           order by 1`,
         [from, to, who, denied.projects, denied.boards]
       ),
-      // What was said to the reader is the reader's own business, so this one is never
-      // about the person picked.
       pool.query<{ day: Date | string; kind: string; said: number; unread: number }>(
         `select (n.created_at at time zone '${ZONE}')::date as day,
                 n.kind,
@@ -221,7 +205,6 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
     });
   });
 
-  // The next day worth knowing about, for the chip in the top bar.
   app.get('/calendar/next', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -346,10 +329,6 @@ async function mayReachMark(auth: Auth, projectId: string | null): Promise<boole
   return !(await deniedFor(auth.roleId)).everything;
 }
 
-/**
- * Turns the project key a write carried into an id, answering the caller itself when the
- * scope is not theirs. `undefined` means the reply has already gone out.
- */
 async function scopeOf(
   auth: Auth,
   reply: FastifyReply,

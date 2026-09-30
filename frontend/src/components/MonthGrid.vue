@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// One month, seven columns, Monday first. A day carries three things at once: what was
-// marked on it, what is due on it, and how much work went through it — the shading. The
-// same grid hangs in the top bar and fills the calendar screen.
 import { computed, ref } from 'vue';
 import { AtSign, Bell, ContactRound, Smile } from 'lucide-vue-next';
 import { useSession } from '../lib/session';
@@ -20,7 +17,6 @@ const props = defineProps<{
   year: number;
   month: number;
   days: Map<string, DayInfo>;
-  /** The busiest day in view; every other day is shaded against it. */
   peak?: number;
   compact?: boolean;
   range?: { from: string; to: string };
@@ -44,15 +40,12 @@ const mine = computed(() => session.me.value?.role?.color ?? undefined);
 const cells = computed(() => monthGrid(props.year, props.month));
 const info = (key?: string): DayInfo => (key && props.days.get(key)) || emptyDay();
 
-/** Five steps rather than a smooth ramp: a shade you can tell apart from its neighbour. */
 function heat(key?: string): number {
   const worked = info(key).worked;
   if (!worked || !props.peak) return 0;
   return Math.min(5, Math.ceil((worked / props.peak) * 5));
 }
 
-// What stands in place of the number, in the order it outranks: an unread name, an unread
-// reaction, then a day somebody marked. The number is the quietest thing a day says.
 const WAITING = ['mention', 'assigned', 'reaction'];
 
 function markOf(key?: string): string | null {
@@ -62,7 +55,6 @@ function markOf(key?: string): string | null {
   return day.marks.length ? 'marked' : null;
 }
 
-// A deadline colours the day itself; one that has gone by with work still open turns it red.
 function dueTone(key?: string): string {
   const dues = key ? info(key).dues : [];
   if (!dues.length) return '';
@@ -105,7 +97,6 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       @mouseenter="onEnter($event, c)"
       @mouseleave="hover = null"
     >
-      <!-- What is waiting comes first, then what was marked; the number is in the popup. -->
       <template v-if="c.day">
         <AtSign
           v-if="markOf(c.key) === 'mention'"
@@ -168,7 +159,6 @@ function onEnter(ev: MouseEvent, c: Cell): void {
   font: 10px/1 var(--font-num);
   text-align: center;
 }
-/* Square cells, so a month keeps its shape whatever it is given. */
 .cal__day {
   position: relative;
   display: flex;
@@ -199,7 +189,6 @@ function onEnter(ev: MouseEvent, c: Cell): void {
   border-color: var(--accent);
   color: var(--accent);
 }
-/* Last word on the colour of a day: what is due on it. */
 .cal__day.has-due,
 .cal__day.has-due.is-weekend,
 .cal__day.has-due.is-today {
@@ -227,7 +216,6 @@ function onEnter(ev: MouseEvent, c: Cell): void {
 .cal__day.is-late .cal__bell {
   color: var(--danger-text);
 }
-/* The day's work, in five steps of the accent. */
 .cal__day.heat-1 { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .cal__day.heat-2 { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .cal__day.heat-3 { background: color-mix(in srgb, var(--accent) 32%, transparent); }

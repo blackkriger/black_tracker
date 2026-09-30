@@ -1,10 +1,5 @@
 <!doctype html>
-<!--
-  The draw.io reader. It is opened inside a frame sandboxed without allow-same-origin, so
-  although it is served from the tracker's own domain it runs with an opaque origin: the
-  diagram's code cannot reach the session or the page around it. The diagram arrives as
-  text by postMessage from the tracker, never by a request of its own.
--->
+<!-- Sandboxed without allow-same-origin: diagram script cannot reach the session or the page. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -20,8 +15,7 @@
   <body>
     <div id="graph"></div>
     <script>
-      // With no origin of its own the frame has no storage, and reading it throws; the
-      // viewer only keeps settings there, so a store that forgets is enough.
+      // An opaque-origin frame throws on storage access; an in-memory stand-in is enough for viewer settings.
       ['localStorage', 'sessionStorage'].forEach(function (name) {
         try {
           window[name].length;
@@ -85,16 +79,12 @@
         watchSize();
       });
 
-      // The tracker sizes the frame to the diagram, so the frame says how big the diagram is —
-      // again whenever it changes, as it does when the zoom buttons are pressed.
       var watching = null;
       function watchSize() {
         var graph = document.querySelector('.mxgraph');
         if (!graph) return;
         if (watching) watching.disconnect();
-        // The toolbar hangs above the diagram's own box, and its strip is stretched to the
-        // width of the window, so it counts only by the buttons on it; the size is the box
-        // together with those, measured from the top of the page.
+        // The absolute toolbar strip spans the window, so only its buttons count toward the size.
         var report = function () {
           var box = graph.getBoundingClientRect();
           var right = box.right;

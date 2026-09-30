@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// The account's other half: the token scripts and agents speak with, and what they may say
-// with it. Every call made with the token is recorded as the person who minted it.
 import { computed, ref } from 'vue';
 import { Check, X } from 'lucide-vue-next';
 import { api } from '../lib/api';
@@ -11,7 +9,6 @@ const session = useSession();
 const me = session.me;
 
 const tokenBusy = ref(false);
-// Held only until the page is left: the server keeps a hash, so this is the one moment the value exists anywhere readable.
 const freshToken = ref<string | null>(null);
 const copied = ref(false);
 const tokenError = ref<string | null>(null);
@@ -63,8 +60,6 @@ async function copyToken(): Promise<void> {
 const BASE = `${window.location.origin}/api`;
 const HEADER = '-H "Authorization: Bearer trk_…"';
 
-// The examples name what the reader fills in, in capitals, rather than borrowing one of
-// their own ids: a real key or uuid reads as part of the call when it is only a stand-in.
 const examples = computed(() => {
   const auth = '-H "Authorization: Bearer $TRACKER_TOKEN"';
   const json = '-H "Content-Type: application/json"';
@@ -271,7 +266,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   display: flex;
   gap: 10px;
 }
-/* The tick and the cross are icons now; they only need to sit on the first line of their item. */
 .token__yes,
 .token__no {
   margin-top: 3px;
@@ -289,7 +283,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
 }
-/* The calls, three columns wide: what to send, where, and what comes back. */
 .api__table {
   display: grid;
   grid-template-columns: 52px minmax(0, auto) minmax(0, 1fr);
@@ -320,7 +313,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   overflow-x: auto;
   white-space: pre;
 }
-/* An example's name on the left, the way to take it on the right. */
 .api__ex-h {
   display: flex;
   align-items: center;

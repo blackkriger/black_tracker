@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// A picture, full screen: the viewer from another project, brought over and dressed in this theme. Wheel zooms towards the cursor, drag moves the picture, double click puts it back, arrows walk the set. `v-model:index` holds which one is open, null closes it.
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 
@@ -35,7 +34,6 @@ function go(dir: number): void {
 
 watch(() => props.index, resetView);
 
-// Zoom towards the cursor: the point under it stays under it.
 function onWheel(ev: WheelEvent): void {
   ev.preventDefault();
   const box = stage.value?.getBoundingClientRect();
@@ -91,7 +89,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 <template>
   <Teleport to="body">
     <div v-if="open && current" class="iviewer">
-      <!-- A click on the empty stage closes; the picture itself is for dragging. -->
       <div ref="stage" class="iviewer__stage" @wheel="onWheel" @click.self="close">
         <img
           :src="current.src"

@@ -1,5 +1,3 @@
-// Invite links. Registration stays closed — nobody can sign themselves up — but an admin no longer has to invent a password for someone else: they mint a link, and whoever opens it picks their own login and password and lands signed in. The token is kept as a hash, shown once, and good for one account.
-
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
@@ -84,11 +82,9 @@ export function registerInviteRoutes(app: FastifyInstance): void {
       ]
     );
     const res = await pool.query<InviteRow>(`${LIST_SQL} where i.id = $1`, [created.rows[0].id]);
-    // The only moment the token exists anywhere readable; from here on the row carries its tail and nothing else.
     return reply.code(201).send({ data: { ...publicInvite(res.rows[0]), token: raw } });
   });
 
-  // A link nobody walked through is just a key left on the table — it can be thrown away. One that was used is the record of how an account came to exist, and that is kept.
   app.delete('/invites/:id', async (req, reply) => {
     if (!(await requireRoleManager(req, reply))) return;
     const { id } = req.params as { id: string };
@@ -102,7 +98,6 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
-  // Open to anyone holding the link: the join screen asks before drawing its form.
   app.get('/invites/:token/check', async (req, reply) => {
     const { token } = req.params as { token: string };
     const res = await pool.query<{ is_admin: boolean; role_name: string | null; role_color: string | null }>(
@@ -135,7 +130,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     type Outcome = { ok: false; error: string; code: number } | { ok: true; userId: string };
 
     const outcome = await inTransaction(async (client): Promise<Outcome> => {
-      // Locked for the length of the transaction, so the same link opened in two tabs cannot make two accounts.
+      // FOR UPDATE stops one link, accepted twice at once, from making two accounts.
       const invite = await client.query<{ id: string; is_admin: boolean; role_id: string | null }>(
         `select id, is_admin, role_id from invites
           where token_hash = $1 and used_at is null and expires_at > now()

@@ -1,6 +1,3 @@
-// The buddy avatar from another project, carried over whole so a person looks the same in both places: an FNV-1a hash of the login picks a hue, and the rest is a self-contained SVG. No upload path here — the tracker has no avatar files.
-
-// FNV-1a hash of a name to a uint32, a stable per-name seed shared by both fallback styles below. Three independent byte-slices of it feed hue, saturation and lightness, so even hue collisions stay distinguishable by brightness; the earlier `(h * 31 + ch) >>> 0` with a raw `% 360` clustered short names into the green band, which FNV fixed.
 function fnv1a(name: string): number {
   let h = 2166136261;
   for (let i = 0; i < name.length; i++) {
@@ -10,7 +7,6 @@ function fnv1a(name: string): number {
   return h >>> 0;
 }
 
-// MSN/Messenger-style glossy buddy, the default avatar for users with no uploaded picture: a self-contained SVG of coloured backdrop plus glass head and torso, tinted by the username's hue so every user gets a stable colour, with a square viewBox so it fills the gold-bordered tiles cover.
 function buddyAvatarSvg(hue: number): string {
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">` +
@@ -33,7 +29,6 @@ function buddyAvatarSvg(hue: number): string {
   );
 }
 
-// Data URI for the buddy avatar, usable as a `background-image`, memoized by name because it is bound directly in `v-for` `:style` on hot feeds — Lobby, comments, friend lists — so it re-runs on every row re-render; the SVG build plus encodeURIComponent is pure in `name` and the distinct-name set is small.
 const buddyUriCache = new Map<string, string>();
 function buddyAvatarDataUri(name: string): string {
   const cached = buddyUriCache.get(name);
@@ -44,7 +39,6 @@ function buddyAvatarDataUri(name: string): string {
   return uri;
 }
 
-// Drop-in for `placeholderAvatarStyle` on user-avatar tiles, painting the buddy as a cover background since the SVG carries its own backdrop.
 export function buddyAvatarStyle(name: string): {
   backgroundImage: string;
   backgroundSize: string;

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// One day, opened from wherever it was clicked: the calendar screen or the little month in
-// the top bar. It reads its own day, so neither host has to hand it anything but the date.
 import { computed, ref, watch } from 'vue';
 import { X } from 'lucide-vue-next';
 import Dialog from './Dialog.vue';
@@ -17,7 +15,6 @@ import { ink } from '../lib/theme';
 const props = defineProps<{ day: string }>();
 const emit = defineEmits<{
   (e: 'close'): void;
-  /** Something about the day changed and whoever hosts this should read it again. */
   (e: 'changed'): void;
   (e: 'open', where: { key: string; projectShort: string; boardSlug: string; comment?: string }): void;
 }>();
@@ -53,7 +50,6 @@ async function read(): Promise<void> {
 
 watch(() => props.day, read, { immediate: true });
 
-// ── marking it ──
 const adding = ref(false);
 const title = ref('');
 const url = ref('');
@@ -238,7 +234,6 @@ async function openNotice(n: Notice): Promise<void> {
   font-size: 13px;
   text-align: left;
 }
-/* A marked day can carry the event's picture, and the picture is the way to it. */
 .mark--kept {
   flex-direction: column;
   align-items: stretch;

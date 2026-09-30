@@ -1,5 +1,3 @@
-// Roles — dev, artist, game designer, whatever the team calls itself. They are rows people create, they carry a colour nobody picks by hand, and board access hangs off them: a board is closed to a role, and whoever wears that role cannot open it. `users.is_admin` stays outside all of it — the creator's own key, held in the database and never handed out by a screen. Reading roles is open to everyone signed in; making and unmaking them is an admin's job, the same rule tags and statuses follow.
-
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
@@ -69,7 +67,6 @@ export function registerRoleRoutes(app: FastifyInstance): void {
     return reply.code(201).send({ data: publicRole(res.rows[0]) });
   });
 
-  // The name and what the role may do. The colour is the server's business, and it never changes under a role people have learned to recognise.
   app.patch('/roles/:id', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
@@ -96,7 +93,6 @@ export function registerRoleRoutes(app: FastifyInstance): void {
     return reply.send({ data: publicRole(res.rows[0]) });
   });
 
-  // Which boards this role cannot open, and the whole list written back at once. A role with nothing denied opens everything, and so does anyone wearing no role.
   app.get('/roles/:id/access', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
@@ -144,7 +140,6 @@ export function registerRoleRoutes(app: FastifyInstance): void {
     });
   });
 
-  // Whoever wore it simply stops wearing one — the column is nulled by the foreign key.
   app.delete('/roles/:id', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };

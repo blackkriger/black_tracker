@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Tags by where they live: the global ones first, then one container per project. The container title is the scope, so no row has to spell it out.
 import { computed, onMounted, ref } from 'vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
@@ -11,7 +10,6 @@ import { useProjects } from '../../lib/projects';
 
 interface Tag extends TagItem {
   projectId: string | null;
-  /** The server folded this name into one tag usable everywhere, because it already lived on another project. */
   merged?: boolean;
 }
 
@@ -20,7 +18,6 @@ const { canDelete } = useSession();
 
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
-// Keyed by the container the action happened in: 'global', or the project's id.
 const { errors, fail, clear } = usePanelErrors();
 const notices = ref<Record<string, string | null>>({});
 
@@ -58,7 +55,6 @@ async function add(scope: string, name: string, project?: string): Promise<void>
       method: 'POST',
       body: project ? { name, project } : { name },
     });
-    // A merge moves rows around — one tag becomes global and its twins are gone — so the list is read again rather than patched.
     if (created.merged) {
       note(
         scope,
@@ -105,7 +101,6 @@ async function remove(scope: string, tag: TagItem): Promise<void> {
 
 <template>
   <SettingsLayout>
-    <!-- While the tags load the page keeps its shape: the global container, then one project container under it, both filled with label-shaped placeholders. -->
     <template v-if="loading">
       <section class="panel sheet__wide">
         <header class="panel__h">Global tags<span class="panel__end">Usable on every project</span></header>
@@ -182,7 +177,6 @@ async function remove(scope: string, tag: TagItem): Promise<void> {
   width: 140px;
   height: 14px;
 }
-/* The add row keeps its place too, or the panel grows the moment the tags land. */
 .field-sk {
   display: block;
   flex: 1 1 auto;

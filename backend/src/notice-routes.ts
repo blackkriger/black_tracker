@@ -1,8 +1,3 @@
-// What a person is told about: being named in a comment, and someone reacting to one they
-// wrote. `@login` in the text is the whole of the first mechanism — the names are read out
-// of what was written, matched against real accounts and roles, and kept until the person
-// they belong to has looked at them.
-
 import type { FastifyInstance } from 'fastify';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
@@ -10,7 +5,6 @@ import { pool } from './db.js';
 import { requireAuth, requireSession } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 
-/** The same shape a login may take, so `@PROJ-1` and an e-mail do not become mentions. */
 const NAME = /(?:^|\s)@([a-zA-Z0-9_.-]{2,32})/g;
 
 const plain = (html: string): string =>
@@ -25,11 +19,6 @@ const plain = (html: string): string =>
 
 const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/**
- * Brings a comment's mentions in line with what it now says. Names that are still there
- * keep whatever they had, including having been read; names that are gone go with it.
- * A name is either a login or a role — naming a role names everyone wearing it.
- */
 export async function syncMentions(
   client: PoolClient,
   commentId: string,
@@ -48,7 +37,6 @@ export async function syncMentions(
     for (const row of found.rows) ids.add(row.id);
   }
 
-  // A role's name may hold spaces, so it is looked for whole rather than tokenised.
   const roles = await client.query<{ id: string; name: string }>('select id, name from roles');
   const named = roles.rows.filter((r) =>
     new RegExp(`(^|\\s)@${escape(r.name)}(?![a-zA-Z0-9_.-])`, 'i').test(said)
@@ -94,7 +82,6 @@ interface NoticeRow {
 }
 
 export function registerNoticeRoutes(app: FastifyInstance): void {
-  // What is waiting for me, newest first: the unread ones matter, the read ones are context.
   app.get('/notices', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -131,7 +118,6 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
     return reply.send({ data: res.rows.map((r) => publicNotice(r, auth.login)) });
   });
 
-  // Seen: one of them, or all of them at once.
   app.post('/notices/read', async (req, reply) => {
     const session = await requireSession(req, reply);
     if (!session) return;
@@ -147,7 +133,6 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
 }
 
 function publicNotice(r: NoticeRow, mine: string) {
-  // A notice about the issue itself has no words of its own, so it carries its title.
   if (!r.comment_id) {
     return {
       id: r.id,
@@ -164,7 +149,6 @@ function publicNotice(r: NoticeRow, mine: string) {
       read: r.read_at !== null,
     };
   }
-  // The name that is being answered is the reader's own, so it says nothing they do not know.
   const said = plain(r.text ?? '')
     .replace(new RegExp(`(^|\\s)@${escape(mine)}(?![a-zA-Z0-9_.-])`, 'gi'), '$1')
     .replace(/\s+/g, ' ')

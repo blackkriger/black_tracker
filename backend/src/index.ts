@@ -21,7 +21,6 @@ import { registerChangeFeed, registerEventRoutes } from './events.js';
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
-  // Screenshots and gifs are the point of attachments; nginx carries the same ceiling.
   bodyLimit: 30 * 1024 * 1024,
 });
 
@@ -31,9 +30,6 @@ await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 10 
 
 app.get('/health', async () => ({ data: { ok: true } }));
 
-// When the running code was last changed. The server deploys by pulling, so the commit it
-// stands on is the moment the service itself was last updated; without git to ask, the
-// moment this process started is the nearest true answer.
 const updatedAt = await new Promise<string>((resolve) => {
   execFile(
     'git',
@@ -57,10 +53,8 @@ registerCalendarRoutes(app);
 registerAnalyticsRoutes(app);
 registerNoticeRoutes(app);
 registerEventRoutes(app);
-// After the routes, so it sees the pattern each one matched.
 registerChangeFeed(app);
 
-// Every route answers the same two shapes: `{ data }` when it worked, `{ error }` when it did not.
 app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found.' }));
 app.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
   app.log.error(err);

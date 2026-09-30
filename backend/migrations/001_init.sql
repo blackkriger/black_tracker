@@ -1,11 +1,8 @@
--- The whole tracker in one file: nine tables from the brief plus the two this instance needs — per-board denials and the sessions the browser rides on. Anything later goes in a new numbered file; there are no down-migrations.
-
 create table if not exists users (
   id            uuid primary key default gen_random_uuid(),
   login         text not null unique,
   full_name     text not null default '',
   password_hash text not null,
-  -- Personal API token for agents and scripts. Null until the user mints one; a fresh one replaces the old, which is how a leaked token is revoked.
   api_token     text unique,
   role          text not null default 'member' check (role in ('admin', 'member')),
   active        boolean not null default true,
@@ -18,7 +15,6 @@ create table if not exists projects (
   short_name        varchar(20) not null unique,
   name              text not null,
   description       text not null default '',
-  -- Counter behind PROJ-123. Bumped inside the same transaction that inserts the issue, so two writers cannot land on one number.
   next_issue_number integer not null default 1,
   default_state_id  uuid,
   archived          boolean not null default false,
@@ -26,7 +22,6 @@ create table if not exists projects (
   created_at        timestamptz not null default now()
 );
 
--- Statuses are rows, not an enum in code: adding one is an insert, and the board grows a column without a deploy. `is_resolved` is what "closed" means — it stamps issues.resolved_at.
 create table if not exists states (
   id          uuid primary key default gen_random_uuid(),
   project_id  uuid not null references projects(id) on delete cascade,
@@ -77,7 +72,6 @@ create table if not exists issue_comments (
 
 create index if not exists issue_comments_issue_idx on issue_comments (issue_id, created_at);
 
--- Files live on disk; the row carries only what is needed to serve them behind a permission check. A null comment_id means the file hangs off the issue itself.
 create table if not exists issue_attachments (
   id           uuid primary key default gen_random_uuid(),
   issue_id     uuid not null references issues(id) on delete cascade,
@@ -92,7 +86,6 @@ create table if not exists issue_attachments (
 
 create index if not exists issue_attachments_issue_idx on issue_attachments (issue_id, created_at);
 
--- Every status, assignee, priority and summary change. One table buys the activity feed, the time an issue spent in each status, and a way to see who broke what.
 create table if not exists issue_history (
   id         uuid primary key default gen_random_uuid(),
   issue_id   uuid not null references issues(id) on delete cascade,
@@ -112,7 +105,6 @@ create table if not exists tags (
   color      text not null default '#71767b'
 );
 
--- A nullable project_id cannot carry a plain UNIQUE, so the two halves get their own partial indexes: one name per project, one name across the global tags.
 create unique index if not exists tags_project_name_idx
   on tags (project_id, lower(name)) where project_id is not null;
 create unique index if not exists tags_global_name_idx
@@ -124,7 +116,6 @@ create table if not exists issue_tags (
   primary key (issue_id, tag_id)
 );
 
--- A board is a saved filter over a project; its columns are the project's states. There is no column entity, which is the whole point.
 create table if not exists boards (
   id          uuid primary key default gen_random_uuid(),
   project_id  uuid not null references projects(id) on delete cascade,
@@ -134,7 +125,6 @@ create table if not exists boards (
   created_at  timestamptz not null default now()
 );
 
--- Access is open by default, so what is stored is the exception: this user does not see this board.
 create table if not exists board_denials (
   board_id uuid not null references boards(id) on delete cascade,
   user_id  uuid not null references users(id) on delete cascade,

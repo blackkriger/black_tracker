@@ -1,4 +1,3 @@
-// Ridgeline geometry shared by the Activity ridge and the shelf charts: a 100×44 viewBox, baseline at H−3, peaks clamped 38 px above it.
 export const RIDGE_W = 100;
 export const RIDGE_H = 44;
 const BASE = RIDGE_H - 3;
@@ -17,7 +16,6 @@ export function smoothRidge(raw: number[]): number[] {
   });
 }
 
-// `full` is the value drawn at the full peak height; the Activity ridge keeps its absolute scale of 4.
 export function ridgePath(profile: number[], full = 4): { line: string; area: string } {
   if (!profile.length) {
     const line = `M0 ${BASE} L${RIDGE_W} ${BASE}`;
@@ -28,11 +26,8 @@ export function ridgePath(profile: number[], full = 4): { line: string; area: st
     x: (i / Math.max(1, n - 1)) * RIDGE_W,
     y: BASE - Math.min(PEAK, (v * PEAK) / full),
   }));
-  // A Catmull-Rom curve through the same points, so the line bends where a polyline would break.
   const at = (i: number) => pts[Math.max(0, Math.min(n - 1, i))];
   const f = (v: number) => v.toFixed(1);
-  // The handles are kept between the baseline and the ceiling, so the curve never dips under
-  // the one or climbs over the other on its way between two points.
   const hold = (y: number) => Math.max(BASE - PEAK, Math.min(BASE, y));
   let line = `M${f(pts[0].x)} ${f(pts[0].y)}`;
   for (let i = 0; i < n - 1; i += 1) {

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The root is a junction, not a page: it sends you to the board you had open and only draws something when there is nothing to send you to.
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';

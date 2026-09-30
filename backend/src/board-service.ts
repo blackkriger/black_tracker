@@ -1,11 +1,8 @@
-// Making a board is never just a row: a board without columns cannot draw anything, so it comes with the starting four. Both the project and the board routes create boards, hence this sits apart from either.
-
 import type { PoolClient } from 'pg';
 import type { Auth } from './auth.js';
 import { pool } from './db.js';
 import { knownColor } from './colors.js';
 
-// The board's address. A name of nothing but punctuation or Cyrillic slugs to an empty string, so it falls back to a plain word and the counter below keeps it unique inside the project.
 export function slugify(name: string): string {
   const base = name
     .toLowerCase()
@@ -52,7 +49,6 @@ export interface StateRow {
   color: string;
 }
 
-// What a new board starts with. Their colours are fixed rather than random: the same four columns should look the same on every board, so "green means done" is learned once.
 export const DEFAULT_STATES: { name: string; isOpen: boolean; isResolved: boolean }[] = [
   { name: 'Backlog', isOpen: true, isResolved: false },
   { name: 'In progress', isOpen: true, isResolved: false },
@@ -99,20 +95,17 @@ export async function createBoardWithDefaults(
 }
 
 export interface Denials {
-  /** Nothing is open at all — there is no role for access to hang off. */
   everything: boolean;
   projects: Set<string>;
   boards: Set<string>;
 }
 
-/** What an admin is held to: nothing. */
 export const DENIES_NOTHING: Denials = {
   everything: false,
   projects: new Set(),
   boards: new Set(),
 };
 
-// What one role cannot open, both kinds of denial in one read: a whole project, or single boards inside a project it does have. Access is carried by the role, so someone wearing none is shut out of everything until they are given one.
 export async function deniedFor(roleId: string | null): Promise<Denials> {
   if (!roleId) return { everything: true, projects: new Set(), boards: new Set() };
   const [projects, boards] = await Promise.all([
@@ -130,8 +123,6 @@ export async function deniedFor(roleId: string | null): Promise<Denials> {
   };
 }
 
-// Which roles are shut out of which board. Access is a denial list, so a board missing from the answer is open to everyone — including anyone wearing no role at all.
-// The question every route about a board asks before it does anything: an admin is held to no denial, and someone with no role is held to all of them.
 export async function mayOpenBoard(
   auth: Auth,
   boardId: string,
@@ -181,6 +172,5 @@ export const publicBoard = (r: BoardRow, states: StateRow[] = [], deniedRoles: s
   defaultStateId: r.default_state_id,
   position: r.position,
   states: states.map(publicState),
-  /** The roles that cannot see it. Settings screens read this; everyone else only ever gets boards they may open. */
   deniedRoles,
 });

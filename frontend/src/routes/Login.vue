@@ -19,7 +19,6 @@ async function onSubmit(): Promise<void> {
   error.value = null;
   try {
     await session.signIn(login.value.trim(), password.value);
-    // Back to where they were headed, or to the root, which decides which board to open.
     const next = route.query.next;
     const target =
       typeof next === 'string' && next.startsWith('/') && !next.startsWith('/login') ? next : '/';

@@ -1,5 +1,3 @@
-// The month, as a grid. The week starts on Monday, the leading and trailing blanks keep
-// whole rows, and a day is always the same string everywhere: YYYY-MM-DD, local time.
 export interface Cell {
   day: number | null;
   key?: string;
@@ -11,7 +9,6 @@ export interface Mark {
   id: string;
   day: string;
   title: string;
-  /** The event's page, and the picture that links to it. */
   url: string | null;
   banner: string | null;
   project: { shortName: string; name: string } | null;
@@ -36,7 +33,6 @@ export interface Activity {
   resolved: number;
 }
 
-/** What was said to the reader that day, by kind, and how much of it is unseen. */
 export interface DayMentions {
   day: string;
   kind: string;
@@ -52,7 +48,6 @@ export interface DayInfo {
   resolved: number;
   said: number;
   unread: number;
-  /** How many are unseen, per kind, so a day can say which kind is waiting. */
   unreadOf: Record<string, number>;
 }
 
@@ -71,7 +66,6 @@ export function todayKey(): string {
 export const daysInMonth = (year: number, month: number): number =>
   new Date(year, month + 1, 0).getDate();
 
-/** Monday is 0 here, which is where every row of the grid starts. */
 export function firstWeekday(year: number, month: number): number {
   const d = new Date(year, month, 1).getDay();
   return d === 0 ? 6 : d - 1;
@@ -81,7 +75,6 @@ export function monthName(year: number, month: number): string {
   return new Date(year, month, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 }
 
-/** The day without its weekday, for places that already say which day they mean. */
 export function dayAndMonth(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
@@ -121,7 +114,6 @@ export function monthGrid(year: number, month: number): Cell[] {
   return cells;
 }
 
-/** The first and last day of a month, as the calendar route wants them. */
 export function monthRange(year: number, month: number): { from: string; to: string } {
   return { from: dayKey(year, month, 1), to: dayKey(year, month, daysInMonth(year, month)) };
 }
@@ -139,7 +131,6 @@ export function emptyDay(): DayInfo {
   };
 }
 
-/** Everything the server said about a stretch of days, gathered per day. */
 export function byDay(
   marks: Mark[],
   dues: { day: string; issues: Due[] }[],

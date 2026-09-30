@@ -1,7 +1,3 @@
-// What somebody was told about, shared between the bar that shows it, the calendar that
-// lays it out by day and the window that causes it. A comment written in this tab never
-// comes back over the live channel — a tab ignores its own echo — so whoever writes one
-// asks the feed to read itself again.
 import { computed, ref } from 'vue';
 import { api } from './api';
 
@@ -10,14 +6,11 @@ export type NoticeKind = 'mention' | 'reaction' | 'assigned';
 export interface Notice {
   id: string;
   kind: NoticeKind;
-  /** The comment it is about, which is what the window scrolls to. */
   commentId: string | null;
-  /** The reaction itself, when that is what this is. */
   emoji: string | null;
   said: string;
   by: string | null;
   key: string;
-  /** The colour of the status the issue stands in. */
   color: string | null;
   projectShort: string;
   boardSlug: string;
@@ -28,7 +21,6 @@ export interface Notice {
 const OFF = 'tracker:notices:off';
 
 const notices = ref<Notice[]>([]);
-// Set once the first read has come back, so a screen can tell an empty feed from one still on its way.
 const loaded = ref(false);
 const off = ref<NoticeKind[]>(read());
 let inflight: Promise<void> | null = null;
@@ -41,7 +33,6 @@ function read(): NoticeKind[] {
   }
 }
 
-/** The day a notice landed on, as the calendar spells a day. */
 export function dayOf(n: Notice): string {
   const d = new Date(n.at);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -57,25 +48,20 @@ export function useNotices() {
     off,
     loaded,
     unread: computed(() => shown.value.filter((n) => !n.read).length),
-    /** A kind switched off is simply not shown; nothing stops being recorded. */
     toggleKind(kind: NoticeKind): void {
       off.value = off.value.includes(kind)
         ? off.value.filter((k) => k !== kind)
         : [...off.value, kind];
       try {
         localStorage.setItem(OFF, JSON.stringify(off.value));
-      } catch {
-        /* the choice simply does not outlive the tab */
-      }
+      } catch {}
     },
     async load(): Promise<void> {
       inflight ??= api<Notice[]>('/notices')
         .then((rows) => {
           notices.value = rows;
         })
-        .catch(() => {
-          /* the bar simply shows no feed */
-        })
+        .catch(() => {})
         .finally(() => {
           inflight = null;
           loaded.value = true;

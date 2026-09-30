@@ -10,13 +10,9 @@ export interface Me {
   createdAt: string;
   lastSeenAt: string | null;
   authKind: 'session' | 'token';
-  /** May delete projects, boards, statuses and tags. */
   canDelete: boolean;
-  /** May hand a role to someone, and mint the invite links that arrive wearing one. */
   canManageRoles: boolean;
-  /** What they are called on the team, and what their access hangs off. */
   role: { id: string; name: string; color: string } | null;
-  /** Null until a token is minted; the raw value is never part of this — only its tail and dates. */
   token: { hint: string | null; createdAt: string | null; lastUsedAt: string | null } | null;
 }
 

@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// A file read where it hangs. Markdown is drawn the way a comment is; everything else is
-// shown as code with its lines numbered. The text arrives as data and is put on the page by
-// us, so nothing the file carries is ever parsed as a document on our own origin.
 import { computed, ref, watch, onUnmounted } from 'vue';
 import { FileDown, WrapText, X } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
@@ -24,13 +21,9 @@ const lang = computed(() => (props.file ? langOf(props.file.name) : 'plaintext')
 const isMd = computed(() => lang.value === 'markdown');
 const isDrawio = computed(() => lang.value === 'drawio');
 
-// A diagram is drawn by draw.io's own viewer, in a frame sandboxed without an origin of its
-// own: its code can reach neither the session nor this page. It says when it is listening,
-// and the text is handed over then — whichever of the two arrives second sends it.
+// Sandboxed without allow-same-origin so draw.io can't reach the session; its opaque origin forces '*'.
 const frame = ref<HTMLIFrameElement | null>(null);
 const frameReady = ref(false);
-// How big the diagram is drawn, as the frame reports it; the frame is sized to match and
-// stays hidden until the first report, so it never jumps from the page's width to its own.
 const frameSize = ref<{ width: number; height: number } | null>(null);
 
 function feedFrame(): void {
@@ -66,9 +59,7 @@ window.addEventListener('message', onFrameMessage);
 watch([text, shownTheme], feedFrame);
 const lines = computed(() => (code.value ? byLines(code.value) : []));
 
-// The highlighter paints the file in one pass and a span may run over several lines, so the
-// markup is cut line by line with whatever was left open reopened on the next one. A line
-// has to be its own row for its number to stay beside it once the line folds.
+// highlight.js spans can cross newlines, so each line closes its open spans and reopens them next.
 function byLines(html: string): string[] {
   const out: string[] = [];
   const open: string[] = [];
@@ -91,8 +82,6 @@ function byLines(html: string): string[] {
   return out;
 }
 
-// Neither the parser nor the highlighter is worth its weight until a file is opened, so
-// both are fetched at that point rather than riding in the bundle.
 async function colour(src: string, language: string): Promise<string> {
   const hljs = (await import('highlight.js/lib/common')).default;
   return hljs.getLanguage(language)
@@ -108,8 +97,6 @@ async function paint(): Promise<void> {
       DOMPurify.sanitize(await marked.parse(text.value)),
       'text/html'
     );
-    // A fenced block is code like any other. The highlighter is handed the block's text,
-    // never its markup, so what it gives back is spans around what was already there.
     for (const link of doc.querySelectorAll('a[href]')) {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener noreferrer');
@@ -160,8 +147,7 @@ function onKey(ev: KeyboardEvent): void {
   }
 }
 
-// The empty page around the file closes it, as the dark around a picture does — unless
-// something is selected, which is what a drag that ended out here was for.
+// A text-selecting drag that ends on the backdrop fires a click here; don't close on it.
 function onPage(): void {
   if (window.getSelection()?.isCollapsed === false) return;
   emit('close');
@@ -245,14 +231,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* The page the file is read on: one column the width of a book, the whole screen to scroll. */
 .fv__page {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  /* The gutter is the box's own margin rather than padding inside it: what scrolls starts
-     at the box's edge, so a file sliding sideways never shows up beside the line numbers
-     that pin there. */
+  /* Margin, not padding: scrolled code would show in the padding beside the sticky line numbers. */
   margin: 24px 24px 0;
   user-select: text;
 }
@@ -262,9 +245,7 @@ onUnmounted(() => {
   max-width: 900px;
   margin: 0 auto;
 }
-/* A document keeps a book's width; code is as wide as its longest line. Nothing here
-   scrolls on its own — the page under it is the one scroller, in both directions, or the
-   middle mouse button would take hold of the code and only ever drag it sideways. */
+/* One scroller only: a nested one would catch middle-click autoscroll and move only sideways. */
 .fv__code {
   width: max-content;
   margin: 0 auto;
@@ -279,8 +260,6 @@ onUnmounted(() => {
   color: var(--text-muted);
   font-size: 12px;
 }
-/* One row per line, so a number stays beside its line even after the line folds. The
-   numbers ride in their own column and stay put when the code is scrolled sideways. */
 .fv__code {
   display: grid;
   grid-template-columns: max-content max-content;
@@ -295,7 +274,6 @@ onUnmounted(() => {
   left: 0;
   padding-right: 14px;
   border-right: 1px solid var(--line);
-  /* The strip between the rule and the code is covered too, so nothing slides out under it. */
   box-shadow: 14px 0 0 var(--surface);
   background: var(--surface);
   color: var(--text-faint);
@@ -307,8 +285,6 @@ onUnmounted(() => {
   color: var(--text);
   white-space: pre;
 }
-/* Folded, the file keeps the width of its own lines; only a line wider than the screen is
-   broken, and the box stops at the edge instead of running off it. */
 .fv__code.is-folded {
   max-width: 100%;
   grid-template-columns: max-content minmax(0, max-content);
@@ -320,8 +296,6 @@ onUnmounted(() => {
 .fv__md {
   color: var(--text);
 }
-/* A diagram is as wide as it is drawn, like a file is as wide as its lines, and never wider
-   or taller than the page; past that the frame scrolls it inside. */
 .fv__drawio {
   display: block;
   width: 100%;
@@ -336,8 +310,6 @@ onUnmounted(() => {
 .fv__drawio.is-sized {
   visibility: visible;
 }
-/* A document carries more than a comment ever does: .md draws the rest, these are the parts
-   Quill has no button for. */
 .fv__md :deep(h1),
 .fv__md :deep(h2) {
   margin: 18px 0 8px;
@@ -374,14 +346,11 @@ onUnmounted(() => {
 .fv__md :deep(img) {
   max-width: 100%;
 }
-/* A fenced block is a `pre` around a `code`, and only the outer one is the box. */
 .fv__md :deep(pre code) {
   padding: 0;
   border: 0;
   background: none;
 }
-/* Code wears the same hues the boards do — in the column of a code file and in a fenced
-   block inside a document alike: the four starting statuses, and a comment in grey. */
 .fv__page :deep(.hljs-keyword),
 .fv__page :deep(.hljs-selector-tag),
 .fv__page :deep(.hljs-tag),

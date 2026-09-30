@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// The work itself, counted: the shape of every board and every priority across the same
-// run of statuses, what is late, who carries what and for how long, and how long a finished
-// issue took. Every key opens its issue, so a number is never a dead end.
 import { computed, onMounted, ref, watch } from 'vue';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
 import TopBar from '../components/TopBar.vue';
@@ -93,7 +90,6 @@ const data = ref<Numbers | null>(null);
 const openPeople = ref<string[]>([]);
 const openIssues = ref<string[]>([]);
 
-// The way back to everything is the picker's own placeholder, so it is not listed again.
 const projectChoices = computed(() =>
   projects.value.map((p) => ({ value: p.shortName, label: p.name }))
 );
@@ -101,8 +97,6 @@ const statusChoices = computed(() =>
   (data.value?.statuses ?? []).map((s) => ({ value: s, label: s }))
 );
 
-// Each read is numbered, and only the latest one's answer is kept: a filter changed while a
-// slower read was still out must not be overwritten by it.
 let reads = 0;
 
 async function load(): Promise<void> {
@@ -142,14 +136,10 @@ useLive((ev) => {
   }
 });
 
-// ── the two stacks, both read against the same run of statuses ──
 const axis = computed(() => data.value?.statuses ?? []);
 
-/** Five samples a status wide, so a run of four reads as hills rather than a zigzag. */
 const WEIGHT = RIDGE_SMOOTH_KERNEL.reduce((all, k) => all + k, 0);
 function shape(counts: number[]): number[] {
-  // The kernel adds up to more than one, so the smoothed run is scaled back to the range
-  // the counts themselves are in — otherwise every hill would sit clamped at the ceiling.
   return smoothRidge(counts.flatMap((n) => [n, n, n, n, n])).map((v) => v / WEIGHT);
 }
 
@@ -161,8 +151,6 @@ const tallest = computed(() => {
   return Math.max(1, ...all);
 });
 
-// Narrowed to one status, every board wears that status's colour and counts what stands in
-// it — open or not, since Done is as much a status to look at as Review.
 const boardRows = computed<RidgeRow[]>(() => {
   const busiest = Math.max(0, ...(data.value?.boards ?? []).map((b) => b.open));
   return (data.value?.boards ?? []).map((b) => {
@@ -197,7 +185,6 @@ const longestMonth = computed(() =>
   Math.max(1, ...(data.value?.cycle.months ?? []).map((m) => m.median ?? 0))
 );
 
-/** However long it lasted, in the unit that says it plainly, from seconds up to days. */
 function days(n: number | null): string {
   if (n === null) return '—';
   const seconds = n * 86400;
@@ -207,7 +194,6 @@ function days(n: number | null): string {
   return `${Math.round(n * 10) / 10}d`;
 }
 
-/** The whole of a duration down to the second, for the hover over its rounded figure. */
 function exact(n: number | null): string | undefined {
   if (n === null) return undefined;
   let rest = Math.round(n * 86400);
@@ -235,7 +221,6 @@ function toggleIssue(key: string): void {
     : [...openIssues.value, key];
 }
 
-// ── opening an issue from a number ──
 interface OpenIssue {
   key: string;
   project: string;
@@ -425,8 +410,6 @@ async function openIssue(w: Where): Promise<void> {
                         {{ days(i.days) }}
                       </button>
                     </div>
-                    <!-- The latest hands first. Each past stretch says which statuses it saw; the
-                         current one does not, its status is already on the line above. -->
                     <div v-if="openIssues.includes(i.key)" class="hands">
                       <template v-for="(h, n) in [...i.hands].reverse()" :key="n">
                         <div class="hands__row">
@@ -538,7 +521,6 @@ async function openIssue(w: Where): Promise<void> {
   height: 100%;
   background: var(--accent);
 }
-/* A row that opens what it counts: ruled like a table rather than boxed on its own. */
 .line {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr) auto;
@@ -595,8 +577,6 @@ async function openIssue(w: Where): Promise<void> {
   font: 11px/1 var(--font-num);
   color: var(--text-muted);
 }
-/* The columns are named in the panel's own header, over the numbers they belong to: the
-   header's gutter is four pixels narrower than the body's, hence the nudge. */
 .who__head {
   display: grid;
   grid-template-columns: 40px 40px 48px 52px;
@@ -606,7 +586,6 @@ async function openIssue(w: Where): Promise<void> {
 .who__head .stamp {
   text-align: right;
 }
-/* Ruled like a table: a line between people, none inside what one person is holding. */
 .nums--table {
   gap: 0;
 }
@@ -622,7 +601,6 @@ async function openIssue(w: Where): Promise<void> {
   padding-top: 8px;
   margin-top: 2px;
 }
-/* What one person is holding, and under an issue, whose hands it passed through. */
 .held {
   display: flex;
   flex-direction: column;
@@ -681,7 +659,6 @@ async function openIssue(w: Where): Promise<void> {
 .hands__row .n {
   text-align: right;
 }
-/* Nested under the person it belongs to, one step in like every level above it. */
 .hands__states {
   display: flex;
   flex-wrap: wrap;
@@ -712,7 +689,6 @@ async function openIssue(w: Where): Promise<void> {
   font: 28px/1 var(--font-num);
   color: var(--accent);
 }
-/* Placeholders drawn in the shape of what they stand for, so nothing moves when it lands. */
 .skel {
   display: flex;
   flex-direction: column;

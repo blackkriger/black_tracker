@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// Who you are here: the name the tracker calls you and the password behind it in one
-// column, the handful of choices the tracker keeps for you in the other. Everything the API
-// side of the account needs lives in ApiPanels instead.
 import { computed, ref } from 'vue';
 import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
@@ -42,7 +39,6 @@ const canChangePassword = computed(
 const since = computed(() => stamp(me.value?.createdAt ?? null));
 const role = computed(() => me.value?.role ?? null);
 
-// ── what the tracker remembers about how you like to read it ──
 const THEMES: { value: Theme; label: string }[] = [
   { value: 'dark', label: 'Dark' },
   { value: 'light', label: 'Light' },
@@ -107,14 +103,12 @@ async function changePassword(): Promise<void> {
         <div class="who">
           <span class="av av--xl" :style="buddyAvatarStyle(me?.login ?? '')"></span>
           <div class="who__lines">
-            <!-- The name and the login are both in the fields below, so this line carries the role; with no role it is the date alone. -->
             <span v-if="role" class="who__role" :style="{ color: ink(role.color) }">{{ role.name }}</span>
             <span class="stamp">SINCE {{ since }}</span>
           </div>
         </div>
         <div class="field">
           <label class="label" for="fullname">Display name</label>
-          <!-- Empty is fine: the placeholder shows the login, which is what stands in for a missing name everywhere. -->
           <input
             id="fullname"
             v-model="fullName"
@@ -263,11 +257,9 @@ async function changePassword(): Promise<void> {
   justify-content: flex-end;
   gap: var(--space-3);
 }
-/* The confirmation belongs at the start of the row, not crowding the button it reports on. */
 .row-end .hint {
   margin-right: auto;
 }
-/* Two groups of switches side by side, each under its own label. */
 .pairs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,5 +1,3 @@
-// Tags are either global or a project's own. Reading and naming them is open to whoever can open the project they belong to; deleting one takes it off every issue that carries it, so that is its own right.
-
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
@@ -26,19 +24,16 @@ const publicTag = (r: TagRow) => ({
 
 const tagCreate = z.object({
   name: z.string().trim().min(1).max(40),
-  /** Absent means a global tag, usable on every project. */
   project: z.string().trim().max(20).optional(),
 });
 
-// Only the name: the colour is the server's business, and it never changes under a tag people have learned to recognise.
 const tagPatch = z.object({
   name: z.string().trim().min(1).max(40),
 });
 
-// One name, one tag. A name that already lives on another project cannot become a second tag with the same word on it — the two are the same idea, so they are merged into a single tag that works everywhere. The survivor keeps its id, so every issue already wearing it keeps its tag; the others hand over their issues and go.
 async function mergeIntoGlobal(name: string, renameFirst?: string): Promise<TagRow> {
   return inTransaction(async (client) => {
-    // A rename that ends in a merge happens inside the merge: a committed rename with a failed merge would leave exactly the duplicate this function exists to remove.
+    // Rename inside the merge's transaction, or a failed merge leaves the duplicate behind.
     if (renameFirst) {
       await client.query('update tags set name = $2 where id = $1', [renameFirst, name]);
     }
@@ -47,7 +42,6 @@ async function mergeIntoGlobal(name: string, renameFirst?: string): Promise<TagR
       [name]
     );
     const rows = existing.rows;
-    // The global one if there is any, otherwise the first project tag is promoted.
     const survivor = rows[0];
     const losers = rows.slice(1).map((r) => r.id);
     if (losers.length) {
@@ -70,7 +64,6 @@ async function mergeIntoGlobal(name: string, renameFirst?: string): Promise<TagR
 }
 
 export function registerTagRoutes(app: FastifyInstance): void {
-  // `?project=PROJ` narrows to what that project can actually use: its own tags plus the global ones.
   app.get('/tags', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
@@ -80,7 +73,6 @@ export function registerTagRoutes(app: FastifyInstance): void {
     if (q.project) {
       const project = await projectByShort(q.project);
       if (!project) return reply.code(404).send({ error: 'No such project.' });
-      // A project their role cannot open is a project that is not there, tags and all.
       if (denied && (denied.everything || denied.projects.has(project.id))) {
         return reply.code(404).send({ error: 'No such project.' });
       }
@@ -116,11 +108,9 @@ export function registerTagRoutes(app: FastifyInstance): void {
       }
       projectId = row.id;
     } else if (!auth.isAdmin && (await deniedFor(auth.roleId)).everything) {
-      // A global tag belongs to every project, so it takes being able to open at least one.
       return reply.code(403).send({ error: 'Making a tag is not open to your role.' });
     }
 
-    // What already carries this name decides what happens: nothing means a plain insert, the same scope is a duplicate, and anywhere else means the two are one tag and it becomes global.
     const twins = await pool.query<{ id: string; project_id: string | null }>(
       'select id, project_id from tags where lower(name) = lower($1)',
       [name]
@@ -134,7 +124,6 @@ export function registerTagRoutes(app: FastifyInstance): void {
     }
 
     try {
-      // Global tags share the field with every project's own, so both halves count as taken.
       const taken = await pool.query<{ color: string }>(
         'select color from tags where project_id is null or project_id is not distinct from $1',
         [projectId]
@@ -173,7 +162,6 @@ export function registerTagRoutes(app: FastifyInstance): void {
       : auth.isAdmin || !(await deniedFor(auth.roleId)).everything;
     if (!reaches) return reply.code(404).send({ error: 'No such tag.' });
 
-    // Renaming onto a name someone else already uses follows the same rule as creating it: same scope is a duplicate, another scope means the two become one global tag.
     const twins = await pool.query<{ id: string; project_id: string | null }>(
       'select id, project_id from tags where lower(name) = lower($1) and id <> $2',
       [parsed.data.name, id]
@@ -195,7 +183,6 @@ export function registerTagRoutes(app: FastifyInstance): void {
     return reply.send({ data: publicTag(res.rows[0]) });
   });
 
-  // Deleting a tag takes it off the issues that carry it — that is the point of deleting it — so the answer says how many were touched.
   app.delete('/tags/:id', async (req, reply) => {
     if (!(await requireDeleter(req, reply))) return;
     const { id } = req.params as { id: string };

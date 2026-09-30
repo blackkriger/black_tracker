@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The editor behind a description and a comment: Quill with a short toolbar and nothing else — no images (files hang off the issue), no fonts, no colours. It speaks the same v-model contract as a textarea, handing back HTML that is sanitised before it is ever shown again.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { usePeople } from '../lib/people';
 import { useRoles } from '../lib/roles';
@@ -32,16 +31,12 @@ const { roles, load: loadRoles } = useRoles();
 const wrap = ref<HTMLDivElement | null>(null);
 const host = ref<HTMLDivElement | null>(null);
 let quill: Quill | null = null;
-// Set while the editor itself is the source of a change, so the watcher below does not reset the caret on every keystroke.
 let fromEditor = false;
 
-// Quill says when it has the caret and when it has lost it: the box draws nothing for it, but a press outside still has to let the caret go.
 const focused = ref(false);
-// A file dragged over the text: Quill would try to paste it into the document, so it is caught here and handed to whoever owns the editor.
 const overWithFiles = ref(false);
 
-// The same for a screenshot in the clipboard: Quill would inline it as base64, which the
-// sanitiser throws away on the way out. Caught before Quill sees it and sent up as a file.
+// Quill would inline pasted or dropped images as base64, which clean() strips; intercept them first.
 function onPaste(ev: ClipboardEvent): void {
   const files = ev.clipboardData?.files;
   if (!files?.length) return;
@@ -94,16 +89,13 @@ function readMarks(): void {
   };
 }
 
-// An `@` and what has been typed after it, while the caret is still on the end of it.
 const naming = ref<{ from: number; query: string } | null>(null);
 const chosen = ref(0);
 const list = ref<HTMLDivElement | null>(null);
 const rows = ref<HTMLDivElement | null>(null);
-// Where the caret stands in the window, and where the list was put beside it.
 const caret = ref({ left: 0, top: 0, bottom: 0 });
 const at = ref({ left: 0, top: 0, tip: 12, room: 0, up: false, ready: false });
 
-// A name can be a person or a role: naming a role names everyone wearing it.
 interface Named {
   id: string;
   label: string;
@@ -114,7 +106,6 @@ interface Named {
 const matches = computed<Named[]>(() => {
   if (!naming.value) return [];
   const q = naming.value.query.toLowerCase();
-  // Only the roles are coloured here: a colour on a person would be their role's, said twice.
   const who = people.value
     .filter((p) => p.login.toLowerCase().includes(q) || p.fullName.toLowerCase().includes(q))
     .map((p) => ({ id: p.id, label: p.login, color: null, hint: p.fullName }));
@@ -127,8 +118,6 @@ const matches = computed<Named[]>(() => {
 const GAP = 6;
 const EDGE = 8;
 
-// Where the caret is in the window. Quill measures it against the editor, which scrolls
-// inside a window that scrolls too, so the answer only holds for the moment it is asked.
 function measure(): void {
   if (!quill) return;
   const sel = quill.getSelection();
@@ -142,9 +131,6 @@ function measure(): void {
   };
 }
 
-// The list hangs in the window rather than in the editor, which clips it: it is held
-// inside the dialog around it, turned upwards when the room below runs out, and given
-// only the height that is left, so it never reaches past the frame it belongs to.
 function place(): void {
   const el = list.value;
   if (!el) return;
@@ -155,7 +141,6 @@ function place(): void {
   const wallB = (walls?.bottom ?? window.innerHeight) - EDGE;
   const below = wallB - caret.value.bottom - GAP;
   const above = caret.value.top - GAP - wallT;
-  // The rows scroll, the box around them does not: what is left over is theirs to have.
   const shell = el.offsetHeight - (rows.value?.offsetHeight ?? 0);
   const up = (rows.value?.scrollHeight ?? 0) + shell > below && above > below;
   const room = Math.max(0, (up ? above : below) - shell);
@@ -166,7 +151,6 @@ function place(): void {
     tip: Math.max(12, Math.min(caret.value.left - left, el.offsetWidth - 12)),
     room,
     up,
-    // Scrolled out of its own dialog, or with no room left to stand in: nothing to show.
     ready: room > 32 && caret.value.top < wallB && caret.value.bottom > wallT,
   };
 }
@@ -180,7 +164,6 @@ function lookForName(): void {
   }
   const back = Math.min(40, sel.index);
   const before = quill.getText(sel.index - back, back);
-  // A name starts a word: an e-mail address in the middle of one is not a mention.
   const found = /(?:^|\s)@([a-zA-Z0-9_.-]*)$/.exec(before);
   if (!found) {
     naming.value = null;
@@ -193,15 +176,12 @@ function lookForName(): void {
   void nextTick(place);
 }
 
-// Anything that moves the editor moves the caret with it, and the list has to follow.
 function follow(): void {
   if (!naming.value) return;
   measure();
   place();
 }
 
-// The names in the box, coloured where they stand. The format is applied silently, so it
-// never reaches the model — what is stored is the plain text, painted again when read.
 let painting = false;
 function paintNames(): void {
   if (!quill || painting) return;
@@ -219,8 +199,6 @@ function paintNames(): void {
   painting = false;
 }
 
-// The lists arrive after the page does, and a draft put back before they land would stay
-// colourless: the names are only recognisable once there is something to recognise them by.
 watch([people, roles], () => paintNames());
 
 function pickName(login: string): void {
@@ -232,8 +210,7 @@ function pickName(login: string): void {
   quill.setSelection(from + login.length + 2, 0, 'silent');
 }
 
-// The list answers the keys first: Quill would otherwise break the line on Enter, and the
-// window above would close on Escape.
+// Capture phase: must run before Quill's Enter handling and the dialog's window Escape listener.
 function onNameKey(ev: KeyboardEvent): void {
   if (!naming.value || !matches.value.length) return;
   const stop = () => {
@@ -283,8 +260,7 @@ onMounted(() => {
     fromEditor = true;
     body.value = clean(quill?.root.innerHTML ?? '');
     readMarks();
-    // Quill has not moved its caret yet when it says the text changed, so the list would
-    // otherwise be a keystroke behind and an `@` on its own would show nothing.
+    // Quill fires text-change before it moves the selection, so read the caret a tick later.
     setTimeout(() => {
       lookForName();
       paintNames();
@@ -305,7 +281,7 @@ onMounted(() => {
   });
 });
 
-// Clicking empty space in a dialog leaves a contenteditable focused — the browser has nothing there to put a caret in, so it keeps the one it has. A press anywhere outside this editor lets it go.
+// Clicking empty space in a dialog leaves the contenteditable focused, so blur it on any outside press.
 function onPointerDown(ev: Event): void {
   if (!focused.value || !quill) return;
   const target = ev.target;
@@ -323,7 +299,6 @@ onBeforeUnmount(() => {
   quill = null;
 });
 
-// Shut while what was written is being sent: anything typed after that would be thrown away without saying so.
 watch(
   () => props.disabled,
   (off) => quill?.enable(!off)
@@ -348,7 +323,6 @@ function toggle(format: string, value: unknown = true): void {
 }
 
 defineExpose({
-  /** `atEnd` puts the caret after everything already written, which is where a reply carries on. */
   focus(atEnd = false): void {
     if (!quill) return;
     quill.focus();
@@ -421,26 +395,21 @@ function addLink(): void {
 .rt {
   position: relative;
 }
-/* The list of names stands where the caret is, in the window: the editor clips whatever
-   hangs out of it, and the caret it belongs to is at the foot of the frame as often as not. */
 .rt__names {
   position: fixed;
   z-index: 40;
   min-width: 180px;
   visibility: hidden;
 }
-/* Only the names scroll: the box keeps its pointer, which hangs outside it. */
 .rt__rows {
   overflow-y: auto;
 }
 .rt__names.is-up {
   transform: translateY(-100%);
 }
-/* Measured before it is seen: until then it would stand wherever it last stood. */
 .rt__names.is-set {
   visibility: visible;
 }
-/* The pointer every popup here has, drawn twice: the border's triangle, then the surface's one pixel lower to cover the line under it. It stands under the `@` it was opened by, wherever the list itself had to be pushed to stay inside. */
 .rt__names::before,
 .rt__names::after {
   content: "";
@@ -479,7 +448,6 @@ function addLink(): void {
   color: var(--text-muted);
   font-size: 12px;
 }
-/* The one in hand is pointed at rather than painted: every name keeps its own colour. */
 .rt__at {
   margin-left: auto;
   color: var(--text);
@@ -487,12 +455,10 @@ function addLink(): void {
 .rt__at.is-off {
   visibility: hidden;
 }
-/* Nothing in here answers while it is off — the toolbar, the text and whatever the owner put in the toolbar alike. */
 .rt.is-off {
   pointer-events: none;
   opacity: 0.6;
 }
-/* The box is the frame; the editable part fills it, so a click anywhere inside lands in the text and not on a dead margin. */
 .rt__editor {
   position: relative;
   display: flex;
@@ -550,7 +516,7 @@ function addLink(): void {
   margin: 0 0 8px;
   padding-left: 22px;
 }
-/* Quill's own bullet lives in a span it draws; the marker is ours to set. */
+/* Quill 2 renders both list kinds as <ol data-list> and draws markers in .ql-ui, hidden below. */
 .rt__editor :deep(li[data-list='bullet']) {
   list-style-type: disc;
 }

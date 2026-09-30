@@ -1,5 +1,3 @@
-// The roles people wear, read once per page load and shared. A role is a name and a
-// colour here; what it may do is settings' business.
 import { ref } from 'vue';
 import { api } from './api';
 
@@ -24,9 +22,7 @@ export function useRoles() {
           roles.value = rows;
           loaded.value = true;
         })
-        .catch(() => {
-          /* a screen that needs them reports its own failure */
-        })
+        .catch(() => {})
         .finally(() => {
           inflight = null;
         });

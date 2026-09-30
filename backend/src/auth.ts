@@ -1,5 +1,3 @@
-// Two ways in, one place that sets `req.auth`: a session cookie for the browser and a personal API token for agents and scripts. The token is deliberately weaker — it can move issues around, but it cannot speak as a person, so comment routes demand a session.
-
 import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -9,17 +7,13 @@ import { env } from './env.js';
 
 export const SESSION_COOKIE = 'tracker_session';
 const SESSION_DAYS = 30;
-// A session stamped this recently does not need its last-seen written again.
 const LAST_SEEN_THROTTLE_MS = 15 * 60 * 1000;
 
 export interface Auth {
   userId: string;
   login: string;
-  /** The creator's own key: may change how the tracker is set up, and is kept out of every board denial. Held in the database, never handed out by a screen. */
   isAdmin: boolean;
-  /** What they are on the team. Board access is denied to roles, so this is what a denial is checked against. */
   roleId: string | null;
-  /** How the caller proved who they are. Comment routes accept 'session' only. */
   kind: 'session' | 'token';
 }
 
@@ -29,7 +23,6 @@ declare module 'fastify' {
   }
 }
 
-// What lands in the sessions table is a hash, so a database dump is not a pile of working cookies. Salted with SESSION_SECRET so the hashes are useless against another instance too.
 export function hashToken(raw: string): string {
   return createHash('sha256').update(`${env.sessionSecret}:${raw}`).digest('hex');
 }
@@ -39,7 +32,6 @@ export const newRawToken = () => randomBytes(32).toString('base64url');
 export const hashPassword = (plain: string) => bcrypt.hash(plain, 10);
 export const checkPassword = (plain: string, hash: string) => bcrypt.compare(plain, hash);
 
-// Signing someone in: one place, so /login and an accepted invite hand out the same cookie.
 export async function startSession(reply: FastifyReply, userId: string): Promise<void> {
   const raw = await createSession(userId);
   reply.setCookie(SESSION_COOKIE, raw, {
@@ -80,7 +72,6 @@ interface UserRow {
   last_seen_at: Date | null;
 }
 
-// Every route that hands back a person reads them through this, so the role always travels with them.
 export const USER_SELECT = `
   select u.*, r.name as role_name, r.color as role_color, r.can_delete as role_can_delete,
          r.can_manage_roles as role_can_manage_roles
@@ -101,16 +92,12 @@ export function publicUser(row: UserRow) {
     active: row.active,
     createdAt: row.created_at.toISOString(),
     lastSeenAt: row.last_seen_at?.toISOString() ?? null,
-    /** Whether the delete buttons do anything for them: the creator always, everyone else through their role. */
     canDelete: row.is_admin || row.role_can_delete === true,
-    /** Whether they may hand a role to someone, their own account included. */
     canManageRoles: row.is_admin || row.role_can_manage_roles === true,
-    // What they are called on the team, and what it lets them do.
     role:
       row.role_id && row.role_name
         ? { id: row.role_id, name: row.role_name, color: row.role_color ?? '' }
         : null,
-    // The raw token is gone the moment it is handed over, so the profile shows the tail and the dates instead.
     token: row.api_token_hash
       ? {
           hint: row.api_token_hint,
@@ -131,7 +118,6 @@ function touchLastSeen(userId: string): void {
     .catch((err) => console.error('[auth] last-seen write failed', err));
 }
 
-// Same throttle as the visit stamp: an agent can fire a burst of calls, and one write a quarter hour is enough to answer "is this token still in use".
 const tokenUseWrites = new Map<string, number>();
 function touchTokenUse(userId: string): void {
   const now = Date.now();
@@ -142,7 +128,6 @@ function touchTokenUse(userId: string): void {
     .catch((err) => console.error('[auth] token-use write failed', err));
 }
 
-// Resolves whoever is calling, or null. Never sends a reply — the requireX helpers below do that, so one place decides the status code.
 async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
@@ -208,7 +193,6 @@ export async function requireAuth(
   return auth;
 }
 
-// Anything that speaks as a person — comments, and the account's own settings. An agent's token is for moving work along, not for writing in someone's name.
 export async function requireSession(
   req: FastifyRequest,
   reply: FastifyReply
@@ -222,7 +206,6 @@ export async function requireSession(
   return auth;
 }
 
-// Deleting is a right a role can be given: it takes away work someone else has done, so it is not simply part of being able to reach the thing. The creator holds it by virtue of is_admin; everyone else holds it only through their role. What a role itself may do — its denials, its rights, whether it exists — stays admin-only, or a role could be granted the power to dismantle the rules it lives under.
 export async function requireDeleter(
   req: FastifyRequest,
   reply: FastifyReply
@@ -238,7 +221,6 @@ export async function requireDeleter(
   return null;
 }
 
-// Who someone is on the team: handing out roles, and minting the links that arrive wearing one. The settings screens are open to everyone signed in, so this is the right that separates reading how the tracker is set up from changing who stands where in it.
 export async function mayManageRoles(auth: Auth): Promise<boolean> {
   if (auth.isAdmin) return true;
   if (!auth.roleId) return false;
@@ -259,7 +241,6 @@ export async function requireRoleManager(
   return null;
 }
 
-// What a person with no role still reaches: their own account, and the stream that tells the tab when that account changes. Everything else is behind the wall below, so a route added later is closed to them until it is named here.
 const ROLELESS_PATHS = new Set([
   '/health',
   '/login',
@@ -271,12 +252,10 @@ const ROLELESS_PATHS = new Set([
   '/events',
 ]);
 
-// No role is no access. It is one wall rather than a guard on every route, because the rule is about the person, not about what they are reaching for: someone wearing no role has a profile and nothing else until somebody hands them one.
 export function registerRoleWall(app: FastifyInstance): void {
   app.addHook('preHandler', async (req, reply) => {
     if (ROLELESS_PATHS.has(req.url.split('?')[0])) return;
     const auth = req.auth ?? (await resolveAuth(req));
-    // Not signed in at all is the route's own business, and it answers 401.
     if (!auth) return;
     req.auth = auth;
     if (auth.isAdmin || auth.roleId) return;
@@ -332,7 +311,6 @@ function noteFailure(key: string): void {
   }
   row.seen = Date.now();
   tries.set(key, row);
-  // Every entry ages out, not only the locked ones: a stream of invented logins would otherwise grow the map for ever.
   if (tries.size > 500) {
     const stale = Date.now() - LOCK_MS;
     for (const [k, v] of tries) if ((v.until || v.seen) < stale) tries.delete(k);
@@ -357,7 +335,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       [parsed.data.login]
     );
     const row = res.rows[0];
-    // The same answer whether the login is unknown or the password is wrong, and a hash is compared either way so the timing does not tell them apart.
+    // Compare against a dummy hash for unknown logins so timing does not reveal which logins exist.
     const hash = row?.password_hash ?? '$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidiu';
     const ok = await checkPassword(parsed.data.password, hash);
     if (!row || !ok || !row.active) {
@@ -385,7 +363,6 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ...publicUser(row), authKind: auth.kind } });
   });
 
-  // The raw token is handed over exactly here and never again: the database keeps its hash, its last four characters and the dates. A lost token is replaced, not recovered.
   app.post('/me/regenerate-token', async (req, reply) => {
     const auth = await requireSession(req, reply);
     if (!auth) return;
@@ -413,7 +390,6 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
-  // The display name is the only thing a person changes about themselves; the login and the role belong to an admin.
   app.patch('/me', async (req, reply) => {
     const auth = await requireSession(req, reply);
     if (!auth) return;
@@ -445,12 +421,10 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'Current password is wrong.' });
     }
     const hash = await hashPassword(parsed.data.newPassword);
-    // Changing the password drops every other session, and the two happen together: a new password that left the old cookies working would be the one failure this route exists to prevent.
     await inTransaction(async (client) => {
       await client.query('update users set password_hash = $1 where id = $2', [hash, auth.userId]);
       await client.query('delete from sessions where user_id = $1', [auth.userId]);
     });
-    // The browser's own session is re-issued afterwards: if this fails, they are signed out, which is the safe end of it.
     const raw = await createSession(auth.userId);
     reply.setCookie(SESSION_COOKIE, raw, {
       httpOnly: true,
@@ -463,7 +437,6 @@ export function registerAuthRoutes(app: FastifyInstance): void {
   });
 }
 
-// Expired rows pile up otherwise; called from the boot sequence and once a day after that.
 export async function pruneSessions(): Promise<void> {
   await pool
     .query('delete from sessions where expires_at < now()')

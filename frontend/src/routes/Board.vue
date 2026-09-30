@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// A board, its columns and the cards in them. Dragging a card is the whole editing surface here: everything else about an issue happens in the view that opens on it.
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import TopBar from '../components/TopBar.vue';
@@ -38,7 +37,6 @@ interface Tag {
   id: string;
   name: string;
   color: string;
-  /** Null for a global tag; the server sorts those ahead of a project's own. */
   projectId?: string | null;
 }
 interface Project {
@@ -55,29 +53,23 @@ const router = useRouter();
 const project = ref<Project | null>(null);
 const issues = ref<Issue[]>([]);
 const issuesLoading = ref(true);
-// Which read is the current one: an older answer landing late is dropped rather than painted.
 let issuesRead = 0;
 let projectRead = 0;
 
-// The card being carried, and where it would land: the column under the cursor and the card it would go in front of.
 const dragId = ref<string | null>(null);
 const dropAt = ref<{ stateId: string; beforeId: string | null } | null>(null);
 
-// The column a new issue is being written into, if any.
 const creatingIn = ref<string | null>(null);
 
-// What the board is narrowed to. Nothing is remembered between visits — a filter is a way of looking at the board right now, not a setting.
 const q = ref('');
 const search = ref<HTMLInputElement | null>(null);
 const byAssignee = ref('');
 const byAuthor = ref('');
 const byPriority = ref('');
 const { people, colorOf, nameOf, load: loadPeople } = usePeople();
-// Tags narrow the board too: pick several and a card has to wear all of them.
 const byTags = ref<string[]>([]);
 const starred = ref(false);
 
-// A name is written in the colour of the role that wears it, here and everywhere else.
 const personChoices = computed(() =>
   people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor }))
 );
@@ -113,7 +105,6 @@ function toggleTag(id: string): void {
 }
 
 const filtered = computed(() => {
-  // A card answers the search by its key or by its title, the two things the card itself shows.
   const needle = q.value.trim().toLowerCase();
   return issues.value.filter(
     (i) =>
@@ -129,7 +120,6 @@ const filtered = computed(() => {
   );
 });
 
-// A tag made from inside an issue: our own tab does not hear its own change, so the list is grown here.
 function tagCreated(tag: Tag): void {
   if (tags.value.some((t) => t.id === tag.id)) return;
   tags.value = [...tags.value, tag].sort(
@@ -139,7 +129,6 @@ function tagCreated(tag: Tag): void {
   );
 }
 
-// Cards that changed under us a moment ago, lit until the animation is done.
 const fresh = ref<Set<string>>(new Set());
 
 function flash(issueId: string): void {
@@ -151,11 +140,9 @@ function flash(issueId: string): void {
   }, 2000);
 }
 
-// Someone else's work on this board, arriving as it happens. Our own changes are already on screen.
 useLive((ev) => {
   const board = current.value;
   if (!board) return;
-  // The board's own furniture — its columns, its name, the project's tags — changed in settings.
   if (['state.changed', 'board.changed', 'project.changed', 'tag.changed'].includes(ev.type)) {
     void load(String(route.params.short), true);
     return;
@@ -169,7 +156,6 @@ useLive((ev) => {
     if (ev.issueId) flash(ev.issueId);
   });
 });
-// What this project can tag an issue with: its own tags and the global ones, in the server's order.
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -177,7 +163,6 @@ const error = ref<string | null>(null);
 const boards = computed(() =>
   [...(project.value?.boards ?? [])].sort((a, b) => a.position - b.position)
 );
-// The address names a board; without one, the board you were last on here, and failing that the first.
 const current = computed(() => {
   const wanted = String(route.params.slug ?? '').toLowerCase();
   if (wanted)
@@ -192,13 +177,11 @@ const openKey = computed(() => String(route.params.key ?? ''));
 const issuesOf = (stateId: string): Issue[] =>
   filtered.value.filter((i) => i.stateId === stateId).sort((a, b) => a.position - b.position);
 
-// `quiet` is for a board that is already on screen: a card moved by someone else must not collapse every column into skeletons.
 async function loadIssues(boardId: string, quiet = false): Promise<void> {
   const mine = ++issuesRead;
   if (!quiet) issuesLoading.value = true;
   try {
     const rows = await api<Issue[]>(`/boards/${boardId}/issues`);
-    // Two board switches in a row can answer out of order; only the newest read may paint.
     if (mine !== issuesRead) return;
     issues.value = rows;
     error.value = null;
@@ -219,7 +202,6 @@ watch(
   }
 );
 
-// ── dragging a card ──────────────────────────────────────────────
 function onDragOver(stateId: string, beforeId: string | null): void {
   if (!dragId.value) return;
   dropAt.value = { stateId, beforeId };
@@ -233,14 +215,13 @@ async function onDrop(): Promise<void> {
   const board = current.value;
   if (!target || !moved || !board) return;
 
-  // The whole column, not just what is on screen: a filter hides cards, and sending only the visible ones would renumber them and leave the rest interleaved.
+  // Send the whole column, not the filtered view, or hidden cards get renumbered out of place.
   const column = issues.value
     .filter((i) => i.stateId === target.stateId && i.id !== moved.id)
     .sort((a, b) => a.position - b.position);
   const at = target.beforeId ? column.findIndex((i) => i.id === target.beforeId) : column.length;
   column.splice(at < 0 ? column.length : at, 0, moved);
 
-  // The board answers to the hand that moved the card; the server is told afterwards and only corrects us if it disagrees.
   moved.stateId = target.stateId;
   column.forEach((i, n) => (i.position = n));
   try {
@@ -254,7 +235,6 @@ async function onDrop(): Promise<void> {
   }
 }
 
-// A new issue is written in the same window it will be read in, and the card appears once it exists.
 function issueCreated(created: Issue): void {
   issues.value = [...issues.value, created];
   creatingIn.value = null;
@@ -274,12 +254,10 @@ function closeIssue(): void {
   if (openKey.value && short && slug) void router.push(`/${short}/${slug}`);
 }
 
-// What changed in the view is what the card shows, without reading the whole board again.
 function issueChanged(updated: Issue): void {
   issues.value = issues.value.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
 }
 
-// It is on another board now, so this one stops showing it and the address follows the issue.
 function issueMoved(boardId: string): void {
   const short = project.value?.shortName;
   const to = boards.value.find((b) => b.id === boardId);
@@ -292,7 +270,6 @@ function issueGone(id: string): void {
   closeIssue();
 }
 
-// Whatever you end up looking at is what this project opens on next time — and what the address says, so /TEST becomes /TEST/test the moment it is clear which board that is.
 watch(current, (board) => {
   const short = project.value?.shortName;
   if (!board || !short) return;
@@ -303,7 +280,6 @@ watch(current, (board) => {
 async function load(short: string, quiet = false): Promise<void> {
   const mine = ++projectRead;
   if (!quiet) {
-    // A project left on screen while the next one loads is a board you can still click into by mistake.
     loading.value = true;
     project.value = null;
     issues.value = [];
@@ -329,7 +305,6 @@ async function load(short: string, quiet = false): Promise<void> {
   }
 }
 
-// Alt+Enter is the way back to the search box from anywhere on the board.
 function onKeydown(ev: KeyboardEvent): void {
   if (!ev.altKey || ev.key !== 'Enter') return;
   ev.preventDefault();
@@ -546,12 +521,10 @@ watch(
   padding: var(--space-5);
   overflow-x: auto;
 }
-/* The tag bar already spaces what follows off the header, so neither the body nor the board does it twice. */
 .page__body--tags,
 .board--tags {
   padding-top: 0;
 }
-/* A tag in the bar is a switch: once any of them is on, the ones that are off step back rather than disappear. */
 .taglabel--pick {
   border: 0;
   cursor: pointer;
@@ -563,7 +536,6 @@ watch(
 .star.is-on {
   color: var(--accent);
 }
-/* A filter is as wide as what it says, and reads as one of the bar's own controls. */
 .filter {
   width: auto;
   height: 26px;
@@ -605,7 +577,6 @@ watch(
   font-size: 12.5px;
   color: var(--text-dim);
 }
-/* The plus is the only thing that lights up, the way the top bar's links do: no plate behind it. */
 .add--plus {
   width: auto;
   padding: 0 8px;

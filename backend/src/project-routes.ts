@@ -1,5 +1,3 @@
-// Projects. Their boards own the statuses, so the only thing a project says about columns is which boards it has.
-
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { pool } from './db.js';
@@ -30,12 +28,11 @@ const publicProject = (r: ProjectRow) => ({
   description: r.description,
   archived: r.archived,
   position: r.position,
-  /** What the next issue here will be called, unless somebody else gets there first. */
   nextKey: `${r.short_name}-${r.next_issue_number}`,
 });
 
 const projectCreate = z.object({
-  // The short name rides in every issue key, so it is upper-case, short and free of anything that would need escaping in a URL.
+  // Must match the router's [A-Z][A-Z0-9]* key pattern; lower-case would collide with pages.
   shortName: z
     .string()
     .trim()
@@ -61,7 +58,6 @@ export async function projectByShort(shortName: string): Promise<ProjectRow | nu
   return res.rows[0] ?? null;
 }
 
-// One project's boards with their columns, in two queries rather than one per board.
 export async function boardsOfProject(projectId: string) {
   const [boards, states] = await Promise.all([
     pool.query<BoardRow>(
@@ -90,14 +86,12 @@ export function registerProjectRoutes(app: FastifyInstance): void {
   app.get('/projects', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    // The top bar names every project's boards, so they ride along with the list rather than one request per project.
     const [projects, boards] = await Promise.all([
       pool.query<ProjectRow>('select * from projects order by position, short_name'),
       pool.query<BoardRow>(
         'select id, project_id, name, slug, default_state_id, position from boards order by position, name'
       ),
     ]);
-    // An admin manages access, so they see everything; anyone else is simply not handed what their role cannot open, and someone with no role has nothing handed to them at all.
     const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
     if (denied.everything) return reply.send({ data: [] });
     const byProject = new Map<string, { id: string; name: string; slug: string }[]>();
@@ -120,7 +114,6 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const { short } = req.params as { short: string };
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
-    // A project their role cannot open is a project that is not there, the same answer a wrong key gets.
     const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
     if (denied.everything || denied.projects.has(project.id)) {
       return reply.code(404).send({ error: 'No such project.' });
@@ -139,7 +132,6 @@ export function registerProjectRoutes(app: FastifyInstance): void {
   app.post('/projects', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    // Someone whose role opens nothing would not see what they made.
     if (!auth.isAdmin && (await deniedFor(auth.roleId)).everything) {
       return reply.code(403).send({ error: 'Making a project is not open to your role.' });
     }
@@ -151,7 +143,6 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     if (await projectByShort(shortName)) {
       return reply.code(409).send({ error: `Project ${shortName} already exists.` });
     }
-    // A project arrives empty: which boards it wants is the next decision, not one made for it here.
     const created = await pool.query<ProjectRow>(
       `insert into projects (short_name, name, description, position)
        values ($1, $2, $3, (select coalesce(max(position), -1) + 1 from projects))
@@ -161,7 +152,6 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     return reply.code(201).send({ data: publicProject(created.rows[0]) });
   });
 
-  // Deleting a project takes its boards, statuses, issues and its own tags with it — the database cascades — so the caller types the project's full name to prove it meant this one.
   app.delete('/projects/:short', async (req, reply) => {
     const auth = await requireDeleter(req, reply);
     if (!auth) return;
