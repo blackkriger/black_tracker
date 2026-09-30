@@ -143,10 +143,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
               <span class="api__what">{{ c.what }}</span>
             </template>
           </div>
-          <span class="hint">
-            Every answer is <code>{ data }</code> or <code>{ error }</code>, and a board you
-            cannot open answers 403, as it should.
-          </span>
         </div>
 
         <div class="field">
