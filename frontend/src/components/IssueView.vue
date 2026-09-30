@@ -12,6 +12,7 @@ import FileWall from './FileWall.vue';
 import Select from './Select.vue';
 import { canRead } from '../lib/files';
 import { usePeople } from '../lib/people';
+import { useProjects } from '../lib/projects';
 import { useFocus } from '../lib/focus';
 import { useNotices } from '../lib/notices';
 import { useSession } from '../lib/session';
@@ -78,6 +79,10 @@ const emit = defineEmits<{
 
 const session = useSession();
 const pressedScrim = ref(false);
+const { projects } = useProjects();
+const projectName = computed(
+  () => projects.value.find((p) => p.shortName === props.project)?.name ?? props.project
+);
 
 const creating = computed(() => !props.issueKey);
 const draft = ref({
@@ -1118,7 +1123,7 @@ async function removeIssue(): Promise<void> {
           </button>
           <div class="sp"></div>
           <span class="iv__path">
-            <span class="key iv__where">{{ project }}</span>
+            <span class="iv__where">{{ projectName }}</span>
             <span class="iv__sep">/</span>
             <span class="iv__where">{{ board.name }}</span>
             <span class="iv__sep">/</span>
@@ -1863,6 +1868,7 @@ async function removeIssue(): Promise<void> {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  white-space: nowrap;
 }
 .iv__where {
   font-size: 13px;
