@@ -61,29 +61,6 @@ async function copyToken(): Promise<void> {
 const BASE = `${window.location.origin}/api`;
 const HEADER = '-H "Authorization: Bearer trk_…"';
 
-const examples = computed(() => {
-  return [
-    {
-      label: 'Your token, set once per terminal session',
-      code: `export TRACKER_TOKEN="${freshToken.value ?? 'trk_…'}"`,
-      bare: true,
-    },
-  ] as { label: string; code: string; hint?: string; bare?: boolean }[];
-});
-
-const copiedAt = ref<number | null>(null);
-async function copyExample(i: number, code: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(code);
-    copiedAt.value = i;
-    setTimeout(() => {
-      if (copiedAt.value === i) copiedAt.value = null;
-    }, 1500);
-  } catch {
-    copiedAt.value = null;
-  }
-}
-
 const CALLS: { verb: string; path: string; what: string }[] = [
   { verb: 'GET', path: '/projects', what: 'Every project open to you, with its boards' },
   { verb: 'GET', path: '/boards/:boardId', what: 'One board with its statuses and their uuids' },
@@ -175,22 +152,6 @@ const CALLS: { verb: string; path: string; what: string }[] = [
         <div class="field">
           <span class="label">Authorization header</span>
           <pre class="api__code">{{ HEADER }}</pre>
-        </div>
-
-        <div v-for="(ex, i) in examples" :key="ex.label" class="field">
-          <div class="api__ex-h">
-            <span class="label">{{ ex.label }}</span>
-            <button
-              v-if="!ex.bare"
-              class="btn btn--sm btn--ghost"
-              type="button"
-              @click="copyExample(i, ex.code)"
-            >
-              {{ copiedAt === i ? 'Copied' : 'Copy' }}
-            </button>
-          </div>
-          <pre class="api__code">{{ ex.code }}</pre>
-          <span v-if="ex.hint" class="hint">{{ ex.hint }}</span>
         </div>
       </div>
     </section>
@@ -295,11 +256,5 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   font: 12.5px/1.6 var(--font-mono);
   overflow-x: auto;
   white-space: pre;
-}
-.api__ex-h {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
 }
 </style>
