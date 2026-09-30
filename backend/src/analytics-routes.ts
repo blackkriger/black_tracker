@@ -207,9 +207,10 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
   app.get('/analytics', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const q = req.query as { project?: string; status?: string; from?: string; to?: string };
+    const q = req.query as { project?: string; status?: string; tag?: string; from?: string; to?: string };
     const only = (q.project ?? '').trim() || null;
     const inState = (q.status ?? '').trim() || null;
+    const tagged = (q.tag ?? '').trim() || null;
     const from = (q.from ?? '').trim() || null;
     const to = (q.to ?? '').trim() || null;
     if ((from && !DAY_RE.test(from)) || (to && !DAY_RE.test(to))) {
@@ -236,7 +237,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       only,
       inState,
     ];
-    const within = [...seen, from, to];
+    const within = [...seen, from, to, tagged];
 
     const [statuses, cells, dues, people, held, loose, priorities, cycle, months] =
       await Promise.all([
@@ -260,6 +261,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
            join states s on s.board_id = b.id
            left join issues i on i.board_id = b.id and i.state_id = s.id
             and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+            and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))
           where b.id <> all($1::uuid[]) and b.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
@@ -282,6 +284,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
+            and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))
           order by i.due_date, i.readable_id`,
         within
       ),
@@ -301,6 +304,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or i.project_id in (select id from projects where short_name = $3))
             and ($4::text is null or i.state_id in (select id from states where name = $4))
+            and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))
           where u.active
           group by u.login, r.color
           order by count(i.id) filter (
@@ -320,6 +324,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
+            and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))
           order by lower(u.login), i.due_date nulls last, i.readable_id`,
         within
       ),
@@ -331,7 +336,8 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           where i.resolved_at is null and i.assignee_id is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
-            and ($4::text is null or s.name = $4)`,
+            and ($4::text is null or s.name = $4)
+            and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))`,
         within
       ),
       pool.query<{ priority: string; state_name: string; n: string }>(
@@ -343,6 +349,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
+            and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))
           group by i.priority, s.name`,
         within
       ),
@@ -357,7 +364,8 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           where i.resolved_at is not null and (i.resolved_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
-            and ($4::text is null or s.name = $4)`,
+            and ($4::text is null or s.name = $4)
+            and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))`,
         within
       ),
       pool.query<{ month: string; median: string | null; closed: string }>(
@@ -373,6 +381,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
             and ($4::text is null or s.name = $4)
+            and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))
           group by 1
           order by 1`,
         within

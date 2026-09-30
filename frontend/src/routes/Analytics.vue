@@ -48,6 +48,11 @@ interface Person {
   held: number | null;
   issues: Held[];
 }
+interface TagOption {
+  id: string;
+  name: string;
+  boardIds: string[];
+}
 interface Numbers {
   statuses: string[];
   boards: {
@@ -84,6 +89,8 @@ function thisMonth(): { from: string; to: string } {
 
 const project = ref('');
 const status = ref('');
+const tag = ref('');
+const tags = ref<TagOption[]>([]);
 const period = ref(thisMonth());
 const loading = ref(true);
 const data = ref<Numbers | null>(null);
@@ -96,6 +103,16 @@ const projectChoices = computed(() =>
 const statusChoices = computed(() =>
   (data.value?.statuses ?? []).map((s) => ({ value: s, label: s }))
 );
+const tagChoices = computed(() => {
+  const chosen = projects.value.find((p) => p.shortName === project.value);
+  const onBoards = chosen ? new Set(chosen.boards.map((b) => b.id)) : null;
+  return tags.value
+    .filter((t) => !onBoards || t.boardIds.some((id) => onBoards.has(id)))
+    .map((t) => ({ value: t.id, label: t.name }));
+});
+watch(tagChoices, (choices) => {
+  if (tag.value && !choices.some((c) => c.value === tag.value)) tag.value = '';
+});
 
 let reads = 0;
 
@@ -106,6 +123,7 @@ async function load(): Promise<void> {
     const q = new URLSearchParams();
     if (project.value) q.set('project', project.value);
     if (status.value) q.set('status', status.value);
+    if (tag.value) q.set('tag', tag.value);
     if (period.value.from) q.set('from', period.value.from);
     if (period.value.to) q.set('to', period.value.to);
     const query = q.toString();
@@ -119,13 +137,20 @@ async function load(): Promise<void> {
   }
 }
 
+async function loadTags(): Promise<void> {
+  try {
+    tags.value = await api<TagOption[]>('/tags');
+  } catch {}
+}
+
 onMounted(async () => {
   void loadPeople();
-  await Promise.all([loadProjects(), load()]);
+  await Promise.all([loadProjects(), loadTags(), load()]);
 });
-watch([project, status, period], () => void load());
+watch([project, status, tag, period], () => void load());
 const reload = settled(() => void load());
 useLive((ev) => {
+  if (ev.type === 'tag.changed') void loadTags();
   if (
     ev.type.startsWith('issue.') ||
     ['state.changed', 'board.changed', 'project.changed', 'role.changed', 'user.changed'].includes(
@@ -266,6 +291,14 @@ async function openIssue(w: Where): Promise<void> {
           <header class="panel__h">
             Boards
             <span class="panel__end">
+              <Select
+                v-model="tag"
+                :options="tagChoices"
+                placeholder="Any tag"
+                keep-placeholder
+                small
+                label="Which tag to count"
+              />
               <Select
                 v-model="status"
                 :options="statusChoices"
