@@ -301,6 +301,24 @@ async function openIssue(w: Where): Promise<void> {
           </div>
         </section>
 
+        <section class="panel sheet__wide">
+          <header class="panel__h">Priorities</header>
+          <div class="panel__b">
+            <div v-if="loading" class="skel">
+              <div v-for="n in 4" :key="n" class="skel__ridge">
+                <span class="sk sk--line" style="width: 64px"></span>
+                <span class="sk sk--line skel__hill"></span>
+                <span class="sk sk--line" style="width: 14px"></span>
+              </div>
+            </div>
+            <RidgeRows v-else :rows="priorityRows" :full="tallest">
+              <template #axis>
+                <span v-for="s in axis" :key="s">{{ s }}</span>
+              </template>
+            </RidgeRows>
+          </div>
+        </section>
+
         <div class="stack">
           <section class="panel">
             <header class="panel__h">
@@ -335,24 +353,6 @@ async function openIssue(w: Where): Promise<void> {
                 v-if="!loading && !data?.due.overdue.length && !data?.due.soon.length"
                 class="hint faint"
               >Nothing is due in this period.</div>
-            </div>
-          </section>
-
-          <section class="panel">
-            <header class="panel__h">Priorities</header>
-            <div class="panel__b">
-              <div v-if="loading" class="skel">
-                <div v-for="n in 4" :key="n" class="skel__ridge">
-                  <span class="sk sk--line" style="width: 64px"></span>
-                  <span class="sk sk--line skel__hill"></span>
-                  <span class="sk sk--line" style="width: 14px"></span>
-                </div>
-              </div>
-              <RidgeRows v-else :rows="priorityRows" :full="tallest">
-                <template #axis>
-                  <span v-for="s in axis" :key="s">{{ s }}</span>
-                </template>
-              </RidgeRows>
             </div>
           </section>
         </div>
