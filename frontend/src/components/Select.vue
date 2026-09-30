@@ -46,6 +46,7 @@ function onChange(): void {
     <option
       v-if="placeholder !== undefined"
       value=""
+      style="color: var(--text)"
       :hidden="keepPlaceholder ? !modelValue : true"
     >{{ placeholder }}</option>
     <option
