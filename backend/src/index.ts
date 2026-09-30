@@ -22,6 +22,7 @@ import { registerChangeFeed, registerEventRoutes } from './events.js';
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
   bodyLimit: 30 * 1024 * 1024,
+  trustProxy: '127.0.0.1',
 });
 
 await app.register(cookie);

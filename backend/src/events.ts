@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { requireAuth, type Auth } from './auth.js';
+import { credentialOf, requireAuth, type Auth } from './auth.js';
 import { pool } from './db.js';
 import { DENIES_NOTHING, deniedFor, type Denials } from './board-service.js';
 
@@ -22,17 +22,26 @@ export const tabOf = (req: { headers: Record<string, unknown> }): string =>
 interface Client {
   reply: FastifyReply;
   auth: Auth;
+  credential: string;
   denied: Denials;
   deniedAt: number;
 }
 
 async function stillAllowed(client: Client): Promise<Denials | null> {
-  const res = await pool.query<{ is_admin: boolean; role_id: string | null; active: boolean }>(
-    'select is_admin, role_id, active from users where id = $1',
-    [client.auth.userId]
+  const res = await pool.query<{ is_admin: boolean; role_id: string | null }>(
+    `select u.is_admin, u.role_id
+       from users u
+      where u.id = $1 and u.active
+        and case when $2 = 'token' then u.api_token_hash = $3
+                 else exists (
+                   select 1 from sessions s
+                    where s.user_id = u.id and s.token = $3 and s.expires_at > now()
+                 )
+            end`,
+    [client.auth.userId, client.auth.kind, client.credential]
   );
   const row = res.rows[0];
-  if (!row || !row.active) return null;
+  if (!row) return null;
   client.auth = { ...client.auth, isAdmin: row.is_admin, roleId: row.role_id };
   return row.is_admin ? DENIES_NOTHING : await deniedFor(row.role_id);
 }
@@ -122,6 +131,8 @@ export function registerEventRoutes(app: FastifyInstance): void {
   app.get('/events', async (req: FastifyRequest, reply: FastifyReply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
+    const credential = credentialOf(req);
+    if (!credential) return reply.code(401).send({ error: 'Sign in first.' });
 
     reply.hijack();
     reply.raw.writeHead(200, {
@@ -141,6 +152,7 @@ export function registerEventRoutes(app: FastifyInstance): void {
     clients.set(id, {
       reply,
       auth,
+      credential,
       denied: auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId),
       deniedAt: Date.now(),
     });

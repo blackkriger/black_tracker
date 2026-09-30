@@ -128,6 +128,16 @@ function touchTokenUse(userId: string): void {
     .catch((err) => console.error('[auth] token-use write failed', err));
 }
 
+export function credentialOf(req: FastifyRequest): string | null {
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    const raw = header.slice(7).trim();
+    return raw ? hashToken(raw) : null;
+  }
+  const cookie = req.cookies?.[SESSION_COOKIE];
+  return cookie ? hashToken(cookie) : null;
+}
+
 async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
@@ -234,7 +244,7 @@ export async function requireRoleManager(
   req: FastifyRequest,
   reply: FastifyReply
 ): Promise<Auth | null> {
-  const auth = await requireAuth(req, reply);
+  const auth = await requireSession(req, reply);
   if (!auth) return null;
   if (await mayManageRoles(auth)) return auth;
   reply.code(403).send({ error: 'Handing out roles is not open to your role.' });
@@ -267,7 +277,7 @@ export async function requireAdmin(
   req: FastifyRequest,
   reply: FastifyReply
 ): Promise<Auth | null> {
-  const auth = await requireAuth(req, reply);
+  const auth = await requireSession(req, reply);
   if (!auth) return null;
   if (!auth.isAdmin) {
     reply.code(403).send({ error: 'Admins only.' });

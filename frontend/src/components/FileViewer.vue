@@ -94,7 +94,14 @@ async function paint(): Promise<void> {
   if (isMd.value) {
     const { marked } = await import('marked');
     const doc = new DOMParser().parseFromString(
-      DOMPurify.sanitize(await marked.parse(text.value)),
+      DOMPurify.sanitize(await marked.parse(text.value), {
+        ALLOWED_TAGS: [
+          'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr', 'blockquote', 'pre', 'code',
+          'ul', 'ol', 'li', 'strong', 'em', 'del', 's', 'a', 'img',
+          'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        ],
+        ALLOWED_ATTR: ['href', 'title', 'alt', 'src', 'class', 'align'],
+      }),
       'text/html'
     );
     for (const link of doc.querySelectorAll('a[href]')) {

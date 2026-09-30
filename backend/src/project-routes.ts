@@ -6,6 +6,7 @@ import { requireAuth, requireDeleter } from './auth.js';
 import {
   DENIES_NOTHING,
   deniedFor,
+  mayOpenProject,
   publicBoard,
   type BoardRow,
   type StateRow,
@@ -190,7 +191,9 @@ export function registerProjectRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     const project = await projectByShort(short);
-    if (!project) return reply.code(404).send({ error: 'No such project.' });
+    if (!project || !(await mayOpenProject(auth, project.id))) {
+      return reply.code(404).send({ error: 'No such project.' });
+    }
     const p = parsed.data;
     const res = await pool.query<ProjectRow>(
       `update projects

@@ -897,6 +897,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const found = await loadIssueFor(req, reply, id);
     if (!found) return;
     const other = await issueById(otherId);
+    if (other && !(await mayOpenBoard(found.auth, other.board_id, other.project_id))) {
+      return reply.code(404).send({ error: 'They are not linked.' });
+    }
     const [a, b] = [found.issue.id.toLowerCase(), (other?.id ?? otherId).toLowerCase()].sort();
     const res = await inTransaction(async (client) => {
       const gone = await client.query('delete from issue_links where a = $1 and b = $2', [a, b]);
@@ -1168,6 +1171,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [comment, id]
       );
       if (!owns.rowCount) return reply.code(400).send({ error: 'That comment is on another issue.' });
+      if (found.auth.kind !== 'session') {
+        return reply.code(403).send({ error: 'An API token cannot do this — sign in instead.' });
+      }
       if (owns.rows[0].author_id !== found.auth.userId) {
         return reply.code(403).send({ error: 'Only the author can edit a comment.' });
       }
@@ -1376,6 +1382,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'This file is not open to you.' });
     }
     if (row.comment_id) {
+      if (auth.kind !== 'session') {
+        return reply.code(403).send({ error: 'An API token cannot do this — sign in instead.' });
+      }
       const owner = await pool.query<{ author_id: string }>(
         'select author_id from issue_comments where id = $1',
         [row.comment_id]

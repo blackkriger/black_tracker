@@ -184,8 +184,19 @@ export function registerTagRoutes(app: FastifyInstance): void {
   });
 
   app.delete('/tags/:id', async (req, reply) => {
-    if (!(await requireDeleter(req, reply))) return;
+    const auth = await requireDeleter(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
+    const current = await pool.query<{ project_id: string | null }>(
+      'select project_id from tags where id = $1',
+      [id]
+    );
+    if (!current.rowCount) return reply.code(404).send({ error: 'No such tag.' });
+    const home = current.rows[0].project_id;
+    const reaches = home
+      ? await mayOpenProject(auth, home)
+      : auth.isAdmin || !(await deniedFor(auth.roleId)).everything;
+    if (!reaches) return reply.code(404).send({ error: 'No such tag.' });
     const used = await pool.query<{ n: number }>(
       'select count(*)::int as n from issue_tags where tag_id = $1',
       [id]

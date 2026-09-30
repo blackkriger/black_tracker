@@ -64,7 +64,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     const auth = await requireRoleManager(req, reply);
     if (!auth) return;
     const parsed = z
-      .object({ isAdmin: z.boolean().optional(), roleId: z.string().uuid().nullable().optional() })
+      .object({ roleId: z.string().uuid().nullable().optional() })
       .safeParse(req.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: 'Bad invite.' });
     const raw = newRawToken();
@@ -75,7 +75,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
       [
         hashToken(raw),
         raw.slice(-6),
-        parsed.data.isAdmin ?? false,
+        false,
         parsed.data.roleId ?? null,
         auth.userId,
         INVITE_DAYS,
