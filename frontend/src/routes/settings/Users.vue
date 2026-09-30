@@ -199,7 +199,10 @@ async function makeResetLink(u: User): Promise<void> {
   resetBusy.value = true;
   try {
     const made = await api<{ token: string }>(`/users/${u.id}/reset-link`, { method: 'POST' });
-    if (resetFor.value?.id === u.id) resetLink.value = `${location.origin}/reset/${made.token}`;
+    if (resetFor.value?.id === u.id) {
+      resetLink.value = `${location.origin}/reset/${made.token}`;
+      await copyResetLink();
+    }
   } catch (err) {
     if (resetFor.value?.id === u.id) {
       resetError.value = err instanceof Error ? err.message : 'Could not make the link.';
