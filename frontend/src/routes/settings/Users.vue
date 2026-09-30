@@ -299,16 +299,15 @@ async function saveAccess(): Promise<void> {
 <template>
   <SettingsLayout>
     <section class="panel sheet__wide">
-      <header class="panel__h">Users</header>
-      <div class="panel__table">
-        <table class="tbl">
+      <div class="panel__table panel__table--head">
+        <table class="tbl tbl--head">
           <thead>
             <tr>
-              <th>Person</th>
-              <th class="c-role">Role</th>
-              <th class="c-flag">Active</th>
-              <th class="c-when">Joined</th>
-              <th class="c-when">Last seen</th>
+              <th>Users</th>
+              <th class="c-role">role</th>
+              <th class="c-flag">active</th>
+              <th class="c-when">joined</th>
+              <th class="c-when">last seen</th>
             </tr>
           </thead>
           <tbody v-if="loading">
@@ -366,33 +365,23 @@ async function saveAccess(): Promise<void> {
     <div v-if="errors.users" class="err sheet__wide panel__err">{{ errors.users }}</div>
 
     <section class="panel sheet__wide">
-      <header class="panel__h">Roles</header>
-      <div class="panel__table">
-        <table v-if="loading" class="tbl">
+      <div class="panel__table panel__table--head">
+        <table class="tbl tbl--head">
           <thead>
             <tr>
-              <th>Role</th>
-              <th class="c-act2">Access</th>
+              <th>Roles</th>
+              <th class="c-act2">access</th>
               <th class="c-del"><span class="sr">Delete</span></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="loading">
             <tr v-for="n in 2" :key="n">
               <td><span class="sk sk--ctl"></span></td>
               <td class="c-act2"><span class="sk sk--ctl" style="width: 72px"></span></td>
               <td class="c-del"><span class="sk sk--ctl sk--right" style="width: 26px"></span></td>
             </tr>
           </tbody>
-        </table>
-        <table v-else-if="roles.length" class="tbl">
-          <thead>
-            <tr>
-              <th>Role</th>
-              <th class="c-act2">Access</th>
-              <th class="c-del"><span class="sr">Delete</span></th>
-            </tr>
-          </thead>
-          <tbody>
+          <tbody v-else>
             <tr v-for="r in roles" :key="r.id">
               <td>
                 <input
@@ -424,7 +413,7 @@ async function saveAccess(): Promise<void> {
             </tr>
           </tbody>
         </table>
-        <div v-else-if="!loading" class="empty empty--sm">
+        <div v-if="!loading && !roles.length" class="empty empty--sm">
           <span class="empty__g">◇</span>None yet.
         </div>
 
@@ -447,9 +436,71 @@ async function saveAccess(): Promise<void> {
     <div v-if="errors.roles" class="err sheet__wide panel__err">{{ errors.roles }}</div>
 
     <section v-if="canManageRoles" class="panel sheet__wide">
-      <header class="panel__h">Links</header>
-      <div class="panel__b">
-        <div v-if="freshLink" class="field">
+      <div class="panel__table panel__table--head">
+        <table class="tbl tbl--head">
+          <thead>
+            <tr>
+              <th>Links</th>
+              <th class="c-kind">kind</th>
+              <th class="c-role">for</th>
+              <th>status</th>
+              <th class="c-when">created</th>
+              <th class="c-act"><span class="sr">Revoke</span></th>
+            </tr>
+          </thead>
+          <tbody v-if="loading">
+            <tr v-for="n in 2" :key="n">
+              <td><span class="sk sk--line" style="width: 64px"></span></td>
+              <td class="c-kind"><span class="sk sk--line" style="width: 90px"></span></td>
+              <td class="c-role"><span class="sk sk--line" style="width: 80px; height: 24px"></span></td>
+              <td><span class="sk sk--line" style="width: 150px"></span></td>
+              <td class="c-when"><span class="sk sk--line" style="width: 130px"></span></td>
+              <td class="c-act"><span class="sk sk--ctl sk--right" style="width: 26px"></span></td>
+            </tr>
+          </tbody>
+          <tbody v-else>
+            <tr v-for="i in invites" :key="i.id">
+              <td class="key">…{{ i.hint }}</td>
+              <td class="c-kind">{{ i.kind === 'reset' ? 'Password reset' : 'Invite' }}</td>
+              <td class="c-role">
+                <span v-if="i.kind === 'reset'" class="who__lines">
+                  {{ nameOf(i.forUser) }}
+                  <span v-if="i.forUser && nameOf(i.forUser) !== i.forUser" class="who__login">{{ i.forUser }}</span>
+                </span>
+                <span v-else-if="i.role" class="taglabel taglabel--plain" :style="{ '--c': i.role.color }">
+                  {{ i.role.name }}
+                </span>
+              </td>
+              <td>
+                <span v-if="i.status === 'used'" class="who__lines">
+                  Used by {{ nameOf(i.usedBy) }}
+                  <span v-if="i.usedBy && nameOf(i.usedBy) !== i.usedBy" class="who__login">{{ i.usedBy }}</span>
+                </span>
+                <template v-else-if="i.status === 'expired'">Expired</template>
+                <template v-else>Good until {{ stampAt(i.expiresAt) }}</template>
+              </td>
+              <td class="stamp">
+                <span class="who__lines">
+                  <span>{{ stampAt(i.createdAt) }}, <span class="who__by">{{ nameOf(i.createdBy) }}</span></span>
+                  <span v-if="i.createdBy && nameOf(i.createdBy) !== i.createdBy" class="who__login">{{ i.createdBy }}</span>
+                </span>
+              </td>
+              <td class="c-act">
+                <button
+                  v-if="i.status !== 'used'"
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  aria-label="Delete link"
+                  @click="i.kind === 'reset' ? revokeInvite(i) : (revokingInvite = i)"
+                >
+                  <X class="ic ic--sm" />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div v-if="freshLink" class="field link__fresh">
           <span class="label">The link — copy it now</span>
           <div class="link__row">
             <code class="input link__value">{{ freshLink }}</code>
@@ -496,85 +547,6 @@ async function saveAccess(): Promise<void> {
             Create link
           </button>
         </div>
-      </div>
-
-      <div v-if="loading" class="panel__table">
-        <table class="tbl">
-          <thead>
-            <tr>
-              <th>Link</th>
-              <th class="c-kind">Kind</th>
-              <th class="c-role">For</th>
-              <th>Status</th>
-              <th class="c-when">Created</th>
-              <th class="c-act"><span class="sr">Revoke</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="n in 2" :key="n">
-              <td><span class="sk sk--line" style="width: 64px"></span></td>
-              <td class="c-kind"><span class="sk sk--line" style="width: 90px"></span></td>
-              <td class="c-role"><span class="sk sk--line" style="width: 80px; height: 24px"></span></td>
-              <td><span class="sk sk--line" style="width: 150px"></span></td>
-              <td class="c-when"><span class="sk sk--line" style="width: 130px"></span></td>
-              <td class="c-act"><span class="sk sk--ctl sk--right" style="width: 26px"></span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-else-if="invites.length" class="panel__table">
-        <table class="tbl">
-          <thead>
-            <tr>
-              <th>Link</th>
-              <th class="c-kind">Kind</th>
-              <th class="c-role">For</th>
-              <th>Status</th>
-              <th class="c-when">Created</th>
-              <th class="c-act"><span class="sr">Revoke</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="i in invites" :key="i.id">
-              <td class="key">…{{ i.hint }}</td>
-              <td class="c-kind">{{ i.kind === 'reset' ? 'Password reset' : 'Invite' }}</td>
-              <td class="c-role">
-                <span v-if="i.kind === 'reset'" class="who__lines">
-                  {{ nameOf(i.forUser) }}
-                  <span v-if="i.forUser && nameOf(i.forUser) !== i.forUser" class="who__login">{{ i.forUser }}</span>
-                </span>
-                <span v-else-if="i.role" class="taglabel taglabel--plain" :style="{ '--c': i.role.color }">
-                  {{ i.role.name }}
-                </span>
-              </td>
-              <td>
-                <span v-if="i.status === 'used'" class="who__lines">
-                  Used by {{ nameOf(i.usedBy) }}
-                  <span v-if="i.usedBy && nameOf(i.usedBy) !== i.usedBy" class="who__login">{{ i.usedBy }}</span>
-                </span>
-                <template v-else-if="i.status === 'expired'">Expired</template>
-                <template v-else>Good until {{ stampAt(i.expiresAt) }}</template>
-              </td>
-              <td class="stamp">
-                <span class="who__lines">
-                  <span>{{ stampAt(i.createdAt) }}, <span class="who__by">{{ nameOf(i.createdBy) }}</span></span>
-                  <span v-if="i.createdBy && nameOf(i.createdBy) !== i.createdBy" class="who__login">{{ i.createdBy }}</span>
-                </span>
-              </td>
-              <td class="c-act">
-                <button
-                  v-if="i.status !== 'used'"
-                  class="btn btn--sm btn--icon btn--ghost"
-                  type="button"
-                  aria-label="Delete link"
-                  @click="i.kind === 'reset' ? revokeInvite(i) : (revokingInvite = i)"
-                >
-                  <X class="ic ic--sm" />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </section>
     <div v-if="canManageRoles && errors.invites" class="err sheet__wide panel__err">
@@ -706,6 +678,9 @@ async function saveAccess(): Promise<void> {
 .role-name {
   width: 100%;
   font-weight: 500;
+}
+.link__fresh {
+  margin-top: 12px;
 }
 .link__row {
   display: flex;
