@@ -138,11 +138,12 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       due_date: string | null;
       short_name: string;
       slug: string;
+      board_name: string;
       state_name: string;
       color: string;
     }>(
       `select i.readable_id, i.summary, i.priority, i.due_date, p.short_name, b.slug,
-              s.name as state_name, s.color
+              b.name as board_name, s.name as state_name, s.color
          from issues i
          join projects p on p.id = i.project_id
          join boards b on b.id = i.board_id
@@ -160,6 +161,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
         due: r.due_date ? day(r.due_date) : null,
         projectShort: r.short_name,
         boardSlug: r.slug,
+        boardName: r.board_name,
         stateName: r.state_name,
         color: r.color,
       })),

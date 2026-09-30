@@ -61,6 +61,7 @@ interface Mine {
   due: string | null;
   projectShort: string;
   boardSlug: string;
+  boardName: string;
   stateName: string;
   color: string;
 }
@@ -359,6 +360,7 @@ function closeIssue(): void {
                   <span class="sk sk--line" style="width: 46px"></span>
                   <span class="sk sk--line" style="width: 44px"></span>
                   <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
+                  <span class="sk sk--line" style="width: 80px"></span>
                   <span class="sk sk--line" style="width: 64px"></span>
                   <span class="sk sk--line mine__due" style="width: 72px"></span>
                 </div>
@@ -375,6 +377,7 @@ function closeIssue(): void {
                   {{ i.priority }}
                 </span>
                 <span class="mine__what">{{ i.summary }}</span>
+                <span class="mine__board">{{ i.boardName }}</span>
                 <span class="stamp" :style="{ color: ink(i.color) }">{{ i.stateName }}</span>
                 <span
                   class="stamp mine__due"
@@ -610,7 +613,7 @@ function closeIssue(): void {
 }
 .mine__row {
   display: grid;
-  grid-template-columns: 84px 72px minmax(0, 1fr) 110px 96px;
+  grid-template-columns: 84px 72px minmax(0, 1fr) 120px 110px 96px;
   align-items: center;
   gap: 10px;
   min-height: 30px;
@@ -627,6 +630,13 @@ function closeIssue(): void {
 }
 .mine__pri {
   font-size: 12px;
+}
+.mine__board {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-dim);
+  font-size: 12.5px;
 }
 .mine__what {
   overflow: hidden;
