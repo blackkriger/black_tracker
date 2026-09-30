@@ -50,7 +50,8 @@ useLive((ev) => {
         <div class="side__h">Workspace</div>
         <RouterLink to="/settings/tags">Tags</RouterLink>
         <RouterLink to="/settings/users">Users &amp; access</RouterLink>
-        <a href="/db/" target="_blank" rel="noopener noreferrer">
+
+        <a class="side__db" href="/db/" target="_blank" rel="noopener noreferrer">
           DB
           <ExternalLink class="ic ic--sm" />
         </a>
@@ -98,8 +99,10 @@ useLive((ev) => {
   height: calc(100vh - var(--top-h) - var(--space-5) * 2);
   overflow-y: auto;
 }
-.side__foot {
+.side__db {
   margin-top: auto;
+}
+.side__foot {
   padding: 14px 10px 4px;
 }
 @media (max-width: 1240px) {
