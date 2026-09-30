@@ -185,6 +185,12 @@ function onEnter(ev: MouseEvent, c: Cell): void {
 .cal__day.is-weekend {
   color: var(--text-muted);
 }
+.cal__day.is-weekend:is(.heat-1, .heat-2):not(.is-today, .has-due, .is-late) {
+  color: var(--text-dim);
+}
+.cal__day:is(.heat-3, .heat-4, .heat-5):not(.is-today, .has-due, .is-late) {
+  color: var(--text);
+}
 .cal__day.is-today {
   border-color: var(--accent);
   color: var(--accent);
