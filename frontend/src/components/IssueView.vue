@@ -522,7 +522,7 @@ function onFileClick(ev: MouseEvent, a: Attachment): void {
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
-  if (deleting.value || picking.value || makingTag.value || shown.value !== null) return;
+  if (deleting.value || deletingComment.value || picking.value || makingTag.value || shown.value !== null) return;
   if (reading.value) return;
   if (creating.value || !editing.value) emit('close');
   else editing.value = false;
@@ -945,6 +945,14 @@ async function togglePin(c: Comment): Promise<void> {
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not pin the comment.';
   }
+}
+
+const deletingComment = ref<Comment | null>(null);
+
+async function confirmRemoveComment(): Promise<void> {
+  const c = deletingComment.value;
+  deletingComment.value = null;
+  if (c) await removeComment(c);
 }
 
 async function removeComment(c: Comment): Promise<void> {
@@ -1430,7 +1438,7 @@ async function removeIssue(): Promise<void> {
                         v-if="c.author.id === session.me.value?.id || session.canDelete.value"
                         class="btn btn--sm btn--ghost"
                         type="button"
-                        @click="removeComment(c)"
+                        @click="deletingComment = c"
                       >Delete</button>
                     </span>
                   </div>
@@ -1817,6 +1825,13 @@ async function removeIssue(): Promise<void> {
           <button class="btn btn--danger" type="button" @click="removeIssue">Delete issue</button>
         </template>
       </Dialog>
+      <Dialog v-if="deletingComment" title="Delete comment" @close="deletingComment = null">
+        <p class="iv__lede">This takes its files and reactions with it. This cannot be undone.</p>
+        <template #footer>
+          <button class="btn" type="button" @click="deletingComment = null">Cancel</button>
+          <button class="btn btn--danger" type="button" @click="confirmRemoveComment">Delete comment</button>
+        </template>
+      </Dialog>
     </div>
   </Teleport>
 </template>
@@ -1830,7 +1845,7 @@ async function removeIssue(): Promise<void> {
   align-items: center;
   justify-content: center;
   padding: var(--space-5);
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
 }
 .iv__win {
   display: flex;

@@ -86,6 +86,14 @@ async function addMark(): Promise<void> {
   }
 }
 
+const removingMark = ref<Mark | null>(null);
+
+async function confirmRemoveMark(): Promise<void> {
+  const m = removingMark.value;
+  removingMark.value = null;
+  if (m) await removeMark(m);
+}
+
 async function removeMark(m: Mark): Promise<void> {
   clear('day');
   try {
@@ -155,7 +163,7 @@ async function openNotice(n: Notice): Promise<void> {
             type="button"
             :disabled="!session.canDelete.value"
             :aria-label="`Delete ${m.title}`"
-            @click="removeMark(m)"
+            @click="removingMark = m"
           ><X class="ic ic--sm" /></button>
         </div>
       </div>
@@ -213,6 +221,15 @@ async function openNotice(n: Notice): Promise<void> {
       </div>
     </template>
     <div v-if="errors.day" class="err">{{ errors.day }}</div>
+
+    <Dialog v-if="removingMark" :title="`Delete ${removingMark.title}`" @close="removingMark = null">
+      <p>It leaves the calendar for everyone. This cannot be undone.</p>
+      <template #footer>
+        <div class="sp"></div>
+        <button class="btn" type="button" @click="removingMark = null">Cancel</button>
+        <button class="btn btn--danger" type="button" @click="confirmRemoveMark">Delete marked day</button>
+      </template>
+    </Dialog>
   </Dialog>
 </template>
 

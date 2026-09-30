@@ -195,6 +195,14 @@ async function copyLink(): Promise<void> {
   }
 }
 
+const revokingInvite = ref<Invite | null>(null);
+
+async function confirmRevokeInvite(): Promise<void> {
+  const i = revokingInvite.value;
+  revokingInvite.value = null;
+  if (i) await revokeInvite(i);
+}
+
 async function revokeInvite(i: Invite): Promise<void> {
   clear('invites');
   try {
@@ -514,7 +522,7 @@ async function saveAccess(): Promise<void> {
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
                   aria-label="Delete link"
-                  @click="revokeInvite(i)"
+                  @click="revokingInvite = i"
                 >
                   <X class="ic ic--sm" />
                 </button>
@@ -527,6 +535,15 @@ async function saveAccess(): Promise<void> {
     <div v-if="canManageRoles && errors.invites" class="err sheet__wide panel__err">
       {{ errors.invites }}
     </div>
+
+    <Dialog v-if="revokingInvite" title="Delete invite link" @close="revokingInvite = null">
+      <p>Nobody can join with it any more. This cannot be undone.</p>
+      <template #footer>
+        <div class="sp"></div>
+        <button class="btn" type="button" @click="revokingInvite = null">Cancel</button>
+        <button class="btn btn--danger" type="button" @click="confirmRevokeInvite">Delete link</button>
+      </template>
+    </Dialog>
 
     <Dialog
       v-if="removingRole"

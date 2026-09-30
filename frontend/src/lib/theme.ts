@@ -36,4 +36,4 @@ prefersLight.addEventListener('change', applyTheme);
 applyTheme();
 
 export const ink = (color: string | null | undefined): string | undefined =>
-  color ? `color-mix(in oklab, ${color}, #000 var(--ink-shade))` : undefined;
+  color ? `color-mix(in oklab, ${color}, var(--black) var(--ink-shade))` : undefined;

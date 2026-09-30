@@ -40,6 +40,9 @@
   --top-h: 56px;
   --col-w: 272px;
   --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
+  --black: #000;
+  --on-chip: #12131a;
+  --scrim: color-mix(in srgb, var(--black) 70%, transparent);
 }
 
 :root[data-theme="light"] {
@@ -123,7 +126,7 @@ button { font-family: var(--font-ui); }
 .board { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; gap: 12px; padding: 16px 24px; overflow-x: auto; }
 .col { flex: 0 0 var(--col-w); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); }
 .col__head { flex: none; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; }
-.col__name { margin: 0; font: 600 13px var(--font-ui); color: color-mix(in oklab, var(--c), #000 var(--ink-shade)); white-space: nowrap; }
+.col__name { margin: 0; font: 600 13px var(--font-ui); color: color-mix(in oklab, var(--c), var(--black) var(--ink-shade)); white-space: nowrap; }
 .col__count { margin-left: auto; font: 12.5px/1 var(--font-num); color: var(--text-muted); }
 .col__body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 0 8px 8px; overflow-y: auto; }
 .col--drop { background: color-mix(in srgb, var(--focus) 12%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--focus) 50%, transparent); }
@@ -154,18 +157,18 @@ button { font-family: var(--font-ui); }
 
 .tag { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 6px; background: color-mix(in srgb, var(--wash) 5%, transparent); font-size: 11.5px; line-height: 1; color: var(--text-dim); white-space: nowrap; }
 .tag b { width: 6px; height: 6px; background: var(--c); flex: none; }
-.taglabel { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px 0 9px; background: var(--c); color: #12131a; font-size: 12.5px; font-weight: 500; }
+.taglabel { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px 0 9px; background: var(--c); color: var(--on-chip); font-size: 12.5px; font-weight: 500; }
 .taglabel--plain { padding: 0 9px; }
 .taglabel--sm { height: 18px; padding: 0 6px; font-size: 11px; }
 .taglabel__x { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: 0; background: none; color: inherit; opacity: .55; cursor: pointer; font-size: 12px; }
-.taglabel__x:hover:enabled { opacity: 1; background: rgba(0, 0, 0, .18); }
+.taglabel__x:hover:enabled { opacity: 1; background: color-mix(in srgb, var(--black) 18%, transparent); }
 .taglabel__x:disabled { opacity: .3; cursor: not-allowed; }
-.taglabel__input { height: 20px; padding: 0 4px; border: 0; background: rgba(0, 0, 0, .22); color: inherit; font: 500 12.5px var(--font-ui); }
+.taglabel__input { height: 20px; padding: 0 4px; border: 0; background: color-mix(in srgb, var(--black) 22%, transparent); color: inherit; font: 500 12.5px var(--font-ui); }
 .taglabels { display: flex; flex-wrap: wrap; gap: 8px; }
 .due { font: 11px/1 var(--font-num); color: var(--text-muted); white-space: nowrap; }
 .due--late { color: var(--danger-text); }
 .is-late { color: var(--danger-text); }
-.av { display: inline-grid; place-items: center; width: 20px; height: 20px; flex: none; font: 10.5px/1 var(--font-num); color: #fff; background: var(--c, var(--mono-c0)); }
+.av { display: inline-grid; place-items: center; width: 20px; height: 20px; flex: none; font: 10.5px/1 var(--font-num); color: var(--on-accent); background: var(--c, var(--mono-c0)); }
 .av--lg { width: 28px; height: 28px; font-size: 18px; }
 .api { font: 10px/1 var(--font-num); letter-spacing: .06em; color: var(--focus); border: 1px solid color-mix(in srgb, var(--focus) 35%, transparent); padding: 1px 3px 0; }
 
@@ -177,11 +180,11 @@ button { font-family: var(--font-ui); }
 .btn:disabled, .btn--icon:disabled { border-style: dashed; }
 .btn--primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 .btn--primary:hover, .btn--primary.is-hover { background: var(--accent-fill-hover); border-color: var(--accent-fill-hover); color: var(--on-accent); }
-.btn--primary:active { background: color-mix(in srgb, var(--accent-fill) 85%, #000); border-color: color-mix(in srgb, var(--accent-fill) 85%, #000); }
+.btn--primary:active { background: color-mix(in srgb, var(--accent-fill) 85%, var(--black)); border-color: color-mix(in srgb, var(--accent-fill) 85%, var(--black)); }
 .btn--primary:disabled { background: var(--accent-fill); border-color: var(--accent-fill); }
 .btn--danger { border-color: color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger-text); }
 .btn--danger:hover, .btn--danger.is-hover { background: var(--danger); border-color: var(--danger); color: var(--on-accent); }
-.btn--danger:active { background: color-mix(in srgb, var(--danger) 85%, #000); border-color: color-mix(in srgb, var(--danger) 85%, #000); color: var(--on-accent); }
+.btn--danger:active { background: color-mix(in srgb, var(--danger) 85%, var(--black)); border-color: color-mix(in srgb, var(--danger) 85%, var(--black)); color: var(--on-accent); }
 .btn--danger:disabled { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .btn--ghost { border-color: transparent; color: var(--text-dim); }
 .btn--ghost:hover, .btn--ghost.is-hover { background: none; border-color: transparent; color: var(--text); }
@@ -243,7 +246,7 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .selbar button { height: 28px; padding: 0 14px; border: 0; background: none; color: var(--text-dim); font: 13px var(--font-ui); cursor: pointer; }
 .selbar button:hover { color: var(--text); }
 
-.iviewer { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: rgba(0, 0, 0, .88); user-select: none; }
+.iviewer { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: color-mix(in srgb, var(--black) 88%, transparent); user-select: none; }
 .iviewer__bar { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--line); }
 .iviewer__nav { display: flex; align-items: center; gap: 8px; }
 .iviewer__close { justify-self: end; }

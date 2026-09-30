@@ -1,3 +1,7 @@
+<script lang="ts">
+const stack: symbol[] = [];
+</script>
+
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { X } from 'lucide-vue-next';
@@ -6,12 +10,20 @@ defineProps<{ title: string; width?: number }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
 const pressedScrim = ref(false);
 
+const self = Symbol('dialog');
+
 function onKeydown(ev: KeyboardEvent): void {
-  if (ev.key === 'Escape') emit('close');
+  if (ev.key === 'Escape' && stack[stack.length - 1] === self) emit('close');
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown));
-onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+onMounted(() => {
+  stack.push(self);
+  window.addEventListener('keydown', onKeydown);
+});
+onUnmounted(() => {
+  stack.splice(stack.indexOf(self), 1);
+  window.removeEventListener('keydown', onKeydown);
+});
 </script>
 
 <template>
@@ -44,7 +56,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   align-items: center;
   justify-content: center;
   padding: var(--space-5);
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
 }
 .dialog {
   max-width: 100%;
