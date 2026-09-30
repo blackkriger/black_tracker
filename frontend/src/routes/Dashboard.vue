@@ -249,7 +249,6 @@ useLive((ev) => {
   if (
     ev.type.startsWith('issue.') ||
     ev.type.startsWith('comment.') ||
-    ev.type.startsWith('mention.') ||
     ev.type === 'key-date.changed'
   ) {
     reloadDays();
@@ -764,65 +763,6 @@ function closeIssue(): void {
 .day--one .day__what {
   width: 100%;
   align-items: center;
-}
-.marks {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.mark {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 30px;
-  padding: 0 4px 0 8px;
-  border: 1px solid var(--line);
-  background: none;
-  color: var(--text);
-  font-size: 13px;
-  text-align: left;
-}
-.mark--kept {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding: 0;
-}
-.mark__banner {
-  display: block;
-  border-bottom: 1px solid var(--line);
-}
-.mark__banner img {
-  display: block;
-  width: 100%;
-  max-height: 150px;
-  object-fit: cover;
-}
-.mark__line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 30px;
-  padding: 0 4px 0 8px;
-}
-a.mark__title {
-  color: var(--accent);
-  text-decoration: none;
-}
-a.mark__title:hover {
-  color: var(--accent-bright);
-}
-.mark--due {
-  cursor: pointer;
-}
-.mark--due:hover {
-  border-color: var(--line-2);
-}
-.mark__title {
-  flex: 1 1 auto;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 </style>

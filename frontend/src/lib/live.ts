@@ -21,8 +21,9 @@ let source: EventSource | null = null;
 
 function open(): void {
   if (source) return;
-  source = new EventSource('/api/events', { withCredentials: true });
-  source.onmessage = (ev) => {
+  const stream = new EventSource('/api/events', { withCredentials: true });
+  source = stream;
+  stream.onmessage = (ev) => {
     let parsed: LiveEvent;
     try {
       parsed = JSON.parse(ev.data) as LiveEvent;
@@ -32,7 +33,9 @@ function open(): void {
     if (parsed.origin && parsed.origin === TAB_ID) return;
     for (const handler of handlers) handler(parsed);
   };
-  source.onerror = () => {};
+  stream.onerror = () => {
+    if (stream.readyState === EventSource.CLOSED && source === stream) source = null;
+  };
 }
 
 export function settled(run: () => void, ms = 300): () => void {

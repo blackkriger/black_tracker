@@ -2145,23 +2145,6 @@ async function removeIssue(): Promise<void> {
   pointer-events: none;
   opacity: 0.6;
 }
-.cm__shots {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 8px;
-}
-.cm__pic {
-  position: relative;
-  display: block;
-}
-.cm__pic-x {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  background: var(--card);
-}
 .rt__clip {
   display: inline-flex;
   align-items: center;
