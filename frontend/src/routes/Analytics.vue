@@ -51,6 +51,7 @@ interface Person {
 interface TagOption {
   id: string;
   name: string;
+  color: string;
   boardIds: string[];
 }
 interface Numbers {
@@ -108,7 +109,7 @@ const tagChoices = computed(() => {
   const onBoards = chosen ? new Set(chosen.boards.map((b) => b.id)) : null;
   return tags.value
     .filter((t) => !onBoards || t.boardIds.some((id) => onBoards.has(id)))
-    .map((t) => ({ value: t.id, label: t.name }));
+    .map((t) => ({ value: t.id, label: t.name, color: t.color }));
 });
 watch(tagChoices, (choices) => {
   if (tag.value && !choices.some((c) => c.value === tag.value)) tag.value = '';
