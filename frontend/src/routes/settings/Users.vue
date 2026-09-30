@@ -196,7 +196,7 @@ async function createInvite(): Promise<void> {
     ];
     inviteRole.value = '';
     resetUser.value = '';
-    if (reset) await copyLink();
+    await copyLink();
   } catch (err) {
     fail('invites', err);
   } finally {
