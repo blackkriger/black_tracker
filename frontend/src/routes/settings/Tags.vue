@@ -111,20 +111,16 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
       </div>
     </section>
     <section v-if="loading" class="panel sheet__wide">
-      <header class="panel__h">Boards</header>
-      <div class="panel__table">
-        <table class="tbl">
-          <thead>
-            <tr>
-              <th v-for="w in [120, 96]" :key="w"><span class="sk sk--line" :style="{ width: `${w}px` }"></span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="n in 2" :key="n">
-              <td v-for="w in [52, 64]" :key="w"><span class="sk tag-sk" :style="{ width: `${w}px` }"></span></td>
-            </tr>
-          </tbody>
-        </table>
+      <header class="panel__h">
+        Boards
+        <span class="panel__end tagmap__head" style="--boards: 2">
+          <span v-for="w in [96, 72]" :key="w" class="sk sk--line" :style="{ width: `${w}px` }"></span>
+        </span>
+      </header>
+      <div class="panel__b">
+        <div v-for="n in 2" :key="n" class="tagmap__row" style="--boards: 2">
+          <span v-for="w in [52, 64]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
+        </div>
       </div>
     </section>
 
@@ -144,29 +140,25 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
     <div v-if="errors.tags" class="err sheet__wide panel__err">{{ errors.tags }}</div>
 
     <section v-if="!loading && boards.length && tags.length" class="panel sheet__wide">
-      <header class="panel__h">Boards</header>
-      <div class="panel__table">
-        <table class="tbl">
-          <thead>
-            <tr>
-              <th v-for="b in boards" :key="b.id">{{ b.label }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="t in tags" :key="t.id">
-              <td v-for="b in boards" :key="b.id">
-                <button
-                  class="taglabel taglabel--plain taglabel--pick"
-                  :class="{ 'is-off': !t.boardIds.includes(b.id) }"
-                  type="button"
-                  :aria-pressed="t.boardIds.includes(b.id)"
-                  :style="{ '--c': t.color }"
-                  @click="toggleOnBoard(t, b.id)"
-                >{{ t.name }}</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <header class="panel__h">
+        Boards
+        <span class="panel__end tagmap__head" :style="{ '--boards': boards.length }">
+          <span v-for="b in boards" :key="b.id" class="stamp" :title="b.label">{{ b.label }}</span>
+        </span>
+      </header>
+      <div class="panel__b">
+        <div v-for="t in tags" :key="t.id" class="tagmap__row" :style="{ '--boards': boards.length }">
+          <button
+            v-for="b in boards"
+            :key="b.id"
+            class="taglabel taglabel--plain taglabel--pick"
+            :class="{ 'is-off': !t.boardIds.includes(b.id) }"
+            type="button"
+            :aria-pressed="t.boardIds.includes(b.id)"
+            :style="{ '--c': t.color }"
+            @click="toggleOnBoard(t, b.id)"
+          >{{ t.name }}</button>
+        </div>
       </div>
     </section>
     <div v-if="errors.boards" class="err sheet__wide panel__err">{{ errors.boards }}</div>
@@ -195,5 +187,30 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
 }
 .taglabel--pick.is-off {
   opacity: 0.35;
+}
+.tagmap__head,
+.tagmap__row {
+  display: grid;
+  grid-template-columns: repeat(var(--boards), 140px);
+  justify-content: end;
+  justify-items: end;
+  gap: 8px;
+}
+.tagmap__head {
+  padding-right: 4px;
+}
+.tagmap__head .stamp {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tagmap__row {
+  align-items: center;
+  min-height: 26px;
+  padding: 5px 0;
+}
+.tagmap__row + .tagmap__row {
+  border-top: 1px solid var(--line);
 }
 </style>
