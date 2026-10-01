@@ -1123,7 +1123,7 @@ async function removeIssue(): Promise<void> {
           </button>
           <div class="sp"></div>
           <span class="iv__path">
-            <span class="iv__where">{{ projectName }}</span>
+            <span class="iv__where iv__project">{{ projectName }}</span>
             <span class="iv__sep">/</span>
             <span class="iv__where">{{ board.name }}</span>
             <span class="iv__sep">/</span>
@@ -1873,6 +1873,9 @@ async function removeIssue(): Promise<void> {
 .iv__where {
   font-size: 13px;
   color: var(--text-dim);
+}
+.iv__project {
+  color: var(--accent-bright);
 }
 .iv__sep {
   font-size: 13px;
