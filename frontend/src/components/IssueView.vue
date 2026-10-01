@@ -1325,7 +1325,7 @@ async function removeIssue(): Promise<void> {
                   </div>
                 </template>
                 <button class="btn btn--sm btn--ghost lgroups__add" type="button" @click="openPicker">
-                  Add link…
+                  Edit links…
                 </button>
               </div>
             </div>
