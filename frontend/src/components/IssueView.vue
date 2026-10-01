@@ -1305,7 +1305,7 @@ async function removeIssue(): Promise<void> {
                 </button>
               </div>
               <div v-else class="lgroups">
-                <template v-for="g in linkGroups" :key="g.kind">
+                <template v-for="(g, gi) in linkGroups" :key="g.kind">
                   <span class="sec-h">
                     {{ g.label }}
                     <span v-if="g.kind === 'child'" class="n">
@@ -1322,11 +1322,16 @@ async function removeIssue(): Promise<void> {
                     >
                       <span class="key lk__key" :style="{ color: ink(l.stateColor) }">{{ l.key }}</span>
                     </RouterLink>
+                    <button
+                      v-if="gi === linkGroups.length - 1"
+                      class="btn btn--sm btn--ghost lgroups__add"
+                      type="button"
+                      @click="openPicker"
+                    >
+                      Edit links…
+                    </button>
                   </div>
                 </template>
-                <button class="btn btn--sm btn--ghost lgroups__add" type="button" @click="openPicker">
-                  Edit links…
-                </button>
               </div>
             </div>
 
@@ -2076,8 +2081,7 @@ async function removeIssue(): Promise<void> {
   align-items: center;
 }
 .lgroups__add {
-  grid-column: 1 / -1;
-  justify-self: end;
+  margin-left: auto;
 }
 .pick__find {
   display: flex;
