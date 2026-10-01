@@ -264,6 +264,10 @@ function issueChanged(updated: Issue): void {
   issues.value = issues.value.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
 }
 
+function linksChanged(): void {
+  if (current.value) void loadIssues(current.value.id, true);
+}
+
 function issueMoved(boardId: string): void {
   const short = project.value?.shortName;
   const to = boards.value.find((b) => b.id === boardId);
@@ -457,13 +461,14 @@ watch(
                 </span>
               </div>
               <div class="card__title">{{ i.summary }}</div>
-              <div v-if="i.assignee || i.dueDate" class="card__meta">
+              <div v-if="i.assignee || i.dueDate || i.subtasks" class="card__meta">
                 <span
                   v-if="i.assignee"
                   class="card__who"
                   :style="{ color: ink(colorOf(i.assignee.login)) }"
                 >{{ nameOf(i.assignee.login) }}</span>
                 <div class="sp"></div>
+                <span v-if="i.subtasks" class="card__subs">{{ i.subtasks.done }}/{{ i.subtasks.total }}</span>
                 <span
                   v-if="dueLabel(i.dueDate)"
                   class="due"
@@ -506,6 +511,7 @@ watch(
       @tag-created="tagCreated"
       @moved="issueMoved"
       @changed="issueChanged"
+      @linked="linksChanged"
       @created="issueCreated"
       @deleted="issueGone"
     />
@@ -574,6 +580,11 @@ watch(
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+.card__subs {
+  font: 11px/1 var(--font-num);
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 .card__who {
   font-size: 12.5px;

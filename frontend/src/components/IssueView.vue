@@ -45,6 +45,7 @@ import {
   type IssueFull,
   type IssueLink,
   type IssueTag,
+  type LinkKind,
   type CommentOrder,
   type Priority,
   type Shot,
@@ -75,6 +76,7 @@ const emit = defineEmits<{
   (e: 'deleted', id: string): void;
   (e: 'tagCreated', tag: IssueTag): void;
   (e: 'moved', boardId: string): void;
+  (e: 'linked'): void;
 }>();
 
 const session = useSession();
@@ -135,7 +137,34 @@ const pendingLinks = ref<IssueLink[]>([]);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let searches = 0;
 
+type LinkPick = 'related' | 'parentOf' | 'subtaskOf' | 'duplicateOf' | 'duplicatedBy';
+const LINK_PICKS: { value: LinkPick; label: string; kind: LinkKind }[] = [
+  { value: 'related', label: 'Related to', kind: 'related' },
+  { value: 'parentOf', label: 'Parent of', kind: 'child' },
+  { value: 'subtaskOf', label: 'Subtask of', kind: 'parent' },
+  { value: 'duplicateOf', label: 'Duplicate of', kind: 'duplicateOf' },
+  { value: 'duplicatedBy', label: 'Duplicated by', kind: 'duplicatedBy' },
+];
+const LINK_GROUPS: { kind: LinkKind; label: string }[] = [
+  { kind: 'parent', label: 'Parent' },
+  { kind: 'child', label: 'Subtasks' },
+  { kind: 'duplicateOf', label: 'Duplicate of' },
+  { kind: 'duplicatedBy', label: 'Duplicated by' },
+  { kind: 'related', label: 'Related' },
+];
+const linkPick = ref<LinkPick>('related');
+
 const shownLinks = computed(() => (creating.value ? pendingLinks.value : (issue.value?.links ?? [])));
+const linkGroups = computed(() =>
+  LINK_GROUPS.map((g) => ({ ...g, links: shownLinks.value.filter((l) => l.kind === g.kind) })).filter(
+    (g) => g.links.length
+  )
+);
+const pickable = computed(() =>
+  linkPick.value === 'parentOf' || linkPick.value === 'subtaskOf'
+    ? linkResults.value.filter((r) => r.projectShort === props.project)
+    : linkResults.value
+);
 
 watch(linkQuery, (term) => {
   if (searchTimer) clearTimeout(searchTimer);
@@ -164,6 +193,7 @@ watch(linkQuery, (term) => {
 
 function openPicker(): void {
   picking.value = true;
+  linkPick.value = 'related';
   linkQuery.value = '';
   linkResults.value = [];
 }
@@ -664,12 +694,16 @@ async function create(): Promise<void> {
     if (pendingLinks.value.length) {
       for (const link of pendingLinks.value) {
         try {
-          await api(`/issues/${made.id}/links`, { method: 'POST', body: { key: link.key } });
+          await api(`/issues/${made.id}/links`, {
+            method: 'POST',
+            body: { key: link.key, kind: LINK_PICKS.find((p) => p.kind === link.kind)?.value },
+          });
         } catch (err) {
           error.value = err instanceof Error ? err.message : 'The issue was created without a link.';
         }
       }
       pendingLinks.value = [];
+      emit('linked');
     }
     if (pending.value.length) {
       try {
@@ -837,7 +871,8 @@ async function addLink(key: string): Promise<void> {
   if (!key || linking.value) return;
   if (creating.value) {
     const found = linkResults.value.find((r) => r.key === key);
-    if (found) pendingLinks.value = [...pendingLinks.value, found];
+    const kind = LINK_PICKS.find((p) => p.value === linkPick.value)?.kind ?? 'related';
+    if (found) pendingLinks.value = [...pendingLinks.value, { ...found, kind }];
     picking.value = false;
     return;
   }
@@ -848,11 +883,16 @@ async function addLink(key: string): Promise<void> {
   try {
     const made = await api<IssueLink>(`/issues/${current.id}/links`, {
       method: 'POST',
-      body: { key },
+      body: { key, kind: linkPick.value },
     });
     const now = issue.value ?? current;
     issue.value = { ...now, links: [...now.links, made] };
     picking.value = false;
+    if (linkPick.value === 'duplicateOf') {
+      await reload();
+      if (issue.value) emit('changed', issue.value);
+    }
+    emit('linked');
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not link them.';
   } finally {
@@ -872,6 +912,7 @@ async function removeLink(link: IssueLink): Promise<void> {
     await api(`/issues/${current.id}/links/${link.id}`, { method: 'DELETE' });
     const now = issue.value ?? current;
     issue.value = { ...now, links: now.links.filter((l) => l.id !== link.id) };
+    emit('linked');
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not unlink them.';
   }
@@ -1255,20 +1296,35 @@ async function removeIssue(): Promise<void> {
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
-              <div class="sec-h links">
+              <div v-if="!shownLinks.length" class="sec-h links">
                 <Link2 class="ic links__icon" aria-hidden="true" />
-                <RouterLink
-                  v-for="l in shownLinks"
-                  :key="l.id"
-                  class="lk"
-                  :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
-                  :title="`${l.summary} — ${l.stateName}`"
-                >
-                  <span class="key lk__key" :style="{ color: ink(l.stateColor) }">{{ l.key }}</span>
-                </RouterLink>
-                <span v-if="!shownLinks.length" class="hint faint">No links yet.</span>
+                <span class="hint faint">No links yet.</span>
                 <div class="sp"></div>
                 <button class="btn btn--sm btn--ghost" type="button" @click="openPicker">
+                  Add link…
+                </button>
+              </div>
+              <div v-else class="lgroups">
+                <template v-for="g in linkGroups" :key="g.kind">
+                  <span class="sec-h">
+                    {{ g.label }}
+                    <span v-if="g.kind === 'child'" class="n">
+                      {{ g.links.filter((l) => l.resolved).length }}/{{ g.links.length }}
+                    </span>
+                  </span>
+                  <div class="links">
+                    <RouterLink
+                      v-for="l in g.links"
+                      :key="l.id"
+                      class="lk"
+                      :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
+                      :title="`${l.summary} — ${l.stateName}`"
+                    >
+                      <span class="key lk__key" :style="{ color: ink(l.stateColor) }">{{ l.key }}</span>
+                    </RouterLink>
+                  </div>
+                </template>
+                <button class="btn btn--sm btn--ghost lgroups__add" type="button" @click="openPicker">
                   Add link…
                 </button>
               </div>
@@ -1727,16 +1783,19 @@ async function removeIssue(): Promise<void> {
         </div>
         <div v-if="shownLinks.length" class="hr"></div>
 
-        <input
-          v-model="linkQuery"
-          class="input"
-          placeholder="Key or title…"
-          autofocus
-          @keydown.enter.prevent="linkResults[0] && addLink(linkResults[0].key)"
-        />
+        <div class="pick__find">
+          <Select v-model="linkPick" class="pick__kind" :options="LINK_PICKS" label="Kind of link" />
+          <input
+            v-model="linkQuery"
+            class="input"
+            placeholder="Key or title…"
+            autofocus
+            @keydown.enter.prevent="pickable[0] && addLink(pickable[0].key)"
+          />
+        </div>
         <div class="pick">
           <button
-            v-for="r in linkResults"
+            v-for="r in pickable"
             :key="r.id"
             class="pick__row"
             type="button"
@@ -1748,7 +1807,7 @@ async function removeIssue(): Promise<void> {
             <span class="pick__state" :style="{ color: ink(r.stateColor) }">{{ r.stateName }}</span>
           </button>
           <p v-if="searching" class="hint">Searching…</p>
-          <p v-else-if="linkQuery.trim() && !linkResults.length" class="hint">Nothing found.</p>
+          <p v-else-if="linkQuery.trim() && !pickable.length" class="hint">Nothing found.</p>
         </div>
       </Dialog>
 
@@ -2005,6 +2064,27 @@ async function removeIssue(): Promise<void> {
   gap: 6px;
   height: auto;
   min-height: 26px;
+}
+.lgroups {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 12px;
+}
+.lgroups .links {
+  display: flex;
+  align-items: center;
+}
+.lgroups__add {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+.pick__find {
+  display: flex;
+  gap: 6px;
+}
+.pick__kind {
+  flex: 0 0 150px;
 }
 .links__icon {
   flex: none;

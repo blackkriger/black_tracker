@@ -38,6 +38,7 @@ export interface Issue {
   resolvedAt: string | null;
   favourite: boolean;
   tags: IssueTag[];
+  subtasks?: { done: number; total: number } | null;
 }
 
 // Must match REACTIONS in backend issue-routes.ts; the server rejects anything else.
@@ -83,6 +84,8 @@ export interface Attachment {
   createdAt: string;
 }
 
+export type LinkKind = 'related' | 'parent' | 'child' | 'duplicateOf' | 'duplicatedBy';
+
 export interface IssueLink {
   id: string;
   key: string;
@@ -91,6 +94,8 @@ export interface IssueLink {
   stateColor: string;
   projectShort: string;
   boardSlug: string;
+  kind: LinkKind;
+  resolved: boolean;
 }
 
 export interface IssueFull extends Issue {

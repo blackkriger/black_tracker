@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
-import { deniedFor, mayOpenBoard } from './board-service.js';
+import { DENIES_NOTHING, deniedFor, mayOpenBoard } from './board-service.js';
 import { syncMentions } from './notice-routes.js';
 import { publish, tabOf } from './events.js';
 
@@ -134,13 +134,22 @@ interface LinkRow {
   slug: string;
   board_id: string;
   project_id: string;
+  kind?: LinkKind;
+  resolved?: boolean;
 }
+
+type LinkKind = 'related' | 'parent' | 'child' | 'duplicateOf' | 'duplicatedBy';
 
 async function linksOf(issueId: string, auth: Auth): Promise<LinkRow[]> {
   const res = await pool.query<LinkRow>(
     `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
-            s.name as state_name, s.color as state_color,
-            p.short_name, b.slug
+            s.name as state_name, s.color as state_color, s.is_resolved as resolved,
+            p.short_name, b.slug,
+            case when l.kind = 'related' then 'related'
+                 when l.kind = 'subtask' and l.b = $1 then 'parent'
+                 when l.kind = 'subtask' then 'child'
+                 when l.a = $1 then 'duplicateOf'
+                 else 'duplicatedBy' end as kind
        from issue_links l
        join issues i on i.id = case when l.a = $1 then l.b else l.a end
        join states s on s.id = i.state_id
@@ -166,6 +175,8 @@ const publicLink = (r: LinkRow) => ({
   stateColor: r.state_color,
   projectShort: r.short_name,
   boardSlug: r.slug,
+  kind: r.kind ?? 'related',
+  resolved: r.resolved ?? false,
 });
 
 async function starredBy(userId: string, issueIds: string[]): Promise<Set<string>> {
@@ -180,6 +191,48 @@ async function starredBy(userId: string, issueIds: string[]): Promise<Set<string
 async function issueById(id: string): Promise<IssueRow | null> {
   const res = await pool.query<IssueRow>(`${ISSUE_SELECT} where i.id = $1`, [id]);
   return res.rows[0] ?? null;
+}
+
+async function parentOf(issueId: string): Promise<IssueRow | null> {
+  const res = await pool.query<IssueRow>(
+    `${ISSUE_SELECT} join issue_links l on l.a = i.id and l.kind = 'subtask' where l.b = $1`,
+    [issueId]
+  );
+  return res.rows[0] ?? null;
+}
+
+function announceParent(parent: IssueRow | null, by: string, origin: string | undefined): void {
+  if (!parent) return;
+  void publish({
+    type: 'issue.linked',
+    boardId: parent.board_id,
+    projectId: parent.project_id,
+    issueId: parent.id,
+    issueKey: parent.readable_id,
+    fields: ['links'],
+    by,
+    origin,
+  });
+}
+
+async function subtaskCounts(
+  auth: Auth,
+  parentIds: string[]
+): Promise<Map<string, { done: number; total: number }>> {
+  const out = new Map<string, { done: number; total: number }>();
+  if (!parentIds.length) return out;
+  const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+  const res = await pool.query<{ parent: string; done: number; total: number }>(
+    `select l.a as parent, count(*)::int as total, count(*) filter (where s.is_resolved)::int as done
+       from issue_links l
+       join issues c on c.id = l.b
+       join states s on s.id = c.state_id
+      where l.kind = 'subtask' and l.a = any($1::uuid[]) and c.board_id <> all($2::uuid[])
+      group by l.a`,
+    [parentIds, [...denied.boards]]
+  );
+  for (const row of res.rows) out.set(row.parent, { done: row.done, total: row.total });
+  return out;
 }
 
 async function mayReachIssue(auth: Auth, issueId: string): Promise<boolean> {
@@ -217,6 +270,42 @@ async function writeHistory(
   await client.query(
     'insert into issue_history (issue_id, user_id, field, old_value, new_value) values ($1, $2, $3, $4, $5)',
     [issueId, userId, field, oldValue, newValue]
+  );
+}
+
+async function changeState(
+  client: { query: typeof pool.query },
+  issueId: string,
+  userId: string,
+  boardId: string,
+  fromStateId: string,
+  toStateId: string
+): Promise<void> {
+  const names = await client.query<{ id: string; name: string; is_resolved: boolean }>(
+    'select id, name, is_resolved from states where id = any($1::uuid[])',
+    [[fromStateId, toStateId]]
+  );
+  const byId = (sid: string) => names.rows.find((r) => r.id === sid);
+  await writeHistory(
+    client,
+    issueId,
+    userId,
+    'status',
+    byId(fromStateId)?.name ?? null,
+    byId(toStateId)?.name ?? null
+  );
+  await client.query(
+    `update issues set resolved_at = case when $2 then coalesce(resolved_at, now()) else null end
+      where id = $1`,
+    [issueId, byId(toStateId)?.is_resolved === true]
+  );
+  const top = await client.query<{ pos: number }>(
+    'select coalesce(min(position), 0) - 1 as pos from issues where board_id = $1 and state_id = $2',
+    [boardId, toStateId]
+  );
+  await client.query(
+    'update issues set state_id = $2, position = $3, updated_at = now() where id = $1',
+    [issueId, toStateId, top.rows[0].pos]
   );
 }
 
@@ -291,12 +380,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       `${ISSUE_SELECT} where i.board_id = $1 order by i.position, i.created_at`,
       [id]
     );
-    const [tags, stars] = await Promise.all([
+    const [tags, stars, subtasks] = await Promise.all([
       tagsFor(res.rows.map((r) => r.id)),
       starredBy(auth.userId, res.rows.map((r) => r.id)),
+      subtaskCounts(auth, res.rows.map((r) => r.id)),
     ]);
     return reply.send({
-      data: res.rows.map((r) => publicIssue(r, tags.get(r.id) ?? [], stars.has(r.id))),
+      data: res.rows.map((r) => ({
+        ...publicIssue(r, tags.get(r.id) ?? [], stars.has(r.id)),
+        subtasks: subtasks.get(r.id) ?? null,
+      })),
     });
   });
 
@@ -647,32 +740,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         await client.query('update issues set board_id = $2 where id = $1', [id, landing.boardId]);
       }
       if (nextState !== undefined && nextState !== issue.state_id) {
-        const names = await client.query<{ id: string; name: string; is_resolved: boolean }>(
-          'select id, name, is_resolved from states where id = any($1::uuid[])',
-          [[issue.state_id, nextState]]
-        );
-        const byId = (sid: string) => names.rows.find((r) => r.id === sid);
-        await writeHistory(
-          client,
-          id,
-          auth.userId,
-          'status',
-          byId(issue.state_id)?.name ?? null,
-          byId(nextState)?.name ?? null
-        );
-        await client.query(
-          `update issues set resolved_at = case when $2 then coalesce(resolved_at, now()) else null end
-            where id = $1`,
-          [id, byId(nextState)?.is_resolved === true]
-        );
-        const top = await client.query<{ pos: number }>(
-          'select coalesce(min(position), 0) - 1 as pos from issues where board_id = $1 and state_id = $2',
-          [home, nextState]
-        );
-        await client.query('update issues set position = $2 where id = $1', [
-          id,
-          top.rows[0].pos,
-        ]);
+        await changeState(client, id, auth.userId, home, issue.state_id, nextState);
       }
 
       await client.query(
@@ -740,6 +808,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       by: auth.login,
       origin: tabOf(req),
     });
+    if (nextState !== undefined && nextState !== issue.state_id) {
+      announceParent(await parentOf(id), auth.login, tabOf(req));
+    }
     if (landing) {
       void publish({
         type: 'issue.moved',
@@ -786,8 +857,10 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
     const doomed = await filesOfIssues([id]);
+    const parent = await parentOf(id);
     await pool.query('delete from issues where id = $1', [id]);
     await sweepFiles([id], doomed);
+    announceParent(parent, auth.login, tabOf(req));
     void publish({
       type: 'issue.deleted',
       boardId: issue.board_id,
@@ -835,8 +908,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const { id } = req.params as { id: string };
     const found = await loadIssueFor(req, reply, id);
     if (!found) return;
-    const parsed = z.object({ key: z.string().trim().min(3).max(30) }).safeParse(req.body);
+    const parsed = z
+      .object({
+        key: z.string().trim().min(3).max(30),
+        kind: z
+          .enum(['related', 'parentOf', 'subtaskOf', 'duplicateOf', 'duplicatedBy'])
+          .default('related'),
+      })
+      .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Which issue? Give its key.' });
+    const { kind } = parsed.data;
 
     const other = await pool.query<IssueRow>(
       `${ISSUE_SELECT} where lower(i.readable_id) = lower($1)`,
@@ -849,15 +930,82 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'That issue is not open to you.' });
     }
 
+    const self = found.issue;
+    const paired = await pool.query(
+      'select 1 from issue_links where (a = $1 and b = $2) or (a = $2 and b = $1)',
+      [self.id, target.id]
+    );
+    if (paired.rowCount) return reply.code(409).send({ error: 'These two are already linked.' });
+
     // Lower-case before sorting so JS string order matches Postgres uuid order in the a < b check.
-    const [a, b] = [found.issue.id.toLowerCase(), target.id.toLowerCase()].sort();
+    const [a, b] = [self.id.toLowerCase(), target.id.toLowerCase()].sort();
+    const stored =
+      kind === 'related' ? 'related' : kind === 'parentOf' || kind === 'subtaskOf' ? 'subtask' : 'duplicate';
+    const [from, to] =
+      kind === 'related'
+        ? [null, null]
+        : kind === 'parentOf' || kind === 'duplicateOf'
+          ? [self, target]
+          : [target, self];
+
+    if (stored === 'subtask' && from && to) {
+      if (from.project_id !== to.project_id) {
+        return reply.code(400).send({ error: "A subtask stays in its parent's project." });
+      }
+      if (await parentOf(to.id)) {
+        return reply.code(409).send({ error: `${to.readable_id} already has a parent.` });
+      }
+      const loop = await pool.query(
+        `with recursive up(id) as (
+           select $1::uuid
+           union
+           select l.a from issue_links l join up on l.b = up.id where l.kind = 'subtask'
+         )
+         select 1 from up where id = $2`,
+        [from.id, to.id]
+      );
+      if (loop.rowCount) {
+        return reply.code(400).send({ error: `${to.readable_id} is already above ${from.readable_id}.` });
+      }
+    }
+    if (stored === 'duplicate' && from) {
+      const already = await pool.query(
+        "select 1 from issue_links where a = $1 and kind = 'duplicate'",
+        [from.id]
+      );
+      if (already.rowCount) {
+        return reply.code(409).send({ error: `${from.readable_id} is already a duplicate.` });
+      }
+    }
+
+    const duplicateState =
+      stored === 'duplicate' && from
+        ? (
+            await pool.query<{ id: string }>(
+              `select id from states where board_id = $1 and lower(name) = 'duplicate' and id <> $2
+                limit 1`,
+              [from.board_id, from.state_id]
+            )
+          ).rows[0]?.id ?? null
+        : null;
+
     const linked = await inTransaction(async (client) => {
       const done = await client.query(
-        `insert into issue_links (a, b, created_by) values ($1, $2, $3)
+        `insert into issue_links (a, b, kind, created_by) values ($1, $2, $3, $4)
          on conflict do nothing`,
-        [a, b, found.auth.userId]
+        [from?.id ?? a, to?.id ?? b, stored, found.auth.userId]
       );
       if (!done.rowCount) return false;
+      if (from && duplicateState) {
+        await changeState(
+          client,
+          from.id,
+          found.auth.userId,
+          from.board_id,
+          from.state_id,
+          duplicateState
+        );
+      }
       await writeHistory(client, id, found.auth.userId, 'link added', null, target.readable_id);
       await writeHistory(
         client,
@@ -870,29 +1018,21 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return true;
     });
     if (!linked) return reply.code(409).send({ error: 'These two are already linked.' });
-    for (const side of [found.issue, target]) {
+    for (const side of [self, target]) {
       void publish({
         type: 'issue.linked',
         boardId: side.board_id,
         projectId: side.project_id,
         issueId: side.id,
         issueKey: side.readable_id,
-        fields: ['links'],
+        fields: duplicateState && side.id === from?.id ? ['links', 'stateId'] : ['links'],
         by: found.auth.login,
         origin: tabOf(req),
       });
     }
-    const row = await pool.query<LinkRow>(
-      `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
-              s.name as state_name, s.color as state_color, p.short_name, b.slug
-         from issues i
-         join states s on s.id = i.state_id
-         join projects p on p.id = i.project_id
-         join boards b on b.id = i.board_id
-        where i.id = $1`,
-      [target.id]
-    );
-    return reply.code(201).send({ data: publicLink(row.rows[0]) });
+    const made = (await linksOf(self.id, found.auth)).find((l) => l.id === target.id);
+    if (!made) return reply.code(404).send({ error: 'No issue with that key.' });
+    return reply.code(201).send({ data: publicLink(made) });
   });
 
   app.delete('/issues/:id/links/:otherId', async (req, reply) => {
@@ -903,9 +1043,11 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (other && !(await mayOpenBoard(found.auth, other.board_id, other.project_id))) {
       return reply.code(404).send({ error: 'They are not linked.' });
     }
-    const [a, b] = [found.issue.id.toLowerCase(), (other?.id ?? otherId).toLowerCase()].sort();
     const res = await inTransaction(async (client) => {
-      const gone = await client.query('delete from issue_links where a = $1 and b = $2', [a, b]);
+      const gone = await client.query(
+        'delete from issue_links where (a = $1 and b = $2) or (a = $2 and b = $1)',
+        [found.issue.id, other?.id ?? otherId]
+      );
       if (!gone.rowCount || !other) return gone;
       await writeHistory(client, id, found.auth.userId, 'link removed', null, other.readable_id);
       await writeHistory(
