@@ -17,6 +17,7 @@ import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { Plus, Search, Star } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
+import { vSplitLine } from '../lib/splitLine';
 
 interface State {
   id: string;
@@ -460,7 +461,17 @@ watch(
                   <i></i><i></i><i></i><i></i>
                 </span>
               </div>
-              <div class="card__title">{{ i.summary }}</div>
+              <div v-split-line class="card__title">
+                <span>{{ i.summary }}</span>
+                <span v-if="i.tags.length" class="card__tags">
+                  <span
+                    v-for="t in i.tags"
+                    :key="t.id"
+                    class="taglabel taglabel--plain taglabel--sm"
+                    :style="{ '--c': t.color }"
+                  >{{ t.name }}</span>
+                </span>
+              </div>
               <div v-if="i.assignee || i.dueDate || i.subtasks" class="card__meta">
                 <span
                   v-if="i.assignee"
@@ -474,14 +485,6 @@ watch(
                   class="due"
                   :class="{ 'due--late': dueLabel(i.dueDate)?.late }"
                 >{{ dueLabel(i.dueDate)?.text }}</span>
-              </div>
-              <div v-if="i.tags.length" class="card__tags">
-                <span
-                  v-for="t in i.tags"
-                  :key="t.id"
-                  class="taglabel taglabel--plain taglabel--sm"
-                  :style="{ '--c': t.color }"
-                >{{ t.name }}</span>
               </div>
             </article>
 
@@ -576,10 +579,23 @@ watch(
 .card {
   user-select: none;
 }
-.card__tags {
+.card__tags .taglabel {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.card__title.is-split {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.card__title.is-split .card__tags {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+.card__title.is-split .card__tags .taglabel {
+  margin-left: 0;
 }
 .card__subs {
   font: 11px/1 var(--font-num);
