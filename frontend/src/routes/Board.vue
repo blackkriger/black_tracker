@@ -435,11 +435,7 @@ watch(
         </header>
 
         <div class="col__body">
-          <template v-if="issuesLoading">
-            <span v-for="h in [64, 78]" :key="h" class="sk" :style="{ height: `${h}px` }"></span>
-          </template>
-
-          <template v-else>
+          <template v-if="!issuesLoading">
             <article
               v-for="i in issuesOf(s.id)"
               :key="i.id"
