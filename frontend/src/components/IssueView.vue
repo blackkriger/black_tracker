@@ -1780,11 +1780,14 @@ async function removeIssue(): Promise<void> {
 
       <Dialog v-if="picking" title="Link an issue" :width="460" @close="picking = false">
         <div v-if="shownLinks.length" class="pick">
-          <div v-for="l in shownLinks" :key="l.id" class="pick__line">
-            <span class="key">{{ l.key }}</span>
-            <span class="pick__sum">{{ l.summary }}</span>
-            <button class="btn btn--sm btn--ghost" type="button" @click="removeLink(l)">Unlink</button>
-          </div>
+          <template v-for="g in linkGroups" :key="g.kind">
+            <div class="sec-h pick__group">{{ g.label }}</div>
+            <div v-for="l in g.links" :key="l.id" class="pick__line">
+              <span class="key">{{ l.key }}</span>
+              <span class="pick__sum">{{ l.summary }}</span>
+              <button class="btn btn--sm btn--ghost" type="button" @click="removeLink(l)">Unlink</button>
+            </div>
+          </template>
         </div>
         <div v-if="shownLinks.length" class="hr"></div>
 
@@ -2113,6 +2116,10 @@ async function removeIssue(): Promise<void> {
   align-items: center;
   gap: 10px;
   height: 32px;
+  padding: 0 8px;
+}
+.pick__group {
+  flex: none;
   padding: 0 8px;
 }
 .pick {
