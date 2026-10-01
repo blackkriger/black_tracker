@@ -353,6 +353,7 @@ function addLink(): void {
       <button type="button" :aria-pressed="marks.ordered" title="Numbered list" @click="toggle('list', 'ordered')"><ListOrdered class="ic" /></button>
       <button type="button" :aria-pressed="marks.blockquote" title="Quote" @click="toggle('blockquote')"><Quote class="ic" /></button>
       <button type="button" title="Link" @click="addLink"><Link class="ic" /></button>
+      <span v-if="$slots.tools" class="mdbar__sep" aria-hidden="true"></span>
       <slot name="tools" />
     </div>
     <div
