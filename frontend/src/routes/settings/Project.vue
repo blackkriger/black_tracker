@@ -90,6 +90,10 @@ function replaceBoard(next: Board): void {
   boards.value = boards.value.map((b) => (b.id === next.id ? { ...b, ...next } : b));
 }
 
+function changeStates(boardId: string, change: (states: State[]) => State[]): void {
+  boards.value = boards.value.map((b) => (b.id === boardId ? { ...b, states: change(b.states) } : b));
+}
+
 async function toggleArchived(): Promise<void> {
   if (!project.value) return;
   clear('project');
@@ -171,7 +175,7 @@ async function addStatus(b: Board): Promise<void> {
       method: 'POST',
       body: { name },
     });
-    replaceBoard({ ...b, states: [...b.states, created] });
+    changeStates(b.id, (states) => [...states, created]);
     newStatus.value = { ...newStatus.value, [b.id]: '' };
   } catch (err) {
     fail(b.id, err);
@@ -182,7 +186,7 @@ async function patchStatus(b: Board, s: State, body: Record<string, unknown>): P
   clear(b.id);
   try {
     const updated = await api<State>(`/states/${s.id}`, { method: 'PATCH', body });
-    replaceBoard({ ...b, states: b.states.map((row) => (row.id === s.id ? updated : row)) });
+    changeStates(b.id, (states) => states.map((row) => (row.id === s.id ? updated : row)));
   } catch (err) {
     fail(b.id, err);
     await load();
@@ -193,7 +197,7 @@ async function deleteStatus(b: Board, s: State): Promise<void> {
   clear(b.id);
   try {
     await api(`/states/${s.id}`, { method: 'DELETE' });
-    replaceBoard({ ...b, states: b.states.filter((row) => row.id !== s.id) });
+    changeStates(b.id, (states) => states.filter((row) => row.id !== s.id));
   } catch (err) {
     fail(b.id, err);
   }
