@@ -6,7 +6,7 @@ import Select from './Select.vue';
 import { api } from '../lib/api';
 import { tellTab } from '../lib/live';
 import { longDate, type Due, type Mark } from '../lib/calendar';
-import { useNotices, type Notice } from '../lib/notices';
+import { describeChanges, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
@@ -139,6 +139,9 @@ async function openNotice(n: Notice): Promise<void> {
         <span class="mark__title">
           <template v-if="n.kind === 'reaction'">{{ nameOf(n.by) }} reacted</template>
           <template v-else-if="n.kind === 'assigned'">{{ nameOf(n.by) }} assigned you</template>
+          <template v-else-if="n.kind === 'starred' && !n.commentId">
+            {{ nameOf(n.by) }}: {{ describeChanges(n.changes, nameOf) }}
+          </template>
           <template v-else>
             <template v-if="n.by && n.by !== session.me.value?.login">{{ nameOf(n.by) }}: </template>
             {{ n.said }}

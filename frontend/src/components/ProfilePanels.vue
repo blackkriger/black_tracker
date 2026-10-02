@@ -56,7 +56,24 @@ const KINDS: { kind: NoticeKind; label: string }[] = [
   { kind: 'mention', label: 'Mentions' },
   { kind: 'assigned', label: 'Assigned to you' },
   { kind: 'reaction', label: 'Reactions' },
+  { kind: 'starred', label: 'Starred issues' },
 ];
+
+const STARS: { key: keyof Me['autoStar']; body: string; label: string }[] = [
+  { key: 'created', body: 'starCreated', label: 'Issues I create' },
+  { key: 'assigned', body: 'starAssigned', label: 'Issues assigned to me' },
+  { key: 'commented', body: 'starCommented', label: 'Issues I comment on' },
+];
+
+async function setAutoStar(body: string, on: boolean): Promise<void> {
+  clear('prefs');
+  try {
+    const updated = await api<Me>('/me', { method: 'PATCH', body: { [body]: on } });
+    me.value = { ...(me.value as Me), ...updated };
+  } catch (err) {
+    fail('prefs', err);
+  }
+}
 
 async function saveName(): Promise<void> {
   if (nameBusy.value) return;
@@ -224,8 +241,22 @@ async function changePassword(): Promise<void> {
           </label>
         </div>
       </div>
+      <div class="pairs">
+        <div class="field">
+          <span class="label">Star automatically</span>
+          <label v-for="s in STARS" :key="s.key" class="flag">
+            <input
+              type="checkbox"
+              :checked="me?.autoStar[s.key] ?? false"
+              @change="setAutoStar(s.body, ($event.target as HTMLInputElement).checked)"
+            />
+            {{ s.label }}
+          </label>
+        </div>
+      </div>
     </div>
   </section>
+  <div v-if="errors.prefs" class="err panel__err">{{ errors.prefs }}</div>
 </template>
 
 <style scoped>

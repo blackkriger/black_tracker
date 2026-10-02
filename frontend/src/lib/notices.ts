@@ -1,13 +1,21 @@
 import { computed, ref } from 'vue';
 import { api, latestRead } from './api';
+import { shortDate } from './calendar';
 
-export type NoticeKind = 'mention' | 'reaction' | 'assigned';
+export type NoticeKind = 'mention' | 'reaction' | 'assigned' | 'starred';
+
+export interface NoticeChange {
+  field: string;
+  from: string | null;
+  to: string | null;
+}
 
 export interface Notice {
   id: string;
   kind: NoticeKind;
   commentId: string | null;
   emoji: string | null;
+  changes: NoticeChange[];
   said: string;
   by: string | null;
   key: string;
@@ -19,6 +27,23 @@ export interface Notice {
 }
 
 const OFF = 'tracker:notices:off';
+
+export function describeChanges(changes: NoticeChange[], name: (login: string) => string): string {
+  const show = (c: NoticeChange, value: string | null): string => {
+    if (!value) return '—';
+    if (c.field === 'assignee') return name(value);
+    if (c.field === 'due date') return shortDate(value, false);
+    return value;
+  };
+  return changes
+    .map((c) => {
+      if (c.field === 'link added') return `linked ${c.to}`;
+      if (c.field === 'link removed') return `unlinked ${c.to}`;
+      const label = c.field === 'due date' ? 'due' : c.field;
+      return `${label} ${show(c, c.from)} → ${show(c, c.to)}`;
+    })
+    .join(', ');
+}
 
 const notices = ref<Notice[]>([]);
 const loaded = ref(false);

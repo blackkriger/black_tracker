@@ -308,6 +308,71 @@ async function loadIssueFor(
   return { auth, issue };
 }
 
+const STARRED_FIELDS = new Set(['status', 'assignee', 'priority', 'due date', 'link added', 'link removed']);
+
+interface StarChange {
+  field: string;
+  from: string | null;
+  to: string | null;
+}
+
+function mergeChange(had: StarChange[], next: StarChange): StarChange[] {
+  if (next.field === 'link added' || next.field === 'link removed') {
+    const undo = next.field === 'link added' ? 'link removed' : 'link added';
+    if (had.some((c) => c.field === undo && c.to === next.to)) {
+      return had.filter((c) => !(c.field === undo && c.to === next.to));
+    }
+    return had.some((c) => c.field === next.field && c.to === next.to) ? had : [...had, next];
+  }
+  const same = had.find((c) => c.field === next.field);
+  if (!same) return [...had, next];
+  const merged = { ...same, to: next.to };
+  return merged.from === merged.to
+    ? had.filter((c) => c !== same)
+    : had.map((c) => (c === same ? merged : c));
+}
+
+async function noteStarred(
+  client: { query: typeof pool.query },
+  issueId: string,
+  actorId: string,
+  change: StarChange
+): Promise<void> {
+  const watchers = await client.query<{ user_id: string; login: string }>(
+    `select f.user_id, u.login
+       from issue_favourites f join users u on u.id = f.user_id and u.active
+      where f.issue_id = $1 and f.user_id <> $2`,
+    [issueId, actorId]
+  );
+  for (const w of watchers.rows) {
+    if (change.field === 'assignee' && change.to === w.login) continue;
+    const open = await client.query<{ id: string; detail: string | null }>(
+      `select id, detail from notices
+        where user_id = $1 and issue_id = $2 and by_id = $3 and kind = 'starred'
+          and comment_id is null and read_at is null and created_at > now() - interval '10 minutes'
+        order by created_at desc
+        limit 1
+        for update`,
+      [w.user_id, issueId, actorId]
+    );
+    const kept = open.rows[0];
+    const changes = mergeChange(kept ? (JSON.parse(kept.detail ?? '[]') as StarChange[]) : [], change);
+    if (kept && changes.length) {
+      await client.query('update notices set detail = $2, created_at = now() where id = $1', [
+        kept.id,
+        JSON.stringify(changes),
+      ]);
+    } else if (kept) {
+      await client.query('delete from notices where id = $1', [kept.id]);
+    } else if (changes.length) {
+      await client.query(
+        `insert into notices (user_id, kind, issue_id, by_id, detail) values ($1, 'starred', $2, $3, $4)`,
+        [w.user_id, issueId, actorId, JSON.stringify(changes)]
+      );
+    }
+  }
+}
+
 async function writeHistory(
   client: { query: typeof pool.query },
   issueId: string,
@@ -320,6 +385,53 @@ async function writeHistory(
     'insert into issue_history (issue_id, user_id, field, old_value, new_value) values ($1, $2, $3, $4, $5)',
     [issueId, userId, field, oldValue, newValue]
   );
+  if (STARRED_FIELDS.has(field)) {
+    await noteStarred(client, issueId, userId, { field, from: oldValue, to: newValue });
+  }
+}
+
+type StarWhen = 'star_created' | 'star_assigned' | 'star_commented';
+
+async function autoStar(
+  client: { query: typeof pool.query },
+  userId: string,
+  issueId: string,
+  when: StarWhen
+): Promise<boolean> {
+  const res = await client.query(
+    `insert into issue_favourites (issue_id, user_id)
+     select $1, u.id from users u where u.id = $2 and u.${when}
+     on conflict do nothing`,
+    [issueId, userId]
+  );
+  return !!res.rowCount;
+}
+
+type Placed = { id: string; board_id: string; project_id: string };
+
+function tellStarred(userId: string, issue: Placed): void {
+  void publish({
+    type: 'favourite.changed',
+    only: userId,
+    issueId: issue.id,
+    boardId: issue.board_id,
+    projectId: issue.project_id,
+  });
+}
+
+async function tellWatchers(issue: Placed, actorId: string): Promise<void> {
+  const res = await pool.query<{ user_id: string }>(
+    'select user_id from issue_favourites where issue_id = $1 and user_id <> $2',
+    [issue.id, actorId]
+  );
+  for (const row of res.rows) {
+    void publish({
+      type: 'notice.changed',
+      only: row.user_id,
+      boardId: issue.board_id,
+      projectId: issue.project_id,
+    });
+  }
 }
 
 async function changeState(
@@ -469,6 +581,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     ]);
     if (!state.rowCount) return reply.code(400).send({ error: 'That status is on another board.' });
 
+    const autoStarred: string[] = [];
     const created = await inTransaction(async (client) => {
       // Bump and read in one UPDATE ... RETURNING so concurrent creates never share a number.
       const counter = await client.query<{ short_name: string; next_issue_number: number }>(
@@ -517,6 +630,12 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           [p.assigneeId, row.rows[0].id, auth.userId]
         );
       }
+      if (await autoStar(client, auth.userId, row.rows[0].id, 'star_created')) {
+        autoStarred.push(auth.userId);
+      }
+      if (p.assigneeId && (await autoStar(client, p.assigneeId, row.rows[0].id, 'star_assigned'))) {
+        autoStarred.push(p.assigneeId);
+      }
       return row.rows[0].id;
     });
     if (p.assigneeId && p.assigneeId !== auth.userId) {
@@ -524,6 +643,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     }
 
     const row = await issueById(created);
+    for (const who of autoStarred) tellStarred(who, row as IssueRow);
     const tags = await tagsFor([created]);
     void publish({
       type: 'issue.created',
@@ -608,7 +728,10 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       by: auth.login,
       origin: tabOf(req),
     });
-    if (moved.state_id !== stateId) announceParent(await parentOf(issueId), auth.login);
+    if (moved.state_id !== stateId) {
+      announceParent(await parentOf(issueId), auth.login);
+      void tellWatchers({ id: issueId, board_id: id, project_id: moved.project_id }, auth.userId);
+    }
     return reply.send({ data: { ok: true } });
   });
 
@@ -744,6 +867,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       }
     }
     const nextState = landing ? (p.stateId ?? landing.stateId) : p.stateId;
+    const autoStarred: string[] = [];
 
     await inTransaction(async (client) => {
       if (p.summary !== undefined && p.summary !== issue.summary) {
@@ -778,6 +902,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
             `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
             [p.assigneeId, id, auth.userId]
           );
+        }
+        if (p.assigneeId && (await autoStar(client, p.assigneeId, id, 'star_assigned'))) {
+          autoStarred.push(p.assigneeId);
         }
       }
       if (landing) {
@@ -854,6 +981,10 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const row = await issueById(id);
     if (p.assigneeId && p.assigneeId !== issue.assignee_id && p.assigneeId !== auth.userId) {
       void publish({ type: 'notice.changed', only: p.assigneeId });
+    }
+    for (const who of autoStarred) tellStarred(who, row as IssueRow);
+    if (['stateId', 'boardId', 'assigneeId', 'priority', 'dueDate'].some((k) => k in p)) {
+      void tellWatchers(row as IssueRow, auth.userId);
     }
     const [tags, stars] = await Promise.all([tagsFor([id]), starredBy(auth.userId, [id])]);
     void publish({
@@ -1103,6 +1234,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       });
     }
     if (from && duplicateState) announceParent(await parentOf(from.id), found.auth.login);
+    for (const side of [self, target]) void tellWatchers(side, found.auth.userId);
     const made = (await linksOf(self.id, found.auth)).find((l) => l.id === target.id);
     if (!made) return reply.code(404).send({ error: 'No issue with that key.' });
     return reply.code(201).send({ data: publicLink(made) });
@@ -1135,6 +1267,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     });
     if (!res.rowCount) return reply.code(404).send({ error: 'They are not linked.' });
     if (other) {
+      for (const side of [found.issue, other]) void tellWatchers(side, found.auth.userId);
       for (const side of [found.issue, other]) {
         void publish({
           type: 'issue.linked',
@@ -1159,6 +1292,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!found) return;
     const parsed = z.object({ text: z.string().trim().min(1).max(20000) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'A comment needs some text.' });
+    let starredNow = false;
     const row = await inTransaction(async (client) => {
       const res = await client.query(
         `insert into issue_comments (issue_id, author_id, text) values ($1, $2, $3)
@@ -1166,8 +1300,21 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [id, session.userId, parsed.data.text]
       );
       await syncMentions(client, res.rows[0].id, parsed.data.text, session.userId);
+      await client.query(
+        `insert into notices (user_id, kind, issue_id, comment_id, by_id)
+         select f.user_id, 'starred', $1, $2, $3
+           from issue_favourites f join users u on u.id = f.user_id and u.active
+          where f.issue_id = $1 and f.user_id <> $3
+            and not exists (
+              select 1 from notices n
+               where n.comment_id = $2 and n.user_id = f.user_id and n.kind = 'mention'
+            )`,
+        [id, res.rows[0].id, session.userId]
+      );
+      starredNow = await autoStar(client, session.userId, id, 'star_commented');
       return res.rows[0];
     });
+    if (starredNow) tellStarred(session.userId, found.issue);
     await writeHistory(pool, id, session.userId, 'comment added', null, null);
     void publish({
       type: 'comment.added',

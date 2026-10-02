@@ -132,13 +132,17 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
   });
 }
 
+type Change = { field: string; from: string | null; to: string | null };
+
 function publicNotice(r: NoticeRow, mine: string) {
   if (!r.comment_id) {
+    const starred = r.kind === 'starred';
     return {
       id: r.id,
       kind: r.kind,
       commentId: null,
-      emoji: r.detail,
+      emoji: starred ? null : r.detail,
+      changes: starred ? (JSON.parse(r.detail ?? '[]') as Change[]) : [],
       said: (r.summary ?? '').slice(0, 140),
       by: r.by_login,
       key: r.readable_id,
@@ -158,6 +162,7 @@ function publicNotice(r: NoticeRow, mine: string) {
     kind: r.kind,
     commentId: r.comment_id,
     emoji: r.detail,
+    changes: [] as Change[],
     said: said.slice(0, 140),
     by: r.by_login,
     key: r.readable_id,

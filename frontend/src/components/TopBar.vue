@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
-import { useNotices, type Notice } from '../lib/notices';
+import { describeChanges, useNotices, type Notice } from '../lib/notices';
 import { useRoles } from '../lib/roles';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
@@ -308,6 +308,9 @@ async function signOut(): Promise<void> {
               <span class="men__said">
                 <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
                 <template v-else-if="n.kind === 'assigned'">{{ n.by }} assigned you</template>
+                <template v-else-if="n.kind === 'starred' && !n.commentId">
+                  {{ n.by }}: {{ describeChanges(n.changes, (login) => login) }}
+                </template>
                 <template v-else>
                   <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
                   {{ n.said }}

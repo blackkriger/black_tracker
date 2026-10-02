@@ -34,7 +34,7 @@ import type { IssueTag } from '../lib/issues';
 import { priorityColor, stampAt, type Priority } from '../lib/issues';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
-import { useNotices, type Notice } from '../lib/notices';
+import { describeChanges, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
@@ -544,6 +544,16 @@ function closeIssue(): void {
                 ><ContactRound class="ic" /></button>
                 <span class="selbar kind__what">Assigned to you</span>
               </span>
+              <span class="kind__hold">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost kind"
+                  :class="{ 'is-off': off.includes('starred') }"
+                  type="button"
+                  aria-label="Starred issues"
+                  @click="toggleKind('starred')"
+                ><Star class="ic" /></button>
+                <span class="selbar kind__what">Starred issues</span>
+              </span>
               <span class="panel__end">{{ spanLabel(pickedDays.from, pickedDays.to, false) }}</span>
             </header>
             <div class="panel__b days">
@@ -568,6 +578,9 @@ function closeIssue(): void {
                   <span class="note__said">
                     <template v-if="n.kind === 'reaction'">{{ nameOf(n.by) }} reacted</template>
                     <template v-else-if="n.kind === 'assigned'">{{ nameOf(n.by) }} assigned you</template>
+                    <template v-else-if="n.kind === 'starred' && !n.commentId">
+                      {{ nameOf(n.by) }}: {{ describeChanges(n.changes, nameOf) }}
+                    </template>
                     <template v-else>
                       <template v-if="n.by && n.by !== session.me.value?.login">
                         {{ nameOf(n.by) }}:

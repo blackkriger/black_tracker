@@ -71,6 +71,9 @@ interface UserRow {
   api_token_last_used_at: Date | null;
   created_at: Date;
   last_seen_at: Date | null;
+  star_created: boolean;
+  star_assigned: boolean;
+  star_commented: boolean;
 }
 
 export const USER_SELECT = `
@@ -108,6 +111,11 @@ export function publicUser(row: UserRow) {
       : null,
   };
 }
+
+const publicMe = (row: UserRow) => ({
+  ...publicUser(row),
+  autoStar: { created: row.star_created, assigned: row.star_assigned, commented: row.star_commented },
+});
 
 const lastSeenWrites = new Map<string, number>();
 function touchLastSeen(userId: string): void {
@@ -371,7 +379,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     if (!auth) return;
     const row = await userById(auth.userId);
     if (!row) return reply.code(404).send({ error: 'User not found.' });
-    return reply.send({ data: { ...publicUser(row), authKind: auth.kind } });
+    return reply.send({ data: { ...publicMe(row), authKind: auth.kind } });
   });
 
   app.post('/me/regenerate-token', async (req, reply) => {
@@ -405,15 +413,32 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     const auth = await requireSession(req, reply);
     if (!auth) return;
     const parsed = z
-      .object({ fullName: z.string().trim().max(120) })
+      .object({
+        fullName: z.string().trim().max(120).optional(),
+        starCreated: z.boolean().optional(),
+        starAssigned: z.boolean().optional(),
+        starCommented: z.boolean().optional(),
+      })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Name is too long.' });
-    await pool.query('update users set full_name = $1 where id = $2', [
-      parsed.data.fullName,
-      auth.userId,
-    ]);
+    const p = parsed.data;
+    await pool.query(
+      `update users
+          set full_name = coalesce($2, full_name),
+              star_created = coalesce($3, star_created),
+              star_assigned = coalesce($4, star_assigned),
+              star_commented = coalesce($5, star_commented)
+        where id = $1`,
+      [
+        auth.userId,
+        p.fullName ?? null,
+        p.starCreated ?? null,
+        p.starAssigned ?? null,
+        p.starCommented ?? null,
+      ]
+    );
     const row = await userById(auth.userId);
-    return reply.send({ data: publicUser(row as NonNullable<typeof row>) });
+    return reply.send({ data: publicMe(row as NonNullable<typeof row>) });
   });
 
   app.post('/me/password', async (req, reply) => {
