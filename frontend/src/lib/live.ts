@@ -55,6 +55,11 @@ function open(): void {
   };
 }
 
+export function tellTab(type: string): void {
+  const event: LiveEvent = { type, at: new Date().toISOString() };
+  for (const handler of handlers) handler(event);
+}
+
 export function settled(run: () => void, ms = 300): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   return () => {

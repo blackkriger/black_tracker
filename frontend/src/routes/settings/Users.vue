@@ -6,7 +6,7 @@ import Select from '../../components/Select.vue';
 import { api } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
 import { stamp, stampAt } from '../../lib/issues';
-import { useLive } from '../../lib/live';
+import { tellTab, useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { usePeople } from '../../lib/people';
 import { useProjects } from '../../lib/projects';
@@ -142,6 +142,7 @@ async function patchUser(u: User, body: Record<string, unknown>): Promise<void> 
   try {
     const updated = await api<User>(`/users/${u.id}`, { method: 'PATCH', body });
     users.value = users.value.map((row) => (row.id === u.id ? updated : row));
+    tellTab('user.changed');
   } catch (err) {
     fail('users', err);
   }
@@ -154,6 +155,7 @@ async function addRole(): Promise<void> {
   try {
     roles.value = [...roles.value, await api<Role>('/roles', { method: 'POST', body: { name } })];
     newRole.value = '';
+    tellTab('role.changed');
   } catch (err) {
     fail('roles', err);
   }
@@ -164,6 +166,7 @@ async function patchRole(role: Role, body: Record<string, unknown>, panel = 'rol
   const updated = await api<Role>(`/roles/${role.id}`, { method: 'PATCH', body });
   roles.value = roles.value.map((r) => (r.id === role.id ? updated : r));
   users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: updated } : u));
+  tellTab('role.changed');
 }
 
 function renameRole(role: Role, name: string): void {
@@ -180,6 +183,7 @@ async function removeRole(): Promise<void> {
     roles.value = roles.value.filter((r) => r.id !== role.id);
     users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: null } : u));
     removingRole.value = null;
+    tellTab('role.changed');
   } catch (err) {
     fail('removeRole', err);
   }
@@ -296,6 +300,7 @@ async function saveAccess(): Promise<void> {
       body: { deniedProjects: deniedProjects.value, deniedBoards: deniedBoards.value },
     });
     accessFor.value = null;
+    tellTab('role.changed');
   } catch (err) {
     fail('access', err);
   } finally {

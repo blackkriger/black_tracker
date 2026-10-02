@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
@@ -35,6 +35,7 @@ const props = defineProps<{
 
 const session = useSession();
 const router = useRouter();
+const route = useRoute();
 const { projects, load } = useProjects();
 const { load: loadPeople } = usePeople();
 const mine = computed(() => session.me.value?.role?.color ?? undefined);
@@ -166,6 +167,7 @@ useLive((ev) => {
   if (['role.changed', 'user.changed'].includes(ev.type)) {
     void loadPeople(true);
     void loadRoles(true);
+    void rereadMe();
   }
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void readNotices();
 }, () => {
@@ -176,6 +178,14 @@ useLive((ev) => {
   void readNext();
   void readMonth();
 });
+
+async function rereadMe(): Promise<void> {
+  await session.refresh();
+  const me = session.me.value;
+  if (me && !me.isAdmin && !me.role && route.name !== 'profile') {
+    await router.replace({ name: 'profile' });
+  }
+}
 
 async function signOut(): Promise<void> {
   await session.signOut();
