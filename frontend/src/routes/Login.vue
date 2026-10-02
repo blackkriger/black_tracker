@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useSession } from '../lib/session';
 import banner from '../assets/banner.png';
 
@@ -10,7 +10,6 @@ const error = ref<string | null>(null);
 const busy = ref(false);
 
 const session = useSession();
-const router = useRouter();
 const route = useRoute();
 
 async function onSubmit(): Promise<void> {
@@ -22,7 +21,7 @@ async function onSubmit(): Promise<void> {
     const next = route.query.next;
     const target =
       typeof next === 'string' && next.startsWith('/') && !next.startsWith('/login') ? next : '/';
-    await router.replace(target);
+    window.location.assign(target);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not sign in.';
   } finally {

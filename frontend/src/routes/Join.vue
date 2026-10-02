@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { ApiError, api } from '../lib/api';
-import { useSession } from '../lib/session';
 import banner from '../assets/banner.png';
 
 const route = useRoute();
-const router = useRouter();
-const session = useSession();
 
 const token = String(route.params.token ?? '');
 const checking = ref(true);
@@ -53,8 +50,7 @@ async function onSubmit(): Promise<void> {
       method: 'POST',
       body: { login: login.value.trim(), password: password.value },
     });
-    await session.refresh();
-    await router.replace('/');
+    window.location.assign('/');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Could not create the account.';
     if (err instanceof ApiError && (err.status === 409 || /login/i.test(message))) {

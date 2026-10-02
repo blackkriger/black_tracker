@@ -179,7 +179,7 @@ useLive((ev) => {
 
 async function signOut(): Promise<void> {
   await session.signOut();
-  await router.push({ name: 'login' });
+  window.location.assign('/login');
 }
 </script>
 

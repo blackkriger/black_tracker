@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { api } from '../lib/api';
-import { useSession } from '../lib/session';
 import banner from '../assets/banner.png';
 
 const route = useRoute();
-const router = useRouter();
-const session = useSession();
 
 const token = String(route.params.token ?? '');
 const checking = ref(true);
@@ -46,8 +43,7 @@ async function onSubmit(): Promise<void> {
       method: 'POST',
       body: { password: password.value },
     });
-    await session.refresh();
-    await router.replace('/');
+    window.location.assign('/');
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'This link is no longer valid.';
   } finally {
