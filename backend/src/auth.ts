@@ -30,6 +30,7 @@ export function hashToken(raw: string): string {
 export const newRawToken = () => randomBytes(32).toString('base64url');
 
 export const hashPassword = (plain: string) => bcrypt.hash(plain, 10);
+const DUMMY_HASH = bcrypt.hashSync('not anyone', 10);
 export const checkPassword = (plain: string, hash: string) => bcrypt.compare(plain, hash);
 
 export async function startSession(reply: FastifyReply, userId: string): Promise<void> {
@@ -346,7 +347,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     );
     const row = res.rows[0];
     // Compare against a dummy hash for unknown logins so timing does not reveal which logins exist.
-    const hash = row?.password_hash ?? '$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidiu';
+    const hash = row?.password_hash ?? DUMMY_HASH;
     const ok = await checkPassword(parsed.data.password, hash);
     if (!row || !ok || !row.active) {
       noteFailure(key);
