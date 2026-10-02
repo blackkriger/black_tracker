@@ -974,13 +974,27 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         return reply.code(400).send({ error: `${to.readable_id} is already above ${from.readable_id}.` });
       }
     }
-    if (stored === 'duplicate' && from) {
+    if (stored === 'duplicate' && from && to) {
       const already = await pool.query(
         "select 1 from issue_links where a = $1 and kind = 'duplicate'",
         [from.id]
       );
       if (already.rowCount) {
         return reply.code(409).send({ error: `${from.readable_id} is already a duplicate.` });
+      }
+      const circle = await pool.query(
+        `with recursive chain(id) as (
+           select $1::uuid
+           union
+           select l.b from issue_links l join chain on l.a = chain.id where l.kind = 'duplicate'
+         )
+         select 1 from chain where id = $2`,
+        [to.id, from.id]
+      );
+      if (circle.rowCount) {
+        return reply
+          .code(400)
+          .send({ error: `${to.readable_id} is already a duplicate of ${from.readable_id}.` });
       }
     }
 
