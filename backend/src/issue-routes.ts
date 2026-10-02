@@ -470,6 +470,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       }
       return row.rows[0].id;
     });
+    if (p.assigneeId && p.assigneeId !== auth.userId) {
+      void publish({ type: 'notice.changed', only: p.assigneeId });
+    }
 
     const row = await issueById(created);
     const tags = await tagsFor([created]);
@@ -797,6 +800,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     });
 
     const row = await issueById(id);
+    if (p.assigneeId && p.assigneeId !== issue.assignee_id && p.assigneeId !== auth.userId) {
+      void publish({ type: 'notice.changed', only: p.assigneeId });
+    }
     const [tags, stars] = await Promise.all([tagsFor([id]), starredBy(auth.userId, [id])]);
     void publish({
       type: 'issue.updated',
