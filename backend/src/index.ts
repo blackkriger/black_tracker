@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises';
-import Fastify from 'fastify';
+import Fastify, { type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -20,7 +20,21 @@ import { registerNoticeRoutes } from './notice-routes.js';
 import { registerChangeFeed, registerEventRoutes } from './events.js';
 
 const app = Fastify({
-  logger: { level: process.env.LOG_LEVEL ?? 'info' },
+  logger: {
+    level: process.env.LOG_LEVEL ?? 'info',
+    serializers: {
+      req: (req: FastifyRequest) => ({
+        method: req.method,
+        url: req.url.replace(/^\/invites\/[^/?]+/, '/invites/…'),
+        host: req.host,
+        remoteAddress: req.ip,
+        remotePort: req.socket?.remotePort,
+      }),
+    },
+  },
+  routerOptions: {
+    querystringParser: (query: string) => Object.fromEntries(new URLSearchParams(query)),
+  },
   bodyLimit: 30 * 1024 * 1024,
   trustProxy: '127.0.0.1',
 });
