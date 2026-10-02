@@ -594,7 +594,7 @@ useLive((ev) => {
     else if (ev.type.startsWith('attachment.')) flash(['files']);
     else flash((ev.fields ?? []).map((f) => FIELD_OF[f] ?? f));
   });
-});
+}, () => void reload());
 
 async function reload(): Promise<void> {
   if (!props.issueKey) return;

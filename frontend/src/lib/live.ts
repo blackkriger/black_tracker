@@ -17,12 +17,22 @@ export interface LiveEvent {
 type Handler = (event: LiveEvent) => void;
 
 const handlers = new Set<Handler>();
+const resyncs = new Set<() => void>();
 let source: EventSource | null = null;
+let lost = false;
+let retry: ReturnType<typeof setTimeout> | null = null;
+let delay = 1000;
 
 function open(): void {
-  if (source) return;
+  if (source || retry) return;
   const stream = new EventSource('/api/events', { withCredentials: true });
   source = stream;
+  stream.onopen = () => {
+    delay = 1000;
+    if (!lost) return;
+    lost = false;
+    for (const resync of resyncs) resync();
+  };
   stream.onmessage = (ev) => {
     let parsed: LiveEvent;
     try {
@@ -34,7 +44,14 @@ function open(): void {
     for (const handler of handlers) handler(parsed);
   };
   stream.onerror = () => {
-    if (stream.readyState === EventSource.CLOSED && source === stream) source = null;
+    lost = true;
+    if (stream.readyState !== EventSource.CLOSED || source !== stream) return;
+    source = null;
+    retry = setTimeout(() => {
+      retry = null;
+      open();
+    }, delay);
+    delay = Math.min(delay * 2, 30_000);
   };
 }
 
@@ -49,8 +66,12 @@ export function settled(run: () => void, ms = 300): () => void {
   };
 }
 
-export function useLive(handler: Handler): void {
+export function useLive(handler: Handler, resync?: () => void): void {
   handlers.add(handler);
+  if (resync) resyncs.add(resync);
   open();
-  onUnmounted(() => handlers.delete(handler));
+  onUnmounted(() => {
+    handlers.delete(handler);
+    if (resync) resyncs.delete(resync);
+  });
 }

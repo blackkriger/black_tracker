@@ -251,6 +251,10 @@ useLive((ev) => {
   }
   if (ev.type.startsWith('issue.') || ev.type === 'favourite.changed') reloadLists();
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadFeed();
+}, () => {
+  reloadDays();
+  reloadLists();
+  void loadFeed();
 });
 
 function step(by: number): void {

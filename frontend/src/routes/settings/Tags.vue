@@ -31,9 +31,12 @@ async function reload(): Promise<void> {
   tags.value = await api<Tag[]>('/tags');
 }
 
-useLive((ev) => {
-  if (ev.type === 'tag.changed') void reload().catch(() => {});
-});
+useLive(
+  (ev) => {
+    if (ev.type === 'tag.changed') void reload().catch(() => {});
+  },
+  () => void reload().catch(() => {})
+);
 
 onMounted(async () => {
   try {

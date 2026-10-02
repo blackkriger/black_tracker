@@ -160,6 +160,9 @@ useLive((ev) => {
   ) {
     reload();
   }
+}, () => {
+  void loadTags();
+  reload();
 });
 
 const axis = computed(() => (data.value?.statuses ?? []).map((s) => s.name));

@@ -158,6 +158,9 @@ useLive((ev) => {
   void loadIssues(board.id, true).then(() => {
     if (ev.issueId) flash(ev.issueId);
   });
+}, () => {
+  void load(String(route.params.short), true);
+  if (current.value) void loadIssues(current.value.id, true);
 });
 const tags = ref<Tag[]>([]);
 const loading = ref(true);

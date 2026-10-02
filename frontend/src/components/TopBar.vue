@@ -168,6 +168,13 @@ useLive((ev) => {
     void loadRoles(true);
   }
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void readNotices();
+}, () => {
+  void load(true);
+  void loadPeople(true);
+  void loadRoles(true);
+  void readNotices();
+  void readNext();
+  void readMonth();
 });
 
 async function signOut(): Promise<void> {

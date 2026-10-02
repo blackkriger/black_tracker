@@ -79,9 +79,12 @@ watch(
   () => void load()
 );
 
-useLive((ev) => {
-  if (['project.changed', 'board.changed', 'state.changed'].includes(ev.type)) void load(true);
-});
+useLive(
+  (ev) => {
+    if (['project.changed', 'board.changed', 'state.changed'].includes(ev.type)) void load(true);
+  },
+  () => void load(true)
+);
 
 function replaceBoard(next: Board): void {
   boards.value = boards.value.map((b) => (b.id === next.id ? { ...b, ...next } : b));

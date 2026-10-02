@@ -22,9 +22,12 @@ onMounted(async () => {
   } catch {}
 });
 
-useLive((ev) => {
-  if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
-});
+useLive(
+  (ev) => {
+    if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
+  },
+  () => void load(true)
+);
 </script>
 
 <template>

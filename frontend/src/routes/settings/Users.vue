@@ -117,17 +117,25 @@ onMounted(async () => {
   loading.value = false;
 });
 
-useLive((ev) => {
-  if (ev.type === 'user.changed') {
-    void api<User[]>('/users').then((rows) => (users.value = rows)).catch(() => {});
+const readUsers = () => void api<User[]>('/users').then((rows) => (users.value = rows)).catch(() => {});
+const readRoles = () => void api<Role[]>('/roles').then((rows) => (roles.value = rows)).catch(() => {});
+const readInvites = () => {
+  if (!canManageRoles.value) return;
+  void api<Invite[]>('/invites').then((rows) => (invites.value = rows)).catch(() => {});
+};
+
+useLive(
+  (ev) => {
+    if (ev.type === 'user.changed') readUsers();
+    if (ev.type === 'role.changed') readRoles();
+    if (ev.type === 'invite.changed') readInvites();
+  },
+  () => {
+    readUsers();
+    readRoles();
+    readInvites();
   }
-  if (ev.type === 'role.changed') {
-    void api<Role[]>('/roles').then((rows) => (roles.value = rows)).catch(() => {});
-  }
-  if (ev.type === 'invite.changed' && canManageRoles.value) {
-    void api<Invite[]>('/invites').then((rows) => (invites.value = rows)).catch(() => {});
-  }
-});
+);
 
 async function patchUser(u: User, body: Record<string, unknown>): Promise<void> {
   clear('users');
