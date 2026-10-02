@@ -150,7 +150,9 @@ export function registerInviteRoutes(app: FastifyInstance): void {
          left join roles r on r.id = i.role_id
          left join users f on f.id = i.for_user
         where i.token_hash = $1 and i.used_at is null and i.expires_at > now()
-          and (i.for_user is null or f.active)`,
+          and (i.for_user is null or f.active)
+          and (not coalesce(f.is_admin, false)
+               or exists (select 1 from users m where m.id = i.created_by and m.is_admin))`,
       [hashToken(token)]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'This link is no longer valid.' });
@@ -185,6 +187,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
              from invites i
              join users u on u.id = i.for_user and u.active
             where i.token_hash = $1 and i.used_at is null and i.expires_at > now()
+              and (not u.is_admin or exists (select 1 from users m where m.id = i.created_by and m.is_admin))
             for update of i`,
           [hashToken(token)]
         );
