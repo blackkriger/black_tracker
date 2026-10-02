@@ -234,6 +234,56 @@ async function subtaskCounts(
   return out;
 }
 
+interface HistoryRow {
+  id: string;
+  field: string;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: Date;
+  user_login: string | null;
+}
+
+async function visibleHistory(auth: Auth, projectId: string, rows: HistoryRow[]): Promise<HistoryRow[]> {
+  if (auth.isAdmin) return rows;
+  const denied = await deniedFor(auth.roleId);
+  if (!denied.boards.size && !denied.projects.size) return rows;
+  const keys = rows
+    .filter((h) => h.field === 'link added' || h.field === 'link removed')
+    .map((h) => h.new_value)
+    .filter((v): v is string => !!v);
+  const names = rows
+    .filter((h) => h.field === 'board')
+    .flatMap((h) => [h.old_value, h.new_value])
+    .filter((v): v is string => !!v);
+  const [linked, boards] = await Promise.all([
+    keys.length
+      ? pool.query<{ readable_id: string; board_id: string; project_id: string }>(
+          'select readable_id, board_id, project_id from issues where readable_id = any($1::text[])',
+          [keys]
+        )
+      : { rows: [] },
+    names.length
+      ? pool.query<{ id: string; name: string }>(
+          'select id, name from boards where project_id = $1 and name = any($2::text[])',
+          [projectId, names]
+        )
+      : { rows: [] },
+  ]);
+  const closedKeys = new Set(
+    linked.rows
+      .filter((r) => denied.boards.has(r.board_id) || denied.projects.has(r.project_id))
+      .map((r) => r.readable_id)
+  );
+  const closedNames = new Set(boards.rows.filter((b) => denied.boards.has(b.id)).map((b) => b.name));
+  return rows.filter((h) => {
+    if (h.field === 'board') {
+      return !closedNames.has(h.old_value ?? '') && !closedNames.has(h.new_value ?? '');
+    }
+    if (h.field === 'link added' || h.field === 'link removed') return !closedKeys.has(h.new_value ?? '');
+    return true;
+  });
+}
+
 async function mayReachIssue(auth: Auth, issueId: string): Promise<boolean> {
   const host = await issueById(issueId);
   return !!host && (await mayOpenBoard(auth, host.board_id, host.project_id));
@@ -595,12 +645,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           order by (c.pinned_at is null), c.created_at`,
         [issue.id]
       ),
-      pool.query(
-        `select h.id, h.field, h.old_value, h.new_value, h.created_at, u.login as user_login
-           from issue_history h left join users u on u.id = h.user_id
-          where h.issue_id = $1 order by h.created_at desc`,
-        [issue.id]
-      ),
+      pool
+        .query<HistoryRow>(
+          `select h.id, h.field, h.old_value, h.new_value, h.created_at, u.login as user_login
+             from issue_history h left join users u on u.id = h.user_id
+            where h.issue_id = $1 order by h.created_at desc`,
+          [issue.id]
+        )
+        .then((r) => visibleHistory(auth, issue.project_id, r.rows)),
       pool.query(
         `select a.id, a.filename, a.mime, a.size, a.comment_id, a.created_at, u.login as uploaded_by_login
            from issue_attachments a left join users u on u.id = a.uploaded_by
@@ -624,7 +676,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           pinnedBy: c.pinned_by_login,
           reactions: c.reactions as { emoji: string; by: string }[],
         })),
-        history: history.rows.map((h) => ({
+        history: history.map((h) => ({
           id: h.id,
           field: h.field,
           from: h.old_value,
