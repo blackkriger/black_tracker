@@ -60,9 +60,9 @@ const KINDS: { kind: NoticeKind; label: string }[] = [
 ];
 
 const STARS: { key: keyof Me['autoStar']; body: string; label: string }[] = [
-  { key: 'created', body: 'starCreated', label: 'Issues I create' },
-  { key: 'assigned', body: 'starAssigned', label: 'Issues assigned to me' },
-  { key: 'commented', body: 'starCommented', label: 'Issues I comment on' },
+  { key: 'created', body: 'starCreated', label: 'Created by me' },
+  { key: 'assigned', body: 'starAssigned', label: 'Assigned to me' },
+  { key: 'commented', body: 'starCommented', label: 'Commented on by me' },
 ];
 
 async function setAutoStar(body: string, on: boolean): Promise<void> {
