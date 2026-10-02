@@ -141,6 +141,7 @@ async function patchBoard(b: Board, body: Record<string, unknown>): Promise<void
   clear(b.id);
   try {
     replaceBoard(await api<Board>(`/boards/${b.id}`, { method: 'PATCH', body }));
+    await projectsStore.load(true);
   } catch (err) {
     fail(b.id, err);
     await load();
