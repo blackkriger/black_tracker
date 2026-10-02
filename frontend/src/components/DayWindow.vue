@@ -298,6 +298,9 @@ a.mark__title:hover {
 .mark--due:hover {
   border-color: var(--line-2);
 }
+.mark .key {
+  flex: none;
+}
 .mark__title {
   flex: 1 1 auto;
   overflow: hidden;

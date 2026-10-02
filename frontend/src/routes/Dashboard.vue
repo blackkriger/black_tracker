@@ -722,6 +722,10 @@ function closeIssue(): void {
   display: flex;
   gap: 8px;
   min-width: 0;
+  max-width: 100%;
+}
+.day__what .key {
+  flex: none;
 }
 .note__said {
   overflow: hidden;

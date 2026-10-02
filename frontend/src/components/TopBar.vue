@@ -434,6 +434,9 @@ async function signOut(): Promise<void> {
 .men__emoji {
   font-size: 12px;
 }
+.men .key {
+  flex: none;
+}
 .men__said {
   overflow: hidden;
   color: var(--text-muted);
