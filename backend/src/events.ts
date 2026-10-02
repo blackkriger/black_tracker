@@ -73,7 +73,6 @@ export async function publish(event: LiveEvent): Promise<void> {
   if (!clients.size) return;
   const { only, ...told } = event;
   const line = `data: ${JSON.stringify({ ...told, at: new Date().toISOString() })}\n\n`;
-  const perRole = new Map<string, Denials | null>();
   for (const [id, client] of clients) {
     if (client.reply.raw.destroyed || client.reply.raw.writableEnded) {
       clients.delete(id);
@@ -81,10 +80,8 @@ export async function publish(event: LiveEvent): Promise<void> {
     }
     if (only && client.auth.userId !== only) continue;
     let denied: Denials | null;
-    const roleKey = `${client.auth.userId}`;
     try {
-      if (!perRole.has(roleKey)) perRole.set(roleKey, await denialsFresh(client));
-      denied = perRole.get(roleKey) ?? null;
+      denied = await denialsFresh(client);
     } catch {
       continue;
     }
