@@ -1051,7 +1051,14 @@ async function sendFiles(issueId: string, list: File[], commentId?: string): Pro
   }
 }
 
-function accept(list: FileList | null): File[] {
+function picked(ev: Event): File[] {
+  const input = ev.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = '';
+  return files;
+}
+
+function accept(list: FileList | File[] | null): File[] {
   const chosen = list ? Array.from(list) : [];
   const tooBig = chosen.filter((f) => f.size > MAX_FILE_BYTES);
   if (tooBig.length) {
@@ -1060,7 +1067,7 @@ function accept(list: FileList | null): File[] {
   return chosen.filter((f) => f.size <= MAX_FILE_BYTES);
 }
 
-async function upload(list: FileList | null): Promise<void> {
+async function upload(list: FileList | File[] | null): Promise<void> {
   dragOver.value = false;
   const chosen = accept(list);
   if (!chosen.length) return;
@@ -1118,12 +1125,12 @@ function dropPending(file: File, from: 'issue' | 'comment'): void {
   list.value = list.value.filter((f) => f !== file);
 }
 
-function pickCommentFiles(list: FileList | null): void {
+function pickCommentFiles(list: FileList | File[] | null): void {
   const chosen = accept(list);
   if (chosen.length) commentFiles.value = [...commentFiles.value, ...chosen];
 }
 
-async function addToComment(commentId: string, list: FileList | null): Promise<void> {
+async function addToComment(commentId: string, list: FileList | File[] | null): Promise<void> {
   const chosen = accept(list);
   if (!chosen.length || !issue.value) return;
   uploading.value = true;
@@ -1425,7 +1432,7 @@ async function removeIssue(): Promise<void> {
                   multiple
                   class="sr"
                   :disabled="uploading"
-                  @change="upload(($event.target as HTMLInputElement).files)"
+                  @change="upload(picked($event))"
                 />
                 {{ uploading ? 'Uploading…' : 'Drop files here, or click to choose' }}
               </label>
@@ -1537,7 +1544,7 @@ async function removeIssue(): Promise<void> {
                             multiple
                             class="sr"
                             :disabled="uploading"
-                            @change="addToComment(c.id, ($event.target as HTMLInputElement).files)"
+                            @change="addToComment(c.id, picked($event))"
                           />
                           <Paperclip class="ic" />
                         </label>
@@ -1621,7 +1628,7 @@ async function removeIssue(): Promise<void> {
                           type="file"
                           multiple
                           class="sr"
-                          @change="pickCommentFiles(($event.target as HTMLInputElement).files)"
+                          @change="pickCommentFiles(picked($event))"
                         />
                         <Paperclip class="ic" />
                       </label>
