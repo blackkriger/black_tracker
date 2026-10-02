@@ -45,7 +45,7 @@ npm run dev               # 127.0.0.1:5174, proxies /api to 127.0.0.1:3100
 
 ## Server
 
-`server.example`, Debian 13, 1 GB of memory plus 1 GB of swap, ufw open on 22, 80 and 443 only. `tracker.example.com` is an A record. nginx terminates HTTPS for it with a Let's Encrypt certificate that `certbot.timer` renews, and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The backend lives in `/opt/issues_tracker` and runs on Node 24 under PM2 as `tracker-api`, brought up at boot by `pm2-root.service`. PostgreSQL 18 from PGDG, role and database `tracker`. Uploads land in `/var/lib/tracker/uploads`, 10 MB a file, served by the API behind the same board check as the issue they hang off.
+`server.example`, Debian 13, 1 GB of memory plus 1 GB of swap, ufw open on 22, 80 and 443 only. `tracker.example.com` is an A record. nginx terminates HTTPS for it with a Let's Encrypt certificate that `certbot.timer` renews, and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The backend lives in `/opt/issues_tracker` and runs on Node 24 under PM2 as `tracker-api`, brought up at boot by `pm2-root.service`. PostgreSQL 18 from PGDG, role and database `tracker`. Uploads land in `/var/lib/tracker/uploads`, 100 MB a file, served by the API behind the same board check as the issue they hang off.
 
 `https://tracker.example.com/db/` is a **pgweb** on the tracker database (`pgweb-tracker.service`, `127.0.0.1:8082`, connection string in `/etc/pgweb-tracker.env`) behind its own nginx basic auth — `/etc/nginx/htpasswd-tracker`. The tracker's own sign-in does not guard it.
 

@@ -163,7 +163,7 @@ export function stampAt(iso: string): string {
 }
 
 // Mirrors the multipart fileSize limit in backend index.ts; change both together.
-export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
 export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
