@@ -67,12 +67,13 @@ const props = defineProps<{
   project: string;
   nextKey?: string;
   focusComment?: string;
+  carriedError?: string;
 }>();
 
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'changed', issue: Issue): void;
-  (e: 'created', issue: Issue): void;
+  (e: 'created', issue: Issue, problem?: string): void;
   (e: 'deleted', id: string): void;
   (e: 'tagCreated', tag: IssueTag): void;
   (e: 'moved', boardId: string): void;
@@ -626,7 +627,7 @@ async function load(): Promise<void> {
     return;
   }
   loading.value = true;
-  error.value = null;
+  error.value = props.carriedError ?? null;
   const mine = ++issueReads;
   try {
     const got = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
@@ -693,6 +694,7 @@ async function create(): Promise<void> {
       },
     });
     writeNew('', '');
+    let problem: string | undefined;
     if (pendingLinks.value.length) {
       for (const link of pendingLinks.value) {
         try {
@@ -701,7 +703,7 @@ async function create(): Promise<void> {
             body: { key: link.key, kind: LINK_PICKS.find((p) => p.kind === link.kind)?.value },
           });
         } catch (err) {
-          error.value = err instanceof Error ? err.message : 'The issue was created without a link.';
+          problem = err instanceof Error ? err.message : 'The issue was created without a link.';
         }
       }
       pendingLinks.value = [];
@@ -711,11 +713,11 @@ async function create(): Promise<void> {
       try {
         await sendFiles(made.id, pending.value);
       } catch (err) {
-        error.value = err instanceof Error ? err.message : 'The issue was created without the files.';
+        problem = err instanceof Error ? err.message : 'The issue was created without the files.';
       }
       pending.value = [];
     }
-    emit('created', made);
+    emit('created', made, problem);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not create the issue.';
   } finally {

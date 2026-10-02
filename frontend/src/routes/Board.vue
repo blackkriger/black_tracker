@@ -245,8 +245,13 @@ async function onDrop(): Promise<void> {
   }
 }
 
-function issueCreated(created: Issue): void {
-  issues.value = [...issues.value, created];
+const carried = ref<{ key: string; message: string } | null>(null);
+
+function issueCreated(created: Issue, problem?: string): void {
+  issues.value = issues.value.some((i) => i.id === created.id)
+    ? issues.value.map((i) => (i.id === created.id ? created : i))
+    : [...issues.value, created];
+  carried.value = problem ? { key: created.key, message: problem } : null;
   creatingIn.value = null;
   openIssue(created);
 }
@@ -513,6 +518,7 @@ watch(
       :project="project?.shortName ?? ''"
       :next-key="project?.nextKey ?? ''"
       :focus-comment="String(route.query.c ?? '') || undefined"
+      :carried-error="carried?.key === openKey ? carried.message : undefined"
       @close="closeIssue"
       @tag-created="tagCreated"
       @moved="issueMoved"
