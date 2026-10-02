@@ -192,16 +192,19 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     if (!project || !(await mayOpenProject(auth, project.id))) {
       return reply.code(404).send({ error: 'No such project.' });
     }
+    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
     await pool.query(
       `update boards b
           set position = o.pos
          from unnest($2::uuid[]) with ordinality as o(id, pos)
-        where b.id = o.id and b.project_id = $1`,
-      [project.id, parsed.data.ids]
+        where b.id = o.id and b.project_id = $1 and b.id <> all($3::uuid[])`,
+      [project.id, parsed.data.ids, [...denied.boards]]
     );
     const { rows, statesByBoard, tagsByBoard } = await boardsOfProject(project.id);
     return reply.send({
-      data: rows.map((r) => publicBoard(r, statesByBoard.get(r.id) ?? [], [], tagsByBoard.get(r.id) ?? [])),
+      data: rows
+        .filter((r) => !denied.boards.has(r.id))
+        .map((r) => publicBoard(r, statesByBoard.get(r.id) ?? [], [], tagsByBoard.get(r.id) ?? [])),
     });
   });
 
