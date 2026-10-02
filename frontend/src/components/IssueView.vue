@@ -173,6 +173,8 @@ watch(linkQuery, (term) => {
   if (searchTimer) clearTimeout(searchTimer);
   const q = term.trim();
   if (!q) {
+    ++searches;
+    searching.value = false;
     linkResults.value = [];
     return;
   }
