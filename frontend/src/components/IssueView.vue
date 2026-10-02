@@ -10,7 +10,7 @@ import { useLive } from '../lib/live';
 import FileViewer from './FileViewer.vue';
 import FileWall from './FileWall.vue';
 import Select from './Select.vue';
-import { canRead } from '../lib/files';
+import { canRead, isPicture } from '../lib/files';
 import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
 import { useFocus } from '../lib/focus';
@@ -445,10 +445,10 @@ const commentFiles = ref<File[]>([]);
 const shown = ref<number | null>(null);
 const gallery = computed(() => [
   ...(issue.value?.attachments ?? [])
-    .filter((a) => a.mime.startsWith('image/'))
+    .filter((a) => isPicture(a.mime))
     .map((a) => ({ src: `/api/attachments/${a.id}`, name: a.filename })),
   ...[...pending.value, ...commentFiles.value]
-    .filter((f) => f.type.startsWith('image/'))
+    .filter((f) => isPicture(f.type))
     .map((f) => ({ src: previewOf(f) ?? '', name: f.name })),
 ]);
 
@@ -499,7 +499,7 @@ const pendingShots = computed(() => pending.value.filter(previewOf).map(shotOfFi
 const commentShots = computed(() => commentFiles.value.filter(previewOf).map(shotOfFile));
 const shotsOf = (commentId: string): Shot[] =>
   filesOf(commentId)
-    .filter((a) => a.mime.startsWith('image/'))
+    .filter((a) => isPicture(a.mime))
     .map(shotOfAttachment);
 
 function openPending(key: string, from: 'issue' | 'comment'): void {
@@ -545,8 +545,8 @@ const freeTags = computed(() =>
 );
 const own = computed(() => (issue.value?.attachments ?? []).filter((a) => !a.commentId));
 const ownBytes = computed(() => own.value.reduce((all, a) => all + a.size, 0));
-const images = computed(() => own.value.filter((a) => a.mime.startsWith('image/')));
-const files = computed(() => own.value.filter((a) => !a.mime.startsWith('image/')));
+const images = computed(() => own.value.filter((a) => isPicture(a.mime)));
+const files = computed(() => own.value.filter((a) => !isPicture(a.mime)));
 const filesOf = (commentId: string) =>
   (issue.value?.attachments ?? []).filter((a) => a.commentId === commentId);
 const bytesOf = (commentId: string) =>
@@ -1091,7 +1091,7 @@ async function upload(list: FileList | File[] | null): Promise<void> {
 const previewUrls = new Map<File, string>();
 
 function previewOf(file: File): string | null {
-  if (!file.type.startsWith('image/')) return null;
+  if (!isPicture(file.type)) return null;
   let url = previewUrls.get(file);
   if (!url) {
     url = URL.createObjectURL(file);
@@ -1578,7 +1578,7 @@ async function removeIssue(): Promise<void> {
                       </div>
                     </div>
                     <span
-                      v-for="a in filesOf(c.id).filter((x) => !x.mime.startsWith('image/'))"
+                      v-for="a in filesOf(c.id).filter((x) => !isPicture(x.mime))"
                       :key="a.id"
                       class="att__cap att__row"
                     >

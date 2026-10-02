@@ -83,3 +83,7 @@ export function setWrapLines(on: boolean): void {
     localStorage.setItem(WRAP, on ? '1' : '0');
   } catch {}
 }
+
+const PICTURES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif']);
+
+export const isPicture = (mime: string): boolean => PICTURES.has(mime);
