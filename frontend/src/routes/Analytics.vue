@@ -114,6 +114,9 @@ const tagChoices = computed(() => {
 watch(tagChoices, (choices) => {
   if (tag.value && !choices.some((c) => c.value === tag.value)) tag.value = '';
 });
+watch(statusChoices, (choices) => {
+  if (status.value && !choices.some((c) => c.value === status.value)) status.value = '';
+});
 
 let reads = 0;
 
