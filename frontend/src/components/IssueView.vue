@@ -127,6 +127,8 @@ const editing = ref(false);
 const saving = ref(false);
 const titleDraft = ref('');
 const bodyDraft = ref('');
+let titleBase = '';
+let bodyBase = '';
 
 const picking = ref(false);
 const linkQuery = ref('');
@@ -736,8 +738,10 @@ async function toggleFavourite(): Promise<void> {
 }
 
 function startEditing(): void {
-  titleDraft.value = issue.value?.summary ?? '';
-  bodyDraft.value = issue.value?.description ?? '';
+  titleBase = issue.value?.summary ?? '';
+  bodyBase = issue.value?.description ?? '';
+  titleDraft.value = titleBase;
+  bodyDraft.value = bodyBase;
   editing.value = true;
 }
 
@@ -750,8 +754,8 @@ async function saveText(): Promise<void> {
     return;
   }
   const body: Record<string, unknown> = {};
-  if (summary !== current.summary) body.summary = summary;
-  if (bodyDraft.value !== current.description) body.description = bodyDraft.value;
+  if (summary !== titleBase) body.summary = summary;
+  if (bodyDraft.value !== bodyBase) body.description = bodyDraft.value;
   saving.value = true;
   try {
     if (Object.keys(body).length && !(await patch(body))) return;
