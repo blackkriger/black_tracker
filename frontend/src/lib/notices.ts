@@ -35,13 +35,6 @@ function read(): NoticeKind[] {
   }
 }
 
-export function dayOf(n: Notice): string {
-  const d = new Date(n.at);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate()
-  ).padStart(2, '0')}`;
-}
-
 export function useNotices() {
   const shown = computed(() => notices.value.filter((n) => !off.value.includes(n.kind)));
   return {

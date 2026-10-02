@@ -5,7 +5,7 @@ import Dialog from './Dialog.vue';
 import Select from './Select.vue';
 import { api } from '../lib/api';
 import { longDate, type Due, type Mark } from '../lib/calendar';
-import { dayOf, useNotices, type Notice } from '../lib/notices';
+import { useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
@@ -23,12 +23,13 @@ const session = useSession();
 const { projects } = useProjects();
 const { nameOf, load: loadPeople } = usePeople();
 void loadPeople();
-const { shown: notices, markRead } = useNotices();
+const { off, markRead } = useNotices();
 const { errors, fail, clear } = usePanelErrors();
 
 const marks = ref<Mark[]>([]);
 const dues = ref<Due[]>([]);
-const said = computed(() => notices.value.filter((n) => dayOf(n) === props.day));
+const heard = ref<Notice[]>([]);
+const said = computed(() => heard.value.filter((n) => !off.value.includes(n.kind)));
 
 const projectChoices = computed(() => [
   { value: '', label: 'Everything' },
@@ -38,9 +39,13 @@ const projectChoices = computed(() => [
 async function read(): Promise<void> {
   clear('day');
   try {
-    const got = await api<{ marks: Mark[]; dues: { day: string; issues: Due[] }[] }>(
-      `/calendar?from=${props.day}&to=${props.day}`
-    );
+    const [got, notices] = await Promise.all([
+      api<{ marks: Mark[]; dues: { day: string; issues: Due[] }[] }>(
+        `/calendar?from=${props.day}&to=${props.day}`
+      ),
+      api<Notice[]>(`/notices?from=${props.day}&to=${props.day}`),
+    ]);
+    heard.value = notices;
     marks.value = got.marks;
     dues.value = got.dues.flatMap((d) => d.issues);
   } catch (err) {
