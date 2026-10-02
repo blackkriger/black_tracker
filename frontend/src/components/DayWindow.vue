@@ -4,6 +4,7 @@ import { X } from 'lucide-vue-next';
 import Dialog from './Dialog.vue';
 import Select from './Select.vue';
 import { api } from '../lib/api';
+import { tellTab } from '../lib/live';
 import { longDate, type Due, type Mark } from '../lib/calendar';
 import { useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
@@ -84,6 +85,7 @@ async function addMark(): Promise<void> {
     adding.value = false;
     await read();
     emit('changed');
+    tellTab('key-date.changed');
   } catch (err) {
     fail('day', err);
   } finally {
@@ -105,6 +107,7 @@ async function removeMark(m: Mark): Promise<void> {
     await api(`/key-dates/${m.id}`, { method: 'DELETE' });
     await read();
     emit('changed');
+    tellTab('key-date.changed');
   } catch (err) {
     fail('day', err);
   }
