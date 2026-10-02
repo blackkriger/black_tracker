@@ -76,7 +76,8 @@ const marks = ref({
 
 function readMarks(): void {
   if (!quill) return;
-  const f = quill.getFormat();
+  const sel = quill.getSelection();
+  const f: Record<string, unknown> = sel ? quill.getFormat(sel) : {};
   marks.value = {
     bold: !!f.bold,
     italic: !!f.italic,
