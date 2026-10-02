@@ -21,7 +21,11 @@ watch(login, () => (loginError.value = null));
 
 const mismatch = computed(() => repeat.value.length > 0 && repeat.value !== password.value);
 const canSubmit = computed(
-  () => login.value.trim().length >= 2 && password.value.length >= 8 && !mismatch.value && !busy.value
+  () =>
+    login.value.trim().length >= 2 &&
+    password.value.length >= 8 &&
+    repeat.value === password.value &&
+    !busy.value
 );
 
 onMounted(async () => {

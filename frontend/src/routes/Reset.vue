@@ -17,7 +17,9 @@ const busy = ref(false);
 const error = ref<string | null>(null);
 
 const mismatch = computed(() => repeat.value.length > 0 && repeat.value !== password.value);
-const canSubmit = computed(() => password.value.length >= 8 && !mismatch.value && !busy.value);
+const canSubmit = computed(
+  () => password.value.length >= 8 && repeat.value === password.value && !busy.value
+);
 
 onMounted(async () => {
   try {

@@ -33,7 +33,7 @@ const canChangePassword = computed(
   () =>
     currentPassword.value.length > 0 &&
     newPassword.value.length >= 8 &&
-    !mismatch.value &&
+    repeatPassword.value === newPassword.value &&
     !passwordBusy.value
 );
 
