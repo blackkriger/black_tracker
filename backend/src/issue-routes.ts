@@ -1271,7 +1271,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
   });
 
   app.delete('/comments/:id', async (req, reply) => {
-    const auth = await requireAuth(req, reply);
+    const auth = await requireSession(req, reply);
     if (!auth) return;
     const { id } = req.params as { id: string };
     const owner = await pool.query<{ author_id: string; issue_id: string }>(
@@ -1282,7 +1282,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!(await mayReachIssue(auth, owner.rows[0].issue_id))) {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
-    const mine = owner.rows[0].author_id === auth.userId && auth.kind === 'session';
+    const mine = owner.rows[0].author_id === auth.userId;
     if (!mine && !(await requireDeleter(req, reply))) return;
     const files = await pool.query<{ storage_path: string }>(
       'select storage_path from issue_attachments where comment_id = $1',
