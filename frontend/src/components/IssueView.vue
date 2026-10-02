@@ -563,6 +563,18 @@ function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
   if (deleting.value || deletingComment.value || picking.value || makingTag.value || shown.value !== null) return;
   if (reading.value) return;
+  if (reacting.value) {
+    reacting.value = null;
+    return;
+  }
+  if (popup.value) {
+    popup.value = null;
+    return;
+  }
+  if (editingComment.value) {
+    editingComment.value = null;
+    return;
+  }
   if (creating.value || !editing.value) emit('close');
   else editing.value = false;
 }
