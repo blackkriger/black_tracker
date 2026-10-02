@@ -201,7 +201,7 @@ async function parentOf(issueId: string): Promise<IssueRow | null> {
   return res.rows[0] ?? null;
 }
 
-function announceParent(parent: IssueRow | null, by: string, origin: string | undefined): void {
+function announceParent(parent: IssueRow | null, by: string): void {
   if (!parent) return;
   void publish({
     type: 'issue.linked',
@@ -211,7 +211,6 @@ function announceParent(parent: IssueRow | null, by: string, origin: string | un
     issueKey: parent.readable_id,
     fields: ['links'],
     by,
-    origin,
   });
 }
 
@@ -559,6 +558,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       by: auth.login,
       origin: tabOf(req),
     });
+    if (moved.state_id !== stateId) announceParent(await parentOf(issueId), auth.login);
     return reply.send({ data: { ok: true } });
   });
 
@@ -815,7 +815,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       origin: tabOf(req),
     });
     if (nextState !== undefined && nextState !== issue.state_id) {
-      announceParent(await parentOf(id), auth.login, tabOf(req));
+      announceParent(await parentOf(id), auth.login);
     }
     if (landing) {
       void publish({
@@ -866,7 +866,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const parent = await parentOf(id);
     await pool.query('delete from issues where id = $1', [id]);
     await sweepFiles([id], doomed);
-    announceParent(parent, auth.login, tabOf(req));
+    announceParent(parent, auth.login);
     void publish({
       type: 'issue.deleted',
       boardId: issue.board_id,
@@ -1036,6 +1036,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         origin: tabOf(req),
       });
     }
+    if (from && duplicateState) announceParent(await parentOf(from.id), found.auth.login);
     const made = (await linksOf(self.id, found.auth)).find((l) => l.id === target.id);
     if (!made) return reply.code(404).send({ error: 'No issue with that key.' });
     return reply.code(201).send({ data: publicLink(made) });

@@ -147,7 +147,7 @@ useLive((ev) => {
   if (!board) return;
   if (['state.changed', 'board.changed', 'project.changed', 'tag.changed'].includes(ev.type)) {
     void load(String(route.params.short), true);
-    if (ev.type === 'tag.changed') void loadIssues(board.id, true);
+    if (ev.type !== 'project.changed') void loadIssues(board.id, true);
     return;
   }
   if (!ev.type.startsWith('issue.') || ev.boardId !== board.id) return;
