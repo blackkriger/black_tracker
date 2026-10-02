@@ -8,6 +8,7 @@ import {
   publicUser,
   requireAdmin,
   requireAuth,
+  requireSession,
   userById,
 } from './auth.js';
 
@@ -22,11 +23,8 @@ export const accountCredentials = z.object({
   fullName: z.string().trim().max(120).optional(),
 });
 
-const userCreate = accountCredentials.extend({ isAdmin: z.boolean().optional() });
-
 const userPatch = z.object({
   fullName: z.string().trim().max(120).optional(),
-  isAdmin: z.boolean().optional(),
   active: z.boolean().optional(),
   roleId: z.string().uuid().nullable().optional(),
 });
@@ -74,25 +72,25 @@ export function registerUserRoutes(app: FastifyInstance): void {
 
   app.post('/users', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
-    const parsed = userCreate.safeParse(req.body);
+    const parsed = accountCredentials.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad account.' });
     }
-    const { login, password, fullName, isAdmin } = parsed.data;
+    const { login, password, fullName } = parsed.data;
     const taken = await pool.query('select 1 from users where lower(login) = lower($1)', [login]);
     if (taken.rowCount) return reply.code(409).send({ error: 'That login is taken.' });
     const res = await pool.query<{ id: string }>(
-      `insert into users (login, password_hash, full_name, is_admin)
-       values ($1, $2, $3, $4)
+      `insert into users (login, password_hash, full_name)
+       values ($1, $2, $3)
        returning id`,
-      [login, await hashPassword(password), fullName ?? '', isAdmin ?? false]
+      [login, await hashPassword(password), fullName ?? '']
     );
     const row = await userById(res.rows[0].id);
     return reply.code(201).send({ data: publicUser(row as NonNullable<typeof row>) });
   });
 
   app.patch('/users/:id', async (req, reply) => {
-    const auth = await requireAuth(req, reply);
+    const auth = await requireSession(req, reply);
     if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = userPatch.safeParse(req.body);
@@ -100,28 +98,25 @@ export function registerUserRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     const p = parsed.data;
-    const touchesAccount =
-      p.fullName !== undefined || p.isAdmin !== undefined || p.active !== undefined;
+    const touchesAccount = p.fullName !== undefined || p.active !== undefined;
     if (touchesAccount && !auth.isAdmin) {
       return reply.code(403).send({ error: 'Admins only.' });
     }
     if (!touchesAccount && !(await mayManageRoles(auth))) {
       return reply.code(403).send({ error: 'Handing out roles is not open to your role.' });
     }
-    if (id === auth.userId && (p.isAdmin === false || p.active === false)) {
+    if (id === auth.userId && p.active === false) {
       return reply.code(409).send({ error: 'You cannot take your own access away.' });
     }
     const res = await pool.query(
       `update users
           set full_name = coalesce($2, full_name),
-              is_admin = coalesce($3, is_admin),
-              active = coalesce($4, active),
-              role_id = case when $5 then $6::uuid else role_id end
+              active = coalesce($3, active),
+              role_id = case when $4 then $5::uuid else role_id end
         where id = $1`,
       [
         id,
         p.fullName ?? null,
-        p.isAdmin ?? null,
         p.active ?? null,
         p.roleId !== undefined,
         p.roleId ?? null,
