@@ -2,6 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { usePeople } from '../lib/people';
 import { useRoles } from '../lib/roles';
+import { useProjects } from '../lib/projects';
+import { api } from '../lib/api';
+import type { IssueLink } from '../lib/issues';
 import Quill from 'quill';
 import 'quill/dist/quill.core.css';
 import { clean } from '../lib/richtext';
@@ -27,6 +30,7 @@ const emit = defineEmits<{ (e: 'files', list: FileList): void; (e: 'blur'): void
 
 const { people, load: loadPeople } = usePeople();
 const { roles, load: loadRoles } = useRoles();
+const { projects, load: loadProjects } = useProjects();
 
 const wrap = ref<HTMLDivElement | null>(null);
 const host = ref<HTMLDivElement | null>(null);
@@ -91,6 +95,10 @@ function readMarks(): void {
 }
 
 const naming = ref<{ from: number; query: string } | null>(null);
+const keying = ref<{ from: number; query: string; moved: boolean } | null>(null);
+const issueHits = ref<IssueLink[]>([]);
+let keySearch = 0;
+let keyTimer = 0;
 const chosen = ref(0);
 const list = ref<HTMLDivElement | null>(null);
 const rows = ref<HTMLDivElement | null>(null);
@@ -102,9 +110,23 @@ interface Named {
   label: string;
   color: string | null;
   hint: string;
+  key?: boolean;
 }
 
+const projectKeys = computed(
+  () => new Set(projects.value.filter((p) => !p.archived).map((p) => p.shortName))
+);
+
 const matches = computed<Named[]>(() => {
+  if (keying.value) {
+    return issueHits.value.map((h) => ({
+      id: h.id,
+      label: h.key,
+      color: h.stateColor,
+      hint: h.summary,
+      key: true,
+    }));
+  }
   if (!naming.value) return [];
   const q = naming.value.query.toLowerCase();
   const who = people.value
@@ -156,29 +178,65 @@ function place(): void {
   };
 }
 
+function findIssues(query: string): void {
+  const mine = ++keySearch;
+  window.clearTimeout(keyTimer);
+  keyTimer = window.setTimeout(async () => {
+    try {
+      const rows = await api<IssueLink[]>(`/issues/search?q=${encodeURIComponent(query)}`);
+      if (mine !== keySearch) return;
+      const prefix = query.includes('-') ? query : `${query}-`;
+      issueHits.value = rows.filter((r) => r.key.startsWith(prefix)).slice(0, 8);
+      chosen.value = 0;
+      void nextTick(place);
+    } catch {
+      if (mine === keySearch) issueHits.value = [];
+    }
+  }, 150);
+}
+
+watch(keying, (now) => {
+  if (now) return;
+  ++keySearch;
+  issueHits.value = [];
+});
+
 function lookForName(): void {
   if (!quill) return;
   const sel = quill.getSelection();
   if (!sel || sel.length) {
     naming.value = null;
+    keying.value = null;
     return;
   }
   const back = Math.min(40, sel.index);
   const before = quill.getText(sel.index - back, back);
   const found = /(?:^|\s)@([a-zA-Z0-9_.-]*)$/.exec(before);
-  if (!found) {
-    naming.value = null;
+  if (found) {
+    keying.value = null;
+    naming.value = { from: sel.index - found[1].length - 1, query: found[1] };
+    chosen.value = 0;
+    measure();
+    void nextTick(place);
+    return;
+  }
+  naming.value = null;
+  const typed = /(?:^|[\s(])([A-Z][A-Z0-9]*(?:-\d*)?)$/.exec(before)?.[1];
+  if (!typed || !projectKeys.value.has(typed.split('-')[0])) {
+    keying.value = null;
     at.value = { ...at.value, ready: false };
     return;
   }
-  naming.value = { from: sel.index - found[1].length - 1, query: found[1] };
-  chosen.value = 0;
+  if (typed !== keying.value?.query) {
+    keying.value = { from: sel.index - typed.length, query: typed, moved: false };
+    findIssues(typed);
+  }
   measure();
   void nextTick(place);
 }
 
 function follow(): void {
-  if (!naming.value) return;
+  if (!naming.value && !keying.value) return;
   measure();
   place();
 }
@@ -202,6 +260,20 @@ function paintNames(): void {
 
 watch([people, roles], () => paintNames());
 
+function pickKey(key: string): void {
+  if (!quill || !keying.value) return;
+  const { from, query } = keying.value;
+  keying.value = null;
+  quill.deleteText(from, query.length, 'user');
+  quill.insertText(from, `${key} `, 'user');
+  quill.setSelection(from + key.length + 1, 0, 'silent');
+}
+
+function pick(n: Named): void {
+  if (n.key) pickKey(n.label);
+  else pickName(n.label);
+}
+
 function pickName(login: string): void {
   if (!quill || !naming.value) return;
   const { from, query } = naming.value;
@@ -213,22 +285,24 @@ function pickName(login: string): void {
 
 // Capture phase: must run before Quill's Enter handling and the dialog's window Escape listener.
 function onNameKey(ev: KeyboardEvent): void {
-  if (!naming.value || !matches.value.length) return;
+  if (!matches.value.length) return;
   const stop = () => {
     ev.preventDefault();
     ev.stopPropagation();
   };
-  if (ev.key === 'ArrowDown') {
-    chosen.value = (chosen.value + 1) % matches.value.length;
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+    const step = ev.key === 'ArrowDown' ? 1 : -1;
+    chosen.value = (chosen.value + step + matches.value.length) % matches.value.length;
+    if (keying.value) keying.value.moved = true;
     stop();
-  } else if (ev.key === 'ArrowUp') {
-    chosen.value = (chosen.value - 1 + matches.value.length) % matches.value.length;
-    stop();
+  } else if (ev.key === 'Enter' && keying.value && !keying.value.moved && !keying.value.query.includes('-')) {
+    keying.value = null;
   } else if (ev.key === 'Enter' || ev.key === 'Tab') {
-    pickName(matches.value[chosen.value].label);
+    pick(matches.value[chosen.value]);
     stop();
   } else if (ev.key === 'Escape') {
     naming.value = null;
+    keying.value = null;
     stop();
   }
 }
@@ -236,6 +310,7 @@ function onNameKey(ev: KeyboardEvent): void {
 onMounted(() => {
   void loadPeople();
   void loadRoles();
+  void loadProjects();
   if (!host.value) return;
   quill = new Quill(host.value, {
     theme: undefined,
@@ -382,10 +457,10 @@ function addLink(): void {
           class="menu__i"
           :class="{ 'is-hover': i === chosen }"
           type="button"
-          @mousedown.prevent="pickName(n.label)"
+          @mousedown.prevent="pick(n)"
         >
-          <span :style="{ color: ink(n.color) }">{{ n.label }}</span>
-          <span v-if="n.hint" class="rt__full">{{ n.hint }}</span>
+          <span :class="{ key: n.key }" :style="{ color: ink(n.color) }">{{ n.label }}</span>
+          <span v-if="n.hint" class="rt__full" :class="{ 'rt__full--clip': n.key }">{{ n.hint }}</span>
           <ChevronLeft class="ic ic--sm rt__at" :class="{ 'is-off': i !== chosen }" />
         </button>
       </div>
@@ -449,6 +524,12 @@ function addLink(): void {
 .rt__full {
   color: var(--text-muted);
   font-size: 12px;
+}
+.rt__full--clip {
+  max-width: 320px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .rt__at {
   margin-left: auto;
