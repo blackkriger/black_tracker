@@ -1071,6 +1071,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const term = (q ?? '').trim().slice(0, 100);
     if (!term) return reply.send({ data: [] });
     const skip = exclude && /^[0-9a-fA-F-]{36}$/.test(exclude) ? exclude : null;
+    const number = /^\d+$/.test(term) ? term : null;
     const res = await pool.query<LinkRow>(
       `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
               s.name as state_name, s.color as state_color, p.short_name, b.slug
@@ -1079,10 +1080,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
          join projects p on p.id = i.project_id
          join boards b on b.id = i.board_id
         where ($2::uuid is null or i.id <> $2)
-          and (i.readable_id ilike $1 || '%' or i.summary ilike '%' || $1 || '%')
-        order by (i.readable_id ilike $1 || '%') desc, i.updated_at desc
+          and not p.archived
+          and (i.readable_id ilike $1 || '%'
+               or ($3::text is not null and split_part(i.readable_id, '-', 2) like $3 || '%')
+               or i.summary ilike '%' || $1 || '%')
+        order by ($3::text is not null and split_part(i.readable_id, '-', 2) = $3) desc,
+                 (i.readable_id ilike $1 || '%'
+                  or ($3::text is not null and split_part(i.readable_id, '-', 2) like $3 || '%')) desc,
+                 i.updated_at desc
         limit 60`,
-      [term, skip]
+      [term, skip, number]
     );
     if (auth.isAdmin) return reply.send({ data: res.rows.slice(0, 20).map(publicLink) });
     const denied = await deniedFor(auth.roleId);
