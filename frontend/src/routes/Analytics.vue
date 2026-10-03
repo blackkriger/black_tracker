@@ -105,7 +105,7 @@ const data = ref<Numbers | null>(null);
 const openPeople = ref<string[]>([]);
 const openWorkers = ref<string[]>([]);
 const foldedSplits = ref<string[]>([]);
-const openIssues = ref<string[]>([]);
+const flippedIssues = ref<string[]>([]);
 
 const projectChoices = computed(() =>
   projects.value.map((p) => ({ value: p.shortName, label: p.name }))
@@ -276,10 +276,11 @@ function toggleSplit(id: string): void {
     ? foldedSplits.value.filter((k) => k !== id)
     : [...foldedSplits.value, id];
 }
+const handsOpen = (i: Held): boolean => i.hands.length > 1 !== flippedIssues.value.includes(i.key);
 function toggleIssue(key: string): void {
-  openIssues.value = openIssues.value.includes(key)
-    ? openIssues.value.filter((k) => k !== key)
-    : [...openIssues.value, key];
+  flippedIssues.value = flippedIssues.value.includes(key)
+    ? flippedIssues.value.filter((k) => k !== key)
+    : [...flippedIssues.value, key];
 }
 
 interface OpenIssue {
@@ -508,7 +509,7 @@ async function openIssue(w: Where): Promise<void> {
                         {{ days(i.days) }}
                       </button>
                     </div>
-                    <div v-if="openIssues.includes(i.key)" class="hands">
+                    <div v-if="handsOpen(i)" class="hands">
                       <template v-for="(h, n) in [...i.hands].reverse()" :key="n">
                         <div class="hands__row">
                           <span :class="{ faint: !h.login }">{{ h.login ? nameOf(h.login) : 'Nobody' }}</span>
