@@ -312,6 +312,8 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .md ol li[data-list="ordered"] { list-style-type: decimal; }
 .md code { font: 12.5px var(--font-mono); padding: 1px 5px; background: var(--bg); border: 1px solid var(--line); }
 .md a { color: var(--accent); }
+.md .ikey { font-family: var(--font-num); text-decoration: none; }
+.md .ikey.is-closed { text-decoration: line-through; }
 .itabs { display: flex; border-bottom: 1px solid var(--line); }
 .itab { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 0; background: none; color: var(--text-dim); font-size: 13px; cursor: pointer; }
 .itab:hover { color: var(--text); }

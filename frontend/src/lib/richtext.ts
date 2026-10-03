@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify';
+import { paintKeys } from './issueKeys';
 import { paintNames } from './mentions';
 
 const ALLOWED_TAGS = [
@@ -43,4 +44,4 @@ export function fromPlain(text: string): string {
 export const looksLikeHtml = (text: string): boolean => /^\s*<(p|h3|h4|ul|ol|pre|blockquote)\b/i.test(text);
 
 export const asHtml = (text: string): string =>
-  !text ? '' : paintNames(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text)));
+  !text ? '' : paintKeys(paintNames(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text))));

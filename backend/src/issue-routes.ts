@@ -1064,6 +1064,40 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
+  app.get('/issues/keys', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const { keys } = req.query as { keys?: string };
+    const wanted = [
+      ...new Set(
+        (keys ?? '')
+          .split(',')
+          .map((k) => k.trim().toLowerCase())
+          .filter((k) => /^[a-z][a-z0-9]*-\d{1,9}$/.test(k))
+      ),
+    ].slice(0, 100);
+    if (!wanted.length) return reply.send({ data: [] });
+    const res = await pool.query<LinkRow>(
+      `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
+              s.name as state_name, s.color as state_color, s.is_resolved as resolved,
+              p.short_name, b.slug
+         from issues i
+         join states s on s.id = i.state_id
+         join projects p on p.id = i.project_id
+         join boards b on b.id = i.board_id
+        where lower(i.readable_id) = any($1::text[])`,
+      [wanted]
+    );
+    if (auth.isAdmin) return reply.send({ data: res.rows.map(publicLink) });
+    const denied = await deniedFor(auth.roleId);
+    if (denied.everything) return reply.send({ data: [] });
+    return reply.send({
+      data: res.rows
+        .filter((r) => !denied.boards.has(r.board_id) && !denied.projects.has(r.project_id))
+        .map(publicLink),
+    });
+  });
+
   app.get('/issues/search', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;

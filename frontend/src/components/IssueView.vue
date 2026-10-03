@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
 import { TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank } from '../lib/richtext';
+import { forgetKeys, keyInfo, refreshKey } from '../lib/issueKeys';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
 import FileViewer from './FileViewer.vue';
@@ -599,7 +601,20 @@ onUnmounted(() => {
 
 watch(() => props.issueKey, load, { immediate: true });
 
+const router = useRouter();
+forgetKeys();
+
+function followKey(ev: MouseEvent): void {
+  if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  const key = (ev.target as HTMLElement | null)?.closest<HTMLAnchorElement>('a.ikey')?.dataset.key;
+  const info = key ? keyInfo(key) : null;
+  if (!info) return;
+  ev.preventDefault();
+  void router.push(`/${info.projectShort}/${info.boardSlug}/${info.key}`);
+}
+
 useLive((ev) => {
+  refreshKey(ev.issueKey);
   const current = issue.value;
   if (!current || ev.issueId !== current.id) return;
   if (ev.type === 'issue.deleted') {
@@ -1317,6 +1332,7 @@ async function removeIssue(): Promise<void> {
                 v-else-if="issue?.description && !isBlank(issue.description)"
                 class="md iv__body"
                 :class="{ 'is-fresh': fresh.has('description') }"
+                @click="followKey"
                 v-html="asHtml(issue.description)"
               ></div>
               <div v-else class="iv__body hint faint">Nothing written yet.</div>
@@ -1558,7 +1574,7 @@ async function removeIssue(): Promise<void> {
                       <button class="btn btn--sm btn--primary" type="button" @click="saveComment(c)">Save</button>
                     </div>
                   </template>
-                  <div v-else class="md cm__body" v-html="asHtml(c.text)"></div>
+                  <div v-else class="md cm__body" @click="followKey" v-html="asHtml(c.text)"></div>
 
                   <div v-if="filesOf(c.id).length" class="cm__files">
                     <div v-if="filesOf(c.id).length > 1" class="att__cap att__row att__all">

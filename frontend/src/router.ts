@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useSession } from './lib/session';
+import { findKeys } from './lib/issueKeys';
 import Login from './routes/Login.vue';
 import Home from './routes/Home.vue';
 
@@ -29,6 +30,15 @@ export const router = createRouter({
     { path: '/:short([A-Z][A-Z0-9]*)', name: 'project-board', component: Board },
     { path: '/:short([A-Z][A-Z0-9]*)/:slug', name: 'board', component: Board },
     { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
+    {
+      path: '/:key([A-Z][A-Z0-9]*-\\d+)',
+      name: 'issue-key',
+      component: NotFound,
+      beforeEnter: async (to) => {
+        const [hit] = await findKeys([String(to.params.key)]).catch(() => []);
+        return hit ? { path: `/${hit.projectShort}/${hit.boardSlug}/${hit.key}`, replace: true } : true;
+      },
+    },
     { path: '/profile', name: 'profile', component: Profile },
     { path: '/calendar', redirect: { name: 'me', query: { calendar: 'full' } } },
     { path: '/analytics', name: 'analytics', component: Analytics },
