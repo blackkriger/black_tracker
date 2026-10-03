@@ -52,7 +52,7 @@ interface Worker {
   login: string;
   color: string | null;
   days: number;
-  issues: (Where & { stateName: string; days: number })[];
+  issues: (Where & { states: { name: string; color: string | null }[]; days: number })[];
 }
 interface TagOption {
   id: string;
@@ -568,7 +568,10 @@ async function openIssue(w: Where): Promise<void> {
                       <span :style="{ color: ink(i.color) }">{{ i.key }}</span>
                     </button>
                     <span class="held__what">{{ i.summary }}</span>
-                    <span class="stamp" :style="{ color: ink(i.color) }">{{ i.stateName }}</span>
+                    <span class="stamp">
+                      <template v-for="(st, n) in i.states" :key="st.name">{{ n ? ', ' : ''
+                      }}<span :style="{ color: ink(st.color) }">{{ st.name }}</span></template>
+                    </span>
                     <span class="held__time" :title="exact(i.days)">
                       <Clock class="ic ic--sm" />
                       {{ days(i.days) }}
