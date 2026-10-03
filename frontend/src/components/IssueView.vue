@@ -61,7 +61,7 @@ interface State {
 const props = defineProps<{
   issueKey?: string;
   createIn?: string | null;
-  board: { id: string; name: string; states: State[] };
+  board: { id: string; name: string; states: State[]; defaultAssigneeId?: string | null };
   boards: { id: string; name: string; slug: string }[];
   tags: IssueTag[];
   project: string;
@@ -629,7 +629,7 @@ async function load(): Promise<void> {
       description: '',
       stateId: props.createIn ?? props.board.states[0]?.id ?? '',
       priority: 'Normal',
-      assigneeId: null,
+      assigneeId: props.board.defaultAssigneeId ?? null,
       dueDate: null,
       tagIds: [],
     };

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Select from '../../components/Select.vue';
@@ -9,6 +9,7 @@ import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
+import { usePeople } from '../../lib/people';
 import { GripVertical, X } from 'lucide-vue-next';
 import { ink } from '../../lib/theme';
 
@@ -25,6 +26,7 @@ interface Board {
   id: string;
   name: string;
   defaultStateId: string | null;
+  defaultAssigneeId: string | null;
   position: number;
   states: State[];
 }
@@ -51,6 +53,12 @@ const deleting = ref(false);
 const confirmKey = ref('');
 const deletingBoard = ref<Board | null>(null);
 const newStatus = ref<Record<string, string>>({});
+const { people, load: loadPeople } = usePeople();
+void loadPeople();
+const assigneeChoices = computed(() => [
+  { value: '', label: '—' },
+  ...people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor })),
+]);
 
 let projectReads = 0;
 
@@ -253,6 +261,8 @@ async function onDrop(b: Board, target: State): Promise<void> {
           <span class="panel__end">
             <span class="label">Default status</span>
             <span class="sk default-pick-sk"></span>
+            <span class="label">Default assignee</span>
+            <span class="sk default-pick-sk"></span>
             <span class="sk sk--ctl" style="width: 96px"></span>
           </span>
         </header>
@@ -346,6 +356,14 @@ async function onDrop(b: Board, target: State): Promise<void> {
               :model-value="b.defaultStateId ?? ''"
               :options="b.states.map((s) => ({ value: s.id, label: s.name, color: s.color }))"
               @update:model-value="patchBoard(b, { defaultStateId: $event })"
+            />
+            <label class="label" :for="`assignee-${b.id}`">Default assignee</label>
+            <Select
+              :id="`assignee-${b.id}`"
+              class="default-pick"
+              :model-value="b.defaultAssigneeId ?? ''"
+              :options="assigneeChoices"
+              @update:model-value="patchBoard(b, { defaultAssigneeId: $event || null })"
             />
             <button
               class="btn btn--sm btn--danger"

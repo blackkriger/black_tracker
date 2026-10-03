@@ -25,6 +25,7 @@ const boardCreate = z.object({ name: z.string().trim().min(1).max(60) });
 const boardPatch = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   defaultStateId: z.string().uuid().optional(),
+  defaultAssigneeId: z.string().uuid().nullable().optional(),
   position: z.number().int().min(0).optional(),
 });
 
@@ -43,7 +44,7 @@ const statePatch = z.object({
 
 async function boardById(id: string): Promise<BoardRow | null> {
   const res = await pool.query<BoardRow>(
-    'select id, project_id, name, slug, default_state_id, position from boards where id = $1',
+    'select id, project_id, name, slug, default_state_id, default_assignee_id, position from boards where id = $1',
     [id]
   );
   return res.rows[0] ?? null;
@@ -173,10 +174,19 @@ export function registerBoardRoutes(app: FastifyInstance): void {
           set name = coalesce($2, name),
               slug = coalesce($3, slug),
               default_state_id = coalesce($4, default_state_id),
-              position = coalesce($5, position)
+              position = coalesce($5, position),
+              default_assignee_id = case when $6 then $7::uuid else default_assignee_id end
         where id = $1
-        returning id, project_id, name, slug, default_state_id, position`,
-      [id, p.name ?? null, slug, p.defaultStateId ?? null, p.position ?? null]
+        returning id, project_id, name, slug, default_state_id, default_assignee_id, position`,
+      [
+        id,
+        p.name ?? null,
+        slug,
+        p.defaultStateId ?? null,
+        p.position ?? null,
+        p.defaultAssigneeId !== undefined,
+        p.defaultAssigneeId ?? null,
+      ]
     );
     const tags = await tagIdsByBoard([id]);
     return reply.send({ data: publicBoard(res.rows[0], await statesOf(id), [], tags.get(id) ?? []) });

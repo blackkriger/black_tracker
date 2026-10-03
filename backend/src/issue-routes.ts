@@ -563,12 +563,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad issue.' });
     }
     const p = parsed.data;
-    const board = await pool.query<{ project_id: string; default_state_id: string | null }>(
-      'select project_id, default_state_id from boards where id = $1',
-      [id]
-    );
+    const board = await pool.query<{
+      project_id: string;
+      default_state_id: string | null;
+      default_assignee_id: string | null;
+    }>('select project_id, default_state_id, default_assignee_id from boards where id = $1', [id]);
     if (!board.rowCount) return reply.code(404).send({ error: 'No such board.' });
     const { project_id: projectId, default_state_id: defaultStateId } = board.rows[0];
+    const assigneeId = p.assigneeId !== undefined ? p.assigneeId : board.rows[0].default_assignee_id;
     if (!(await mayOpenBoard(auth, id, projectId))) {
       return reply.code(403).send({ error: 'This board is not open to you.' });
     }
@@ -610,7 +612,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           p.description ?? '',
           stateId,
           p.priority ?? 'Normal',
-          p.assigneeId ?? null,
+          assigneeId ?? null,
           auth.userId,
           p.dueDate ?? null,
           top.rows[0].pos,
@@ -624,22 +626,22 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         );
       }
       await writeHistory(client, row.rows[0].id, auth.userId, 'created', null, null);
-      if (p.assigneeId && p.assigneeId !== auth.userId) {
+      if (assigneeId && assigneeId !== auth.userId) {
         await client.query(
           `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
-          [p.assigneeId, row.rows[0].id, auth.userId]
+          [assigneeId, row.rows[0].id, auth.userId]
         );
       }
       if (await autoStar(client, auth.userId, row.rows[0].id, 'star_created')) {
         autoStarred.push(auth.userId);
       }
-      if (p.assigneeId && (await autoStar(client, p.assigneeId, row.rows[0].id, 'star_assigned'))) {
-        autoStarred.push(p.assigneeId);
+      if (assigneeId && (await autoStar(client, assigneeId, row.rows[0].id, 'star_assigned'))) {
+        autoStarred.push(assigneeId);
       }
       return row.rows[0].id;
     });
-    if (p.assigneeId && p.assigneeId !== auth.userId) {
-      void publish({ type: 'notice.changed', only: p.assigneeId });
+    if (assigneeId && assigneeId !== auth.userId) {
+      void publish({ type: 'notice.changed', only: assigneeId });
     }
 
     const row = await issueById(created);
