@@ -38,6 +38,7 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
 
 <style scoped>
 .rg {
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   --rg-h: 44px;
