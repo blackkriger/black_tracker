@@ -185,9 +185,9 @@ const boardTags = computed(() => tags.value.filter((t) => current.value?.tagIds.
 const openKey = computed(() => String(route.params.key ?? ''));
 
 const ORDER_CHOICES = [
-  { value: 'manual', label: 'Manual' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'due', label: 'Due date' },
+  { value: 'manual', label: 'Manual order' },
+  { value: 'priority', label: 'By priority' },
+  { value: 'due', label: 'By due date' },
 ];
 const order = ref<CardOrder>('manual');
 watch(
