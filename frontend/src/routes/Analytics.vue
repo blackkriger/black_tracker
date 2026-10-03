@@ -48,6 +48,12 @@ interface Person {
   held: number | null;
   issues: Held[];
 }
+interface Worker {
+  login: string;
+  color: string | null;
+  days: number;
+  issues: (Where & { stateName: string; days: number })[];
+}
 interface TagOption {
   id: string;
   name: string;
@@ -67,12 +73,13 @@ interface Numbers {
   }[];
   due: { overdue: Dated[]; soon: Dated[] };
   people: Person[];
+  worked: Worker[];
   unassigned: number;
   priorities: { name: string; count: number; byState: Record<string, number> }[];
   cycle: {
     median: number | null;
     closed: number;
-    months: { month: string; median: number | null; closed: number }[];
+    months: { month: string; median: number | null; closed: number; buckets: number[] }[];
   };
 }
 
@@ -96,6 +103,7 @@ const period = ref(thisMonth());
 const loading = ref(true);
 const data = ref<Numbers | null>(null);
 const openPeople = ref<string[]>([]);
+const openWorkers = ref<string[]>([]);
 const openIssues = ref<string[]>([]);
 
 const projectChoices = computed(() =>
@@ -213,8 +221,9 @@ const priorityRows = computed<RidgeRow[]>(() => {
   });
 });
 
-const longestMonth = computed(() =>
-  Math.max(1, ...(data.value?.cycle.months ?? []).map((m) => m.median ?? 0))
+const CLOSE_AXIS = ['<1h', '<1d', '<3d', '<1w', '<1m', '1m+'];
+const closeTallest = computed(() =>
+  Math.max(1, ...(data.value?.cycle.months ?? []).flatMap((m) => m.buckets))
 );
 
 function days(n: number | null): string {
@@ -242,10 +251,24 @@ const monthLabel = (month: string): string => {
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 };
 
+const closeRows = computed<RidgeRow[]>(() =>
+  (data.value?.cycle.months ?? []).map((m) => ({
+    key: m.month,
+    label: monthLabel(m.month),
+    profile: shape(m.buckets),
+    value: days(m.median),
+  }))
+);
+
 function togglePerson(login: string): void {
   openPeople.value = openPeople.value.includes(login)
     ? openPeople.value.filter((l) => l !== login)
     : [...openPeople.value, login];
+}
+function toggleWorker(login: string): void {
+  openWorkers.value = openWorkers.value.includes(login)
+    ? openWorkers.value.filter((l) => l !== login)
+    : [...openWorkers.value, login];
 }
 function toggleIssue(key: string): void {
   openIssues.value = openIssues.value.includes(key)
@@ -400,33 +423,28 @@ async function openIssue(w: Where): Promise<void> {
           <section class="panel">
             <header class="panel__h">
               Time to close
-              <span class="panel__end">{{ data?.cycle.closed ?? 0 }}</span>
+              <span
+                v-if="data?.cycle.median != null"
+                class="panel__end"
+                :title="exact(data.cycle.median)"
+              >{{ days(data.cycle.median) }}</span>
             </header>
-            <div class="panel__b nums">
-              <template v-if="loading">
-                <span class="sk sk--line" style="width: 84px; height: 28px"></span>
-                <div v-for="n in 3" :key="n" class="pri">
+            <div class="panel__b">
+              <div v-if="loading" class="skel">
+                <div v-for="n in 2" :key="n" class="skel__ridge">
                   <span class="sk sk--line" style="width: 64px"></span>
                   <span class="sk sk--line skel__hill"></span>
-                  <span class="sk sk--line" style="width: 36px"></span>
+                  <span class="sk sk--line" style="width: 20px"></span>
                 </div>
-              </template>
-              <div v-else class="big" :title="exact(data?.cycle.median ?? null)">
-                {{ days(data?.cycle.median ?? null) }}
               </div>
-              <div v-for="m in data?.cycle.months ?? []" :key="m.month" class="pri">
-                <span class="pri__name">{{ monthLabel(m.month) }}</span>
-                <span class="bar">
-                  <span
-                    class="bar__part"
-                    :style="{ width: `${((m.median ?? 0) / longestMonth) * 100}%` }"
-                  ></span>
-                </span>
-                <span class="n" :title="exact(m.median)">{{ days(m.median) }}</span>
-              </div>
-              <div v-if="!loading && !data?.cycle.closed" class="hint faint">
+              <div v-else-if="!data?.cycle.closed" class="hint faint">
                 Nothing was closed in this period.
               </div>
+              <RidgeRows v-else :rows="closeRows" :full="closeTallest">
+                <template #axis>
+                  <span v-for="b in CLOSE_AXIS" :key="b">{{ b }}</span>
+                </template>
+              </RidgeRows>
             </div>
           </section>
         </div>
@@ -517,6 +535,52 @@ async function openIssue(w: Where): Promise<void> {
             </div>
           </section>
 
+          <section class="panel">
+            <header class="panel__h">
+              Worked on
+              <span class="panel__end who__head who__head--worked">
+                <span class="stamp">issues</span>
+                <span class="stamp">time</span>
+              </span>
+            </header>
+            <div class="panel__b nums nums--table">
+              <template v-if="loading">
+                <div v-for="w in [96, 78]" :key="w" class="who who--worked skel__who">
+                  <span class="sk sk--line" :style="{ width: `${w}px` }"></span>
+                  <span class="sk sk--line skel__n"></span>
+                  <span class="sk sk--line skel__n"></span>
+                </div>
+              </template>
+              <template v-for="p in data?.worked ?? []" :key="p.login">
+                <button class="who who--go who--worked" type="button" @click="toggleWorker(p.login)">
+                  <span class="who__name">
+                    <ChevronDown v-if="openWorkers.includes(p.login)" class="ic ic--sm" />
+                    <ChevronRight v-else class="ic ic--sm" />
+                    <span :style="{ color: ink(p.color) }">{{ nameOf(p.login) }}</span>
+                    <span v-if="nameOf(p.login) !== p.login" class="who__login">{{ p.login }}</span>
+                  </span>
+                  <span class="n">{{ p.issues.length }}</span>
+                  <span class="n" :title="exact(p.days)">{{ days(p.days) }}</span>
+                </button>
+                <div v-if="openWorkers.includes(p.login)" class="held">
+                  <div v-for="i in p.issues" :key="i.key" class="held__row">
+                    <button class="key held__key" type="button" @click="openIssue(i)">
+                      <span :style="{ color: ink(i.color) }">{{ i.key }}</span>
+                    </button>
+                    <span class="held__what">{{ i.summary }}</span>
+                    <span class="stamp" :style="{ color: ink(i.color) }">{{ i.stateName }}</span>
+                    <span class="held__time" :title="exact(i.days)">
+                      <Clock class="ic ic--sm" />
+                      {{ days(i.days) }}
+                    </span>
+                  </div>
+                </div>
+              </template>
+              <div v-if="!loading && !data?.worked.length" class="hint faint">
+                Nothing was worked on in this period.
+              </div>
+            </div>
+          </section>
         </div>
 
         <div v-if="errors.numbers" class="err sheet__wide">{{ errors.numbers }}</div>
@@ -550,17 +614,6 @@ async function openIssue(w: Where): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-.bar {
-  display: flex;
-  flex: 1 1 auto;
-  height: 8px;
-  background: var(--bg);
-}
-.bar__part {
-  display: block;
-  height: 100%;
-  background: var(--accent);
 }
 .line {
   display: grid;
@@ -597,6 +650,9 @@ async function openIssue(w: Where): Promise<void> {
   font-size: 13px;
   text-align: left;
 }
+.who--worked {
+  grid-template-columns: 1fr 48px 52px;
+}
 .who .n,
 .who .stamp {
   text-align: right;
@@ -623,6 +679,9 @@ async function openIssue(w: Where): Promise<void> {
   grid-template-columns: 40px 40px 48px 52px;
   gap: 8px;
   padding-right: 4px;
+}
+.who__head--worked {
+  grid-template-columns: 48px 52px;
 }
 .who__head .stamp {
   text-align: right;
@@ -654,6 +713,10 @@ async function openIssue(w: Where): Promise<void> {
   gap: 8px;
   font-size: 12.5px;
 }
+.held__row .stamp {
+  flex: none;
+  white-space: nowrap;
+}
 .held__key,
 .held__days {
   padding: 0;
@@ -664,7 +727,8 @@ async function openIssue(w: Where): Promise<void> {
 .held__key {
   flex: none;
 }
-.held__days {
+.held__days,
+.held__time {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -712,23 +776,6 @@ async function openIssue(w: Where): Promise<void> {
 .hands__state {
   display: inline-flex;
   gap: 5px;
-}
-.pri {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-}
-.pri__name {
-  flex: 0 0 96px;
-}
-.pri .n {
-  flex: 0 0 52px;
-  text-align: right;
-}
-.big {
-  font: 28px/1 var(--font-num);
-  color: var(--accent);
 }
 .skel {
   display: flex;

@@ -53,6 +53,28 @@ interface HeldRow {
   color: string;
 }
 
+interface WorkRow {
+  id: string;
+  login: string | null;
+  board_id: string;
+  project_id: string;
+  readable_id: string;
+  summary: string;
+  created_at: Date;
+  short_name: string;
+  slug: string;
+  state_name: string;
+  color: string;
+}
+
+interface StateKind {
+  board_id: string;
+  project_id: string;
+  name: string;
+  is_resolved: boolean;
+  starting: boolean;
+}
+
 interface HandRow {
   issue_id: string;
   field: 'assignee' | 'status';
@@ -224,6 +246,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           boards: [],
           due: { overdue: [], soon: [] },
           people: [],
+          worked: [],
           unassigned: 0,
           priorities: [],
           cycle: { median: null, closed: 0, months: [] },
@@ -239,7 +262,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
     ];
     const within = [...seen, from, to, tagged];
 
-    const [statuses, cells, dues, people, held, loose, priorities, cycle, months] =
+    const [statuses, cells, dues, people, held, loose, priorities, cycle, months, worked, bounds] =
       await Promise.all([
       pool.query<{ name: string; color: string }>(
         `select s.name, (array_agg(s.color order by p.position, p.short_name, b.position))[1] as color
@@ -368,15 +391,22 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             and ($7::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $7))`,
         within
       ),
-      pool.query<{ month: string; median: string | null; closed: string }>(
+      pool.query<{ month: string; median: string | null; closed: string; buckets: string[] }>(
         `select to_char(date_trunc('month', i.resolved_at at time zone '${ZONE}'), 'YYYY-MM') as month,
-                percentile_cont(0.5) within group (
-                  order by extract(epoch from (i.resolved_at - i.created_at)) / 86400
-                ) as median,
-                count(*) as closed
+                percentile_cont(0.5) within group (order by t.secs / 86400) as median,
+                count(*) as closed,
+                array[
+                  count(*) filter (where t.secs < 3600),
+                  count(*) filter (where t.secs >= 3600 and t.secs < 86400),
+                  count(*) filter (where t.secs >= 86400 and t.secs < 259200),
+                  count(*) filter (where t.secs >= 259200 and t.secs < 604800),
+                  count(*) filter (where t.secs >= 604800 and t.secs < 2592000),
+                  count(*) filter (where t.secs >= 2592000)
+                ] as buckets
            from issues i
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
+          cross join lateral (select extract(epoch from (i.resolved_at - i.created_at)) as secs) t
           where i.resolved_at is not null and (i.resolved_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text is null or p.short_name = $3)
@@ -386,23 +416,60 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           order by 1`,
         within
       ),
+      pool.query<WorkRow>(
+        `select i.id, u.login, i.board_id, i.project_id, i.readable_id, i.summary, i.created_at,
+                p.short_name, b.slug, s.name as state_name, s.color
+           from issues i
+           join projects p on p.id = i.project_id
+           join boards b on b.id = i.board_id
+           join states s on s.id = i.state_id
+           left join users u on u.id = i.assignee_id
+          where i.created_at < coalesce(($5::date + 1)::timestamp at time zone '${ZONE}', 'infinity')
+            and (i.resolved_at is null
+                 or i.resolved_at >= coalesce($4::date::timestamp at time zone '${ZONE}', '-infinity'))
+            and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
+            and ($3::text is null or p.short_name = $3)
+            and ($6::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $6))`,
+        [denied.boards, denied.projects, only, from, to, tagged]
+      ),
+      pool.query<{ start: Date | null; stop: Date | null }>(
+        `select $1::date::timestamp at time zone '${ZONE}' as start,
+                ($2::date + 1)::timestamp at time zone '${ZONE}' as stop`,
+        [from, to]
+      ),
     ]);
 
-    const [handRows, palette] = held.rows.length
-      ? await Promise.all([
-          pool.query<HandRow>(
+    const traced = [...new Set([...held.rows, ...worked.rows].map((r) => r.id))];
+    const [handRows, palette, kinds] = await Promise.all([
+      traced.length
+        ? pool.query<HandRow>(
             `select issue_id, field, old_value, new_value, created_at
                from issue_history
               where issue_id = any($1::uuid[]) and field in ('assignee', 'status')
               order by issue_id, created_at`,
-            [held.rows.map((r) => r.id)]
-          ),
-          pool.query<{ board_id: string; name: string; color: string }>(
+            [traced]
+          )
+        : { rows: [] as HandRow[] },
+      held.rows.length
+        ? pool.query<{ board_id: string; name: string; color: string }>(
             'select board_id, name, color from states where board_id = any($1::uuid[])',
             [[...new Set(held.rows.map((r) => r.board_id))]]
-          ),
-        ])
-      : [{ rows: [] as HandRow[] }, { rows: [] as { board_id: string; name: string; color: string }[] }];
+          )
+        : { rows: [] as { board_id: string; name: string; color: string }[] },
+      worked.rows.length
+        ? pool.query<StateKind>(
+            `select s.board_id, b.project_id, s.name, s.is_resolved,
+                    s.id = coalesce(b.default_state_id, (
+                      select f.id from states f where f.board_id = b.id order by f.position, f.name limit 1
+                    )) as starting
+               from states s
+               join boards b on b.id = s.board_id
+              where b.project_id = any($1::uuid[])
+              order by b.position, s.position`,
+            [[...new Set(worked.rows.map((r) => r.project_id))]]
+          )
+        : { rows: [] as StateKind[] },
+    ]);
     const colors = new Map(palette.rows.map((r) => [`${r.board_id}:${r.name}`, r.color]));
     const changes = new Map<string, HandRow[]>();
     for (const row of handRows.rows) {
@@ -470,6 +537,56 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       holding.set(r.login, list);
     }
 
+    const onBoard = new Map<string, StateKind>();
+    const inProject = new Map<string, StateKind>();
+    for (const k of kinds.rows) {
+      onBoard.set(`${k.board_id}:${k.name}`, k);
+      if (!inProject.has(`${k.project_id}:${k.name}`)) inProject.set(`${k.project_id}:${k.name}`, k);
+    }
+    const working = (r: WorkRow, name: string | null): boolean => {
+      const kind = name
+        ? (onBoard.get(`${r.board_id}:${name}`) ?? inProject.get(`${r.project_id}:${name}`))
+        : undefined;
+      return !!kind && !kind.is_resolved && !kind.starting;
+    };
+    const start = bounds.rows[0]?.start?.getTime() ?? -Infinity;
+    const stop = Math.min(bounds.rows[0]?.stop?.getTime() ?? Infinity, Date.now());
+    const work = new Map<
+      string,
+      { key: string; summary: string; projectShort: string; boardSlug: string; color: string;
+        stateName: string; days: number }[]
+    >();
+    for (const r of worked.rows) {
+      const trail = changes.get(r.id) ?? [];
+      const born = r.created_at.getTime();
+      const hands = stretchesOf(born, r.login, trail.filter((c) => c.field === 'assignee'));
+      const states = stretchesOf(born, r.state_name, trail.filter((c) => c.field === 'status')).filter(
+        (st) => working(r, st.name)
+      );
+      const spent = new Map<string, number>();
+      for (const h of hands) {
+        if (!h.name) continue;
+        for (const st of states) {
+          const ms = Math.min(h.to, st.to, stop) - Math.max(h.from, st.from, start);
+          if (ms > 0) spent.set(h.name, (spent.get(h.name) ?? 0) + ms);
+        }
+      }
+      for (const [login, ms] of spent) {
+        const list = work.get(login) ?? [];
+        list.push({
+          key: r.readable_id,
+          summary: r.summary,
+          projectShort: r.short_name,
+          boardSlug: r.slug,
+          color: r.color,
+          stateName: r.state_name,
+          days: ms / DAY_MS,
+        });
+        work.set(login, list);
+      }
+    }
+    const roleColors = new Map(people.rows.map((r) => [r.login, r.role_color]));
+
     const where = (r: DueRow) => ({
       key: r.readable_id,
       summary: r.summary,
@@ -502,6 +619,14 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             issues,
           };
         }),
+        worked: [...work]
+          .map(([login, issues]) => ({
+            login,
+            color: roleColors.get(login) ?? null,
+            days: issues.reduce((all, i) => all + i.days, 0),
+            issues: issues.sort((a, b) => b.days - a.days),
+          }))
+          .sort((a, b) => b.days - a.days || a.login.localeCompare(b.login)),
         unassigned: Number(loose.rows[0]?.n ?? 0),
         priorities: [...new Set(priorities.rows.map((r) => r.priority))].map((name) => {
           const mine = priorities.rows.filter((r) => r.priority === name);
@@ -518,6 +643,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             month: r.month,
             median: r.median === null ? null : Number(r.median),
             closed: Number(r.closed),
+            buckets: r.buckets.map(Number),
           })),
         },
       },
