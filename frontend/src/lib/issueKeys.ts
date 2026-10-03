@@ -1,9 +1,10 @@
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { api } from './api';
 import type { IssueLink } from './issues';
 import { ink } from './theme';
 
 const known = reactive(new Map<string, IssueLink | null>());
+export const keysVersion = ref(0);
 const asked = new Set<string>();
 let queued: string[] = [];
 let timer = 0;
@@ -19,6 +20,7 @@ async function ask(keys: string[]): Promise<void> {
     try {
       const found = new Map((await findKeys(batch)).map((r) => [r.key.toUpperCase(), r]));
       for (const key of batch) known.set(key, found.get(key) ?? null);
+      keysVersion.value += 1;
     } catch {
       for (const key of batch) asked.delete(key);
     }
@@ -52,7 +54,7 @@ export function forgetKeys(): void {
   asked.clear();
 }
 
-const KEY = /\b[A-Z][A-Z0-9]*-\d+\b/g;
+export const KEY = /\b[A-Z][A-Z0-9]*-\d+\b/g;
 const HAS_KEY = /[A-Z][A-Z0-9]*-\d/;
 
 export function paintKeys(html: string): string {

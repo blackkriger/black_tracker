@@ -9,6 +9,8 @@ import Quill from 'quill';
 import 'quill/dist/quill.core.css';
 import { clean } from '../lib/richtext';
 import '../lib/mention-blot';
+import '../lib/issue-key-blot';
+import { KEY, keyInfo, keysVersion } from '../lib/issueKeys';
 import { nameAt } from '../lib/mentions';
 import {
   Bold,
@@ -260,6 +262,21 @@ function paintNames(): void {
 
 watch([people, roles], () => paintNames());
 
+function paintKeys(): void {
+  if (!quill) return;
+  const text = quill.getText();
+  quill.formatText(0, text.length, 'issuekey', false, 'silent');
+  for (const m of text.matchAll(KEY)) {
+    const from = m.index ?? 0;
+    const f = quill.getFormat(from, m[0].length);
+    if (f.code || f['code-block'] || f.link) continue;
+    const info = keyInfo(m[0]);
+    if (info) quill.formatText(from, m[0].length, 'issuekey', info.key, 'silent');
+  }
+}
+
+watch(keysVersion, () => paintKeys());
+
 function pickKey(key: string): void {
   if (!quill || !keying.value) return;
   const { from, query } = keying.value;
@@ -326,11 +343,15 @@ onMounted(() => {
       'header',
       'link',
       'mention',
+      'issuekey',
     ],
   });
   if (body.value) {
     quill.clipboard.dangerouslyPasteHTML(clean(body.value), 'silent');
-    setTimeout(paintNames, 0);
+    setTimeout(() => {
+      paintNames();
+      paintKeys();
+    }, 0);
   }
   quill.on('text-change', () => {
     fromEditor = true;
@@ -340,6 +361,7 @@ onMounted(() => {
     setTimeout(() => {
       lookForName();
       paintNames();
+      paintKeys();
     }, 0);
   });
   quill.on('selection-change', () => {
@@ -387,7 +409,10 @@ watch(body, (next) => {
   }
   if (!quill || clean(quill.root.innerHTML) === next) return;
   quill.clipboard.dangerouslyPasteHTML(clean(next ?? ''), 'silent');
-  setTimeout(paintNames, 0);
+  setTimeout(() => {
+    paintNames();
+    paintKeys();
+  }, 0);
 });
 
 function toggle(format: string, value: unknown = true): void {
@@ -611,5 +636,11 @@ function addLink(): void {
 }
 .rt__editor :deep(a) {
   color: var(--focus);
+}
+.rt__editor :deep(.ikey) {
+  font-family: var(--font-num);
+}
+.rt__editor :deep(.ikey.is-closed) {
+  text-decoration: line-through;
 }
 </style>
