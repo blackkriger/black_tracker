@@ -1084,7 +1084,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           and (i.readable_id ilike $1 || '%'
                or ($3::text is not null and split_part(i.readable_id, '-', 2) like $3 || '%')
                or i.summary ilike '%' || $1 || '%')
-        order by ($3::text is not null and split_part(i.readable_id, '-', 2) = $3) desc,
+        order by (lower(i.readable_id) = lower($1)
+                  or ($3::text is not null and split_part(i.readable_id, '-', 2) = $3)) desc,
                  (i.readable_id ilike $1 || '%'
                   or ($3::text is not null and split_part(i.readable_id, '-', 2) like $3 || '%')) desc,
                  i.updated_at desc
