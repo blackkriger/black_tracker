@@ -52,7 +52,7 @@ interface Worker {
   login: string;
   color: string | null;
   days: number;
-  issues: (Where & { states: { name: string; color: string | null }[]; days: number })[];
+  issues: (Where & { states: { name: string; color: string | null; days: number }[]; days: number })[];
 }
 interface TagOption {
   id: string;
@@ -104,6 +104,7 @@ const loading = ref(true);
 const data = ref<Numbers | null>(null);
 const openPeople = ref<string[]>([]);
 const openWorkers = ref<string[]>([]);
+const foldedSplits = ref<string[]>([]);
 const openIssues = ref<string[]>([]);
 
 const projectChoices = computed(() =>
@@ -269,6 +270,11 @@ function toggleWorker(login: string): void {
   openWorkers.value = openWorkers.value.includes(login)
     ? openWorkers.value.filter((l) => l !== login)
     : [...openWorkers.value, login];
+}
+function toggleSplit(id: string): void {
+  foldedSplits.value = foldedSplits.value.includes(id)
+    ? foldedSplits.value.filter((k) => k !== id)
+    : [...foldedSplits.value, id];
 }
 function toggleIssue(key: string): void {
   openIssues.value = openIssues.value.includes(key)
@@ -563,20 +569,42 @@ async function openIssue(w: Where): Promise<void> {
                   <span class="n" :title="exact(p.days)">{{ days(p.days) }}</span>
                 </button>
                 <div v-if="openWorkers.includes(p.login)" class="held">
-                  <div v-for="i in p.issues" :key="i.key" class="held__row">
-                    <button class="key held__key" type="button" @click="openIssue(i)">
-                      <span :style="{ color: ink(i.color) }">{{ i.key }}</span>
-                    </button>
-                    <span class="held__what">{{ i.summary }}</span>
-                    <span class="stamp">
-                      <template v-for="(st, n) in i.states" :key="st.name">{{ n ? ', ' : ''
-                      }}<span :style="{ color: ink(st.color) }">{{ st.name }}</span></template>
-                    </span>
-                    <span class="held__time" :title="exact(i.days)">
-                      <Clock class="ic ic--sm" />
-                      {{ days(i.days) }}
-                    </span>
-                  </div>
+                  <template v-for="i in p.issues" :key="i.key">
+                    <div class="held__row">
+                      <button class="key held__key" type="button" @click="openIssue(i)">
+                        <span :style="{ color: ink(i.color) }">{{ i.key }}</span>
+                      </button>
+                      <span class="held__what">{{ i.summary }}</span>
+                      <span class="stamp">
+                        <template v-for="(st, n) in i.states" :key="st.name">{{ n ? ', ' : ''
+                        }}<span :style="{ color: ink(st.color) }">{{ st.name }}</span></template>
+                      </span>
+                      <button
+                        v-if="i.states.length > 1"
+                        class="held__days"
+                        type="button"
+                        :title="exact(i.days)"
+                        @click="toggleSplit(`${p.login}:${i.key}`)"
+                      >
+                        <Clock class="ic ic--sm" />
+                        {{ days(i.days) }}
+                      </button>
+                      <span v-else class="held__time" :title="exact(i.days)">
+                        <Clock class="ic ic--sm" />
+                        {{ days(i.days) }}
+                      </span>
+                    </div>
+                    <div
+                      v-if="i.states.length > 1 && !foldedSplits.includes(`${p.login}:${i.key}`)"
+                      class="hands"
+                    >
+                      <div v-for="st in i.states" :key="st.name" class="hands__row">
+                        <span :style="{ color: ink(st.color) }">{{ st.name }}</span>
+                        <span class="n" :title="exact(st.days)">{{ days(st.days) }}</span>
+                        <span></span>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </template>
               <div v-if="!loading && !data?.worked.length" class="hint faint">

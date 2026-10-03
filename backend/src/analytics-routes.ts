@@ -556,7 +556,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
     const work = new Map<
       string,
       { key: string; summary: string; projectShort: string; boardSlug: string; color: string;
-        states: { name: string; color: string | null }[]; days: number }[]
+        states: { name: string; color: string | null; days: number }[]; days: number }[]
     >();
     for (const r of worked.rows) {
       const trail = changes.get(r.id) ?? [];
@@ -579,9 +579,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       }
       for (const [login, { ms, states: inState }] of spent) {
         const lasting = [...inState].filter(([, held]) => held >= MINUTE_MS);
-        const names = (lasting.length ? lasting : [...inState].sort((a, b) => b[1] - a[1]).slice(0, 1)).map(
-          ([name]) => name
-        );
+        const shown = lasting.length ? lasting : [...inState].sort((a, b) => b[1] - a[1]).slice(0, 1);
         const list = work.get(login) ?? [];
         list.push({
           key: r.readable_id,
@@ -589,7 +587,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           projectShort: r.short_name,
           boardSlug: r.slug,
           color: r.color,
-          states: names.map((name) => ({ name, color: kindOf(r, name)?.color ?? null })),
+          states: shown.map(([name, held]) => ({
+            name,
+            color: kindOf(r, name)?.color ?? null,
+            days: held / DAY_MS,
+          })),
           days: ms / DAY_MS,
         });
         work.set(login, list);
