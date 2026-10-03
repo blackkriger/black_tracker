@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue';
-import { FileDown, WrapText, X } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, FileDown, Scan, WrapText, X, ZoomIn, ZoomOut } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
 import { api } from '../lib/api';
 import { langOf, setWrapLines, wrapLines as wrapped } from '../lib/files';
@@ -25,6 +25,11 @@ const isDrawio = computed(() => lang.value === 'drawio');
 const frame = ref<HTMLIFrameElement | null>(null);
 const frameReady = ref(false);
 const frameSize = ref<{ width: number; height: number } | null>(null);
+const pages = ref({ page: 0, count: 1 });
+
+function drawio(act: 'prev' | 'next' | 'zoomIn' | 'zoomOut' | 'fit'): void {
+  frame.value?.contentWindow?.postMessage({ type: 'drawio-do', act }, '*');
+}
 
 function feedFrame(): void {
   if (!isDrawio.value || !frameReady.value || !text.value) return;
@@ -52,6 +57,12 @@ function onFrameMessage(ev: MessageEvent): void {
     Number.isFinite(ev.data.height)
   ) {
     frameSize.value = { width: ev.data.width, height: ev.data.height };
+  } else if (
+    ev.data?.type === 'drawio-pages' &&
+    Number.isInteger(ev.data.page) &&
+    Number.isInteger(ev.data.count)
+  ) {
+    pages.value = { page: ev.data.page, count: ev.data.count };
   }
 }
 
@@ -130,6 +141,7 @@ async function read(): Promise<void> {
   code.value = '';
   frameReady.value = false;
   frameSize.value = null;
+  pages.value = { page: 0, count: 1 };
   try {
     const got = await api<{ text: string; truncated: boolean }>(`/attachments/${file.id}/text`);
     if (props.file?.id !== file.id) return;
@@ -219,6 +231,14 @@ onUnmounted(() => {
             <WrapText class="ic" />
             Wrap
           </button>
+          <template v-if="isDrawio && frameSize">
+            <button v-if="pages.count > 1" class="btn btn--sm" type="button" aria-label="Previous" @click="drawio('prev')"><ChevronLeft class="ic" /></button>
+            <span v-if="pages.count > 1" class="iviewer__n">{{ pages.page + 1 }} / {{ pages.count }}</span>
+            <button v-if="pages.count > 1" class="btn btn--sm" type="button" aria-label="Next" @click="drawio('next')"><ChevronRight class="ic" /></button>
+            <button class="btn btn--sm" type="button" aria-label="Zoom out" @click="drawio('zoomOut')"><ZoomOut class="ic" /></button>
+            <button class="btn btn--sm" type="button" aria-label="Zoom in" @click="drawio('zoomIn')"><ZoomIn class="ic" /></button>
+            <button class="btn btn--sm" type="button" aria-label="Fit" @click="drawio('fit')"><Scan class="ic" /></button>
+          </template>
           <a class="btn btn--sm" :href="`/api/attachments/${file.id}`" download>
             <FileDown class="ic" />
             Download
@@ -233,6 +253,12 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.iviewer__n {
+  min-width: 56px;
+  text-align: center;
+  font: 12px/1 var(--font-num);
+  color: var(--accent);
+}
 .fv__page {
   flex: 1 1 auto;
   min-height: 0;

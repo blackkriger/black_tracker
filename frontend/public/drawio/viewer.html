@@ -48,6 +48,30 @@
     </script>
     <script src="viewer-static.min.js"></script>
     <script>
+      var shown = null;
+
+      function tellPages() {
+        if (!shown) return;
+        parent.postMessage(
+          { type: 'drawio-pages', page: shown.currentPage, count: shown.diagrams.length },
+          '*'
+        );
+      }
+
+      window.addEventListener('message', function (ev) {
+        var act = ev.data && ev.data.type === 'drawio-do' ? ev.data.act : null;
+        if (!act || !shown) return;
+        var graph = shown.graph;
+        if (act === 'prev') shown.selectPage(shown.currentPage - 1);
+        else if (act === 'next') shown.selectPage(shown.currentPage + 1);
+        else if (act === 'zoomIn') graph.zoomIn();
+        else if (act === 'zoomOut') graph.zoomOut();
+        else if (act === 'fit') {
+          var start = graph.initialViewState;
+          graph.view.scaleAndTranslate(start.scale, start.translate.x, start.translate.y);
+        }
+      });
+
       window.addEventListener('message', function (ev) {
         var data = ev.data;
         if (!data || data.type !== 'drawio' || typeof data.xml !== 'string') return;
@@ -68,16 +92,19 @@
             center: true,
             border: 24,
             lightbox: false,
-            toolbar: 'pages zoom layers',
-            'toolbar-position': 'top',
-            'toolbar-nohide': true,
             'dark-mode': light ? 'light' : 'dark',
           })
         );
         host.appendChild(el);
         try {
           GraphViewer.createViewerForElement(el, function (viewer) {
+            shown = viewer;
             spreadGrid(viewer.graph);
+            viewer.addListener('graphChanged', function () {
+              viewer.graph.view.validateBackground();
+              tellPages();
+            });
+            tellPages();
           });
         } catch (err) {
           el.innerText = err.message;
@@ -89,6 +116,7 @@
         var view = graph.view;
         var paint = view.validateBackgroundStyles;
         view.validateBackgroundStyles = function () {
+          graph.gridEnabled = true;
           paint.apply(this, arguments);
           var svg = view.canvas.ownerSVGElement || view.canvas;
           var box = svg.getBoundingClientRect();
