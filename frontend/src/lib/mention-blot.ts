@@ -13,7 +13,7 @@ class Mention extends Inline {
   static className = 'mention';
 
   static create(value: string): HTMLElement {
-    const node = Inline.create(value);
+    const node = super.create(value);
     node.setAttribute('data-name', value);
     const color = colorOfName(value);
     if (color) node.style.color = ink(color) ?? '';
