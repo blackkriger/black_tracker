@@ -259,10 +259,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
         <header class="panel__h">
           <span class="sk board-name-sk"></span>
           <span class="panel__end">
-            <span class="label">Default status</span>
-            <span class="sk default-pick-sk"></span>
-            <span class="label">Default assignee</span>
-            <span class="sk default-pick-sk"></span>
             <span class="sk sk--ctl" style="width: 96px"></span>
           </span>
         </header>
@@ -291,6 +287,17 @@ async function onDrop(b: Board, target: State): Promise<void> {
           <div class="addrow">
             <span class="sk sk--field"></span>
             <span class="sk sk--field" style="flex: 0 0 56px"></span>
+          </div>
+
+          <div class="board-prefs">
+            <div class="field">
+              <span class="label">Default status</span>
+              <span class="sk sk--field"></span>
+            </div>
+            <div class="field">
+              <span class="label">Default assignee</span>
+              <span class="sk sk--field"></span>
+            </div>
           </div>
         </div>
       </section>
@@ -349,22 +356,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
             @change="patchBoard(b, { name: ($event.target as HTMLInputElement).value })"
           />
           <span class="panel__end">
-            <label class="label" :for="`default-${b.id}`">Default status</label>
-            <Select
-              :id="`default-${b.id}`"
-              class="default-pick"
-              :model-value="b.defaultStateId ?? ''"
-              :options="b.states.map((s) => ({ value: s.id, label: s.name, color: s.color }))"
-              @update:model-value="patchBoard(b, { defaultStateId: $event })"
-            />
-            <label class="label" :for="`assignee-${b.id}`">Default assignee</label>
-            <Select
-              :id="`assignee-${b.id}`"
-              class="default-pick"
-              :model-value="b.defaultAssigneeId ?? ''"
-              :options="assigneeChoices"
-              @update:model-value="patchBoard(b, { defaultAssigneeId: $event || null })"
-            />
             <button
               class="btn btn--sm btn--danger"
               type="button"
@@ -449,6 +440,27 @@ async function onDrop(b: Board, target: State): Promise<void> {
             />
             <button class="btn" type="submit" :disabled="!(newStatus[b.id] ?? '').trim()">Add</button>
           </form>
+
+          <div class="board-prefs">
+            <div class="field">
+              <label class="label" :for="`default-${b.id}`">Default status</label>
+              <Select
+                :id="`default-${b.id}`"
+                :model-value="b.defaultStateId ?? ''"
+                :options="b.states.map((s) => ({ value: s.id, label: s.name, color: s.color }))"
+                @update:model-value="patchBoard(b, { defaultStateId: $event })"
+              />
+            </div>
+            <div class="field">
+              <label class="label" :for="`assignee-${b.id}`">Default assignee</label>
+              <Select
+                :id="`assignee-${b.id}`"
+                :model-value="b.defaultAssigneeId ?? ''"
+                :options="assigneeChoices"
+                @update:model-value="patchBoard(b, { defaultAssigneeId: $event || null })"
+              />
+            </div>
+          </div>
         </div>
       </section>
       <div v-if="errors[b.id]" class="err sheet__wide panel__err">{{ errors[b.id] }}</div>
@@ -541,17 +553,14 @@ async function onDrop(b: Board, target: State): Promise<void> {
   width: 220px;
   height: 30px;
 }
-.default-pick-sk {
-  display: block;
-  width: 160px;
-  height: 30px;
-}
 .sk--right {
   margin-left: auto;
 }
-.default-pick {
-  width: 160px;
-  height: 30px;
+.board-prefs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-top: 16px;
 }
 .panel__end {
   display: flex;
