@@ -60,6 +60,8 @@ let issuesRead = 0;
 let projectRead = 0;
 
 const dragId = ref<string | null>(null);
+const lifted = ref<string | null>(null);
+const slotHeight = ref(0);
 const dropAt = ref<{ stateId: string; beforeId: string | null } | null>(null);
 
 const creatingIn = ref<string | null>(null);
@@ -244,19 +246,61 @@ watch(
   }
 );
 
-function onDragOver(stateId: string, beforeId: string | null): void {
-  if (!dragId.value) return;
-  dropAt.value = { stateId, beforeId: order.value === 'manual' ? beforeId : null };
+const nextAfter = (issue: Issue): string | null => {
+  const column = issuesOf(issue.stateId);
+  return column[column.findIndex((i) => i.id === issue.id) + 1]?.id ?? null;
+};
+
+function onDragStart(issue: Issue, event: DragEvent): void {
+  dragId.value = issue.id;
+  slotHeight.value = (event.currentTarget as HTMLElement).offsetHeight;
+  dropAt.value = { stateId: issue.stateId, beforeId: nextAfter(issue) };
+  setTimeout(() => {
+    if (dragId.value === issue.id) lifted.value = issue.id;
+  });
 }
+
+function endDrag(): void {
+  dragId.value = null;
+  lifted.value = null;
+  dropAt.value = null;
+}
+
+function cardBelow(event: DragEvent): string | null {
+  const cards = (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('.card[data-id]');
+  for (const card of cards) {
+    if (card.dataset.id === dragId.value) continue;
+    const box = card.getBoundingClientRect();
+    if (event.clientY < box.top + box.height / 2) return card.dataset.id ?? null;
+  }
+  return null;
+}
+
+function onDragOver(stateId: string, event: DragEvent): void {
+  if (!dragId.value) return;
+  const beforeId = order.value === 'manual' ? cardBelow(event) : null;
+  if (dropAt.value?.stateId === stateId && dropAt.value.beforeId === beforeId) return;
+  dropAt.value = { stateId, beforeId };
+}
+
+const dropSlot = computed<{ stateId: string; beforeId: string | null } | null>(() => {
+  const at = dropAt.value;
+  const moved = issues.value.find((i) => i.id === lifted.value);
+  if (!at || !moved) return null;
+  if (order.value === 'manual') return at;
+  const probe = at.stateId === moved.stateId ? moved : { ...moved, position: Infinity };
+  const next = issuesOf(at.stateId).find((i) => i.id !== moved.id && byOrder(probe, i) < 0);
+  return { stateId: at.stateId, beforeId: next?.id ?? null };
+});
 
 async function onDrop(): Promise<void> {
   const target = dropAt.value;
   const moved = issues.value.find((i) => i.id === dragId.value);
-  dragId.value = null;
-  dropAt.value = null;
+  endDrag();
   const board = current.value;
   if (!target || !moved || !board) return;
   if (target.beforeId === moved.id) return;
+  if (target.stateId === moved.stateId && target.beforeId === nextAfter(moved)) return;
   if (order.value !== 'manual' && target.stateId === moved.stateId) return;
   issuesRead += 1;
 
@@ -483,7 +527,7 @@ watch(
         :class="{ 'col--drop': dropAt?.stateId === s.id }"
         :style="{ '--c': s.color }"
         :aria-label="`${s.name}, ${issuesOf(s.id).length} issues`"
-        @dragover.prevent="onDragOver(s.id, null)"
+        @dragover.prevent="onDragOver(s.id, $event)"
         @drop.prevent="onDrop"
       >
         <header class="col__head">
@@ -493,52 +537,64 @@ watch(
 
         <div class="col__body">
           <template v-if="!issuesLoading">
-            <article
-              v-for="i in issuesOf(s.id)"
-              :key="i.id"
-              class="card"
-              :class="{ 'card--ghost': dragId === i.id, 'is-fresh': fresh.has(i.id) }"
-              draggable="true"
-              tabindex="0"
-              @dragstart="dragId = i.id"
-              @dragend="dragId = null; dropAt = null"
-              @dragover.prevent.stop="onDragOver(s.id, i.id)"
-              @drop.prevent.stop="onDrop"
-              @click="openIssue(i)"
-              @keydown.enter="openIssue(i)"
-            >
-              <div class="card__top">
-                <span class="key">{{ i.key }}</span>
-                <span class="prio" :class="priorityClass(i.priority)" :aria-label="i.priority">
-                  <i></i><i></i><i></i><i></i>
-                </span>
-              </div>
-              <div v-split-line class="card__title">
-                <span>{{ i.summary }}</span>
-                <span v-if="i.tags.length" class="card__tags">
+            <template v-for="i in issuesOf(s.id)" :key="i.id">
+              <div
+                v-if="dropSlot?.stateId === s.id && dropSlot.beforeId === i.id"
+                class="card card--ghost"
+                :style="{ height: `${slotHeight}px` }"
+                aria-hidden="true"
+              ></div>
+              <article
+                v-show="lifted !== i.id"
+                class="card"
+                :class="{ 'is-fresh': fresh.has(i.id) }"
+                :data-id="i.id"
+                draggable="true"
+                tabindex="0"
+                @dragstart="onDragStart(i, $event)"
+                @dragend="endDrag"
+                @click="openIssue(i)"
+                @keydown.enter="openIssue(i)"
+              >
+                <div class="card__top">
+                  <span class="key">{{ i.key }}</span>
+                  <span class="prio" :class="priorityClass(i.priority)" :aria-label="i.priority">
+                    <i></i><i></i><i></i><i></i>
+                  </span>
+                </div>
+                <div v-split-line class="card__title">
+                  <span>{{ i.summary }}</span>
+                  <span v-if="i.tags.length" class="card__tags">
+                    <span
+                      v-for="t in i.tags"
+                      :key="t.id"
+                      class="taglabel taglabel--plain taglabel--sm"
+                      :style="{ '--c': t.color }"
+                    >{{ t.name }}</span>
+                  </span>
+                </div>
+                <div v-if="i.assignee || i.dueDate || i.subtasks" class="card__meta">
                   <span
-                    v-for="t in i.tags"
-                    :key="t.id"
-                    class="taglabel taglabel--plain taglabel--sm"
-                    :style="{ '--c': t.color }"
-                  >{{ t.name }}</span>
-                </span>
-              </div>
-              <div v-if="i.assignee || i.dueDate || i.subtasks" class="card__meta">
-                <span
-                  v-if="i.assignee"
-                  class="card__who"
-                  :style="{ color: ink(colorOf(i.assignee.login)) }"
-                >{{ nameOf(i.assignee.login) }}</span>
-                <div class="sp"></div>
-                <span v-if="i.subtasks" class="card__subs">{{ i.subtasks.done }}/{{ i.subtasks.total }}</span>
-                <span
-                  v-if="dueLabel(i.dueDate)"
-                  class="due"
-                  :class="{ 'due--late': dueLabel(i.dueDate)?.late }"
-                >{{ dueLabel(i.dueDate)?.text }}</span>
-              </div>
-            </article>
+                    v-if="i.assignee"
+                    class="card__who"
+                    :style="{ color: ink(colorOf(i.assignee.login)) }"
+                  >{{ nameOf(i.assignee.login) }}</span>
+                  <div class="sp"></div>
+                  <span v-if="i.subtasks" class="card__subs">{{ i.subtasks.done }}/{{ i.subtasks.total }}</span>
+                  <span
+                    v-if="dueLabel(i.dueDate)"
+                    class="due"
+                    :class="{ 'due--late': dueLabel(i.dueDate)?.late }"
+                  >{{ dueLabel(i.dueDate)?.text }}</span>
+                </div>
+              </article>
+            </template>
+            <div
+              v-if="dropSlot?.stateId === s.id && dropSlot.beforeId === null"
+              class="card card--ghost"
+              :style="{ height: `${slotHeight}px` }"
+              aria-hidden="true"
+            ></div>
 
             <button
               class="add add--plus"
