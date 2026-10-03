@@ -53,7 +53,7 @@
         if (!data || data.type !== 'drawio' || typeof data.xml !== 'string') return;
         var light = data.theme === 'light';
         document.documentElement.style.colorScheme = light ? 'light' : 'dark';
-        document.body.style.background = String(data.background || '');
+        document.body.style.backgroundColor = light ? '#ffffff' : Editor.darkColor;
         var host = document.getElementById('graph');
         host.innerHTML = '';
         var el = document.createElement('div');
@@ -75,9 +75,36 @@
           })
         );
         host.appendChild(el);
-        GraphViewer.processElements();
+        try {
+          GraphViewer.createViewerForElement(el, function (viewer) {
+            spreadGrid(viewer.graph);
+          });
+        } catch (err) {
+          el.innerText = err.message;
+        }
         watchSize();
       });
+
+      function spreadGrid(graph) {
+        var view = graph.view;
+        var paint = view.validateBackgroundStyles;
+        view.validateBackgroundStyles = function () {
+          paint.apply(this, arguments);
+          var svg = view.canvas.ownerSVGElement || view.canvas;
+          var box = svg.getBoundingClientRect();
+          var at = (svg.style.backgroundPosition || '0px 0px').split(' ').map(parseFloat);
+          document.body.style.backgroundImage = svg.style.backgroundImage;
+          document.body.style.backgroundPosition =
+            box.left + window.scrollX + at[0] + 'px ' + (box.top + window.scrollY + at[1]) + 'px';
+          svg.style.backgroundImage = 'none';
+          svg.style.backgroundColor = 'transparent';
+        };
+        graph.gridEnabled = true;
+        view.validateBackground();
+        window.addEventListener('resize', function () {
+          view.validateBackground();
+        });
+      }
 
       var watching = null;
       function watchSize() {

@@ -190,11 +190,6 @@ onUnmounted(() => {
           ref="frame"
           class="fv__drawio"
           :class="{ 'is-sized': frameSize }"
-          :style="
-            frameSize
-              ? { width: `${frameSize.width + 2}px`, height: `${frameSize.height + 2}px` }
-              : undefined
-          "
           src="/drawio/viewer.html"
           sandbox="allow-scripts"
           title="Diagram"
