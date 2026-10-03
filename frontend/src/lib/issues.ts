@@ -125,6 +125,25 @@ export const commentOrder = {
   },
 };
 
+const CARD_ORDER_KEY = 'tracker:card-order:';
+export type CardOrder = 'manual' | 'priority' | 'due';
+
+export const cardOrder = {
+  get(boardId: string): CardOrder {
+    try {
+      const kept = localStorage.getItem(CARD_ORDER_KEY + boardId);
+      return kept === 'priority' || kept === 'due' ? kept : 'manual';
+    } catch {
+      return 'manual';
+    }
+  },
+  set(boardId: string, order: CardOrder): void {
+    try {
+      localStorage.setItem(CARD_ORDER_KEY + boardId, order);
+    } catch {}
+  },
+};
+
 export const priorityColor = (p: Priority): string =>
   ({
     Critical: 'var(--danger-text)',

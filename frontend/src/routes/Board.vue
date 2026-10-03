@@ -8,9 +8,11 @@ import { usePeople } from '../lib/people';
 import { api } from '../lib/api';
 import {
   PRIORITIES,
+  cardOrder,
   dueLabel,
   priorityClass,
   priorityColor,
+  type CardOrder,
   type Issue,
 } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
@@ -182,8 +184,40 @@ const boardTags = computed(() => tags.value.filter((t) => current.value?.tagIds.
 
 const openKey = computed(() => String(route.params.key ?? ''));
 
+const ORDER_CHOICES = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'due', label: 'Due date' },
+];
+const order = ref<CardOrder>('manual');
+watch(
+  () => current.value?.id,
+  (boardId) => {
+    order.value = boardId ? cardOrder.get(boardId) : 'manual';
+  },
+  { immediate: true }
+);
+
+function setOrder(next: string): void {
+  order.value = next as CardOrder;
+  if (current.value) cardOrder.set(current.value.id, order.value);
+}
+
+function byOrder(a: Issue, b: Issue): number {
+  if (order.value === 'priority') {
+    const rank = PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority);
+    if (rank) return rank;
+  }
+  if (order.value === 'due' && a.dueDate !== b.dueDate) {
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return a.dueDate < b.dueDate ? -1 : 1;
+  }
+  return a.position - b.position;
+}
+
 const issuesOf = (stateId: string): Issue[] =>
-  filtered.value.filter((i) => i.stateId === stateId).sort((a, b) => a.position - b.position);
+  filtered.value.filter((i) => i.stateId === stateId).sort(byOrder);
 
 async function loadIssues(boardId: string, quiet = false): Promise<void> {
   const mine = ++issuesRead;
@@ -212,7 +246,7 @@ watch(
 
 function onDragOver(stateId: string, beforeId: string | null): void {
   if (!dragId.value) return;
-  dropAt.value = { stateId, beforeId };
+  dropAt.value = { stateId, beforeId: order.value === 'manual' ? beforeId : null };
 }
 
 async function onDrop(): Promise<void> {
@@ -223,6 +257,7 @@ async function onDrop(): Promise<void> {
   const board = current.value;
   if (!target || !moved || !board) return;
   if (target.beforeId === moved.id) return;
+  if (order.value !== 'manual' && target.stateId === moved.stateId) return;
   issuesRead += 1;
 
   // Send the whole column, not the filtered view, or hidden cards get renumbered out of place.
@@ -350,6 +385,15 @@ watch(
     <TopBar :project="project" :board="current" />
 
     <div v-if="current" class="tagbar">
+      <Select
+        :model-value="order"
+        class="filter"
+        :options="ORDER_CHOICES"
+        small
+        label="Order the cards"
+        @update:model-value="setOrder"
+      />
+      <span class="tagbar__sep" aria-hidden="true"></span>
       <span class="search">
         <Search class="ic ic--sm search__i" />
         <input
@@ -566,6 +610,13 @@ watch(
 }
 .filter:hover {
   color: var(--text);
+}
+.tagbar__sep {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--line-2);
 }
 .search {
   position: relative;
