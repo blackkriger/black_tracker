@@ -44,7 +44,7 @@ import { ink } from '../lib/theme';
 const route = useRoute();
 const router = useRouter();
 const session = useSession();
-const { nameOf, load: loadPeople } = usePeople();
+const { nameOf, colorOf, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 const { ask } = useFocus();
@@ -576,14 +576,19 @@ function closeIssue(): void {
                   <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
                   <span v-if="n.emoji">{{ n.emoji }}</span>
                   <span class="note__said">
-                    <template v-if="n.kind === 'reaction'">{{ nameOf(n.by) }} reacted</template>
-                    <template v-else-if="n.kind === 'assigned'">{{ nameOf(n.by) }} assigned you</template>
+                    <template v-if="n.kind === 'reaction'">
+                      <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span> reacted
+                    </template>
+                    <template v-else-if="n.kind === 'assigned'">
+                      <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span> assigned you
+                    </template>
                     <template v-else-if="n.kind === 'starred' && !n.commentId">
-                      {{ nameOf(n.by) }}: {{ describeChanges(n.changes, nameOf) }}
+                      <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span>
+                      {{ describeChanges(n.changes, nameOf) }}
                     </template>
                     <template v-else>
                       <template v-if="n.by && n.by !== session.me.value?.login">
-                        {{ nameOf(n.by) }}:
+                        <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span>
                       </template>
                       {{ n.said }}
                     </template>

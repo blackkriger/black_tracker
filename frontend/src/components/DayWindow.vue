@@ -22,7 +22,7 @@ const emit = defineEmits<{
 
 const session = useSession();
 const { projects } = useProjects();
-const { nameOf, load: loadPeople } = usePeople();
+const { nameOf, colorOf, load: loadPeople } = usePeople();
 void loadPeople();
 const { off, markRead } = useNotices();
 const { errors, fail, clear } = usePanelErrors();
@@ -137,13 +137,20 @@ async function openNotice(n: Notice): Promise<void> {
         <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
         <span v-if="n.emoji">{{ n.emoji }}</span>
         <span class="mark__title">
-          <template v-if="n.kind === 'reaction'">{{ nameOf(n.by) }} reacted</template>
-          <template v-else-if="n.kind === 'assigned'">{{ nameOf(n.by) }} assigned you</template>
+          <template v-if="n.kind === 'reaction'">
+            <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span> reacted
+          </template>
+          <template v-else-if="n.kind === 'assigned'">
+            <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span> assigned you
+          </template>
           <template v-else-if="n.kind === 'starred' && !n.commentId">
-            {{ nameOf(n.by) }}: {{ describeChanges(n.changes, nameOf) }}
+            <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span>
+            {{ describeChanges(n.changes, nameOf) }}
           </template>
           <template v-else>
-            <template v-if="n.by && n.by !== session.me.value?.login">{{ nameOf(n.by) }}: </template>
+            <template v-if="n.by && n.by !== session.me.value?.login">
+              <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span>
+            </template>
             {{ n.said }}
           </template>
         </span>

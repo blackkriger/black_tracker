@@ -37,7 +37,7 @@ const session = useSession();
 const router = useRouter();
 const route = useRoute();
 const { projects, load } = useProjects();
-const { load: loadPeople } = usePeople();
+const { colorOf, load: loadPeople } = usePeople();
 const mine = computed(() => session.me.value?.role?.color ?? undefined);
 const { load: loadRoles } = useRoles();
 
@@ -306,13 +306,20 @@ async function signOut(): Promise<void> {
               <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
               <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
               <span class="men__said">
-                <template v-if="n.kind === 'reaction'">{{ n.by }} reacted</template>
-                <template v-else-if="n.kind === 'assigned'">{{ n.by }} assigned you</template>
+                <template v-if="n.kind === 'reaction'">
+                  <span :style="{ color: ink(colorOf(n.by)) }">{{ n.by }}</span> reacted
+                </template>
+                <template v-else-if="n.kind === 'assigned'">
+                  <span :style="{ color: ink(colorOf(n.by)) }">{{ n.by }}</span> assigned you
+                </template>
                 <template v-else-if="n.kind === 'starred' && !n.commentId">
-                  {{ n.by }}: {{ describeChanges(n.changes, (login) => login) }}
+                  <span :style="{ color: ink(colorOf(n.by)) }">{{ n.by }}</span>
+                  {{ describeChanges(n.changes, (login) => login) }}
                 </template>
                 <template v-else>
-                  <template v-if="n.by && n.by !== session.me.value?.login">{{ n.by }}: </template>
+                  <template v-if="n.by && n.by !== session.me.value?.login">
+                    <span :style="{ color: ink(colorOf(n.by)) }">{{ n.by }}</span>
+                  </template>
                   {{ n.said }}
                 </template>
               </span>
