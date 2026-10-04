@@ -419,7 +419,10 @@ async function signOut(): Promise<void> {
 .rail__projects {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 2px;
+}
+.rail__proj + .rail__proj {
+  margin-top: 10px;
 }
 .rail__proj {
   display: flex;
@@ -436,8 +439,8 @@ async function signOut(): Promise<void> {
   padding-left: 31px;
 }
 .rail__sections {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .rail__date {
   display: flex;

@@ -46,15 +46,15 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
       <line class="f" x1="72.5" y1="0" x2="72.5" y2="160" />
       <rect class="t" x="7" y="7" width="3" height="3" />
       <rect class="t" x="13" y="7.5" width="12" height="2" />
-      <rect class="t" x="7" y="13" width="3" height="3" />
-      <rect class="t" x="13" y="13.5" width="16" height="2" />
-      <rect class="m" x="7" y="24" width="12" height="2" />
-      <rect class="k" x="7" y="30" width="9" height="3.5" />
-      <rect class="t" x="18" y="30.25" width="22" height="3" />
-      <line class="f" x1="8.5" y1="37" x2="8.5" y2="52" />
-      <rect class="t" x="18" y="38" width="18" height="2" />
-      <rect class="m" x="18" y="43" width="14" height="2" />
-      <rect class="m" x="18" y="48" width="10" height="2" />
+      <rect class="t" x="40" y="7" width="3" height="3" />
+      <rect class="t" x="46" y="7.5" width="16" height="2" />
+      <rect class="m" x="7" y="19" width="12" height="2" />
+      <rect class="k" x="7" y="25" width="9" height="3.5" />
+      <rect class="t" x="18" y="25.25" width="22" height="3" />
+      <line class="f" x1="8.5" y1="31" x2="8.5" y2="46" />
+      <rect class="t" x="18" y="32" width="18" height="2" />
+      <rect class="m" x="18" y="37" width="14" height="2" />
+      <rect class="m" x="18" y="42" width="10" height="2" />
       <rect class="m" x="7" y="70" width="22" height="2" />
       <rect class="m" x="56" y="70" width="2" height="2" />
       <rect class="m" x="62" y="70" width="2" height="2" />
