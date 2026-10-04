@@ -437,18 +437,14 @@ onMounted(() => {
               </label>
             </div>
             <div class="list__row">
-              <span class="list__period" :class="{ 'is-on': period.from || period.to }">
-                <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
-              </span>
               <FilterMenu v-model="byProjects" label="Projects" :options="projectChoices" />
               <FilterMenu v-model="byStates" label="Status" :options="stateChoices" />
               <FilterMenu v-model="byAssignees" label="Assignee" :options="assigneeChoices" />
               <FilterMenu v-model="byAuthors" label="Author" :options="personChoices" />
-              <button v-if="anyFilter" class="btn btn--sm btn--ghost" type="button" @click="clearAll">
-                Clear all
-              </button>
-            </div>
-            <div v-if="tagChoices.length" class="list__row">
+              <span class="list__sep" aria-hidden="true"></span>
+              <span class="list__period" :class="{ 'is-on': period.from || period.to }">
+                <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
+              </span>
               <button
                 v-for="t in tagChoices"
                 :key="t.id"
@@ -459,6 +455,9 @@ onMounted(() => {
                 :style="{ '--c': t.color }"
                 @click="toggleTag(t.id)"
               >{{ t.name }}</button>
+              <button v-if="anyFilter" class="btn btn--sm btn--ghost" type="button" @click="clearAll">
+                Clear all
+              </button>
             </div>
           </div>
 
@@ -693,6 +692,13 @@ onMounted(() => {
 }
 .taglabel--pick.is-off {
   opacity: 0.35;
+}
+.list__sep {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--line-2);
 }
 .list__period:not(.is-on) :deep(.drp__trigger) {
   color: var(--text-muted);
