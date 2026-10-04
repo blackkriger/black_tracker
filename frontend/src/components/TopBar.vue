@@ -241,7 +241,7 @@ async function signOut(): Promise<void> {
 
     <div class="rail__date">
       <span v-if="countdown" class="stamp topcount rail__count">{{ countdown }}</span>
-      <DatePanel ref="panel" :soon="soon" @day="toDay" />
+      <DatePanel ref="panel" :soon="soon" all @day="toDay" />
     </div>
 
     <nav class="rail__account" aria-label="Account">
@@ -435,6 +435,7 @@ async function signOut(): Promise<void> {
 }
 .rail__date {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 6px;
 }

@@ -22,7 +22,7 @@ import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
 
-defineProps<{ soon: Mark | null; withFull?: boolean }>();
+defineProps<{ soon: Mark | null; withFull?: boolean; all?: boolean }>();
 const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>();
 
 const session = useSession();
@@ -92,7 +92,7 @@ defineExpose({ readMonth });
 </script>
 
 <template>
-  <div class="dp">
+  <div class="dp" :class="{ 'dp--all': all }">
     <div class="datemenu__h">
       {{ monthName(calYear, calMonth) }}
       <div class="sp"></div>
@@ -147,30 +147,32 @@ defineExpose({ readMonth });
     </template>
     <template v-if="notices.length">
       <hr />
-      <button
-        v-for="n in notices.slice(0, 5)"
-        :key="n.id"
-        class="menu__i men"
-        :class="{ 'men--new': !n.read }"
-        type="button"
-        @click="openNotice(n)"
-      >
-        <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
-        <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
-        <span
-          v-if="showsAuthor(n, session.me.value?.login)"
-          class="men__by"
-          :style="{ color: ink(colorOf(n.by)) }"
-        >{{ nameOf(n.by) }}</span>
-        <span class="men__said">
-          <template v-if="n.kind === 'reaction'">reacted</template>
-          <template v-else-if="n.kind === 'assigned'">assigned you</template>
-          <template v-else-if="n.kind === 'starred' && !n.commentId">
-            {{ describeChanges(n.changes, nameOf) }}
-          </template>
-          <template v-else>{{ n.said }}</template>
-        </span>
-      </button>
+      <div class="dp__notices">
+        <button
+          v-for="n in all ? notices : notices.slice(0, 5)"
+          :key="n.id"
+          class="menu__i men"
+          :class="{ 'men--new': !n.read }"
+          type="button"
+          @click="openNotice(n)"
+        >
+          <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
+          <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
+          <span
+            v-if="showsAuthor(n, session.me.value?.login)"
+            class="men__by"
+            :style="{ color: ink(colorOf(n.by)) }"
+          >{{ nameOf(n.by) }}</span>
+          <span class="men__said">
+            <template v-if="n.kind === 'reaction'">reacted</template>
+            <template v-else-if="n.kind === 'assigned'">assigned you</template>
+            <template v-else-if="n.kind === 'starred' && !n.commentId">
+              {{ describeChanges(n.changes, nameOf) }}
+            </template>
+            <template v-else>{{ n.said }}</template>
+          </span>
+        </button>
+      </div>
     </template>
     <template v-if="withFull">
       <hr />
@@ -183,6 +185,15 @@ defineExpose({ readMonth });
 </template>
 
 <style scoped>
+.dp--all {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+.dp--all .dp__notices {
+  flex: 1 1 0;
+  overflow-y: auto;
+}
 .dp hr {
   border: 0;
   border-top: 1px solid var(--line);
