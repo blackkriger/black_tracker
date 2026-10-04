@@ -5,7 +5,7 @@ import Dialog from './Dialog.vue';
 import Select from './Select.vue';
 import { api } from '../lib/api';
 import { tellTab } from '../lib/live';
-import { longDate, type Due, type Mark } from '../lib/calendar';
+import { longDate, type Activity, type Due, type Mark } from '../lib/calendar';
 import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
@@ -29,6 +29,17 @@ const { errors, fail, clear } = usePanelErrors();
 
 const marks = ref<Mark[]>([]);
 const dues = ref<Due[]>([]);
+const activity = ref<Activity[]>([]);
+const sum = computed(() =>
+  activity.value.reduce(
+    (all, a) => ({
+      worked: all.worked + a.worked,
+      created: all.created + a.created,
+      resolved: all.resolved + a.resolved,
+    }),
+    { worked: 0, created: 0, resolved: 0 }
+  )
+);
 const heard = ref<Notice[]>([]);
 const said = computed(() => heard.value.filter((n) => !off.value.includes(n.kind)));
 
@@ -41,7 +52,7 @@ async function read(): Promise<void> {
   clear('day');
   try {
     const [got, notices] = await Promise.all([
-      api<{ marks: Mark[]; dues: { day: string; issues: Due[] }[] }>(
+      api<{ marks: Mark[]; dues: { day: string; issues: Due[] }[]; activity: Activity[] }>(
         `/calendar?from=${props.day}&to=${props.day}`
       ),
       api<Notice[]>(`/notices?from=${props.day}&to=${props.day}`),
@@ -49,6 +60,7 @@ async function read(): Promise<void> {
     heard.value = notices;
     marks.value = got.marks;
     dues.value = got.dues.flatMap((d) => d.issues);
+    activity.value = got.activity;
   } catch (err) {
     fail('day', err, 'Could not read the day.');
   }
@@ -126,6 +138,10 @@ async function openNotice(n: Notice): Promise<void> {
 
 <template>
   <Dialog :title="longDate(day)" :width="460" @close="emit('close')">
+    <div v-if="sum.worked" class="day__sum">
+      {{ sum.worked }} worked, {{ sum.created }} opened, {{ sum.resolved }} closed
+    </div>
+
     <div v-if="said.length" class="marks">
       <button
         v-for="n in said"
@@ -247,6 +263,10 @@ async function openNotice(n: Notice): Promise<void> {
 </template>
 
 <style scoped>
+.day__sum {
+  color: var(--text-muted);
+  font: 11.5px var(--font-num);
+}
 .marks {
   display: flex;
   flex-direction: column;
