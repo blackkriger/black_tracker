@@ -20,6 +20,7 @@ const Join = () => import('./routes/Join.vue');
 const Reset = () => import('./routes/Reset.vue');
 const Dashboard = () => import('./routes/Dashboard.vue');
 const Analytics = () => import('./routes/Analytics.vue');
+const Issues = () => import('./routes/Issues.vue');
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -47,6 +48,7 @@ export const router = createRouter({
         },
         { path: '/profile', name: 'profile', component: Profile },
         { path: '/calendar', redirect: { name: 'me', query: { calendar: 'full' } } },
+        { path: '/issues/:key?', name: 'issues', component: Issues },
         { path: '/analytics', name: 'analytics', component: Analytics },
         { path: '/settings', name: 'settings', component: SettingsIndex },
         { path: '/settings/profile', name: 'settings-profile', component: SettingsProfile },

@@ -32,6 +32,9 @@ const live = computed(() => projects.value.filter((p) => !p.archived));
 const PLACES = ['project-board', 'board', 'issue'];
 const here = computed(() => PLACES.includes(String(route.name)));
 const currentShort = computed(() => (here.value ? String(route.params.short) : null));
+const issuesTo = computed(() =>
+  currentShort.value ? { name: 'issues', query: { projects: currentShort.value } } : { name: 'issues' }
+);
 const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
 
 const today = stamp(new Date().toISOString());
@@ -203,6 +206,7 @@ async function signOut(): Promise<void> {
         <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
         {{ session.me.value?.login }}
       </RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" :to="issuesTo">Issues</RouterLink>
       <RouterLink v-if="hasRole" class="topitem" to="/analytics">Analytics</RouterLink>
       <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
@@ -230,7 +234,10 @@ async function signOut(): Promise<void> {
       </div>
     </nav>
 
-    <RouterLink v-if="hasRole" class="topitem" to="/analytics">Analytics</RouterLink>
+    <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
+      <RouterLink class="topitem" :to="issuesTo">Issues</RouterLink>
+      <RouterLink class="topitem" to="/analytics">Analytics</RouterLink>
+    </nav>
 
     <div class="rail__date">
       <span v-if="countdown" class="stamp topcount rail__count">{{ countdown }}</span>
@@ -421,6 +428,10 @@ async function signOut(): Promise<void> {
 .rail__board {
   height: 26px;
   padding-left: 38px;
+}
+.rail__sections {
+  display: flex;
+  flex-direction: column;
 }
 .rail__date {
   display: flex;
