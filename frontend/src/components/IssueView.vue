@@ -21,7 +21,6 @@ import { useSession } from '../lib/session';
 import {
   ArrowDown,
   ArrowUp,
-  ArrowUpToLine,
   FileArchive,
   FileDown,
   Link2,
@@ -1232,7 +1231,7 @@ async function removeIssue(): Promise<void> {
             :tabindex="scrolled ? 0 : -1"
             @click="toTop"
           >
-            <ArrowUpToLine class="ic" />
+            <ArrowUp class="ic" />
           </button>
           <div class="sp"></div>
           <span class="iv__path">
