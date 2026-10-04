@@ -15,7 +15,7 @@ import { todayKey, type Mark } from '../lib/calendar';
 import { stamp } from '../lib/issues';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { layout } from '../lib/layout';
-import { AtSign, ContactRound, Moon, Smile, Star, Sun } from 'lucide-vue-next';
+import { AtSign, ChartColumn, ContactRound, ListChecks, Moon, Smile, Star, Sun } from 'lucide-vue-next';
 import { ink, setTheme, shownTheme } from '../lib/theme';
 
 const session = useSession();
@@ -212,7 +212,13 @@ async function signOut(): Promise<void> {
   </header>
 
   <aside v-else class="rail">
+    <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
+      <RouterLink class="topitem" :to="issuesTo"><ListChecks class="ic" />Issues</RouterLink>
+      <RouterLink class="topitem" to="/analytics"><ChartColumn class="ic" />Analytics</RouterLink>
+    </nav>
+
     <nav v-if="live.length" class="rail__projects" aria-label="Projects">
+      <div class="side__h">Projects</div>
       <div v-for="p in live" :key="p.id" class="rail__proj">
         <RouterLink
           class="topitem topitem--project"
@@ -222,19 +228,16 @@ async function signOut(): Promise<void> {
           <span class="proj__k">{{ p.shortName }}</span>
           <span class="topitem__name">{{ p.name }}</span>
         </RouterLink>
-        <RouterLink
-          v-for="b in p.boards"
-          :key="b.id"
-          class="topitem topitem__board rail__board"
-          :class="{ 'is-here': p.shortName === currentShort && b.slug.toLowerCase() === currentSlug }"
-          :to="`/${p.shortName}/${b.slug}`"
-        >{{ b.name }}</RouterLink>
+        <div v-if="p.boards.length" class="rail__boards">
+          <RouterLink
+            v-for="b in p.boards"
+            :key="b.id"
+            class="topitem topitem__board rail__board"
+            :class="{ 'is-here': p.shortName === currentShort && b.slug.toLowerCase() === currentSlug }"
+            :to="`/${p.shortName}/${b.slug}`"
+          >{{ b.name }}</RouterLink>
+        </div>
       </div>
-    </nav>
-
-    <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
-      <RouterLink class="topitem" :to="issuesTo">Issues</RouterLink>
-      <RouterLink class="topitem" to="/analytics">Analytics</RouterLink>
     </nav>
 
     <div class="rail__date">
@@ -422,17 +425,19 @@ async function signOut(): Promise<void> {
   display: flex;
   flex-direction: column;
 }
+.rail__boards {
+  display: flex;
+  flex-direction: column;
+  margin-left: 16px;
+  border-left: 1px solid var(--line);
+}
 .rail__board {
   height: 26px;
-  padding-left: 38px;
+  padding-left: 31px;
 }
 .rail__sections {
   display: flex;
   flex-direction: column;
-}
-.rail__projects + .rail__sections {
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--line);
 }
 .rail__date {
   display: flex;

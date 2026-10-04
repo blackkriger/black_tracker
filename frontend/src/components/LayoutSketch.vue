@@ -44,37 +44,38 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
 
     <template v-else>
       <line class="f" x1="72.5" y1="0" x2="72.5" y2="160" />
-      <rect class="k" x="7" y="7" width="9" height="3.5" />
-      <rect class="t" x="18" y="7.25" width="22" height="3" />
-      <rect class="m" x="18" y="14" width="18" height="2" />
-      <rect class="m" x="18" y="19" width="14" height="2" />
-      <rect class="k" x="7" y="27" width="9" height="3.5" />
-      <rect class="t" x="18" y="27.25" width="16" height="3" />
-      <rect class="m" x="18" y="34" width="10" height="2" />
-      <rect class="t" x="7" y="42" width="14" height="2" />
-      <rect class="t" x="7" y="47" width="20" height="2" />
-      <rect class="m" x="7" y="56" width="22" height="2" />
-      <rect class="m" x="56" y="56" width="2" height="2" />
-      <rect class="m" x="62" y="56" width="2" height="2" />
+      <rect class="t" x="7" y="7" width="3" height="3" />
+      <rect class="t" x="13" y="7.5" width="12" height="2" />
+      <rect class="t" x="7" y="13" width="3" height="3" />
+      <rect class="t" x="13" y="13.5" width="16" height="2" />
+      <rect class="m" x="7" y="24" width="12" height="2" />
+      <rect class="k" x="7" y="30" width="9" height="3.5" />
+      <rect class="t" x="18" y="30.25" width="22" height="3" />
+      <line class="f" x1="8.5" y1="37" x2="8.5" y2="52" />
+      <rect class="t" x="18" y="38" width="18" height="2" />
+      <rect class="m" x="18" y="43" width="14" height="2" />
+      <rect class="m" x="18" y="48" width="10" height="2" />
+      <rect class="m" x="7" y="70" width="22" height="2" />
+      <rect class="m" x="56" y="70" width="2" height="2" />
+      <rect class="m" x="62" y="70" width="2" height="2" />
       <rect
         v-for="(d, i) in days"
         :key="i"
         :class="i === 6 ? 'k' : 'm'"
         :x="7 + d.col * 8.5"
-        :y="63 + d.row * 7"
+        :y="77 + d.row * 7"
         width="3"
         height="3"
       />
-      <line class="f" x1="4" y1="98.5" x2="69" y2="98.5" />
-      <rect class="t" x="7" y="103" width="8" height="2" />
-      <rect class="t" x="17" y="103" width="10" height="2" />
-      <rect class="m" x="29" y="103" width="30" height="2" />
-      <rect class="t" x="7" y="109" width="8" height="2" />
-      <rect class="t" x="17" y="109" width="10" height="2" />
-      <rect class="m" x="29" y="109" width="24" height="2" />
-      <rect class="t" x="7" y="115" width="8" height="2" />
-      <rect class="t" x="17" y="115" width="10" height="2" />
-      <rect class="m" x="29" y="115" width="18" height="2" />
+      <rect class="t" x="7" y="113" width="30" height="2" />
+      <rect class="m" x="7" y="118" width="40" height="2" />
+      <line class="f" x1="4" y1="123.5" x2="69" y2="123.5" />
+      <rect class="t" x="7" y="128" width="8" height="2" />
+      <rect class="t" x="17" y="128" width="10" height="2" />
+      <rect class="m" x="29" y="128" width="30" height="2" />
+      <rect class="t" x="7" y="134" width="8" height="2" />
+      <rect class="t" x="17" y="134" width="10" height="2" />
+      <rect class="m" x="29" y="134" width="24" height="2" />
       <circle class="t" cx="10" cy="146" r="3" />
       <rect class="t" x="16" y="145" width="18" height="2" />
       <circle class="m" cx="56" cy="146" r="2" />
