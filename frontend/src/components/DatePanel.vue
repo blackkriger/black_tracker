@@ -113,6 +113,7 @@ defineExpose({ readMonth });
 
 <template>
   <div class="dp" :class="{ 'dp--all': all }">
+    <slot />
     <div class="datemenu__h">
       {{ monthName(calYear, calMonth) }}
       <div class="sp"></div>
@@ -209,9 +210,11 @@ defineExpose({ readMonth });
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  justify-content: flex-end;
 }
 .dp--all .dp__notices {
   flex: 1 1 0;
+  max-height: max-content;
   overflow-y: auto;
 }
 .dp hr {

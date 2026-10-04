@@ -238,8 +238,9 @@ async function signOut(): Promise<void> {
     </nav>
 
     <div class="rail__date">
-      <span v-if="countdown" class="stamp topcount rail__count">{{ countdown }}</span>
-      <DatePanel ref="panel" :soon="soon" all @day="toDay" />
+      <DatePanel ref="panel" :soon="soon" all @day="toDay">
+        <span v-if="countdown" class="stamp topcount rail__count">{{ countdown }}</span>
+      </DatePanel>
     </div>
 
     <nav class="rail__account" aria-label="Account">
@@ -439,6 +440,7 @@ async function signOut(): Promise<void> {
 }
 .rail__count {
   max-width: none;
+  margin-bottom: 6px;
   padding: 0 10px;
 }
 .rail__account {
