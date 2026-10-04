@@ -57,102 +57,104 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
 </script>
 
 <template>
-  <section class="panel sheet__wide">
-    <header class="panel__h">Layout</header>
-    <div class="panel__b layouts">
-      <label
-        v-for="l in LAYOUTS"
-        :key="l.value"
-        class="layout"
-        :class="{ 'is-on': layout === l.value }"
-      >
-        <input
-          class="sr"
-          type="radio"
-          name="layout"
-          :checked="layout === l.value"
-          @change="setLayout(l.value)"
-        />
-        <LayoutSketch :kind="l.value" />
-        <span class="layout__name">{{ l.label }}</span>
-      </label>
+  <div class="sheet__wide prefs">
+    <section class="panel prefs__layout">
+      <header class="panel__h">Layout</header>
+      <div class="panel__b layouts">
+        <label
+          v-for="l in LAYOUTS"
+          :key="l.value"
+          class="layout"
+          :class="{ 'is-on': layout === l.value }"
+        >
+          <input
+            class="sr"
+            type="radio"
+            name="layout"
+            :checked="layout === l.value"
+            @change="setLayout(l.value)"
+          />
+          <LayoutSketch :kind="l.value" />
+          <span class="layout__name">{{ l.label }}</span>
+        </label>
+      </div>
+    </section>
+    <div class="stack prefs__main">
+      <section class="panel">
+        <header class="panel__h">Preferences</header>
+        <div class="panel__b form">
+          <div class="pairs">
+            <div class="field">
+              <span class="label">Theme</span>
+              <label v-for="t in THEMES" :key="t.value" class="flag">
+                <input type="radio" name="theme" :checked="theme === t.value" @change="setTheme(t.value)" />
+                {{ t.label }}
+              </label>
+            </div>
+            <div class="field">
+              <span class="label">Comments read</span>
+              <label class="flag">
+                <input
+                  type="radio"
+                  name="comment-order"
+                  :checked="order === 'oldest'"
+                  @change="setOrder('oldest')"
+                />
+                Oldest first
+              </label>
+              <label class="flag">
+                <input
+                  type="radio"
+                  name="comment-order"
+                  :checked="order === 'newest'"
+                  @change="setOrder('newest')"
+                />
+                Newest first
+              </label>
+            </div>
+          </div>
+          <div class="pairs">
+            <div class="field">
+              <span class="label">Notices shown</span>
+              <label v-for="k in KINDS" :key="k.kind" class="flag">
+                <input
+                  type="checkbox"
+                  :checked="!off.includes(k.kind)"
+                  @change="toggleKind(k.kind)"
+                />
+                {{ k.label }}
+              </label>
+            </div>
+            <div class="field">
+              <span class="label">Files</span>
+              <label class="flag">
+                <input
+                  type="checkbox"
+                  :checked="wrapLines"
+                  @change="setWrapLines(($event.target as HTMLInputElement).checked)"
+                />
+                Wrap long lines
+              </label>
+            </div>
+          </div>
+          <div class="pairs">
+            <div class="field">
+              <span class="label">Star automatically</span>
+              <label v-for="s in STARS" :key="s.key" class="flag">
+                <input
+                  type="checkbox"
+                  :checked="me?.autoStar[s.key] ?? false"
+                  @change="setAutoStar(s.body, ($event.target as HTMLInputElement).checked)"
+                />
+                {{ s.label }}
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+      <div v-if="errors.prefs" class="err panel__err">{{ errors.prefs }}</div>
     </div>
-  </section>
-
-
-  <section class="panel sheet__wide">
-    <header class="panel__h">Preferences</header>
-    <div class="panel__b form">
-      <div class="pairs">
-        <div class="field">
-          <span class="label">Theme</span>
-          <label v-for="t in THEMES" :key="t.value" class="flag">
-            <input type="radio" name="theme" :checked="theme === t.value" @change="setTheme(t.value)" />
-            {{ t.label }}
-          </label>
-        </div>
-        <div class="field">
-          <span class="label">Comments read</span>
-          <label class="flag">
-            <input
-              type="radio"
-              name="comment-order"
-              :checked="order === 'oldest'"
-              @change="setOrder('oldest')"
-            />
-            Oldest first
-          </label>
-          <label class="flag">
-            <input
-              type="radio"
-              name="comment-order"
-              :checked="order === 'newest'"
-              @change="setOrder('newest')"
-            />
-            Newest first
-          </label>
-        </div>
-      </div>
-      <div class="pairs">
-        <div class="field">
-          <span class="label">Notices shown</span>
-          <label v-for="k in KINDS" :key="k.kind" class="flag">
-            <input
-              type="checkbox"
-              :checked="!off.includes(k.kind)"
-              @change="toggleKind(k.kind)"
-            />
-            {{ k.label }}
-          </label>
-        </div>
-        <div class="field">
-          <span class="label">Files</span>
-          <label class="flag">
-            <input
-              type="checkbox"
-              :checked="wrapLines"
-              @change="setWrapLines(($event.target as HTMLInputElement).checked)"
-            />
-            Wrap long lines
-          </label>
-        </div>
-      </div>
-      <div class="pairs">
-        <div class="field">
-          <span class="label">Star automatically</span>
-          <label v-for="s in STARS" :key="s.key" class="flag">
-            <input
-              type="checkbox"
-              :checked="me?.autoStar[s.key] ?? false"
-              @change="setAutoStar(s.body, ($event.target as HTMLInputElement).checked)"
-            />
-            {{ s.label }}
-          </label>
-        </div>
-      </div>
-    </div>
-  </section>
-  <div v-if="errors.prefs" class="err panel__err sheet__wide">{{ errors.prefs }}</div>
+  </div>
 </template>
 
 <style scoped>
@@ -173,10 +175,22 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
   gap: 8px;
   font-size: 13px;
 }
-.layouts {
+.prefs {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--space-5);
+}
+.prefs__layout {
+  flex: none;
+}
+.prefs__main {
+  flex: 1 1 360px;
+}
+.layouts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 .layout {
   display: flex;
