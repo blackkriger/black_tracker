@@ -138,7 +138,7 @@ async function openNotice(n: Notice): Promise<void> {
 
 <template>
   <Dialog :title="longDate(day)" :width="460" @close="emit('close')">
-    <div v-if="sum.worked" class="day__sum">
+    <div v-if="sum.worked || sum.created || sum.resolved" class="day__sum">
       {{ sum.worked }} worked, {{ sum.created }} opened, {{ sum.resolved }} closed
     </div>
 

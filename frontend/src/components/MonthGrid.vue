@@ -162,12 +162,12 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       <span v-if="hovered.said" class="cal__pop-at" :style="{ color: ink(mine) }">
         {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
       </span>
-      <span v-if="hovered.worked" class="cal__pop-work">
+      <span v-if="hovered.worked || hovered.created || hovered.resolved" class="cal__pop-work">
         {{ hovered.worked }} worked, {{ hovered.created }} opened,
         {{ hovered.resolved }} closed
       </span>
       <span
-        v-if="!hovered.marks.length && !hovered.dues.length && !hovered.worked && !hovered.said"
+        v-if="!hovered.marks.length && !hovered.dues.length && !hovered.worked && !hovered.created && !hovered.resolved && !hovered.said"
         class="cal__pop-work"
       >Nothing yet.</span>
     </div>
