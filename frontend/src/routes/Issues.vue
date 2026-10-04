@@ -507,11 +507,11 @@ onBeforeUnmount(() => window.removeEventListener('click', onOutside));
               </label>
             </div>
             <div class="list__row">
+              <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
               <FilterMenu v-model="byProjects" label="Projects" :options="projectChoices" />
               <FilterMenu v-model="byStates" label="Status" :options="stateChoices" />
               <FilterMenu v-model="byAssignees" label="Assignee" :options="assigneeChoices" />
               <FilterMenu v-model="byAuthors" label="Author" :options="personChoices" />
-              <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
             </div>
             <div v-if="tagChoices.length" class="list__row">
               <span class="label">Tags:</span>
