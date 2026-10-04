@@ -13,6 +13,12 @@ export const TAB_ID =
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
 
+let unauthorized: ((message: string) => void) | null = null;
+
+export function onUnauthorized(handler: (message: string) => void): void {
+  unauthorized = handler;
+}
+
 export async function api<T>(
   path: string,
   init: Omit<RequestInit, 'body'> & { body?: unknown } = {}
@@ -32,7 +38,9 @@ export async function api<T>(
     | { data?: T; error?: string }
     | null;
   if (!res.ok || !payload || payload.error) {
-    throw new ApiError(payload?.error ?? `Request failed (${res.status})`, res.status);
+    const message = payload?.error ?? `Request failed (${res.status})`;
+    if (res.status === 401 && path !== '/login') unauthorized?.(message);
+    throw new ApiError(message, res.status);
   }
   return payload.data as T;
 }

@@ -168,6 +168,7 @@ useLive((ev) => {
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const failed = ref(false);
 
 const boards = computed(() =>
   [...(project.value?.boards ?? [])].sort((a, b) => a.position - b.position)
@@ -228,10 +229,12 @@ async function loadIssues(boardId: string, quiet = false): Promise<void> {
     if (mine !== issuesRead) return;
     issues.value = rows;
     error.value = null;
+    failed.value = false;
   } catch (err) {
     if (mine !== issuesRead) return;
     issues.value = [];
     error.value = err instanceof Error ? err.message : 'Could not load the issues.';
+    failed.value = true;
   } finally {
     if (mine === issuesRead) issuesLoading.value = false;
   }
@@ -426,7 +429,7 @@ watch(
 <template>
   <div class="page">
 
-    <div v-if="current" class="tagbar">
+    <div v-if="current && !failed" class="tagbar">
       <Select
         :model-value="order"
         class="filter"
@@ -510,14 +513,14 @@ watch(
     <div
       v-if="loading || error || !current"
       class="page__body"
-      :class="{ 'page__body--tags': current }"
+      :class="{ 'page__body--tags': current && !failed }"
     >
       <p v-if="loading" class="hint">Loading…</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
       <div v-else-if="!current" class="empty"><span class="empty__g">◇</span>This project has no boards.</div>
     </div>
 
-    <div v-if="current" class="board board--tags">
+    <div v-if="current && !failed" class="board board--tags">
       <section
         v-for="s in current.states"
         :key="s.id"

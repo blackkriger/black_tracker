@@ -1,5 +1,5 @@
 import { onUnmounted } from 'vue';
-import { TAB_ID } from './api';
+import { api, TAB_ID } from './api';
 
 export interface LiveEvent {
   type: string;
@@ -47,6 +47,7 @@ function open(): void {
     lost = true;
     if (stream.readyState !== EventSource.CLOSED || source !== stream) return;
     source = null;
+    void api('/me').catch(() => {});
     retry = setTimeout(() => {
       retry = null;
       open();

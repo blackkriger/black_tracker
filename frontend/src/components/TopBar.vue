@@ -131,6 +131,7 @@ useLive((ev) => {
     void rereadMe();
   }
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void readNotices();
+  if (ev.type === 'session.changed') void api('/me').catch(() => {});
 }, () => {
   void load(true);
   void loadPeople(true);

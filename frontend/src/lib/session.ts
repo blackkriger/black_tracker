@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import { api } from './api';
+import { api, onUnauthorized } from './api';
 
 export interface Me {
   id: string;
@@ -20,11 +20,17 @@ export interface Me {
 
 const me = ref<Me | null>(null);
 const ready = ref(false);
+const signedOut = ref<string | null>(null);
+
+onUnauthorized((message) => {
+  if (me.value) signedOut.value = message;
+});
 
 export function useSession() {
   return {
     me,
     ready,
+    signedOut,
     isAdmin: computed(() => me.value?.isAdmin === true),
     canDelete: computed(() => me.value?.canDelete === true),
     canManageRoles: computed(() => me.value?.canManageRoles === true),
