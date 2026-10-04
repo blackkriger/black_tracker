@@ -22,7 +22,7 @@ import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
 
-defineProps<{ soon: Mark | null }>();
+defineProps<{ soon: Mark | null; withFull?: boolean }>();
 const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>();
 
 const session = useSession();
@@ -172,11 +172,13 @@ defineExpose({ readMonth });
         </span>
       </button>
     </template>
-    <hr />
-    <button class="menu__i" type="button" @click="toCalendar">
-      Full calendar
-      <ArrowRight class="ic ic--sm" />
-    </button>
+    <template v-if="withFull">
+      <hr />
+      <button class="menu__i" type="button" @click="toCalendar">
+        Full calendar
+        <ArrowRight class="ic ic--sm" />
+      </button>
+    </template>
   </div>
 </template>
 

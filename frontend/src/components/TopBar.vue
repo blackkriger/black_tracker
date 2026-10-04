@@ -180,7 +180,7 @@ async function signOut(): Promise<void> {
           </span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
-          <DatePanel ref="panel" :soon="soon" @day="toDay" @leave="dateOpen = false" />
+          <DatePanel ref="panel" :soon="soon" with-full @day="toDay" @leave="dateOpen = false" />
         </div>
       </span>
       <RouterLink class="topitem" :to="{ name: 'me' }">
