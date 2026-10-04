@@ -54,7 +54,7 @@ const countdown = computed(() => {
   return `${left} days till ${what}`;
 });
 
-const { shown: notices, unread, load: readNotices } = useNotices();
+const { shown: notices, load: readNotices } = useNotices();
 
 const KINDS: { kind: NoticeKind; icon: typeof AtSign; label: string }[] = [
   { kind: 'mention', icon: AtSign, label: 'Mentions' },
@@ -185,9 +185,13 @@ async function signOut(): Promise<void> {
         >
           <span v-if="countdown" class="stamp topcount">{{ countdown }}</span>
           <span class="datechip__now">
-            <span v-if="unread" class="stamp topat" :style="{ color: ink(mine) }">
-              <AtSign class="ic ic--sm" />{{ unread }}
-            </span>
+            <span
+              v-for="k in unreadKinds"
+              :key="k.kind"
+              class="stamp topat"
+              :style="{ color: ink(mine) }"
+              :aria-label="k.label"
+            ><component :is="k.icon" class="ic ic--sm" />{{ k.count }}</span>
             <span class="stamp">{{ today }}</span>
           </span>
         </button>
