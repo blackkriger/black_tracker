@@ -194,7 +194,7 @@ async function loadTags(): Promise<void> {
 }
 
 const projectChoices = computed(() =>
-  live.value.map((p) => ({ value: p.shortName, label: `${p.shortName} ${p.name}` }))
+  live.value.map((p) => ({ value: p.shortName, key: p.shortName, label: p.name }))
 );
 const stateChoices = computed(() => {
   const seen = new Map<string, string>();
