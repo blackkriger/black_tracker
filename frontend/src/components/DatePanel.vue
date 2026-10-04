@@ -44,7 +44,7 @@ const soonIn = computed(() => {
 async function fill(): Promise<void> {
   await nextTick();
   const el = list.value;
-  if (!props.all || !el || !hasMore.value) return;
+  if (!el || !hasMore.value) return;
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
     const before = everything.value.length;
     await loadMore();
@@ -178,7 +178,7 @@ defineExpose({ readMonth });
       <hr />
       <div ref="list" class="dp__notices" :style="{ '--rows': notices.length }" @scroll="fill">
         <button
-          v-for="n in all ? notices : notices.slice(0, 5)"
+          v-for="n in notices"
           :key="n.id"
           class="menu__i men"
           :class="{ 'men--new': !n.read }"
@@ -219,6 +219,10 @@ defineExpose({ readMonth });
   flex: 1 1 auto;
   flex-direction: column;
   justify-content: flex-end;
+}
+.dp__notices {
+  max-height: calc(5 * 32px);
+  overflow-y: auto;
 }
 .dp--all .dp__notices {
   flex: 1 1 0;
