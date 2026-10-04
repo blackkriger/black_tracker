@@ -51,7 +51,6 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
       <rect class="m" x="7" y="19" width="12" height="2" />
       <rect class="k" x="7" y="25" width="9" height="3.5" />
       <rect class="t" x="18" y="25.25" width="22" height="3" />
-      <line class="f" x1="8.5" y1="31" x2="8.5" y2="46" />
       <rect class="t" x="18" y="32" width="18" height="2" />
       <rect class="m" x="18" y="37" width="14" height="2" />
       <rect class="m" x="18" y="42" width="10" height="2" />

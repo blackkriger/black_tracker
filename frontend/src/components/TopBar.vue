@@ -228,15 +228,13 @@ async function signOut(): Promise<void> {
           <span class="proj__k">{{ p.shortName }}</span>
           <span class="topitem__name">{{ p.name }}</span>
         </RouterLink>
-        <div v-if="p.boards.length" class="rail__boards">
-          <RouterLink
-            v-for="b in p.boards"
-            :key="b.id"
-            class="topitem topitem__board rail__board"
-            :class="{ 'is-here': p.shortName === currentShort && b.slug.toLowerCase() === currentSlug }"
-            :to="`/${p.shortName}/${b.slug}`"
-          >{{ b.name }}</RouterLink>
-        </div>
+        <RouterLink
+          v-for="b in p.boards"
+          :key="b.id"
+          class="topitem topitem__board rail__board"
+          :class="{ 'is-here': p.shortName === currentShort && b.slug.toLowerCase() === currentSlug }"
+          :to="`/${p.shortName}/${b.slug}`"
+        >{{ b.name }}</RouterLink>
       </div>
     </nav>
 
@@ -428,15 +426,9 @@ async function signOut(): Promise<void> {
   display: flex;
   flex-direction: column;
 }
-.rail__boards {
-  display: flex;
-  flex-direction: column;
-  margin-left: 16px;
-  border-left: 1px solid var(--line);
-}
 .rail__board {
   height: 26px;
-  padding-left: 31px;
+  padding-left: 38px;
 }
 .rail__sections {
   display: grid;
