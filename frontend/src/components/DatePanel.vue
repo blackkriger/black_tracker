@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import MonthGrid from './MonthGrid.vue';
@@ -22,7 +22,7 @@ import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
 
-const props = defineProps<{ soon: Mark | null; withFull?: boolean; all?: boolean }>();
+const props = defineProps<{ soon: Mark | null; daysLeft?: number | null; withFull?: boolean; all?: boolean }>();
 const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>();
 
 const session = useSession();
@@ -31,6 +31,14 @@ const route = useRoute();
 const { colorOf, nameOf } = usePeople();
 const { notices: everything, shown: notices, hasMore, loadMore, markRead } = useNotices();
 const list = ref<HTMLDivElement | null>(null);
+
+const soonIn = computed(() => {
+  const left = props.daysLeft;
+  if (left == null || left < 0) return '';
+  if (left === 0) return 'today';
+  if (left === 1) return 'in 1 day';
+  return `in ${left} days`;
+});
 
 async function fill(): Promise<void> {
   await nextTick();
@@ -113,7 +121,6 @@ defineExpose({ readMonth });
 
 <template>
   <div class="dp" :class="{ 'dp--all': all }">
-    <slot />
     <div class="datemenu__h">
       {{ monthName(calYear, calMonth) }}
       <div class="sp"></div>
@@ -160,7 +167,7 @@ defineExpose({ readMonth });
               rel="noopener noreferrer"
             >{{ soon.title }}</a>
             <span v-else class="soon__title">{{ soon.title }}</span>
-            <span class="stamp">{{ longDate(soon.day) }}</span>
+            <span class="stamp">{{ longDate(soon.day) }}<template v-if="soonIn">, {{ soonIn }}</template></span>
           </span>
           <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
         </div>
@@ -168,7 +175,7 @@ defineExpose({ readMonth });
     </template>
     <template v-if="notices.length">
       <hr />
-      <div ref="list" class="dp__notices" @scroll="fill">
+      <div ref="list" class="dp__notices" :style="{ '--rows': notices.length }" @scroll="fill">
         <button
           v-for="n in all ? notices : notices.slice(0, 5)"
           :key="n.id"
@@ -214,7 +221,7 @@ defineExpose({ readMonth });
 }
 .dp--all .dp__notices {
   flex: 1 1 0;
-  max-height: max-content;
+  max-height: calc(var(--rows) * 32px);
   overflow-y: auto;
 }
 .dp hr {
