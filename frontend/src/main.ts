@@ -6,6 +6,7 @@ import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import './styles/tracker.css';
 import './lib/theme';
+import './lib/layout';
 import App from './App.vue';
 import { router } from './router';
 

@@ -4,29 +4,19 @@ import { useRoute, useRouter } from 'vue-router';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
-import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
+import { useNotices } from '../lib/notices';
 import { useRoles } from '../lib/roles';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
 import DayWindow from './DayWindow.vue';
-import MonthGrid from './MonthGrid.vue';
+import DatePanel from './DatePanel.vue';
 import { api } from '../lib/api';
-import {
-  byDay,
-  longDate,
-  monthName,
-  monthRange,
-  todayKey,
-  type Activity,
-  type DayInfo,
-  type DayMentions,
-  type Due,
-  type Mark,
-} from '../lib/calendar';
+import { todayKey, type Mark } from '../lib/calendar';
 import { stamp } from '../lib/issues';
 import { buddyAvatarStyle } from '../lib/avatar';
-import { ArrowRight, AtSign, ChevronLeft, ChevronRight } from 'lucide-vue-next';
-import { ink } from '../lib/theme';
+import { layout } from '../lib/layout';
+import { AtSign, Moon, Sun } from 'lucide-vue-next';
+import { ink, setTheme, shownTheme } from '../lib/theme';
 
 const props = defineProps<{
   project?: { shortName: string; name: string } | null;
@@ -37,7 +27,7 @@ const session = useSession();
 const router = useRouter();
 const route = useRoute();
 const { projects, load } = useProjects();
-const { colorOf, load: loadPeople } = usePeople();
+const { load: loadPeople } = usePeople();
 const mine = computed(() => session.me.value?.role?.color ?? undefined);
 const { load: loadRoles } = useRoles();
 
@@ -46,31 +36,9 @@ const hasRole = computed(() => session.me.value?.isAdmin === true || !!session.m
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const currentShort = computed(() => props.project?.shortName ?? null);
 
-const now = new Date();
-const today = stamp(now.toISOString());
+const today = stamp(new Date().toISOString());
 const dateOpen = ref(false);
-const calYear = ref(now.getFullYear());
-const calMonth = ref(now.getMonth());
-const calDays = ref(new Map<string, DayInfo>());
-const calPeak = ref(1);
-
-let monthReads = 0;
-
-async function readMonth(): Promise<void> {
-  const { from, to } = monthRange(calYear.value, calMonth.value);
-  const mine = ++monthReads;
-  try {
-    const got = await api<{
-      marks: Mark[];
-      dues: { day: string; issues: Due[] }[];
-      activity: Activity[];
-      mentions: DayMentions[];
-    }>(`/calendar?from=${from}&to=${to}`);
-    if (mine !== monthReads) return;
-    calDays.value = byDay(got.marks, got.dues, got.activity, got.mentions);
-    calPeak.value = Math.max(1, ...[...calDays.value.values()].map((d) => d.worked));
-  } catch {}
-}
+const panel = ref<InstanceType<typeof DatePanel> | null>(null);
 
 const soon = ref<Mark | null>(null);
 const daysOff = computed(() => {
@@ -88,18 +56,8 @@ const countdown = computed(() => {
   return `${left} days till ${what}`;
 });
 
-const { shown: notices, unread, load: readNotices, markRead } = useNotices();
+const { unread, load: readNotices } = useNotices();
 const { ask } = useFocus();
-
-async function openNotice(n: Notice): Promise<void> {
-  dateOpen.value = false;
-  if (!n.read) await markRead(n.id);
-  ask(n.commentId);
-  await router.push({
-    path: `/${n.projectShort}/${n.boardSlug}/${n.key}`,
-    query: n.commentId ? { c: n.commentId } : {},
-  });
-}
 
 async function readNext(): Promise<void> {
   try {
@@ -109,19 +67,6 @@ async function readNext(): Promise<void> {
 
 function toggleDate(): void {
   dateOpen.value = !dateOpen.value;
-  if (dateOpen.value) void readMonth();
-}
-
-function stepMonth(by: number): void {
-  const d = new Date(calYear.value, calMonth.value + by, 1);
-  calYear.value = d.getFullYear();
-  calMonth.value = d.getMonth();
-  void readMonth();
-}
-
-async function toCalendar(): Promise<void> {
-  dateOpen.value = false;
-  await router.push({ name: 'me', query: { calendar: 'full' } });
 }
 
 const pickedDay = ref<string | null>(null);
@@ -163,10 +108,7 @@ function onKeydown(ev: KeyboardEvent): void {
 
 useLive((ev) => {
   if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
-  if (ev.type === 'key-date.changed') {
-    void readNext();
-    void readMonth();
-  }
+  if (ev.type === 'key-date.changed') void readNext();
   if (['role.changed', 'user.changed'].includes(ev.type)) {
     void loadPeople(true);
     void loadRoles(true);
@@ -179,7 +121,6 @@ useLive((ev) => {
   void loadRoles(true);
   void readNotices();
   void readNext();
-  void readMonth();
 });
 
 async function rereadMe(): Promise<void> {
@@ -197,7 +138,7 @@ async function signOut(): Promise<void> {
 </script>
 
 <template>
-  <header class="top">
+  <header v-if="layout === 'top'" class="top">
     <nav v-if="live.length" class="topitems" aria-label="Projects">
       <span v-for="p in live" :key="p.id" class="topproj">
         <RouterLink
@@ -241,90 +182,7 @@ async function signOut(): Promise<void> {
           </span>
         </button>
         <div v-if="dateOpen" class="menu datemenu">
-          <div class="datemenu__h">
-            {{ monthName(calYear, calMonth) }}
-            <div class="sp"></div>
-            <button
-              class="btn btn--sm btn--icon btn--ghost"
-              type="button"
-              aria-label="Previous month"
-              @click="stepMonth(-1)"
-            ><ChevronLeft class="ic ic--sm" /></button>
-            <button
-              class="btn btn--sm btn--icon btn--ghost"
-              type="button"
-              aria-label="Next month"
-              @click="stepMonth(1)"
-            ><ChevronRight class="ic ic--sm" /></button>
-          </div>
-          <div class="datemenu__grid">
-            <MonthGrid
-              :year="calYear"
-              :month="calMonth"
-              :days="calDays"
-              :peak="calPeak"
-              compact
-              @pick="toDay"
-            />
-          </div>
-          <template v-if="soon">
-            <hr v-if="!soon.banner" />
-            <div class="soon" :class="{ 'soon--banner': soon.banner }">
-              <a
-                v-if="soon.banner"
-                class="soon__banner"
-                :href="soon.url ?? soon.banner"
-                target="_blank"
-                rel="noopener noreferrer"
-              ><img :src="soon.banner" :alt="soon.title" /></a>
-              <div class="soon__line">
-                <span class="soon__text">
-                  <a
-                    v-if="soon.url"
-                    class="soon__title"
-                    :href="soon.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >{{ soon.title }}</a>
-                  <span v-else class="soon__title">{{ soon.title }}</span>
-                  <span class="stamp">{{ longDate(soon.day) }}</span>
-                </span>
-                <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
-              </div>
-            </div>
-          </template>
-          <template v-if="notices.length">
-            <hr />
-            <button
-              v-for="n in notices.slice(0, 5)"
-              :key="n.id"
-              class="menu__i men"
-              :class="{ 'men--new': !n.read }"
-              type="button"
-              @click="openNotice(n)"
-            >
-              <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
-              <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
-              <span
-                v-if="showsAuthor(n, session.me.value?.login)"
-                class="men__by"
-                :style="{ color: ink(colorOf(n.by)) }"
-              >{{ n.by }}</span>
-              <span class="men__said">
-                <template v-if="n.kind === 'reaction'">reacted</template>
-                <template v-else-if="n.kind === 'assigned'">assigned you</template>
-                <template v-else-if="n.kind === 'starred' && !n.commentId">
-                  {{ describeChanges(n.changes, (login) => login) }}
-                </template>
-                <template v-else>{{ n.said }}</template>
-              </span>
-            </button>
-          </template>
-          <hr />
-          <button class="menu__i" type="button" @click="toCalendar">
-            Full calendar
-            <ArrowRight class="ic ic--sm" />
-          </button>
+          <DatePanel ref="panel" :soon="soon" @day="toDay" @leave="dateOpen = false" />
         </div>
       </span>
       <RouterLink class="topitem" :to="{ name: 'me' }">
@@ -335,15 +193,74 @@ async function signOut(): Promise<void> {
       <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
-
-    <DayWindow
-      v-if="pickedDay"
-      :day="pickedDay"
-      @close="pickedDay = null"
-      @changed="readNext(); readMonth()"
-      @open="fromDay"
-    />
   </header>
+
+  <aside v-else class="rail">
+    <nav v-if="live.length" class="rail__projects" aria-label="Projects">
+      <div v-for="p in live" :key="p.id" class="rail__proj">
+        <RouterLink
+          class="topitem topitem--project"
+          :to="`/${p.shortName}`"
+          :aria-current="p.shortName === currentShort ? 'page' : undefined"
+        >
+          <span class="proj__k">{{ p.shortName }}</span>
+          <span class="topitem__name">{{ p.name }}</span>
+        </RouterLink>
+        <RouterLink
+          v-for="b in p.boards"
+          :key="b.id"
+          class="topitem topitem__board rail__board"
+          :class="{ 'is-here': p.shortName === currentShort && b.slug === board?.slug }"
+          :to="`/${p.shortName}/${b.slug}`"
+        >{{ b.name }}</RouterLink>
+      </div>
+    </nav>
+
+    <div class="rail__date">
+      <span v-if="countdown" class="stamp topcount rail__count">{{ countdown }}</span>
+      <DatePanel ref="panel" :soon="soon" @day="toDay" />
+    </div>
+
+    <nav class="rail__account" aria-label="Account">
+      <RouterLink class="topitem" :to="{ name: 'me' }">
+        <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
+        {{ session.me.value?.login }}
+        <span v-if="unread" class="stamp topat rail__at" :style="{ color: ink(mine) }">
+          <AtSign class="ic ic--sm" />{{ unread }}
+        </span>
+      </RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" to="/analytics">Analytics</RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
+      <div class="rail__end">
+        <button
+          class="topitem rail__theme"
+          :class="{ 'is-on': shownTheme === 'light' }"
+          type="button"
+          aria-label="Light"
+          :aria-pressed="shownTheme === 'light'"
+          @click="setTheme('light')"
+        ><Sun class="ic" /></button>
+        <button
+          class="topitem rail__theme"
+          :class="{ 'is-on': shownTheme === 'dark' }"
+          type="button"
+          aria-label="Dark"
+          :aria-pressed="shownTheme === 'dark'"
+          @click="setTheme('dark')"
+        ><Moon class="ic" /></button>
+        <div class="sp"></div>
+        <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
+      </div>
+    </nav>
+  </aside>
+
+  <DayWindow
+    v-if="pickedDay"
+    :day="pickedDay"
+    @close="pickedDay = null"
+    @changed="readNext(); panel?.readMonth()"
+    @open="fromDay"
+  />
 </template>
 
 <style scoped>
@@ -433,22 +350,6 @@ async function signOut(): Promise<void> {
   gap: 2px;
   color: var(--text);
 }
-.men__emoji {
-  font-size: 12px;
-}
-.men .key,
-.men__by {
-  flex: none;
-}
-.men__said {
-  overflow: hidden;
-  color: var(--text-muted);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.men--new .men__said {
-  color: var(--text-dim);
-}
 .topcount {
   max-width: 280px;
   overflow: hidden;
@@ -478,64 +379,60 @@ async function signOut(): Promise<void> {
   margin-bottom: -1px;
   border-bottom-color: var(--card);
 }
-.datemenu__h {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 6px 6px 10px;
-  color: var(--text-muted);
-  font-size: 11.5px;
-}
-.datemenu__grid {
-  padding: 0 10px 6px;
-}
-.soon {
+.rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 2px 0 6px;
+  gap: var(--space-5);
+  width: var(--rail-w);
+  padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+  overflow-y: auto;
 }
-.soon--banner {
-  padding-top: 0;
-}
-.soon__banner {
-  display: block;
-}
-.soon__banner img {
-  display: block;
-  width: 100%;
-  max-height: 96px;
-  object-fit: cover;
-}
-.soon__line {
+.rail__projects {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.rail__proj {
+  display: flex;
+  flex-direction: column;
+}
+.rail__board {
+  height: 26px;
+  padding-left: 38px;
+}
+.rail__date {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rail__count {
+  max-width: none;
   padding: 0 10px;
 }
-.soon__text {
+.rail__account {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  margin-top: auto;
 }
-.soon__title {
-  overflow: hidden;
-  color: var(--accent);
-  font-size: 13px;
-  text-decoration: none;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.rail__at {
+  margin-left: auto;
 }
-a.soon__title:hover {
-  color: var(--accent-bright);
+.rail__end {
+  display: flex;
+  align-items: center;
 }
-.datemenu .menu__i {
-  color: var(--text-dim);
+.rail__theme {
+  padding: 0 8px;
+  color: var(--text-muted);
 }
-.datemenu .menu__i:hover {
-  background: none;
+.rail__theme.is-on {
   color: var(--text);
 }
 </style>

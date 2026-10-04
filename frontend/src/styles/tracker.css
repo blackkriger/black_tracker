@@ -38,6 +38,7 @@
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-8: 48px;
   --top-h: 56px;
+  --rail-w: 264px;
   --col-w: 272px;
   --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
   --black: #000;
@@ -95,6 +96,8 @@ svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor;
 button { font-family: var(--font-ui); }
 
 .top { position: sticky; top: 0; z-index: 3; flex: none; display: flex; align-items: center; gap: 16px; height: var(--top-h); padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--bg); }
+:root[data-layout="side"] { --top-h: 0px; }
+:root[data-layout="side"] .page { padding-left: var(--rail-w); }
 .proj__k { font: 15.5px/1 var(--font-num); color: var(--accent); letter-spacing: .04em; }
 .caret { color: var(--text-muted); font-size: 10px; }
 .tabs { display: flex; align-items: center; gap: 2px; padding-left: 16px; border-left: 1px solid var(--line); height: 28px; }
