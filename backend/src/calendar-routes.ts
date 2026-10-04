@@ -4,6 +4,7 @@ import { pool, ZONE } from './db.js';
 import { requireAuth, requireDeleter, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor, mayOpenProject } from './board-service.js';
 import { projectByShort } from './project-routes.js';
+import { workOf } from './work.js';
 
 
 const range = z.object({
@@ -70,14 +71,14 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
     const parsed = range.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send({ error: 'Send from and to as dates.' });
     const { from, to } = parsed.data;
-    const who = (req.query as { user?: string }).user ?? null;
+    const who = (req.query as { user?: string }).user || auth.login;
     const denied = await shutOut(auth);
 
     if (denied.all) {
       return reply.send({ data: { marks: [], dues: [], activity: [], mentions: [] } });
     }
 
-    const [marks, dues, activity, mentions] = await Promise.all([
+    const [marks, dues, activity, mentions, worked, days] = await Promise.all([
       pool.query<MarkRow>(
         `select k.id, k.day, k.title, k.url, k.banner,
                 p.short_name, p.name as project_name, u.login as by_login
@@ -114,14 +115,10 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
       ),
       pool.query<{
         day: Date | string;
-        login: string;
-        worked: number;
         created: number;
         resolved: number;
       }>(
         `select (h.created_at at time zone '${ZONE}')::date as day,
-                u.login,
-                count(distinct h.issue_id)::int as worked,
                 count(distinct h.issue_id) filter (where h.field = 'created')::int as created,
                 count(distinct h.issue_id) filter (
                   where h.field = 'status' and h.created_at = i.resolved_at
@@ -130,10 +127,10 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
            join issues i on i.id = h.issue_id
            join users u on u.id = h.user_id
           where (h.created_at at time zone '${ZONE}')::date between $1::date and $2::date
-            and ($3::text is null or u.login = $3)
+            and u.login = $3
             and i.project_id <> all($4::uuid[])
             and i.board_id <> all($5::uuid[])
-          group by 1, 2
+          group by 1
           order by 1`,
         [from, to, who, denied.projects, denied.boards]
       ),
@@ -152,7 +149,32 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
           group by 1, 2`,
         [auth.userId, from, to, denied.projects, denied.boards]
       ),
+      workOf({ boards: denied.boards, projects: denied.projects, from, to, login: who }),
+      pool.query<{ day: Date | string; start: Date; stop: Date }>(
+        `select d::date as day,
+                d at time zone '${ZONE}' as start,
+                (d + interval '1 day') at time zone '${ZONE}' as stop
+           from generate_series($1::date::timestamp, $2::date::timestamp, interval '1 day') d`,
+        [from, to]
+      ),
     ]);
+
+    const now = Date.now();
+    const done = new Map<string, { day: string; worked: number; created: number; resolved: number }>();
+    for (const d of days.rows) {
+      const begin = d.start.getTime();
+      const end = Math.min(d.stop.getTime(), now);
+      if (end <= begin) continue;
+      const n = worked.filter((w) => w.spans.some((sp) => sp.to > begin && sp.from < end)).length;
+      if (n) done.set(iso(d.day), { day: iso(d.day), worked: n, created: 0, resolved: 0 });
+    }
+    for (const a of activity.rows) {
+      const key = iso(a.day);
+      const row = done.get(key) ?? { day: key, worked: 0, created: 0, resolved: 0 };
+      row.created = a.created;
+      row.resolved = a.resolved;
+      done.set(key, row);
+    }
 
     const byDay = new Map<
       string,
@@ -185,13 +207,10 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
       data: {
         marks: marks.rows.map(publicMark),
         dues: [...byDay].map(([day, issues]) => ({ day, issues })),
-        activity: activity.rows.map((a) => ({
-          day: iso(a.day),
-          login: a.login,
-          worked: a.worked,
-          created: a.created,
-          resolved: a.resolved,
-        })),
+        activity: [...done.values()]
+          .filter((a) => a.worked || a.created || a.resolved)
+          .sort((a, b) => a.day.localeCompare(b.day))
+          .map((a) => ({ ...a, login: who })),
         mentions: mentions.rows.map((m) => ({
           day: iso(m.day),
           kind: m.kind,

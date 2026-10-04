@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { DAY_RE, pool, ZONE } from './db.js';
 import { requireAuth, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
+import { stretchesOf, workOf, type HandRow } from './work.js';
 
 async function shutOut(auth: Auth): Promise<{ all: boolean; projects: string[]; boards: string[] }> {
   const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
@@ -53,37 +54,6 @@ interface HeldRow {
   color: string;
 }
 
-interface WorkRow {
-  id: string;
-  login: string | null;
-  board_id: string;
-  project_id: string;
-  readable_id: string;
-  summary: string;
-  created_at: Date;
-  short_name: string;
-  slug: string;
-  state_name: string;
-  color: string;
-}
-
-interface StateKind {
-  board_id: string;
-  project_id: string;
-  name: string;
-  color: string;
-  is_resolved: boolean;
-  starting: boolean;
-}
-
-interface HandRow {
-  issue_id: string;
-  field: 'assignee' | 'status';
-  old_value: string | null;
-  new_value: string | null;
-  created_at: Date;
-}
-
 interface Hand {
   login: string | null;
   days: number;
@@ -91,31 +61,11 @@ interface Hand {
   states: { name: string; color: string | null; days: number }[];
 }
 
-interface Stretch {
-  from: number;
-  to: number;
-  name: string | null;
-}
-
 const day = (d: Date | string): string =>
   typeof d === 'string' ? d.slice(0, 10) : d.toISOString().slice(0, 10);
 
 const DAY_MS = 86_400_000;
 const MINUTE_MS = 60_000;
-
-function stretchesOf(born: number, now: string | null, changes: HandRow[]): Stretch[] {
-  const out: Stretch[] = [];
-  let since = born;
-  let what = changes.length ? changes[0].old_value : now;
-  for (const change of changes) {
-    const at = change.created_at.getTime();
-    out.push({ from: since, to: at, name: what });
-    what = change.new_value;
-    since = at;
-  }
-  out.push({ from: since, to: Date.now(), name: what });
-  return out;
-}
 
 function handsOf(
   born: Date,
@@ -418,22 +368,14 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           order by 1`,
         within
       ),
-      pool.query<WorkRow>(
-        `select i.id, u.login, i.board_id, i.project_id, i.readable_id, i.summary, i.created_at,
-                p.short_name, b.slug, s.name as state_name, s.color
-           from issues i
-           join projects p on p.id = i.project_id
-           join boards b on b.id = i.board_id
-           join states s on s.id = i.state_id
-           left join users u on u.id = i.assignee_id
-          where i.created_at < coalesce(($5::date + 1)::timestamp at time zone '${ZONE}', 'infinity')
-            and (i.resolved_at is null
-                 or i.resolved_at >= coalesce($4::date::timestamp at time zone '${ZONE}', '-infinity'))
-            and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
-            and ($3::text is null or p.short_name = $3)
-            and ($6::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $6))`,
-        [denied.boards, denied.projects, only, from, to, tagged]
-      ),
+      workOf({
+        boards: denied.boards,
+        projects: denied.projects,
+        project: only,
+        tag: tagged,
+        from,
+        to,
+      }),
       pool.query<{ start: Date | null; stop: Date | null }>(
         `select $1::date::timestamp at time zone '${ZONE}' as start,
                 ($2::date + 1)::timestamp at time zone '${ZONE}' as stop`,
@@ -441,8 +383,8 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       ),
     ]);
 
-    const traced = [...new Set([...held.rows, ...worked.rows].map((r) => r.id))];
-    const [handRows, palette, kinds] = await Promise.all([
+    const traced = held.rows.map((r) => r.id);
+    const [handRows, palette] = await Promise.all([
       traced.length
         ? pool.query<HandRow>(
             `select issue_id, field, old_value, new_value, created_at
@@ -458,19 +400,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
             [[...new Set(held.rows.map((r) => r.board_id))]]
           )
         : { rows: [] as { board_id: string; name: string; color: string }[] },
-      worked.rows.length
-        ? pool.query<StateKind>(
-            `select s.board_id, b.project_id, s.name, s.color, s.is_resolved,
-                    s.id = coalesce(b.default_state_id, (
-                      select f.id from states f where f.board_id = b.id order by f.position, f.name limit 1
-                    )) as starting
-               from states s
-               join boards b on b.id = s.board_id
-              where b.project_id = any($1::uuid[])
-              order by b.position, s.position`,
-            [[...new Set(worked.rows.map((r) => r.project_id))]]
-          )
-        : { rows: [] as StateKind[] },
     ]);
     const colors = new Map(palette.rows.map((r) => [`${r.board_id}:${r.name}`, r.color]));
     const changes = new Map<string, HandRow[]>();
@@ -539,18 +468,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       holding.set(r.login, list);
     }
 
-    const onBoard = new Map<string, StateKind>();
-    const inProject = new Map<string, StateKind>();
-    for (const k of kinds.rows) {
-      onBoard.set(`${k.board_id}:${k.name}`, k);
-      if (!inProject.has(`${k.project_id}:${k.name}`)) inProject.set(`${k.project_id}:${k.name}`, k);
-    }
-    const kindOf = (r: WorkRow, name: string | null): StateKind | undefined =>
-      name ? (onBoard.get(`${r.board_id}:${name}`) ?? inProject.get(`${r.project_id}:${name}`)) : undefined;
-    const working = (r: WorkRow, name: string | null): boolean => {
-      const kind = kindOf(r, name);
-      return !!kind && !kind.is_resolved && !kind.starting;
-    };
     const start = bounds.rows[0]?.start?.getTime() ?? -Infinity;
     const stop = Math.min(bounds.rows[0]?.stop?.getTime() ?? Infinity, Date.now());
     const work = new Map<
@@ -558,24 +475,15 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
       { key: string; summary: string; projectShort: string; boardSlug: string; color: string;
         states: { name: string; color: string | null; days: number }[]; days: number }[]
     >();
-    for (const r of worked.rows) {
-      const trail = changes.get(r.id) ?? [];
-      const born = r.created_at.getTime();
-      const hands = stretchesOf(born, r.login, trail.filter((c) => c.field === 'assignee'));
-      const states = stretchesOf(born, r.state_name, trail.filter((c) => c.field === 'status')).filter(
-        (st) => working(r, st.name)
-      );
+    for (const { issue: r, spans, colorOf } of worked) {
       const spent = new Map<string, { ms: number; states: Map<string, number> }>();
-      for (const h of hands) {
-        if (!h.name) continue;
-        for (const st of states) {
-          const ms = Math.min(h.to, st.to, stop) - Math.max(h.from, st.from, start);
-          if (ms <= 0 || !st.name) continue;
-          const mine = spent.get(h.name) ?? { ms: 0, states: new Map<string, number>() };
-          mine.ms += ms;
-          mine.states.set(st.name, (mine.states.get(st.name) ?? 0) + ms);
-          spent.set(h.name, mine);
-        }
+      for (const sp of spans) {
+        const ms = Math.min(sp.to, stop) - Math.max(sp.from, start);
+        if (ms <= 0) continue;
+        const mine = spent.get(sp.login) ?? { ms: 0, states: new Map<string, number>() };
+        mine.ms += ms;
+        mine.states.set(sp.state, (mine.states.get(sp.state) ?? 0) + ms);
+        spent.set(sp.login, mine);
       }
       for (const [login, { ms, states: inState }] of spent) {
         const lasting = [...inState].filter(([, held]) => held >= MINUTE_MS);
@@ -587,11 +495,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
           projectShort: r.short_name,
           boardSlug: r.slug,
           color: r.color,
-          states: shown.map(([name, held]) => ({
-            name,
-            color: kindOf(r, name)?.color ?? null,
-            days: held / DAY_MS,
-          })),
+          states: shown.map(([name, held]) => ({ name, color: colorOf(name), days: held / DAY_MS })),
           days: ms / DAY_MS,
         });
         work.set(login, list);
