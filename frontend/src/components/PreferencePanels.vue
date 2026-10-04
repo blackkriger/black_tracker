@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import LayoutSketch from './LayoutSketch.vue';
 import { api } from '../lib/api';
 import { commentOrder, type CommentOrder } from '../lib/issues';
 import { setWrapLines, wrapLines } from '../lib/files';
@@ -65,20 +66,15 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
         class="layout"
         :class="{ 'is-on': layout === l.value }"
       >
-        <span class="lay" :class="`lay--${l.value}`" aria-hidden="true">
-          <span v-if="l.value === 'top'" class="lay__bar"><i></i><i></i><i></i><i></i></span>
-          <span v-else class="lay__rail"><i></i><i></i><i></i><span class="lay__cal"></span></span>
-          <span class="lay__cols"><i></i><i></i><i></i><i></i></span>
-        </span>
-        <span class="flag">
-          <input
-            type="radio"
-            name="layout"
-            :checked="layout === l.value"
-            @change="setLayout(l.value)"
-          />
-          {{ l.label }}
-        </span>
+        <input
+          class="sr"
+          type="radio"
+          name="layout"
+          :checked="layout === l.value"
+          @change="setLayout(l.value)"
+        />
+        <LayoutSketch :kind="l.value" />
+        <span class="layout__name">{{ l.label }}</span>
       </label>
     </div>
   </section>
@@ -186,72 +182,27 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 282px;
+  padding: 10px 10px 12px;
+  border: 1px solid var(--line-2);
   color: var(--text-faint);
   cursor: pointer;
 }
-.layout .flag {
-  color: var(--text-dim);
+.layout:hover {
+  border-color: var(--line-3);
 }
 .layout.is-on {
+  border-color: var(--accent);
   color: var(--accent);
 }
-.layout.is-on .flag {
+.layout:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.layout__name {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.layout.is-on .layout__name {
   color: var(--text);
-}
-.lay {
-  display: flex;
-  width: 220px;
-  height: 136px;
-  border: 1px solid currentColor;
-  background: var(--bg);
-}
-.lay--top {
-  flex-direction: column;
-}
-.lay__bar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  height: 18px;
-  padding: 0 8px;
-  border-bottom: 1px solid currentColor;
-}
-.lay__bar i {
-  width: 16px;
-  height: 3px;
-  background: currentColor;
-}
-.lay__bar i:nth-child(3) {
-  margin-left: auto;
-}
-.lay__rail {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 6px;
-  width: 58px;
-  padding: 8px;
-  border-right: 1px solid currentColor;
-}
-.lay__rail i {
-  width: 70%;
-  height: 3px;
-  background: currentColor;
-}
-.lay__cal {
-  height: 30px;
-  margin-top: 4px;
-  border: 1px solid currentColor;
-}
-.lay__cols {
-  display: flex;
-  flex: 1 1 auto;
-  gap: 6px;
-  padding: 8px;
-}
-.lay__cols i {
-  flex: 1 1 0;
-  border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
 }
 </style>
