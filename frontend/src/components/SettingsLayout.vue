@@ -50,8 +50,8 @@ useLive(
         <RouterLink to="/settings/new">New project…</RouterLink>
 
         <div class="side__h">Workspace</div>
-        <RouterLink to="/settings/tags">Tags</RouterLink>
         <RouterLink to="/settings/users">Users &amp; access</RouterLink>
+        <RouterLink to="/settings/tags">Tags</RouterLink>
 
         <a class="side__db" href="/db/" target="_blank" rel="noopener noreferrer">
           DB
