@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from 'lucide-vue-next';
 import DateRangePicker from '../components/DateRangePicker.vue';
@@ -396,42 +396,6 @@ function closeIssue(): void {
   void router.push({ name: 'issues', params: {}, query: route.query });
 }
 
-const newBoards = computed(() =>
-  scope.value.flatMap((p) => p.boards.map((b) => ({ ...b, project: p.shortName })))
-);
-const choosing = ref(false);
-const chooser = ref<HTMLElement | null>(null);
-const creating = ref<{ project: string; nextKey: string; board: BoardFull } | null>(null);
-
-function newIssue(): void {
-  if (newBoards.value.length === 1) void startCreate(newBoards.value[0]);
-  else choosing.value = !choosing.value;
-}
-
-async function startCreate(b: { id: string; project: string }): Promise<void> {
-  choosing.value = false;
-  clear('list');
-  try {
-    const [board, project] = await Promise.all([
-      boardOf(b.id),
-      api<{ nextKey: string }>(`/projects/${b.project}`),
-    ]);
-    creating.value = { project: b.project, nextKey: project.nextKey, board };
-  } catch (err) {
-    fail('list', err);
-  }
-}
-
-function created(issue: Issue): void {
-  creating.value = null;
-  void load();
-  void router.push({ name: 'issues', params: { key: issue.key }, query: route.query });
-}
-
-function onOutside(ev: MouseEvent): void {
-  if (choosing.value && ev.target instanceof Node && !chooser.value?.contains(ev.target)) choosing.value = false;
-}
-
 const reload = settled(() => void load());
 useLive(
   (ev) => {
@@ -458,9 +422,7 @@ onMounted(() => {
   void loadTags();
   void load();
   void showIssue(openKey.value);
-  window.addEventListener('click', onOutside);
 });
-onBeforeUnmount(() => window.removeEventListener('click', onOutside));
 </script>
 
 <template>
@@ -470,23 +432,7 @@ onBeforeUnmount(() => window.removeEventListener('click', onOutside));
         <section class="panel sheet__wide">
           <header class="panel__h">
             Issues
-            <span ref="chooser" class="panel__end list__new">
-              <button class="btn btn--sm" type="button" :disabled="!newBoards.length" @click="newIssue">
-                New issue
-              </button>
-              <div v-if="choosing" class="menu list__boards">
-                <button
-                  v-for="b in newBoards"
-                  :key="b.id"
-                  class="menu__i"
-                  type="button"
-                  @click="startCreate(b)"
-                >
-                  <span class="key">{{ b.project }}</span>
-                  {{ b.name }}
-                </button>
-              </div>
-            </span>
+            <span v-if="!loading" class="panel__end">{{ sorted.length }}</span>
           </header>
 
           <div class="panel__b list__tools">
@@ -687,7 +633,6 @@ onBeforeUnmount(() => window.removeEventListener('click', onOutside));
           </div>
         </section>
         <div v-if="errors.list" class="err sheet__wide">{{ errors.list }}</div>
-        <div v-if="!loading" class="stamp sheet__wide">Found: {{ sorted.length }}</div>
       </div>
     </div>
 
@@ -705,19 +650,6 @@ onBeforeUnmount(() => window.removeEventListener('click', onOutside));
       @deleted="closeIssue(); reload()"
     />
 
-    <IssueView
-      v-if="creating"
-      key="new"
-      :create-in="creating.board.defaultStateId ?? creating.board.states[0]?.id ?? null"
-      :board="creating.board"
-      :boards="boardsOf(creating.project)"
-      :tags="tagsOf(creating.board)"
-      :project="creating.project"
-      :next-key="creating.nextKey"
-      @close="creating = null"
-      @created="created"
-    />
-
     <Dialog v-if="deleting" :title="`Delete ${picked.size} issues`" @close="deleting = false">
       <p>This takes their comments, files and history with them. This cannot be undone.</p>
       <template #footer>
@@ -731,15 +663,6 @@ onBeforeUnmount(() => window.removeEventListener('click', onOutside));
 <style scoped>
 .page__body {
   padding: var(--space-6) var(--space-5);
-}
-.list__new {
-  position: relative;
-}
-.list__boards {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 20;
 }
 .list__tools {
   display: flex;
