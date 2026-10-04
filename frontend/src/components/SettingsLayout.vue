@@ -38,6 +38,7 @@ useLive(
       <nav class="side settings__side" aria-label="Settings sections">
         <div class="side__h">Profile</div>
         <RouterLink to="/settings/profile">Profile</RouterLink>
+        <RouterLink to="/settings/preferences">Preferences</RouterLink>
         <RouterLink to="/settings/api">API</RouterLink>
 
         <div class="side__h">Projects</div>

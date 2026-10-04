@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import TopBar from '../components/TopBar.vue';
 import ProfilePanels from '../components/ProfilePanels.vue';
+import PreferencePanels from '../components/PreferencePanels.vue';
 </script>
 
 <template>
@@ -9,6 +10,7 @@ import ProfilePanels from '../components/ProfilePanels.vue';
     <div class="page__body">
       <div class="sheet">
         <ProfilePanels />
+        <PreferencePanels />
       </div>
     </div>
   </div>

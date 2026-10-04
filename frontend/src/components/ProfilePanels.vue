@@ -2,10 +2,8 @@
 import { computed, ref } from 'vue';
 import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
-import { commentOrder, stamp, type CommentOrder } from '../lib/issues';
-import { setWrapLines, wrapLines } from '../lib/files';
-import { ink, setTheme, theme, type Theme } from '../lib/theme';
-import { useNotices, type NoticeKind } from '../lib/notices';
+import { stamp } from '../lib/issues';
+import { ink } from '../lib/theme';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useSession, type Me } from '../lib/session';
@@ -14,7 +12,6 @@ const session = useSession();
 const { errors, fail, clear } = usePanelErrors();
 const { load: loadPeople } = usePeople();
 const me = session.me;
-const { off, toggleKind } = useNotices();
 
 const fullName = ref(me.value?.fullName ?? '');
 const nameBusy = ref(false);
@@ -39,41 +36,6 @@ const canChangePassword = computed(
 
 const since = computed(() => stamp(me.value?.createdAt ?? null));
 const role = computed(() => me.value?.role ?? null);
-
-const THEMES: { value: Theme; label: string }[] = [
-  { value: 'dark', label: 'Dark' },
-  { value: 'light', label: 'Light' },
-  { value: 'system', label: 'System' },
-];
-
-const order = ref<CommentOrder>(commentOrder.get());
-function setOrder(next: CommentOrder): void {
-  order.value = next;
-  commentOrder.set(next);
-}
-
-const KINDS: { kind: NoticeKind; label: string }[] = [
-  { kind: 'mention', label: 'Mentions' },
-  { kind: 'assigned', label: 'Assigned to you' },
-  { kind: 'reaction', label: 'Reactions' },
-  { kind: 'starred', label: 'Starred issues' },
-];
-
-const STARS: { key: keyof Me['autoStar']; body: string; label: string }[] = [
-  { key: 'created', body: 'starCreated', label: 'Created by me' },
-  { key: 'assigned', body: 'starAssigned', label: 'Assigned to me' },
-  { key: 'commented', body: 'starCommented', label: 'Commented on (by me)' },
-];
-
-async function setAutoStar(body: string, on: boolean): Promise<void> {
-  clear('prefs');
-  try {
-    const updated = await api<Me>('/me', { method: 'PATCH', body: { [body]: on } });
-    me.value = { ...(me.value as Me), ...updated };
-  } catch (err) {
-    fail('prefs', err);
-  }
-}
 
 async function saveName(): Promise<void> {
   if (nameBusy.value) return;
@@ -183,80 +145,6 @@ async function changePassword(): Promise<void> {
     </section>
     <div v-if="errors.password" class="err panel__err">{{ errors.password }}</div>
   </div>
-
-  <section class="panel">
-    <header class="panel__h">Preferences</header>
-    <div class="panel__b form">
-      <div class="pairs">
-        <div class="field">
-          <span class="label">Theme</span>
-          <label v-for="t in THEMES" :key="t.value" class="flag">
-            <input type="radio" name="theme" :checked="theme === t.value" @change="setTheme(t.value)" />
-            {{ t.label }}
-          </label>
-        </div>
-        <div class="field">
-          <span class="label">Comments read</span>
-          <label class="flag">
-            <input
-              type="radio"
-              name="comment-order"
-              :checked="order === 'oldest'"
-              @change="setOrder('oldest')"
-            />
-            Oldest first
-          </label>
-          <label class="flag">
-            <input
-              type="radio"
-              name="comment-order"
-              :checked="order === 'newest'"
-              @change="setOrder('newest')"
-            />
-            Newest first
-          </label>
-        </div>
-      </div>
-      <div class="pairs">
-        <div class="field">
-          <span class="label">Notices shown</span>
-          <label v-for="k in KINDS" :key="k.kind" class="flag">
-            <input
-              type="checkbox"
-              :checked="!off.includes(k.kind)"
-              @change="toggleKind(k.kind)"
-            />
-            {{ k.label }}
-          </label>
-        </div>
-        <div class="field">
-          <span class="label">Files</span>
-          <label class="flag">
-            <input
-              type="checkbox"
-              :checked="wrapLines"
-              @change="setWrapLines(($event.target as HTMLInputElement).checked)"
-            />
-            Wrap long lines
-          </label>
-        </div>
-      </div>
-      <div class="pairs">
-        <div class="field">
-          <span class="label">Star automatically</span>
-          <label v-for="s in STARS" :key="s.key" class="flag">
-            <input
-              type="checkbox"
-              :checked="me?.autoStar[s.key] ?? false"
-              @change="setAutoStar(s.body, ($event.target as HTMLInputElement).checked)"
-            />
-            {{ s.label }}
-          </label>
-        </div>
-      </div>
-    </div>
-  </section>
-  <div v-if="errors.prefs" class="err panel__err">{{ errors.prefs }}</div>
 </template>
 
 <style scoped>
@@ -292,17 +180,5 @@ async function changePassword(): Promise<void> {
 }
 .row-end .hint {
   margin-right: auto;
-}
-.pairs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-  align-items: start;
-}
-.flag {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
 }
 </style>

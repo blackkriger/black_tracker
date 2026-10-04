@@ -10,6 +10,7 @@ const NotFound = () => import('./routes/NotFound.vue');
 const SettingsIndex = () => import('./routes/settings/Index.vue');
 const SettingsProfile = () => import('./routes/settings/Profile.vue');
 const SettingsApi = () => import('./routes/settings/Api.vue');
+const SettingsPreferences = () => import('./routes/settings/Preferences.vue');
 const SettingsProject = () => import('./routes/settings/Project.vue');
 const SettingsNewProject = () => import('./routes/settings/NewProject.vue');
 const SettingsTags = () => import('./routes/settings/Tags.vue');
@@ -44,6 +45,7 @@ export const router = createRouter({
     { path: '/analytics', name: 'analytics', component: Analytics },
     { path: '/settings', name: 'settings', component: SettingsIndex },
     { path: '/settings/profile', name: 'settings-profile', component: SettingsProfile },
+    { path: '/settings/preferences', name: 'settings-preferences', component: SettingsPreferences },
     { path: '/settings/api', name: 'settings-api', component: SettingsApi },
     { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject },
     { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject },
