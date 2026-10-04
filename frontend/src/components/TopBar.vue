@@ -238,19 +238,11 @@ async function signOut(): Promise<void> {
     </div>
 
     <nav class="rail__account" aria-label="Account">
-      <RouterLink class="topitem" :to="{ name: 'me' }">
-        <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
-        {{ session.me.value?.login }}
-        <span
-          v-for="k in unreadKinds"
-          :key="k.kind"
-          class="stamp topat"
-          :style="{ color: ink(mine) }"
-          :aria-label="k.label"
-        ><component :is="k.icon" class="ic ic--sm" />{{ k.count }}</span>
-      </RouterLink>
       <div class="rail__row">
-        <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
+        <RouterLink class="topitem" :to="{ name: 'me' }">
+          <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
+          {{ session.me.value?.login }}
+        </RouterLink>
         <div class="sp"></div>
         <button
           class="topitem rail__theme"
@@ -269,7 +261,11 @@ async function signOut(): Promise<void> {
           @click="setTheme('dark')"
         ><Moon class="ic" /></button>
       </div>
-      <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
+      <div class="rail__row">
+        <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
+        <div class="sp"></div>
+        <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
+      </div>
     </nav>
   </aside>
 
