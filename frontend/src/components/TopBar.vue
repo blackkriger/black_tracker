@@ -216,22 +216,28 @@ async function signOut(): Promise<void> {
       </div>
     </nav>
 
+    <RouterLink v-if="hasRole" class="topitem" to="/analytics">Analytics</RouterLink>
+
     <div class="rail__date">
       <span v-if="countdown" class="stamp topcount rail__count">{{ countdown }}</span>
       <DatePanel ref="panel" :soon="soon" @day="toDay" />
     </div>
 
     <nav class="rail__account" aria-label="Account">
-      <RouterLink class="topitem" :to="{ name: 'me' }">
-        <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
-        {{ session.me.value?.login }}
-        <span v-if="unread" class="stamp topat rail__at" :style="{ color: ink(mine) }">
-          <AtSign class="ic ic--sm" />{{ unread }}
-        </span>
-      </RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" to="/analytics">Analytics</RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
-      <div class="rail__end">
+      <div class="rail__row">
+        <RouterLink class="topitem" :to="{ name: 'me' }">
+          <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
+          {{ session.me.value?.login }}
+          <span v-if="unread" class="stamp topat" :style="{ color: ink(mine) }">
+            <AtSign class="ic ic--sm" />{{ unread }}
+          </span>
+        </RouterLink>
+        <div class="sp"></div>
+        <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
+      </div>
+      <div class="rail__row">
+        <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
+        <div class="sp"></div>
         <button
           class="topitem rail__theme"
           :class="{ 'is-on': shownTheme === 'light' }"
@@ -248,8 +254,6 @@ async function signOut(): Promise<void> {
           :aria-pressed="shownTheme === 'dark'"
           @click="setTheme('dark')"
         ><Moon class="ic" /></button>
-        <div class="sp"></div>
-        <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
       </div>
     </nav>
   </aside>
@@ -421,10 +425,7 @@ async function signOut(): Promise<void> {
   flex-direction: column;
   margin-top: auto;
 }
-.rail__at {
-  margin-left: auto;
-}
-.rail__end {
+.rail__row {
   display: flex;
   align-items: center;
 }
