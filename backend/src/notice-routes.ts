@@ -85,9 +85,11 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
   app.get('/notices', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const q = req.query as { from?: string; to?: string };
+    const q = req.query as { from?: string; to?: string; limit?: string; after?: string };
     const from = q.from?.trim() || null;
     const to = q.to?.trim() || null;
+    const size = Math.min(200, Math.max(1, Number(q.limit) || 10));
+    const after = q.after && /^[0-9a-f-]{36}$/i.test(q.after) ? q.after : null;
     if ((from && !DAY_RE.test(from)) || (to && !DAY_RE.test(to))) {
       return reply.code(400).send({ error: 'Dates go as YYYY-MM-DD.' });
     }
@@ -110,12 +112,38 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
           and i.board_id <> all($3::uuid[])
           and ($4::date is null or (n.created_at at time zone '${ZONE}')::date >= $4)
           and ($5::date is null or (n.created_at at time zone '${ZONE}')::date <= $5)
-        order by ${within ? '' : 'n.read_at is not null, '}n.created_at desc
-        limit ${within ? 500 : 40}`,
-      [auth.userId, [...denied.projects], [...denied.boards], from, to]
+          and ($6::uuid is null or exists (
+                select 1 from notices c
+                 where c.id = $6 and c.user_id = $1
+                   and ((n.read_at is not null) > (c.read_at is not null)
+                        or ((n.read_at is not null) = (c.read_at is not null)
+                            and (n.created_at, n.id) < (c.created_at, c.id)))
+              ))
+        order by ${within ? '' : 'n.read_at is not null, '}n.created_at desc, n.id desc
+        limit ${within ? 500 : size}`,
+      [auth.userId, [...denied.projects], [...denied.boards], from, to, within ? null : after]
     );
 
     return reply.send({ data: res.rows.map((r) => publicNotice(r, auth.login)) });
+  });
+
+  app.get('/notices/unread', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    if (denied.everything) return reply.send({ data: {} });
+    const res = await pool.query<{ kind: string; n: number }>(
+      `select n.kind, count(*)::int as n
+         from notices n
+         left join issue_comments c on c.id = n.comment_id
+         join issues i on i.id = coalesce(c.issue_id, n.issue_id)
+        where n.user_id = $1 and n.read_at is null
+          and i.project_id <> all($2::uuid[])
+          and i.board_id <> all($3::uuid[])
+        group by n.kind`,
+      [auth.userId, [...denied.projects], [...denied.boards]]
+    );
+    return reply.send({ data: Object.fromEntries(res.rows.map((r) => [r.kind, r.n])) });
   });
 
   app.post('/notices/read', async (req, reply) => {
