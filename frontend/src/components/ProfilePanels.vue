@@ -206,6 +206,28 @@ async function changePassword(): Promise<void> {
 
   <div class="stack">
     <section class="panel">
+      <header class="panel__h">GitHub</header>
+      <form class="panel__b form" @submit.prevent="saveGithub">
+        <div class="field">
+          <label class="label" for="github">GitHub login</label>
+          <input
+            id="github"
+            v-model="github"
+            class="input"
+            maxlength="200"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="row-end">
+          <span v-if="githubSaved" class="hint">Saved.</span>
+          <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
+        </div>
+      </form>
+    </section>
+    <div v-if="errors.github" class="err panel__err">{{ errors.github }}</div>
+
+    <section class="panel">
       <header class="panel__h">Sessions</header>
       <div class="panel__b form">
         <ul class="sess">
@@ -244,28 +266,6 @@ async function changePassword(): Promise<void> {
       </div>
     </section>
     <div v-if="errors.sessions" class="err panel__err">{{ errors.sessions }}</div>
-
-    <section class="panel">
-      <header class="panel__h">GitHub</header>
-      <form class="panel__b form" @submit.prevent="saveGithub">
-        <div class="field">
-          <label class="label" for="github">GitHub login</label>
-          <input
-            id="github"
-            v-model="github"
-            class="input"
-            maxlength="200"
-            autocomplete="off"
-            spellcheck="false"
-          />
-        </div>
-        <div class="row-end">
-          <span v-if="githubSaved" class="hint">Saved.</span>
-          <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
-        </div>
-      </form>
-    </section>
-    <div v-if="errors.github" class="err panel__err">{{ errors.github }}</div>
   </div>
 </template>
 
