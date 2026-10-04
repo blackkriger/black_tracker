@@ -41,7 +41,7 @@ type Column = 'key' | 'priority' | 'board' | 'status' | 'due' | 'assignee';
 const route = useRoute();
 const router = useRouter();
 const session = useSession();
-const { projects, load: loadProjects } = useProjects();
+const { projects, loaded: projectsLoaded, load: loadProjects } = useProjects();
 const { people, nameOf, colorOf, load: loadPeople } = usePeople();
 const { errors, fail, clear } = usePanelErrors();
 
@@ -115,6 +115,8 @@ watch(typed, (text) => {
 
 const rows = ref<Row[]>([]);
 const loading = ref(true);
+const skBody = ref<HTMLElement | null>(null);
+const skRows = ref(6);
 let reads = 0;
 
 async function load(): Promise<void> {
@@ -181,10 +183,14 @@ watch(
 );
 
 const tags = ref<TagOption[]>([]);
+const tagsLoaded = ref(false);
 async function loadTags(): Promise<void> {
   try {
     tags.value = await api<TagOption[]>('/tags');
-  } catch {}
+  } catch {
+  } finally {
+    tagsLoaded.value = true;
+  }
 }
 
 const projectChoices = computed(() =>
@@ -406,6 +412,12 @@ onMounted(() => {
   void loadTags();
   void load();
   void showIssue(openKey.value);
+  const body = skBody.value;
+  const row = body?.querySelector('tr');
+  if (body && row) {
+    const room = window.innerHeight - body.getBoundingClientRect().top;
+    skRows.value = Math.max(skRows.value, Math.ceil(room / row.getBoundingClientRect().height));
+  }
 });
 </script>
 
@@ -455,6 +467,9 @@ onMounted(() => {
                 :style="{ '--c': t.color }"
                 @click="toggleTag(t.id)"
               >{{ t.name }}</button>
+              <template v-if="!tagsLoaded || !projectsLoaded">
+                <span v-for="w in [40, 62]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
+              </template>
               <button v-if="anyFilter" class="btn btn--sm btn--ghost" type="button" @click="clearAll">
                 Clear all
               </button>
@@ -555,16 +570,16 @@ onMounted(() => {
                   </th>
                 </tr>
               </thead>
-              <tbody v-if="loading">
-                <tr v-for="n in 6" :key="n">
+              <tbody v-if="loading" ref="skBody">
+                <tr v-for="n in skRows" :key="n">
                   <td class="list__pick"><span class="sk sk--line" style="width: 13px"></span></td>
-                  <td><span class="sk sk--line" style="width: 46px"></span></td>
-                  <td><span class="sk sk--line" style="width: 15px"></span></td>
-                  <td><span class="sk sk--line" :style="{ width: `${40 + ((n * 17) % 45)}%` }"></span></td>
-                  <td><span class="sk sk--line" style="width: 70px"></span></td>
-                  <td><span class="sk sk--line" style="width: 60px"></span></td>
-                  <td><span class="sk sk--line" style="width: 44px"></span></td>
-                  <td><span class="sk sk--line" style="width: 70px"></span></td>
+                  <td><span class="sk sk--line" style="width: 42px"></span></td>
+                  <td><span class="sk sk--line" style="width: 18px"></span></td>
+                  <td class="list__what"><span class="sk sk--line" :style="{ width: `${40 + ((n * 17) % 45)}%` }"></span></td>
+                  <td><span class="sk sk--line" style="width: 73px"></span></td>
+                  <td><span class="sk sk--line" style="width: 66px"></span></td>
+                  <td><span class="sk sk--line" style="width: 40px"></span></td>
+                  <td><span class="sk sk--line" style="width: 48px"></span></td>
                 </tr>
               </tbody>
               <tbody v-else>
@@ -699,6 +714,10 @@ onMounted(() => {
   height: 16px;
   margin: 0 6px;
   background: var(--line-2);
+}
+.tag-sk {
+  display: block;
+  height: 24px;
 }
 .list__period:not(.is-on) :deep(.drp__trigger) {
   color: var(--text-muted);
