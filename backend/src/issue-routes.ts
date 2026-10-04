@@ -6,7 +6,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { inTransaction, pool } from './db.js';
+import { DAY_RE, inTransaction, pool, ZONE } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor, mayOpenBoard } from './board-service.js';
@@ -70,6 +70,23 @@ interface IssueRow {
   assignee_login: string | null;
   author_login: string | null;
 }
+
+interface ListedRow extends IssueRow {
+  state_name: string;
+  state_color: string;
+  is_resolved: boolean;
+  board_name: string;
+  slug: string;
+  short_name: string;
+}
+
+const listOf = (value: string | undefined): string[] | null => {
+  const items = (value ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return items.length ? items.slice(0, 100) : null;
+};
 
 interface TagRow {
   id: string;
@@ -1062,6 +1079,73 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       origin: tabOf(req),
     });
     return reply.send({ data: { ok: true } });
+  });
+
+  app.get('/issues', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const q = req.query as Record<string, string | undefined>;
+    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    if (denied.everything) return reply.send({ data: [] });
+    const from = q.from && DAY_RE.test(q.from) ? q.from : null;
+    const to = q.to && DAY_RE.test(q.to) ? q.to : null;
+    const tags = listOf(q.tags)?.filter((t) => /^[0-9a-f-]{36}$/i.test(t)) ?? null;
+    const term = (q.q ?? '').trim().slice(0, 100) || null;
+    const res = await pool.query<ListedRow>(
+      `select i.*, a.login as assignee_login, w.login as author_login,
+              s.name as state_name, s.color as state_color, s.is_resolved,
+              b.name as board_name, b.slug, p.short_name
+         from issues i
+         join projects p on p.id = i.project_id
+         join boards b on b.id = i.board_id
+         join states s on s.id = i.state_id
+         left join users a on a.id = i.assignee_id
+         left join users w on w.id = i.author_id
+        where not p.archived
+          and b.id <> all($1::uuid[]) and p.id <> all($2::uuid[])
+          and ($3::text[] is null or p.short_name = any($3))
+          and ($4::text[] is null or s.name = any($4))
+          and ($5::text[] is null or a.login = any($5) or ('-' = any($5) and i.assignee_id is null))
+          and ($6::text[] is null or w.login = any($6))
+          and ($7::uuid[] is null or (
+                select count(*) from issue_tags it where it.issue_id = i.id and it.tag_id = any($7)
+              ) = cardinality($7))
+          and ($8::boolean or not s.is_resolved)
+          and ($9::date is null or (i.created_at at time zone '${ZONE}')::date >= $9)
+          and ($10::date is null or (i.created_at at time zone '${ZONE}')::date <= $10)
+          and ($11::text is null or i.summary ilike '%' || $11 || '%' or i.readable_id ilike $11 || '%'
+               or split_part(i.readable_id, '-', 2) = $11)
+        order by i.updated_at desc, i.created_at desc
+        limit 1000`,
+      [
+        [...denied.boards],
+        [...denied.projects],
+        listOf(q.projects),
+        listOf(q.states),
+        listOf(q.assignees),
+        listOf(q.authors),
+        tags,
+        q.closed === '1',
+        from,
+        to,
+        term,
+      ]
+    );
+    const tagged = await tagsFor(res.rows.map((r) => r.id));
+    return reply.send({
+      data: res.rows.map((r) => {
+        const { description, ...issue } = publicIssue(r, tagged.get(r.id) ?? []);
+        return {
+          ...issue,
+          stateName: r.state_name,
+          stateColor: r.state_color,
+          resolved: r.is_resolved,
+          boardName: r.board_name,
+          boardSlug: r.slug,
+          projectShort: r.short_name,
+        };
+      }),
+    });
   });
 
   app.get('/issues/keys', async (req, reply) => {
