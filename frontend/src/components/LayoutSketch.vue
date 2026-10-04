@@ -48,12 +48,12 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
       <rect class="t" x="13" y="7.5" width="12" height="2" />
       <rect class="t" x="40" y="7" width="3" height="3" />
       <rect class="t" x="46" y="7.5" width="16" height="2" />
-      <rect class="m" x="7" y="19" width="12" height="2" />
-      <rect class="k" x="7" y="25" width="9" height="3.5" />
-      <rect class="t" x="18" y="25.25" width="22" height="3" />
-      <rect class="t" x="18" y="32" width="18" height="2" />
-      <rect class="m" x="18" y="37" width="14" height="2" />
-      <rect class="m" x="18" y="42" width="10" height="2" />
+      <rect class="m" x="7" y="16" width="12" height="2" />
+      <rect class="k" x="7" y="22" width="9" height="3.5" />
+      <rect class="t" x="18" y="22.25" width="22" height="3" />
+      <rect class="t" x="10.5" y="29" width="18" height="2" />
+      <rect class="m" x="10.5" y="34" width="14" height="2" />
+      <rect class="m" x="10.5" y="39" width="10" height="2" />
       <rect class="m" x="7" y="70" width="22" height="2" />
       <rect class="m" x="56" y="70" width="2" height="2" />
       <rect class="m" x="62" y="70" width="2" height="2" />

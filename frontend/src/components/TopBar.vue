@@ -419,6 +419,9 @@ async function signOut(): Promise<void> {
   flex-direction: column;
   gap: 2px;
 }
+.rail__projects .side__h {
+  padding-top: 0;
+}
 .rail__proj + .rail__proj {
   margin-top: 10px;
 }
@@ -428,7 +431,7 @@ async function signOut(): Promise<void> {
 }
 .rail__board {
   height: 26px;
-  padding-left: 38px;
+  padding-left: 22px;
 }
 .rail__sections {
   display: grid;
