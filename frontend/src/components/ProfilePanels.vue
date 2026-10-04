@@ -246,7 +246,7 @@ async function changePassword(): Promise<void> {
     <div v-if="errors.sessions" class="err panel__err">{{ errors.sessions }}</div>
 
     <section class="panel">
-      <header class="panel__h">Integrations</header>
+      <header class="panel__h">GitHub</header>
       <form class="panel__b form" @submit.prevent="saveGithub">
         <div class="field">
           <label class="label" for="github">GitHub login</label>
