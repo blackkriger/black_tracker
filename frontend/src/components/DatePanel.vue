@@ -28,7 +28,7 @@ const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>(
 const session = useSession();
 const router = useRouter();
 const route = useRoute();
-const { colorOf } = usePeople();
+const { colorOf, nameOf } = usePeople();
 const { shown: notices, markRead } = useNotices();
 const { ask } = useFocus();
 
@@ -161,12 +161,12 @@ defineExpose({ readMonth });
           v-if="showsAuthor(n, session.me.value?.login)"
           class="men__by"
           :style="{ color: ink(colorOf(n.by)) }"
-        >{{ n.by }}</span>
+        >{{ nameOf(n.by) }}</span>
         <span class="men__said">
           <template v-if="n.kind === 'reaction'">reacted</template>
           <template v-else-if="n.kind === 'assigned'">assigned you</template>
           <template v-else-if="n.kind === 'starred' && !n.commentId">
-            {{ describeChanges(n.changes, (login) => login) }}
+            {{ describeChanges(n.changes, nameOf) }}
           </template>
           <template v-else>{{ n.said }}</template>
         </span>
