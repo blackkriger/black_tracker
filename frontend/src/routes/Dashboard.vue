@@ -34,7 +34,7 @@ import type { IssueTag } from '../lib/issues';
 import { priorityColor, stampAt, type Priority } from '../lib/issues';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
-import { describeChanges, useNotices, type Notice } from '../lib/notices';
+import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
@@ -575,23 +575,18 @@ function closeIssue(): void {
                 <span class="day__what">
                   <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
                   <span v-if="n.emoji">{{ n.emoji }}</span>
+                  <span
+                    v-if="showsAuthor(n, session.me.value?.login)"
+                    class="note__by"
+                    :style="{ color: ink(colorOf(n.by)) }"
+                  >{{ nameOf(n.by) }}</span>
                   <span class="note__said">
-                    <template v-if="n.kind === 'reaction'">
-                      <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span> reacted
-                    </template>
-                    <template v-else-if="n.kind === 'assigned'">
-                      <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span> assigned you
-                    </template>
+                    <template v-if="n.kind === 'reaction'">reacted</template>
+                    <template v-else-if="n.kind === 'assigned'">assigned you</template>
                     <template v-else-if="n.kind === 'starred' && !n.commentId">
-                      <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span>
                       {{ describeChanges(n.changes, nameOf) }}
                     </template>
-                    <template v-else>
-                      <template v-if="n.by && n.by !== session.me.value?.login">
-                        <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span>
-                      </template>
-                      {{ n.said }}
-                    </template>
+                    <template v-else>{{ n.said }}</template>
                   </span>
                 </span>
               </button>
@@ -729,7 +724,8 @@ function closeIssue(): void {
   min-width: 0;
   max-width: 100%;
 }
-.day__what .key {
+.day__what .key,
+.note__by {
   flex: none;
 }
 .note__said {

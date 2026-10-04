@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
-import { describeChanges, useNotices, type Notice } from '../lib/notices';
+import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { useRoles } from '../lib/roles';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
@@ -305,23 +305,18 @@ async function signOut(): Promise<void> {
             >
               <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
               <span v-if="n.emoji" class="men__emoji">{{ n.emoji }}</span>
+              <span
+                v-if="showsAuthor(n, session.me.value?.login)"
+                class="men__by"
+                :style="{ color: ink(colorOf(n.by)) }"
+              >{{ n.by }}</span>
               <span class="men__said">
-                <template v-if="n.kind === 'reaction'">
-                  <span :style="{ color: ink(colorOf(n.by)) }">{{ n.by }}</span> reacted
-                </template>
-                <template v-else-if="n.kind === 'assigned'">
-                  <span :style="{ color: ink(colorOf(n.by)) }">{{ n.by }}</span> assigned you
-                </template>
+                <template v-if="n.kind === 'reaction'">reacted</template>
+                <template v-else-if="n.kind === 'assigned'">assigned you</template>
                 <template v-else-if="n.kind === 'starred' && !n.commentId">
-                  <span :style="{ color: ink(colorOf(n.by)) }">{{ n.by }}</span>
                   {{ describeChanges(n.changes, (login) => login) }}
                 </template>
-                <template v-else>
-                  <template v-if="n.by && n.by !== session.me.value?.login">
-                    <span :style="{ color: ink(colorOf(n.by)) }">{{ n.by }}</span>
-                  </template>
-                  {{ n.said }}
-                </template>
+                <template v-else>{{ n.said }}</template>
               </span>
             </button>
           </template>
@@ -441,7 +436,8 @@ async function signOut(): Promise<void> {
 .men__emoji {
   font-size: 12px;
 }
-.men .key {
+.men .key,
+.men__by {
   flex: none;
 }
 .men__said {

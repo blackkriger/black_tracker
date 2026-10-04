@@ -6,7 +6,7 @@ import Select from './Select.vue';
 import { api } from '../lib/api';
 import { tellTab } from '../lib/live';
 import { longDate, type Due, type Mark } from '../lib/calendar';
-import { describeChanges, useNotices, type Notice } from '../lib/notices';
+import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
@@ -136,23 +136,18 @@ async function openNotice(n: Notice): Promise<void> {
       >
         <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
         <span v-if="n.emoji">{{ n.emoji }}</span>
+        <span
+          v-if="showsAuthor(n, session.me.value?.login)"
+          class="mark__by"
+          :style="{ color: ink(colorOf(n.by)) }"
+        >{{ nameOf(n.by) }}</span>
         <span class="mark__title">
-          <template v-if="n.kind === 'reaction'">
-            <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span> reacted
-          </template>
-          <template v-else-if="n.kind === 'assigned'">
-            <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span> assigned you
-          </template>
+          <template v-if="n.kind === 'reaction'">reacted</template>
+          <template v-else-if="n.kind === 'assigned'">assigned you</template>
           <template v-else-if="n.kind === 'starred' && !n.commentId">
-            <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span>
             {{ describeChanges(n.changes, nameOf) }}
           </template>
-          <template v-else>
-            <template v-if="n.by && n.by !== session.me.value?.login">
-              <span :style="{ color: ink(colorOf(n.by)) }">{{ nameOf(n.by) }}</span>
-            </template>
-            {{ n.said }}
-          </template>
+          <template v-else>{{ n.said }}</template>
         </span>
       </button>
     </div>
@@ -305,7 +300,8 @@ a.mark__title:hover {
 .mark--due:hover {
   border-color: var(--line-2);
 }
-.mark .key {
+.mark .key,
+.mark__by {
   flex: none;
 }
 .mark__title {

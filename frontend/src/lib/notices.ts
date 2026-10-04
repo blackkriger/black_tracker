@@ -28,6 +28,12 @@ export interface Notice {
 
 const OFF = 'tracker:notices:off';
 
+export function showsAuthor(n: Notice, me: string | null | undefined): boolean {
+  if (!n.by) return false;
+  if (n.kind === 'reaction' || n.kind === 'assigned' || (n.kind === 'starred' && !n.commentId)) return true;
+  return n.by !== me;
+}
+
 export function describeChanges(changes: NoticeChange[], name: (login: string) => string): string {
   const show = (c: NoticeChange, value: string | null): string => {
     if (!value) return '—';
