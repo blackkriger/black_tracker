@@ -28,7 +28,8 @@ const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>(
 const session = useSession();
 const router = useRouter();
 const route = useRoute();
-const { colorOf, nameOf } = usePeople();
+const { colorOf, nameOf, load: loadPeople } = usePeople();
+void loadPeople();
 const { notices: everything, shown: notices, hasMore, loadMore, markRead } = useNotices();
 const list = ref<HTMLDivElement | null>(null);
 
