@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import { api, latestRead } from './api';
+import { api } from './api';
 import { shortDate } from './calendar';
 
 export type NoticeKind = 'mention' | 'reaction' | 'assigned' | 'starred';
@@ -51,12 +51,15 @@ export function describeChanges(changes: NoticeChange[], name: (login: string) =
     .join(', ');
 }
 
+const PAGE = 10;
+
 const notices = ref<Notice[]>([]);
 const loaded = ref(false);
+const hasMore = ref(true);
+const counts = ref<Partial<Record<NoticeKind, number>>>({});
 const off = ref<NoticeKind[]>(read());
-const readNotices = latestRead<Notice[]>('/notices', (rows) => {
-  notices.value = rows;
-});
+let reads = 0;
+let paging: Promise<void> | null = null;
 
 function read(): NoticeKind[] {
   try {
@@ -66,14 +69,57 @@ function read(): NoticeKind[] {
   }
 }
 
+async function readCounts(): Promise<void> {
+  try {
+    counts.value = await api<Partial<Record<NoticeKind, number>>>('/notices/unread');
+  } catch {}
+}
+
+async function refresh(): Promise<void> {
+  const mine = ++reads;
+  const size = Math.min(200, Math.max(PAGE, notices.value.length));
+  try {
+    const [rows, unread] = await Promise.all([
+      api<Notice[]>(`/notices?limit=${size}`),
+      api<Partial<Record<NoticeKind, number>>>('/notices/unread'),
+    ]);
+    if (mine !== reads) return;
+    notices.value = rows;
+    counts.value = unread;
+    hasMore.value = rows.length >= size;
+  } catch {}
+  loaded.value = true;
+}
+
+function loadMore(): Promise<void> {
+  const last = notices.value[notices.value.length - 1];
+  if (paging || !hasMore.value || !last) return paging ?? Promise.resolve();
+  const mine = reads;
+  paging = api<Notice[]>(`/notices?limit=${PAGE}&after=${last.id}`)
+    .then((rows) => {
+      if (mine !== reads) return;
+      const seen = new Set(notices.value.map((n) => n.id));
+      notices.value = [...notices.value, ...rows.filter((r) => !seen.has(r.id))];
+      hasMore.value = rows.length >= PAGE;
+    })
+    .catch(() => {})
+    .finally(() => {
+      paging = null;
+    });
+  return paging;
+}
+
 export function useNotices() {
   const shown = computed(() => notices.value.filter((n) => !off.value.includes(n.kind)));
+  const unreadOf = computed(() => (kind: NoticeKind) => (off.value.includes(kind) ? 0 : counts.value[kind] ?? 0));
   return {
     notices,
     shown,
     off,
     loaded,
-    unread: computed(() => shown.value.filter((n) => !n.read).length),
+    hasMore,
+    loadMore,
+    unreadOf,
     toggleKind(kind: NoticeKind): void {
       off.value = off.value.includes(kind)
         ? off.value.filter((k) => k !== kind)
@@ -82,15 +128,13 @@ export function useNotices() {
         localStorage.setItem(OFF, JSON.stringify(off.value));
       } catch {}
     },
-    async load(): Promise<void> {
-      await readNotices(true).catch(() => {});
-      loaded.value = true;
-    },
+    load: refresh,
     async markRead(id?: string): Promise<void> {
       await api('/notices/read', { method: 'POST', body: { id } }).catch(() => {});
       notices.value = notices.value
         .map((n) => (!id || n.id === id ? { ...n, read: true } : n))
         .sort((a, b) => Number(a.read) - Number(b.read) || Date.parse(b.at) - Date.parse(a.at));
+      await readCounts();
     },
   };
 }

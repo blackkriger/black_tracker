@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import MonthGrid from './MonthGrid.vue';
@@ -22,14 +22,29 @@ import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
 
-defineProps<{ soon: Mark | null; withFull?: boolean; all?: boolean }>();
+const props = defineProps<{ soon: Mark | null; withFull?: boolean; all?: boolean }>();
 const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>();
 
 const session = useSession();
 const router = useRouter();
 const route = useRoute();
 const { colorOf, nameOf } = usePeople();
-const { shown: notices, markRead } = useNotices();
+const { notices: everything, shown: notices, hasMore, loadMore, markRead } = useNotices();
+const list = ref<HTMLDivElement | null>(null);
+
+async function fill(): Promise<void> {
+  await nextTick();
+  const el = list.value;
+  if (!props.all || !el || !hasMore.value) return;
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+    const before = everything.value.length;
+    await loadMore();
+    if (everything.value.length > before) void fill();
+  }
+}
+
+watch(() => everything.value.length, () => void fill());
+
 const { ask } = useFocus();
 
 const now = new Date();
@@ -78,7 +93,12 @@ async function toCalendar(): Promise<void> {
   await router.push({ name: 'me', query: { calendar: 'full' } });
 }
 
-onMounted(() => void readMonth());
+onMounted(() => {
+  void readMonth();
+  void fill();
+  window.addEventListener('resize', fill);
+});
+onBeforeUnmount(() => window.removeEventListener('resize', fill));
 watch(() => route.fullPath, () => void readMonth());
 
 useLive(
@@ -147,7 +167,7 @@ defineExpose({ readMonth });
     </template>
     <template v-if="notices.length">
       <hr />
-      <div class="dp__notices">
+      <div ref="list" class="dp__notices" @scroll="fill">
         <button
           v-for="n in all ? notices : notices.slice(0, 5)"
           :key="n.id"

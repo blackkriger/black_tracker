@@ -57,7 +57,7 @@ const countdown = computed(() => {
   return `${left} days till ${what}`;
 });
 
-const { shown: notices, load: readNotices } = useNotices();
+const { unreadOf, load: readNotices } = useNotices();
 
 const KINDS: { kind: NoticeKind; icon: typeof AtSign; label: string }[] = [
   { kind: 'mention', icon: AtSign, label: 'Mentions' },
@@ -66,9 +66,7 @@ const KINDS: { kind: NoticeKind; icon: typeof AtSign; label: string }[] = [
   { kind: 'starred', icon: Star, label: 'Starred issues' },
 ];
 const unreadKinds = computed(() =>
-  KINDS.map((k) => ({ ...k, count: notices.value.filter((n) => !n.read && n.kind === k.kind).length })).filter(
-    (k) => k.count
-  )
+  KINDS.map((k) => ({ ...k, count: unreadOf.value(k.kind) })).filter((k) => k.count)
 );
 const { ask } = useFocus();
 
