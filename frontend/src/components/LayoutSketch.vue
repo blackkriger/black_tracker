@@ -23,13 +23,17 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
       <rect class="k" x="62" y="7" width="9" height="3.5" />
       <rect class="t" x="73" y="7.25" width="14" height="3" />
       <rect class="m" x="91" y="7.5" width="8" height="2" />
-      <rect class="m" x="148" y="5" width="24" height="2" />
-      <rect class="t" x="158" y="10" width="14" height="2" />
-      <circle class="t" cx="181" cy="8.5" r="3" />
-      <rect class="t" x="187" y="7.5" width="14" height="2" />
-      <rect class="t" x="206" y="7.5" width="13" height="2" />
-      <rect class="t" x="224" y="7.5" width="12" height="2" />
-      <rect class="m" x="241" y="7.5" width="11" height="2" />
+      <rect class="m" x="148" y="5" width="22" height="2" />
+      <rect class="k" x="128" y="10" width="3" height="2" />
+      <rect class="k" x="134" y="10" width="3" height="2" />
+      <rect class="k" x="140" y="10" width="3" height="2" />
+      <rect class="t" x="156" y="10" width="14" height="2" />
+      <circle class="t" cx="177" cy="8.5" r="3" />
+      <rect class="t" x="183" y="7.5" width="12" height="2" />
+      <rect class="t" x="199" y="7.5" width="10" height="2" />
+      <rect class="t" x="213" y="7.5" width="12" height="2" />
+      <rect class="t" x="229" y="7.5" width="11" height="2" />
+      <rect class="m" x="244" y="7.5" width="9" height="2" />
       <rect class="f" x="8" y="23" width="24" height="6" />
       <line class="f" x1="36.5" y1="23" x2="36.5" y2="29" />
       <rect class="f" x="41" y="23" width="38" height="6" />
@@ -47,38 +51,36 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
       <rect class="k" x="7" y="27" width="9" height="3.5" />
       <rect class="t" x="18" y="27.25" width="16" height="3" />
       <rect class="m" x="18" y="34" width="10" height="2" />
-      <rect class="t" x="7" y="44" width="20" height="2" />
-      <rect class="m" x="7" y="54" width="22" height="2" />
-      <rect class="m" x="56" y="54" width="2" height="2" />
-      <rect class="m" x="62" y="54" width="2" height="2" />
+      <rect class="t" x="7" y="42" width="14" height="2" />
+      <rect class="t" x="7" y="47" width="20" height="2" />
+      <rect class="m" x="7" y="56" width="22" height="2" />
+      <rect class="m" x="56" y="56" width="2" height="2" />
+      <rect class="m" x="62" y="56" width="2" height="2" />
       <rect
         v-for="(d, i) in days"
         :key="i"
         :class="i === 6 ? 'k' : 'm'"
         :x="7 + d.col * 8.5"
-        :y="61 + d.row * 7"
+        :y="63 + d.row * 7"
         width="3"
         height="3"
       />
-      <line class="f" x1="4" y1="96.5" x2="69" y2="96.5" />
-      <rect class="t" x="7" y="101" width="8" height="2" />
-      <rect class="t" x="17" y="101" width="10" height="2" />
-      <rect class="m" x="29" y="101" width="30" height="2" />
-      <rect class="t" x="7" y="107" width="8" height="2" />
-      <rect class="t" x="17" y="107" width="10" height="2" />
-      <rect class="m" x="29" y="107" width="24" height="2" />
-      <rect class="t" x="7" y="113" width="8" height="2" />
-      <rect class="t" x="17" y="113" width="10" height="2" />
-      <rect class="m" x="29" y="113" width="18" height="2" />
-      <line class="f" x1="4" y1="118.5" x2="69" y2="118.5" />
-      <rect class="m" x="7" y="123" width="24" height="2" />
+      <line class="f" x1="4" y1="98.5" x2="69" y2="98.5" />
+      <rect class="t" x="7" y="103" width="8" height="2" />
+      <rect class="t" x="17" y="103" width="10" height="2" />
+      <rect class="m" x="29" y="103" width="30" height="2" />
+      <rect class="t" x="7" y="109" width="8" height="2" />
+      <rect class="t" x="17" y="109" width="10" height="2" />
+      <rect class="m" x="29" y="109" width="24" height="2" />
+      <rect class="t" x="7" y="115" width="8" height="2" />
+      <rect class="t" x="17" y="115" width="10" height="2" />
+      <rect class="m" x="29" y="115" width="18" height="2" />
       <circle class="t" cx="10" cy="146" r="3" />
       <rect class="t" x="16" y="145" width="18" height="2" />
-      <rect class="k" x="37" y="145" width="5" height="2" />
-      <rect class="t" x="52" y="145" width="14" height="2" />
+      <circle class="m" cx="56" cy="146" r="2" />
+      <circle class="t" cx="64" cy="146" r="2" />
       <rect class="m" x="7" y="153" width="16" height="2" />
-      <circle class="m" cx="56" cy="154" r="2" />
-      <circle class="t" cx="64" cy="154" r="2" />
+      <rect class="t" x="52" y="153" width="14" height="2" />
       <rect class="f" x="82" y="8" width="24" height="6" />
       <line class="f" x1="110.5" y1="8" x2="110.5" y2="14" />
       <rect class="f" x="115" y="8" width="36" height="6" />
