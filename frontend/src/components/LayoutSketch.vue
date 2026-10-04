@@ -23,12 +23,11 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
       <rect class="k" x="62" y="7" width="9" height="3.5" />
       <rect class="t" x="73" y="7.25" width="14" height="3" />
       <rect class="m" x="91" y="7.5" width="8" height="2" />
-      <rect class="m" x="148" y="5" width="22" height="2" />
-      <rect class="k" x="128" y="10" width="3" height="2" />
-      <rect class="k" x="134" y="10" width="3" height="2" />
-      <rect class="k" x="140" y="10" width="3" height="2" />
+      <rect class="m" x="118" y="5" width="52" height="2" />
+      <rect class="k" x="143" y="10" width="4" height="2" />
+      <rect class="k" x="149" y="10" width="4" height="2" />
       <rect class="t" x="156" y="10" width="14" height="2" />
-      <circle class="t" cx="177" cy="8.5" r="3" />
+      <rect class="t" x="174" y="5.5" width="6" height="6" />
       <rect class="t" x="183" y="7.5" width="12" height="2" />
       <rect class="t" x="199" y="7.5" width="10" height="2" />
       <rect class="t" x="213" y="7.5" width="12" height="2" />
@@ -75,7 +74,7 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
       <rect class="t" x="7" y="134" width="8" height="2" />
       <rect class="t" x="17" y="134" width="10" height="2" />
       <rect class="m" x="29" y="134" width="24" height="2" />
-      <circle class="t" cx="10" cy="146" r="3" />
+      <rect class="t" x="7" y="143" width="6" height="6" />
       <rect class="t" x="16" y="145" width="18" height="2" />
       <circle class="m" cx="56" cy="146" r="2" />
       <circle class="t" cx="64" cy="146" r="2" />
