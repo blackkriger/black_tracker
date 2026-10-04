@@ -21,6 +21,7 @@ import { useSession } from '../lib/session';
 import {
   ArrowDown,
   ArrowUp,
+  ArrowUpToLine,
   FileArchive,
   FileDown,
   Link2,
@@ -613,6 +614,24 @@ function followKey(ev: MouseEvent): void {
   void router.push(`/${info.projectShort}/${info.boardSlug}/${info.key}`);
 }
 
+const mainBox = ref<HTMLDivElement | null>(null);
+const scrolled = ref(false);
+
+function onMainScroll(): void {
+  scrolled.value = (mainBox.value?.scrollTop ?? 0) > 8;
+}
+
+function toTop(): void {
+  mainBox.value?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+watch(
+  () => props.issueKey,
+  () => {
+    scrolled.value = false;
+  }
+);
+
 useLive((ev) => {
   refreshKey(ev.issueKey);
   const current = issue.value;
@@ -1204,6 +1223,17 @@ async function removeIssue(): Promise<void> {
           >
             <X class="ic" />
           </button>
+          <button
+            class="btn btn--sm btn--icon btn--ghost iv__top"
+            :class="{ 'is-off': !scrolled }"
+            type="button"
+            aria-label="Back to top"
+            :aria-hidden="!scrolled"
+            :tabindex="scrolled ? 0 : -1"
+            @click="toTop"
+          >
+            <ArrowUpToLine class="ic" />
+          </button>
           <div class="sp"></div>
           <span class="iv__path">
             <span class="iv__where iv__project">{{ projectName }}</span>
@@ -1303,7 +1333,7 @@ async function removeIssue(): Promise<void> {
         </div>
 
         <div v-else class="iv">
-          <div class="iv__main">
+          <div ref="mainBox" class="iv__main" @scroll="onMainScroll">
             <input
               v-if="editing"
               v-model="titleDraft"
@@ -1962,6 +1992,9 @@ async function removeIssue(): Promise<void> {
 .iv__main,
 .props {
   overflow-y: auto;
+}
+.iv__top.is-off {
+  visibility: hidden;
 }
 .iv__star.is-on {
   color: var(--accent);
