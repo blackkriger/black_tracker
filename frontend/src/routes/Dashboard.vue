@@ -11,7 +11,6 @@ import {
   Smile,
   Star,
 } from 'lucide-vue-next';
-import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
@@ -355,7 +354,6 @@ function closeIssue(): void {
 
 <template>
   <div class="page">
-    <TopBar />
     <div class="page__body">
       <div class="sheet sheet--cal">
           <section class="panel sheet__wide">

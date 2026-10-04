@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
-import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import Select from '../components/Select.vue';
@@ -321,7 +320,6 @@ async function openIssue(w: Where): Promise<void> {
 
 <template>
   <div class="page">
-    <TopBar />
     <div class="page__body">
       <div class="sheet">
         <section class="panel sheet__wide">

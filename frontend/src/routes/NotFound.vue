@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import TopBar from '../components/TopBar.vue';
 </script>
 
 <template>
   <div class="page">
-    <TopBar />
     <div class="page__body">
       <div class="empty">
         <span class="empty__g">404</span>
@@ -16,7 +14,7 @@ import TopBar from '../components/TopBar.vue';
 
 <style scoped>
 .page {
-  min-height: 100vh;
+  min-height: calc(100vh - var(--top-h));
   display: flex;
   flex-direction: column;
 }

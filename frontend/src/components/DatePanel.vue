@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import MonthGrid from './MonthGrid.vue';
 import { api } from '../lib/api';
@@ -27,6 +27,7 @@ const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>(
 
 const session = useSession();
 const router = useRouter();
+const route = useRoute();
 const { colorOf } = usePeople();
 const { shown: notices, markRead } = useNotices();
 const { ask } = useFocus();
@@ -78,6 +79,7 @@ async function toCalendar(): Promise<void> {
 }
 
 onMounted(() => void readMonth());
+watch(() => route.fullPath, () => void readMonth());
 
 useLive(
   (ev) => {

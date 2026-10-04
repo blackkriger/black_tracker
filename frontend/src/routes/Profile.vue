@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import TopBar from '../components/TopBar.vue';
 import ProfilePanels from '../components/ProfilePanels.vue';
 import PreferencePanels from '../components/PreferencePanels.vue';
 </script>
 
 <template>
   <div class="page">
-    <TopBar />
     <div class="page__body">
       <div class="sheet">
         <ProfilePanels />
@@ -18,7 +16,7 @@ import PreferencePanels from '../components/PreferencePanels.vue';
 
 <style scoped>
 .page {
-  min-height: 100vh;
+  min-height: calc(100vh - var(--top-h));
   display: flex;
   flex-direction: column;
 }

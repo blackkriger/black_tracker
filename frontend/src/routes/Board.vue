@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import TopBar from '../components/TopBar.vue';
 import IssueView from '../components/IssueView.vue';
 import Select from '../components/Select.vue';
 import { usePeople } from '../lib/people';
@@ -426,7 +425,6 @@ watch(
 
 <template>
   <div class="page">
-    <TopBar :project="project" :board="current" />
 
     <div v-if="current" class="tagbar">
       <Select
@@ -632,7 +630,7 @@ watch(
 
 <style scoped>
 .page {
-  height: 100vh;
+  height: calc(100vh - var(--top-h));
   display: flex;
   flex-direction: column;
 }

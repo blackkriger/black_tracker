@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import TopBar from './TopBar.vue';
 import { ExternalLink } from 'lucide-vue-next';
 import { api } from '../lib/api';
 import { stamp } from '../lib/issues';
@@ -32,7 +31,6 @@ useLive(
 
 <template>
   <div class="page">
-    <TopBar />
 
     <div class="page__body">
       <nav class="side settings__side" aria-label="Settings sections">
@@ -80,7 +78,7 @@ useLive(
   margin: 0 10px;
 }
 .page {
-  min-height: 100vh;
+  min-height: calc(100vh - var(--top-h));
   display: flex;
   flex-direction: column;
 }

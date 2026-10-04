@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import TopBar from '../components/TopBar.vue';
 import { lastProject } from '../lib/lastProject';
 import { useProjects } from '../lib/projects';
 
@@ -28,7 +27,6 @@ onMounted(async () => {
 
 <template>
   <div class="page">
-    <TopBar />
     <div class="page__body">
       <p v-if="loading" class="hint">Loading…</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
@@ -39,7 +37,7 @@ onMounted(async () => {
 
 <style scoped>
 .page {
-  min-height: 100vh;
+  min-height: calc(100vh - var(--top-h));
   display: flex;
   flex-direction: column;
 }

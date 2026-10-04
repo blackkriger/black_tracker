@@ -18,11 +18,6 @@ import { layout } from '../lib/layout';
 import { AtSign, Moon, Sun } from 'lucide-vue-next';
 import { ink, setTheme, shownTheme } from '../lib/theme';
 
-const props = defineProps<{
-  project?: { shortName: string; name: string } | null;
-  board?: { name: string; slug: string } | null;
-}>();
-
 const session = useSession();
 const router = useRouter();
 const route = useRoute();
@@ -34,7 +29,10 @@ const { load: loadRoles } = useRoles();
 const hasRole = computed(() => session.me.value?.isAdmin === true || !!session.me.value?.role);
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
-const currentShort = computed(() => props.project?.shortName ?? null);
+const PLACES = ['project-board', 'board', 'issue'];
+const here = computed(() => PLACES.includes(String(route.name)));
+const currentShort = computed(() => (here.value ? String(route.params.short) : null));
+const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
 
 const today = stamp(new Date().toISOString());
 const dateOpen = ref(false);
@@ -155,7 +153,7 @@ async function signOut(): Promise<void> {
             v-for="b in p.boards"
             :key="b.id"
             class="topitem topitem__board"
-            :class="{ 'is-here': p.shortName === currentShort && b.slug === board?.slug }"
+            :class="{ 'is-here': p.shortName === currentShort && b.slug.toLowerCase() === currentSlug }"
             :to="`/${p.shortName}/${b.slug}`"
           >{{ b.name }}</RouterLink>
         </span>
@@ -210,7 +208,7 @@ async function signOut(): Promise<void> {
           v-for="b in p.boards"
           :key="b.id"
           class="topitem topitem__board rail__board"
-          :class="{ 'is-here': p.shortName === currentShort && b.slug === board?.slug }"
+          :class="{ 'is-here': p.shortName === currentShort && b.slug.toLowerCase() === currentSlug }"
           :to="`/${p.shortName}/${b.slug}`"
         >{{ b.name }}</RouterLink>
       </div>

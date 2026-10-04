@@ -3,6 +3,7 @@ import { useSession } from './lib/session';
 import { findKeys } from './lib/issueKeys';
 import Login from './routes/Login.vue';
 import Home from './routes/Home.vue';
+import AppShell from './components/AppShell.vue';
 
 const Board = () => import('./routes/Board.vue');
 const Profile = () => import('./routes/Profile.vue');
@@ -23,35 +24,41 @@ const Analytics = () => import('./routes/Analytics.vue');
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'home', component: Home },
-    { path: '/me', name: 'me', component: Dashboard },
     { path: '/login', name: 'login', component: Login, meta: { public: true } },
     { path: '/join/:token', name: 'join', component: Join, meta: { public: true } },
     { path: '/reset/:token', name: 'reset', component: Reset, meta: { public: true } },
-    { path: '/:short([A-Z][A-Z0-9]*)', name: 'project-board', component: Board },
-    { path: '/:short([A-Z][A-Z0-9]*)/:slug', name: 'board', component: Board },
-    { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
     {
-      path: '/:key([A-Z][A-Z0-9]*-\\d+)',
-      name: 'issue-key',
-      component: NotFound,
-      beforeEnter: async (to) => {
-        const [hit] = await findKeys([String(to.params.key)]).catch(() => []);
-        return hit ? { path: `/${hit.projectShort}/${hit.boardSlug}/${hit.key}`, replace: true } : true;
-      },
+      path: '/',
+      component: AppShell,
+      children: [
+        { path: '', name: 'home', component: Home },
+        { path: '/me', name: 'me', component: Dashboard },
+        { path: '/:short([A-Z][A-Z0-9]*)', name: 'project-board', component: Board },
+        { path: '/:short([A-Z][A-Z0-9]*)/:slug', name: 'board', component: Board },
+        { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
+        {
+          path: '/:key([A-Z][A-Z0-9]*-\\d+)',
+          name: 'issue-key',
+          component: NotFound,
+          beforeEnter: async (to) => {
+            const [hit] = await findKeys([String(to.params.key)]).catch(() => []);
+            return hit ? { path: `/${hit.projectShort}/${hit.boardSlug}/${hit.key}`, replace: true } : true;
+          },
+        },
+        { path: '/profile', name: 'profile', component: Profile },
+        { path: '/calendar', redirect: { name: 'me', query: { calendar: 'full' } } },
+        { path: '/analytics', name: 'analytics', component: Analytics },
+        { path: '/settings', name: 'settings', component: SettingsIndex },
+        { path: '/settings/profile', name: 'settings-profile', component: SettingsProfile },
+        { path: '/settings/preferences', name: 'settings-preferences', component: SettingsPreferences },
+        { path: '/settings/api', name: 'settings-api', component: SettingsApi },
+        { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject },
+        { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject },
+        { path: '/settings/tags', name: 'settings-tags', component: SettingsTags },
+        { path: '/settings/users', name: 'settings-users', component: SettingsUsers },
+        { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },
+      ],
     },
-    { path: '/profile', name: 'profile', component: Profile },
-    { path: '/calendar', redirect: { name: 'me', query: { calendar: 'full' } } },
-    { path: '/analytics', name: 'analytics', component: Analytics },
-    { path: '/settings', name: 'settings', component: SettingsIndex },
-    { path: '/settings/profile', name: 'settings-profile', component: SettingsProfile },
-    { path: '/settings/preferences', name: 'settings-preferences', component: SettingsPreferences },
-    { path: '/settings/api', name: 'settings-api', component: SettingsApi },
-    { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject },
-    { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject },
-    { path: '/settings/tags', name: 'settings-tags', component: SettingsTags },
-    { path: '/settings/users', name: 'settings-users', component: SettingsUsers },
-    { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },
   ],
 });
 
