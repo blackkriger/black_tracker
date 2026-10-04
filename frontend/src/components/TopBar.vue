@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
-import { useNotices } from '../lib/notices';
+import { useNotices, type NoticeKind } from '../lib/notices';
 import { useRoles } from '../lib/roles';
 import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
@@ -15,7 +15,7 @@ import { todayKey, type Mark } from '../lib/calendar';
 import { stamp } from '../lib/issues';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { layout } from '../lib/layout';
-import { AtSign, Moon, Sun } from 'lucide-vue-next';
+import { AtSign, ContactRound, Moon, Smile, Star, Sun } from 'lucide-vue-next';
 import { ink, setTheme, shownTheme } from '../lib/theme';
 
 const session = useSession();
@@ -54,7 +54,19 @@ const countdown = computed(() => {
   return `${left} days till ${what}`;
 });
 
-const { unread, load: readNotices } = useNotices();
+const { shown: notices, unread, load: readNotices } = useNotices();
+
+const KINDS: { kind: NoticeKind; icon: typeof AtSign; label: string }[] = [
+  { kind: 'mention', icon: AtSign, label: 'Mentions' },
+  { kind: 'assigned', icon: ContactRound, label: 'Assigned to you' },
+  { kind: 'reaction', icon: Smile, label: 'Reactions' },
+  { kind: 'starred', icon: Star, label: 'Starred issues' },
+];
+const unreadKinds = computed(() =>
+  KINDS.map((k) => ({ ...k, count: notices.value.filter((n) => !n.read && n.kind === k.kind).length })).filter(
+    (k) => k.count
+  )
+);
 const { ask } = useFocus();
 
 async function readNext(): Promise<void> {
@@ -222,19 +234,19 @@ async function signOut(): Promise<void> {
     </div>
 
     <nav class="rail__account" aria-label="Account">
+      <RouterLink class="topitem" :to="{ name: 'me' }">
+        <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
+        {{ session.me.value?.login }}
+        <span
+          v-for="k in unreadKinds"
+          :key="k.kind"
+          class="stamp topat"
+          :style="{ color: ink(mine) }"
+          :aria-label="k.label"
+        ><component :is="k.icon" class="ic ic--sm" />{{ k.count }}</span>
+      </RouterLink>
       <div class="rail__row">
-        <RouterLink class="topitem" :to="{ name: 'me' }">
-          <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
-          {{ session.me.value?.login }}
-          <span v-if="unread" class="stamp topat" :style="{ color: ink(mine) }">
-            <AtSign class="ic ic--sm" />{{ unread }}
-          </span>
-        </RouterLink>
-        <div class="sp"></div>
         <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
-      </div>
-      <div class="rail__row">
-        <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
         <div class="sp"></div>
         <button
           class="topitem rail__theme"
@@ -253,6 +265,7 @@ async function signOut(): Promise<void> {
           @click="setTheme('dark')"
         ><Moon class="ic" /></button>
       </div>
+      <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
   </aside>
 
