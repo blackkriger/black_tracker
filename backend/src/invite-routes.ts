@@ -200,7 +200,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
       });
       if (!owner) return reply.code(404).send({ error: 'This link is no longer valid.' });
       const who = await userById(owner);
-      await startSession(reply, owner);
+      await startSession(req, reply, owner);
       return reply.send({ data: publicUser(who as NonNullable<typeof who>) });
     }
     const parsed = accountCredentials.safeParse(req.body);
@@ -243,7 +243,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
 
     if (!outcome.ok) return reply.code(outcome.code).send({ error: outcome.error });
     const row = await userById(outcome.userId);
-    await startSession(reply, outcome.userId);
+    await startSession(req, reply, outcome.userId);
     return reply.code(201).send({ data: publicUser(row as NonNullable<typeof row>) });
   });
 }

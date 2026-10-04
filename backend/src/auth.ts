@@ -33,8 +33,15 @@ export const hashPassword = (plain: string) => bcrypt.hash(plain, 10);
 const DUMMY_HASH = bcrypt.hashSync('not anyone', 10);
 export const checkPassword = (plain: string, hash: string) => bcrypt.compare(plain, hash);
 
-export async function startSession(reply: FastifyReply, userId: string): Promise<void> {
-  const raw = await createSession(userId);
+const agentOf = (req: FastifyRequest): string | null =>
+  req.headers['user-agent']?.slice(0, 400) || null;
+
+export async function startSession(
+  req: FastifyRequest,
+  reply: FastifyReply,
+  userId: string
+): Promise<void> {
+  const raw = await createSession(userId, agentOf(req));
   reply.setCookie(SESSION_COOKIE, raw, {
     httpOnly: true,
     sameSite: 'lax',
@@ -44,12 +51,12 @@ export async function startSession(reply: FastifyReply, userId: string): Promise
   });
 }
 
-async function createSession(userId: string): Promise<string> {
+async function createSession(userId: string, userAgent: string | null): Promise<string> {
   const raw = newRawToken();
   await pool.query(
-    `insert into sessions (token, user_id, expires_at)
-     values ($1, $2, now() + make_interval(days => $3::int))`,
-    [hashToken(raw), userId, SESSION_DAYS]
+    `insert into sessions (token, user_id, expires_at, user_agent, last_seen_at)
+     values ($1, $2, now() + make_interval(days => $3::int), $4, now())`,
+    [hashToken(raw), userId, SESSION_DAYS, userAgent]
   );
   return raw;
 }
@@ -74,6 +81,7 @@ interface UserRow {
   star_created: boolean;
   star_assigned: boolean;
   star_commented: boolean;
+  github_login: string | null;
 }
 
 export const USER_SELECT = `
@@ -115,6 +123,7 @@ export function publicUser(row: UserRow) {
 const publicMe = (row: UserRow) => ({
   ...publicUser(row),
   autoStar: { created: row.star_created, assigned: row.star_assigned, commented: row.star_commented },
+  githubLogin: row.github_login,
 });
 
 const lastSeenWrites = new Map<string, number>();
@@ -125,6 +134,19 @@ function touchLastSeen(userId: string): void {
   pool
     .query('update users set last_seen_at = now() where id = $1', [userId])
     .catch((err) => console.error('[auth] last-seen write failed', err));
+}
+
+const sessionWrites = new Map<string, number>();
+function touchSession(token: string, userAgent: string | null): void {
+  const now = Date.now();
+  if (now - (sessionWrites.get(token) ?? 0) < LAST_SEEN_THROTTLE_MS) return;
+  sessionWrites.set(token, now);
+  pool
+    .query(
+      'update sessions set last_seen_at = now(), user_agent = coalesce(user_agent, $2) where token = $1',
+      [token, userAgent]
+    )
+    .catch((err) => console.error('[auth] session-use write failed', err));
 }
 
 const tokenUseWrites = new Map<string, number>();
@@ -175,6 +197,7 @@ async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
 
   const cookie = req.cookies?.[SESSION_COOKIE];
   if (!cookie) return null;
+  const token = hashToken(cookie);
   const res = await pool.query<{
     id: string;
     login: string;
@@ -185,11 +208,12 @@ async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
        from sessions s
        join users u on u.id = s.user_id and u.active
       where s.token = $1 and s.expires_at > now()`,
-    [hashToken(cookie)]
+    [token]
   );
   const row = res.rows[0];
   if (!row) return null;
   touchLastSeen(row.id);
+  touchSession(token, agentOf(req));
   return {
     userId: row.id,
     login: row.login,
@@ -268,6 +292,7 @@ const ROLELESS_PATHS = new Set([
   '/me/password',
   '/me/token',
   '/me/regenerate-token',
+  '/me/sessions',
   '/events',
 ]);
 
@@ -299,6 +324,14 @@ const loginSchema = z.object({
   login: z.string().trim().min(1).max(64),
   password: z.string().min(1).max(200),
 });
+
+const GITHUB_LOGIN = /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/;
+const githubLoginOf = (typed: string): string =>
+  typed
+    .trim()
+    .replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '')
+    .replace(/^@/, '')
+    .replace(/\/+$/, '');
 
 const passwordSchema = z.object({
   currentPassword: z.string().min(1).max(200),
@@ -363,7 +396,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     }
     tries.delete(key);
 
-    await startSession(reply, row.id);
+    await startSession(req, reply, row.id);
     return reply.send({ data: publicUser(row) });
   });
 
@@ -418,27 +451,92 @@ export function registerAuthRoutes(app: FastifyInstance): void {
         starCreated: z.boolean().optional(),
         starAssigned: z.boolean().optional(),
         starCommented: z.boolean().optional(),
+        githubLogin: z.string().max(200).optional(),
       })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Name is too long.' });
     const p = parsed.data;
-    await pool.query(
-      `update users
-          set full_name = coalesce($2, full_name),
-              star_created = coalesce($3, star_created),
-              star_assigned = coalesce($4, star_assigned),
-              star_commented = coalesce($5, star_commented)
-        where id = $1`,
-      [
-        auth.userId,
-        p.fullName ?? null,
-        p.starCreated ?? null,
-        p.starAssigned ?? null,
-        p.starCommented ?? null,
-      ]
-    );
+    const github = p.githubLogin === undefined ? undefined : githubLoginOf(p.githubLogin);
+    if (github && !GITHUB_LOGIN.test(github)) {
+      return reply.code(400).send({ error: 'Not a valid GitHub login.' });
+    }
+    try {
+      await pool.query(
+        `update users
+            set full_name = coalesce($2, full_name),
+                star_created = coalesce($3, star_created),
+                star_assigned = coalesce($4, star_assigned),
+                star_commented = coalesce($5, star_commented),
+                github_login = case when $6 then $7 else github_login end
+          where id = $1`,
+        [
+          auth.userId,
+          p.fullName ?? null,
+          p.starCreated ?? null,
+          p.starAssigned ?? null,
+          p.starCommented ?? null,
+          github !== undefined,
+          github || null,
+        ]
+      );
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505') {
+        return reply.code(409).send({ error: 'This GitHub login is linked to another account.' });
+      }
+      throw err;
+    }
     const row = await userById(auth.userId);
     return reply.send({ data: publicMe(row as NonNullable<typeof row>) });
+  });
+
+  app.get('/me/sessions', async (req, reply) => {
+    const auth = await requireSession(req, reply);
+    if (!auth) return;
+    const res = await pool.query<{
+      id: string;
+      user_agent: string | null;
+      created_at: Date;
+      last_seen_at: Date | null;
+      current: boolean;
+    }>(
+      `select id, user_agent, created_at, last_seen_at, token = $2 as current
+         from sessions
+        where user_id = $1 and expires_at > now()
+        order by token = $2 desc, coalesce(last_seen_at, created_at) desc`,
+      [auth.userId, credentialOf(req)]
+    );
+    return reply.send({
+      data: res.rows.map((r) => ({
+        id: r.id,
+        userAgent: r.user_agent,
+        createdAt: r.created_at.toISOString(),
+        lastSeenAt: r.last_seen_at?.toISOString() ?? null,
+        current: r.current,
+      })),
+    });
+  });
+
+  app.delete('/me/sessions', async (req, reply) => {
+    const auth = await requireSession(req, reply);
+    if (!auth) return;
+    const parsed = z
+      .union([z.object({ id: z.string().uuid() }), z.object({ others: z.literal(true) })])
+      .safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Say which session to end.' });
+    const current = credentialOf(req);
+    if ('id' in parsed.data) {
+      const res = await pool.query(
+        'delete from sessions where id = $1 and user_id = $2 and token <> $3',
+        [parsed.data.id, auth.userId, current]
+      );
+      if (!res.rowCount) return reply.code(404).send({ error: 'Session not found.' });
+    } else {
+      await pool.query('delete from sessions where user_id = $1 and token <> $2', [
+        auth.userId,
+        current,
+      ]);
+    }
+    return reply.send({ data: { ok: true } });
   });
 
   app.post('/me/password', async (req, reply) => {
@@ -461,7 +559,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       await client.query('update users set password_hash = $1 where id = $2', [hash, auth.userId]);
       await client.query('delete from sessions where user_id = $1', [auth.userId]);
     });
-    const raw = await createSession(auth.userId);
+    const raw = await createSession(auth.userId, agentOf(req));
     reply.setCookie(SESSION_COOKIE, raw, {
       httpOnly: true,
       sameSite: 'lax',

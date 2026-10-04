@@ -15,6 +15,7 @@ export interface Me {
   role: { id: string; name: string; color: string } | null;
   token: { hint: string | null; createdAt: string | null; lastUsedAt: string | null } | null;
   autoStar: { created: boolean; assigned: boolean; commented: boolean };
+  githubLogin: string | null;
 }
 
 const me = ref<Me | null>(null);

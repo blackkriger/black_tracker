@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { api } from '../lib/api';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { stamp } from '../lib/issues';
@@ -7,6 +7,15 @@ import { ink } from '../lib/theme';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useSession, type Me } from '../lib/session';
+import { describeAgent } from '../lib/userAgent';
+
+interface Session {
+  id: string;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string | null;
+  current: boolean;
+}
 
 const session = useSession();
 const { errors, fail, clear } = usePanelErrors();
@@ -34,6 +43,14 @@ const canChangePassword = computed(
     !passwordBusy.value
 );
 
+const sessions = ref<Session[] | null>(null);
+const sessionBusy = ref(false);
+const others = computed(() => sessions.value?.some((s) => !s.current) ?? false);
+
+const github = ref(me.value?.githubLogin ?? '');
+const githubBusy = ref(false);
+const githubSaved = ref(false);
+
 const since = computed(() => stamp(me.value?.createdAt ?? null));
 const role = computed(() => me.value?.role ?? null);
 
@@ -53,6 +70,48 @@ async function saveName(): Promise<void> {
     nameBusy.value = false;
   }
 }
+
+async function readSessions(): Promise<void> {
+  try {
+    sessions.value = await api<Session[]>('/me/sessions');
+  } catch (err) {
+    sessions.value = [];
+    fail('sessions', err, 'Could not read the sessions.');
+  }
+}
+
+async function endSessions(body: { id: string } | { others: true }): Promise<void> {
+  if (sessionBusy.value) return;
+  sessionBusy.value = true;
+  clear('sessions');
+  try {
+    await api('/me/sessions', { method: 'DELETE', body });
+    await readSessions();
+  } catch (err) {
+    fail('sessions', err, 'Could not sign the session out.');
+  } finally {
+    sessionBusy.value = false;
+  }
+}
+
+async function saveGithub(): Promise<void> {
+  if (githubBusy.value) return;
+  githubBusy.value = true;
+  clear('github');
+  githubSaved.value = false;
+  try {
+    const updated = await api<Me>('/me', { method: 'PATCH', body: { githubLogin: github.value } });
+    me.value = { ...(me.value as Me), ...updated };
+    github.value = updated.githubLogin ?? '';
+    githubSaved.value = true;
+  } catch (err) {
+    fail('github', err, 'Could not save the GitHub login.');
+  } finally {
+    githubBusy.value = false;
+  }
+}
+
+onMounted(() => void readSessions());
 
 async function changePassword(): Promise<void> {
   if (!canChangePassword.value) return;
@@ -109,9 +168,7 @@ async function changePassword(): Promise<void> {
       </form>
     </section>
     <div v-if="errors.name" class="err panel__err">{{ errors.name }}</div>
-  </div>
 
-  <div class="stack">
     <section class="panel">
       <header class="panel__h">Password</header>
       <form class="panel__b form" @submit.prevent="changePassword">
@@ -145,6 +202,70 @@ async function changePassword(): Promise<void> {
       </form>
     </section>
     <div v-if="errors.password" class="err panel__err">{{ errors.password }}</div>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <header class="panel__h">Sessions</header>
+      <div class="panel__b form">
+        <ul class="sess">
+          <template v-if="!sessions">
+            <li v-for="n in 2" :key="n" class="sess__i">
+              <span class="sess__lines">
+                <span class="sk sk--line" style="width: 120px"></span>
+                <span class="sk sk--line" style="width: 220px"></span>
+              </span>
+            </li>
+          </template>
+          <li v-for="s in sessions" :key="s.id" class="sess__i">
+            <span class="sess__lines">
+              <span class="sess__what">{{ describeAgent(s.userAgent) }}</span>
+              <span class="stamp">
+                SIGNED IN {{ stamp(s.createdAt) }}<template v-if="s.lastSeenAt">, ACTIVE {{ stamp(s.lastSeenAt) }}</template>
+              </span>
+            </span>
+            <span v-if="s.current" class="hint">This device</span>
+            <button
+              v-else
+              class="btn btn--sm btn--danger"
+              type="button"
+              :disabled="sessionBusy"
+              @click="endSessions({ id: s.id })"
+            >
+              Sign out
+            </button>
+          </li>
+        </ul>
+        <div v-if="others" class="row-end">
+          <button class="btn btn--danger" type="button" :disabled="sessionBusy" @click="endSessions({ others: true })">
+            Sign out other sessions
+          </button>
+        </div>
+      </div>
+    </section>
+    <div v-if="errors.sessions" class="err panel__err">{{ errors.sessions }}</div>
+
+    <section class="panel">
+      <header class="panel__h">Integrations</header>
+      <form class="panel__b form" @submit.prevent="saveGithub">
+        <div class="field">
+          <label class="label" for="github">GitHub login</label>
+          <input
+            id="github"
+            v-model="github"
+            class="input"
+            maxlength="200"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="row-end">
+          <span v-if="githubSaved" class="hint">Saved.</span>
+          <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
+        </div>
+      </form>
+    </section>
+    <div v-if="errors.github" class="err panel__err">{{ errors.github }}</div>
   </div>
 </template>
 
@@ -181,5 +302,34 @@ async function changePassword(): Promise<void> {
 }
 .row-end .hint {
   margin-right: auto;
+}
+.sess {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sess__i {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.sess__i:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.sess__lines {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.sess__what {
+  color: var(--text);
+  font-size: 13px;
 }
 </style>
