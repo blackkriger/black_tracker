@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
+import { publish, tabOf } from './events.js';
 
 export const SESSION_COOKIE = 'tracker_session';
 const SESSION_DAYS = 30;
@@ -42,6 +43,7 @@ export async function startSession(
   userId: string
 ): Promise<void> {
   const raw = await createSession(userId, agentOf(req));
+  void publish({ type: 'session.changed', only: userId });
   reply.setCookie(SESSION_COOKIE, raw, {
     httpOnly: true,
     sameSite: 'lax',
@@ -137,7 +139,7 @@ function touchLastSeen(userId: string): void {
 }
 
 const sessionWrites = new Map<string, number>();
-function touchSession(token: string, userAgent: string | null): void {
+function touchSession(token: string, userId: string, userAgent: string | null): void {
   const now = Date.now();
   if (now - (sessionWrites.get(token) ?? 0) < LAST_SEEN_THROTTLE_MS) return;
   sessionWrites.set(token, now);
@@ -146,6 +148,7 @@ function touchSession(token: string, userAgent: string | null): void {
       'update sessions set last_seen_at = now(), user_agent = coalesce(user_agent, $2) where token = $1',
       [token, userAgent]
     )
+    .then(() => publish({ type: 'session.changed', only: userId }))
     .catch((err) => console.error('[auth] session-use write failed', err));
 }
 
@@ -213,7 +216,7 @@ async function resolveAuth(req: FastifyRequest): Promise<Auth | null> {
   const row = res.rows[0];
   if (!row) return null;
   touchLastSeen(row.id);
-  touchSession(token, agentOf(req));
+  touchSession(token, row.id, agentOf(req));
   return {
     userId: row.id,
     login: row.login,
@@ -402,7 +405,14 @@ export function registerAuthRoutes(app: FastifyInstance): void {
 
   app.post('/logout', async (req, reply) => {
     const cookie = req.cookies?.[SESSION_COOKIE];
-    if (cookie) await pool.query('delete from sessions where token = $1', [hashToken(cookie)]);
+    if (cookie) {
+      const res = await pool.query<{ user_id: string }>(
+        'delete from sessions where token = $1 returning user_id',
+        [hashToken(cookie)]
+      );
+      const userId = res.rows[0]?.user_id;
+      if (userId) void publish({ type: 'session.changed', only: userId });
+    }
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return reply.send({ data: { ok: true } });
   });
@@ -536,6 +546,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
         current,
       ]);
     }
+    void publish({ type: 'session.changed', only: auth.userId, origin: tabOf(req) });
     return reply.send({ data: { ok: true } });
   });
 
@@ -567,6 +578,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       path: '/',
       maxAge: SESSION_DAYS * 24 * 60 * 60,
     });
+    void publish({ type: 'session.changed', only: auth.userId });
     return reply.send({ data: { ok: true } });
   });
 }

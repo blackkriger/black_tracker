@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { stamp } from '../lib/issues';
 import { ink } from '../lib/theme';
@@ -112,6 +113,12 @@ async function saveGithub(): Promise<void> {
 }
 
 onMounted(() => void readSessions());
+useLive(
+  (ev) => {
+    if (ev.type === 'session.changed') void readSessions();
+  },
+  () => void readSessions()
+);
 
 async function changePassword(): Promise<void> {
   if (!canChangePassword.value) return;
