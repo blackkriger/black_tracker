@@ -109,8 +109,9 @@ async function changePassword(): Promise<void> {
       </form>
     </section>
     <div v-if="errors.name" class="err panel__err">{{ errors.name }}</div>
+  </div>
 
-
+  <div class="stack">
     <section class="panel">
       <header class="panel__h">Password</header>
       <form class="panel__b form" @submit.prevent="changePassword">
