@@ -460,7 +460,6 @@ onMounted(() => {
               <FilterMenu v-model="byAuthors" label="Author" :options="personChoices" />
             </div>
             <div v-if="tagChoices.length" class="list__row">
-              <span class="label">Tags:</span>
               <button
                 v-for="t in tagChoices"
                 :key="t.id"
