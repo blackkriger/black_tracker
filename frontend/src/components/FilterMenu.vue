@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ChevronDown } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
 
@@ -11,6 +11,11 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'update:modelValue', value: string[]): void }>();
 
 const open = ref(false);
+const summary = computed(() => {
+  if (!props.modelValue.length) return 'all';
+  if (props.modelValue.length > 1) return String(props.modelValue.length);
+  return props.options.find((o) => o.value === props.modelValue[0])?.label ?? props.modelValue[0];
+});
 const root = ref<HTMLElement | null>(null);
 
 function toggle(value: string): void {
@@ -43,18 +48,27 @@ onBeforeUnmount(() => {
   <span ref="root" class="fmenu">
     <button
       class="input input--sm fmenu__btn"
+      :class="{ 'is-on': modelValue.length }"
       type="button"
       :aria-expanded="open"
       @click="open = !open"
     >
-      {{ label }}: {{ modelValue.length || 'all' }}
+      {{ label }}: {{ summary }}
       <ChevronDown class="ic ic--sm" />
     </button>
     <div v-if="open" class="menu fmenu__list">
-      <label v-for="o in options" :key="o.value" class="menu__i fmenu__i">
-        <input type="checkbox" :checked="modelValue.includes(o.value)" @change="toggle(o.value)" />
+      <button
+        v-for="o in options"
+        :key="o.value"
+        class="menu__i fmenu__i"
+        :class="{ 'is-off': modelValue.length && !modelValue.includes(o.value) }"
+        type="button"
+        role="menuitemcheckbox"
+        :aria-checked="modelValue.includes(o.value)"
+        @click="toggle(o.value)"
+      >
         <span :style="{ color: ink(o.color) }">{{ o.label }}</span>
-      </label>
+      </button>
     </div>
   </span>
 </template>
@@ -72,8 +86,11 @@ onBeforeUnmount(() => {
   height: 26px;
   padding: 0 6px 0 8px;
   border-color: var(--line);
-  color: var(--text-dim);
+  color: var(--text-muted);
   cursor: pointer;
+}
+.fmenu__btn.is-on {
+  color: var(--text);
 }
 .fmenu__btn:hover,
 .fmenu__btn[aria-expanded='true'] {
@@ -87,8 +104,7 @@ onBeforeUnmount(() => {
   max-height: 320px;
   overflow-y: auto;
 }
-.fmenu__i {
-  gap: 8px;
-  cursor: pointer;
+.fmenu__i.is-off {
+  opacity: 0.35;
 }
 </style>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-vue-next';
 import DateRangePicker from '../components/DateRangePicker.vue';
 import Dialog from '../components/Dialog.vue';
 import FilterMenu from '../components/FilterMenu.vue';
@@ -210,34 +210,18 @@ function toggleTag(id: string): void {
   byTags.value = byTags.value.includes(id) ? byTags.value.filter((t) => t !== id) : [...byTags.value, id];
 }
 
-const chips = computed(() => {
-  const out: { key: string; text: string; clear: () => void }[] = [];
-  const named = (list: string[], choices: { value: string; label: string }[]) =>
-    list.map((v) => choices.find((c) => c.value === v)?.label ?? v).join(', ');
-  if (byProjects.value.length)
-    out.push({ key: 'projects', text: `Projects: ${byProjects.value.join(', ')}`, clear: () => (byProjects.value = []) });
-  if (byStates.value.length)
-    out.push({ key: 'states', text: `Status: ${byStates.value.join(', ')}`, clear: () => (byStates.value = []) });
-  if (byAssignees.value.length)
-    out.push({
-      key: 'assignees',
-      text: `Assignee: ${named(byAssignees.value, assigneeChoices.value)}`,
-      clear: () => (byAssignees.value = []),
-    });
-  if (byAuthors.value.length)
-    out.push({
-      key: 'authors',
-      text: `Author: ${named(byAuthors.value, personChoices.value)}`,
-      clear: () => (byAuthors.value = []),
-    });
-  if (byTags.value.length)
-    out.push({
-      key: 'tags',
-      text: `Tags: ${byTags.value.map((id) => tags.value.find((t) => t.id === id)?.name ?? id).join(', ')}`,
-      clear: () => (byTags.value = []),
-    });
-  return out;
-});
+const anyFilter = computed(
+  () =>
+    byProjects.value.length > 0 ||
+    byStates.value.length > 0 ||
+    byAssignees.value.length > 0 ||
+    byAuthors.value.length > 0 ||
+    byTags.value.length > 0 ||
+    !!q.value ||
+    closed.value ||
+    !!period.value.from ||
+    !!period.value.to
+);
 
 function clearAll(): void {
   byProjects.value = [];
@@ -453,11 +437,16 @@ onMounted(() => {
               </label>
             </div>
             <div class="list__row">
-              <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
+              <span class="list__period" :class="{ 'is-on': period.from || period.to }">
+                <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
+              </span>
               <FilterMenu v-model="byProjects" label="Projects" :options="projectChoices" />
               <FilterMenu v-model="byStates" label="Status" :options="stateChoices" />
               <FilterMenu v-model="byAssignees" label="Assignee" :options="assigneeChoices" />
               <FilterMenu v-model="byAuthors" label="Author" :options="personChoices" />
+              <button v-if="anyFilter" class="btn btn--sm btn--ghost" type="button" @click="clearAll">
+                Clear all
+              </button>
             </div>
             <div v-if="tagChoices.length" class="list__row">
               <button
@@ -470,13 +459,6 @@ onMounted(() => {
                 :style="{ '--c': t.color }"
                 @click="toggleTag(t.id)"
               >{{ t.name }}</button>
-            </div>
-            <div v-if="chips.length" class="list__row">
-              <button v-for="c in chips" :key="c.key" class="list__chip" type="button" @click="c.clear()">
-                {{ c.text }}
-                <X class="ic ic--sm" />
-              </button>
-              <button class="btn btn--sm btn--ghost" type="button" @click="clearAll">Clear all</button>
             </div>
           </div>
 
@@ -712,20 +694,8 @@ onMounted(() => {
 .taglabel--pick.is-off {
   opacity: 0.35;
 }
-.list__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--line-2);
-  background: none;
-  color: var(--text-dim);
-  font: 12px var(--font-ui);
-  cursor: pointer;
-}
-.list__chip:hover {
-  color: var(--text);
+.list__period:not(.is-on) :deep(.drp__trigger) {
+  color: var(--text-muted);
 }
 .list__bulk {
   display: flex;
