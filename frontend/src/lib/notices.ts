@@ -88,7 +88,9 @@ export function useNotices() {
     },
     async markRead(id?: string): Promise<void> {
       await api('/notices/read', { method: 'POST', body: { id } }).catch(() => {});
-      notices.value = notices.value.map((n) => (!id || n.id === id ? { ...n, read: true } : n));
+      notices.value = notices.value
+        .map((n) => (!id || n.id === id ? { ...n, read: true } : n))
+        .sort((a, b) => Number(a.read) - Number(b.read) || Date.parse(b.at) - Date.parse(a.at));
     },
   };
 }
