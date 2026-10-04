@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { AtSign, Bell, ContactRound, Smile } from 'lucide-vue-next';
 import { useSession } from '../lib/session';
 import {
@@ -61,13 +61,34 @@ function dueTone(key?: string): string {
   return key! < todayKey() && dues.some((d) => !d.done) ? 'is-late' : 'has-due';
 }
 
-const hover = ref<{ key: string; x: number; y: number } | null>(null);
+const hover = ref<{ key: string; x: number; y: number; bottom: number } | null>(null);
 const hovered = computed(() => (hover.value ? info(hover.value.key) : null));
+const pop = ref<HTMLDivElement | null>(null);
+const shift = ref(0);
+const below = ref(false);
+
+const EDGE = 8;
+const GAP = 8;
+
+function fit(): void {
+  const el = pop.value;
+  const at = hover.value;
+  if (!el || !at) return;
+  const half = el.offsetWidth / 2;
+  const left = at.x - half;
+  const right = at.x + half;
+  shift.value =
+    left < EDGE ? EDGE - left : right > window.innerWidth - EDGE ? window.innerWidth - EDGE - right : 0;
+  below.value = at.y - GAP - el.offsetHeight < EDGE;
+}
 
 function onEnter(ev: MouseEvent, c: Cell): void {
   if (!c.key) return;
   const box = (ev.currentTarget as HTMLElement).getBoundingClientRect();
-  hover.value = { key: c.key, x: box.left + box.width / 2, y: box.top };
+  hover.value = { key: c.key, x: box.left + box.width / 2, y: box.top, bottom: box.bottom };
+  shift.value = 0;
+  below.value = false;
+  void nextTick(fit);
 }
 </script>
 
@@ -120,8 +141,14 @@ function onEnter(ev: MouseEvent, c: Cell): void {
 
     <div
       v-if="hover && hovered"
+      ref="pop"
       class="selbar cal__pop"
-      :style="{ left: `${hover.x}px`, top: `${hover.y}px` }"
+      :class="{ 'is-below': below }"
+      :style="{
+        left: `${hover.x + shift}px`,
+        top: `${below ? hover.bottom : hover.y}px`,
+        '--tip': `calc(50% - ${shift}px)`,
+      }"
     >
       <span class="cal__pop-day">{{ longDate(hover.key) }}</span>
       <span v-for="m in hovered.marks" :key="m.id" class="cal__pop-mark">
@@ -238,6 +265,27 @@ function onEnter(ev: MouseEvent, c: Cell): void {
 }
 .cal__day.is-edge {
   box-shadow: inset 0 0 0 1px var(--text);
+}
+.cal__pop::before,
+.cal__pop::after {
+  left: var(--tip, 50%);
+}
+.cal__pop.is-below {
+  transform: translate(-50%, 8px);
+}
+.cal__pop.is-below::before,
+.cal__pop.is-below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+}
+.cal__pop.is-below::before {
+  border-bottom-color: var(--line-2);
+}
+.cal__pop.is-below::after {
+  margin-top: 0;
+  margin-bottom: -1px;
+  border-bottom-color: var(--card);
 }
 .cal__pop {
   flex-direction: column;
