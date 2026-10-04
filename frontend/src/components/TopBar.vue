@@ -36,6 +36,11 @@ const issuesTo = computed(() =>
   currentShort.value ? { name: 'issues', query: { projects: currentShort.value } } : { name: 'issues' }
 );
 const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
+const section = computed(() => {
+  const name = String(route.name ?? '');
+  return name.startsWith('settings') ? 'settings' : name;
+});
+const at = (name: string): 'page' | undefined => (section.value === name ? 'page' : undefined);
 
 const today = stamp(new Date().toISOString());
 const dateOpen = ref(false);
@@ -200,21 +205,21 @@ async function signOut(): Promise<void> {
           <DatePanel ref="panel" :soon="soon" with-full @day="toDay" @leave="dateOpen = false" />
         </div>
       </span>
-      <RouterLink class="topitem" :to="{ name: 'me' }">
+      <RouterLink class="topitem" :to="{ name: 'me' }" :aria-current="at('me')">
         <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
         {{ session.me.value?.login }}
       </RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" :to="issuesTo">Issues</RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" to="/analytics">Analytics</RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" :to="issuesTo" :aria-current="at('issues')">Issues</RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" to="/analytics" :aria-current="at('analytics')">Analytics</RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
   </header>
 
   <aside v-else class="rail">
     <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
-      <RouterLink class="topitem" :to="issuesTo"><ListChecks class="ic" />Issues</RouterLink>
-      <RouterLink class="topitem" to="/analytics"><ChartColumn class="ic" />Analytics</RouterLink>
+      <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />Issues</RouterLink>
+      <RouterLink class="topitem" to="/analytics" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
     </nav>
 
     <nav v-if="live.length" class="rail__projects" aria-label="Projects">
@@ -244,7 +249,7 @@ async function signOut(): Promise<void> {
 
     <nav class="rail__account" aria-label="Account">
       <div class="rail__row">
-        <RouterLink class="topitem" :to="{ name: 'me' }">
+        <RouterLink class="topitem" :to="{ name: 'me' }" :aria-current="at('me')">
           <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
           {{ session.me.value?.login }}
         </RouterLink>
@@ -269,7 +274,7 @@ async function signOut(): Promise<void> {
       <div class="rail__row">
         <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
         <div class="sp"></div>
-        <RouterLink v-if="hasRole" class="topitem" to="/settings">Settings</RouterLink>
+        <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
       </div>
     </nav>
   </aside>
@@ -302,7 +307,8 @@ async function signOut(): Promise<void> {
   text-decoration: none;
   cursor: pointer;
 }
-.topitem:hover {
+.topitem:hover,
+.topitem[aria-current] {
   color: var(--text);
 }
 .topitem--project:hover,
