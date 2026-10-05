@@ -10,6 +10,7 @@ import { useLive } from '../lib/live';
 import { useSession } from '../lib/session';
 import DayWindow from './DayWindow.vue';
 import DatePanel from './DatePanel.vue';
+import RailSky from './RailSky.vue';
 import { api } from '../lib/api';
 import { todayKey, type Mark } from '../lib/calendar';
 import { stamp } from '../lib/issues';
@@ -262,6 +263,7 @@ async function signOut(): Promise<void> {
 
   <div v-if="narrow && drawer" class="rail__scrim" @click="drawer = false"></div>
   <aside v-if="narrow ? drawer : layout === 'side'" class="rail" :class="{ 'rail--drawer': narrow }">
+    <RailSky />
     <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
       <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />Issues</RouterLink>
       <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
