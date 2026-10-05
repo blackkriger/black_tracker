@@ -35,6 +35,9 @@ const currentShort = computed(() => (here.value ? String(route.params.short) : n
 const issuesTo = computed(() =>
   currentShort.value ? { name: 'issues', query: { projects: currentShort.value } } : { name: 'issues' }
 );
+const analyticsTo = computed(() =>
+  currentShort.value ? { name: 'analytics', query: { project: currentShort.value } } : { name: 'analytics' }
+);
 const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
 const section = computed(() => {
   const name = String(route.name ?? '');
@@ -254,7 +257,7 @@ async function signOut(): Promise<void> {
         {{ session.me.value?.login }}
       </RouterLink>
       <RouterLink v-if="hasRole" class="topitem" :to="issuesTo" :aria-current="at('issues')">Issues</RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" to="/analytics" :aria-current="at('analytics')">Analytics</RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" :to="analyticsTo" :aria-current="at('analytics')">Analytics</RouterLink>
       <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
@@ -264,7 +267,7 @@ async function signOut(): Promise<void> {
   <aside v-if="narrow ? drawer : layout === 'side'" class="rail" :class="{ 'rail--drawer': narrow }">
     <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
       <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />Issues</RouterLink>
-      <RouterLink class="topitem" to="/analytics" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
+      <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
     </nav>
 
     <nav v-if="live.length" class="rail__projects" aria-label="Projects">

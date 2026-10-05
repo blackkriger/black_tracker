@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
 import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
@@ -94,7 +95,42 @@ function thisMonth(): { from: string; to: string } {
   return { from: `${y}-${m}-01`, to: `${y}-${m}-${last}` };
 }
 
-const project = ref('');
+const route = useRoute();
+const router = useRouter();
+const KEPT = 'tracker:analytics-project';
+
+function keptProject(): string {
+  try {
+    return localStorage.getItem(KEPT) ?? '';
+  } catch {
+    return '';
+  }
+}
+const projectOf = (asked: unknown): string => (typeof asked === 'string' ? asked : keptProject());
+const showProject = (shortName: string): void => {
+  void router.replace({ name: 'analytics', query: shortName ? { project: shortName } : {} });
+};
+
+const project = ref(projectOf(route.query.project));
+watch(
+  project,
+  (now) => {
+    try {
+      localStorage.setItem(KEPT, now);
+    } catch {}
+    if ((route.query.project ?? '') !== now) showProject(now);
+  },
+  { immediate: true }
+);
+watch(
+  () => route.query.project,
+  (asked) => {
+    if (route.name !== 'analytics') return;
+    const next = projectOf(asked);
+    if (next !== project.value) project.value = next;
+    else if ((asked ?? '') !== next) showProject(next);
+  }
+);
 const status = ref('');
 const tag = ref('');
 const tags = ref<TagOption[]>([]);
