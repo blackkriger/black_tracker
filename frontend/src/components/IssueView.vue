@@ -1599,9 +1599,9 @@ async function removeIssue(): Promise<void> {
                       :href="k.url"
                       target="_blank"
                       rel="noopener noreferrer"
-                    ><span class="ev__sha">{{ k.sha.slice(0, 7) }}</span><time class="stamp ev__at">{{
-                      stampAt(k.at)
-                    }}</time><span class="ev__msg">{{ k.message }}</span></a>
+                    ><span class="ev__sha">{{ k.sha.slice(0, 7) }}</span><span class="ev__msg">{{
+                      k.message
+                    }}</span><time class="stamp ev__at">{{ stampAt(k.at) }}</time></a>
                   </div>
                 </div>
                 <article
@@ -2503,6 +2503,7 @@ async function removeIssue(): Promise<void> {
 }
 .ev__at {
   flex: none;
+  margin-left: auto;
 }
 .ev__sha {
   flex: none;
@@ -2510,6 +2511,7 @@ async function removeIssue(): Promise<void> {
   color: var(--text-muted);
 }
 .ev__msg {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2589,6 +2591,7 @@ async function removeIssue(): Promise<void> {
     row-gap: 2px;
   }
   .ev__msg {
+    order: 2;
     flex-basis: 100%;
     white-space: normal;
   }
