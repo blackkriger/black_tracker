@@ -5,7 +5,7 @@ import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
 import { TAB_ID, api } from '../lib/api';
-import { asHtml, isBlank } from '../lib/richtext';
+import { asHtml, isBlank, trimBlank } from '../lib/richtext';
 import { forgetKeys, keyInfo, refreshKey } from '../lib/issueKeys';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
@@ -747,7 +747,7 @@ async function create(): Promise<void> {
       method: 'POST',
       body: {
         summary,
-        description: bodyDraft.value,
+        description: trimBlank(bodyDraft.value),
         stateId: draft.value.stateId,
         priority: draft.value.priority,
         assigneeId: draft.value.assigneeId,
@@ -819,7 +819,7 @@ async function saveText(): Promise<void> {
   }
   const body: Record<string, unknown> = {};
   if (summary !== titleBase) body.summary = summary;
-  if (bodyDraft.value !== bodyBase) body.description = bodyDraft.value;
+  if (bodyDraft.value !== bodyBase) body.description = trimBlank(bodyDraft.value);
   saving.value = true;
   try {
     if (Object.keys(body).length && !(await patch(body))) return;
@@ -873,7 +873,7 @@ function toggleTag(tagId: string, on: boolean): void {
 }
 
 async function postComment(): Promise<void> {
-  const text = commentDraft.value;
+  const text = trimBlank(commentDraft.value);
   const current = issue.value;
   if (isBlank(text) || !current || posting.value) return;
   posting.value = true;
@@ -908,7 +908,7 @@ async function postComment(): Promise<void> {
 }
 
 async function saveComment(c: Comment): Promise<void> {
-  const text = commentEdit.value;
+  const text = trimBlank(commentEdit.value);
   const current = issue.value;
   if (!current) return;
   if (isBlank(text) || text === c.text) {

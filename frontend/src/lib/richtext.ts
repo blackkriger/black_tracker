@@ -29,6 +29,10 @@ export function clean(html: string): string {
   });
 }
 
+const EMPTY_EDGES = /^(?:\s*<p(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>)+|(?:<p(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*)+$/gi;
+
+export const trimBlank = (html: string): string => html.replace(EMPTY_EDGES, '');
+
 export function isBlank(html: string): boolean {
   return clean(html).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() === '';
 }
@@ -44,4 +48,4 @@ export function fromPlain(text: string): string {
 export const looksLikeHtml = (text: string): boolean => /^\s*<(p|h3|h4|ul|ol|pre|blockquote)\b/i.test(text);
 
 export const asHtml = (text: string): string =>
-  !text ? '' : paintKeys(paintNames(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text))));
+  !text ? '' : paintKeys(paintNames(trimBlank(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text)))));
