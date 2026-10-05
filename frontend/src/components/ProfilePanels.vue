@@ -225,6 +225,7 @@ async function changePassword(): Promise<void> {
             autocomplete="off"
             spellcheck="false"
           />
+          <span class="hint">The name in github.com/name, so your commits show up under your name.</span>
         </div>
         <div class="row-end">
           <span v-if="githubSaved" class="hint">Saved.</span>
