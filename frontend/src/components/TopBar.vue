@@ -49,11 +49,12 @@ const place = computed(() => {
   if (here.value) {
     const p = live.value.find((x) => x.shortName === currentShort.value);
     const b = p?.boards.find((x) => x.slug.toLowerCase() === currentSlug.value);
-    return p ? { key: p.shortName, name: b?.name ?? p.name } : null;
+    return p ? { key: p.shortName, name: b?.name ?? p.name, avatar: null } : null;
   }
-  if (section.value === 'me') return { key: null, name: session.me.value?.login ?? '' };
+  const login = session.me.value?.login ?? '';
+  if (section.value === 'me') return { key: null, name: login, avatar: login };
   const name = SECTION_NAMES[section.value];
-  return name ? { key: null, name } : null;
+  return name ? { key: null, name, avatar: null } : null;
 });
 
 const today = stamp(new Date().toISOString());
@@ -181,6 +182,7 @@ async function signOut(): Promise<void> {
       @click="drawer = !drawer"
     ><Menu class="ic" /></button>
     <span v-if="place" class="topplace">
+      <span v-if="place.avatar" class="av" :style="buddyAvatarStyle(place.avatar)"></span>
       <span v-if="place.key" class="proj__k">{{ place.key }}</span>
       <span class="topitem__name">{{ place.name }}</span>
     </span>
