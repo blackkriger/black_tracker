@@ -98,11 +98,25 @@ export interface IssueLink {
   resolved: boolean;
 }
 
+export interface IssueCommit {
+  id: string;
+  kind: 'commit' | 'merge';
+  sha: string;
+  message: string;
+  branch: string | null;
+  mergedFrom: string | null;
+  author: string | null;
+  by: string | null;
+  at: string;
+  url: string;
+}
+
 export interface IssueFull extends Issue {
   comments: Comment[];
   history: HistoryEntry[];
   attachments: Attachment[];
   links: IssueLink[];
+  commits?: IssueCommit[];
 }
 
 export const PRIORITIES: Priority[] = ['Critical', 'Major', 'Normal', 'Minor'];

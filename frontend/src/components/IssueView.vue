@@ -26,6 +26,8 @@ import {
   ChevronRight,
   FileArchive,
   FileDown,
+  GitCommitHorizontal,
+  GitMerge,
   Link2,
   Paperclip,
   Pencil,
@@ -52,6 +54,7 @@ import {
   type IssueTag,
   type LinkKind,
   type CommentOrder,
+  type IssueCommit,
   type Priority,
   type Shot,
 } from '../lib/issues';
@@ -114,15 +117,54 @@ const { wanted, pending: askedFor } = useFocus();
 const tab = ref<'comments' | 'history'>('comments');
 const order = ref<CommentOrder>(commentOrder.get());
 
-const thread = computed(() =>
-  [...(issue.value?.comments ?? [])].sort(
-    (a, b) =>
-      Number(!!b.pinnedAt) - Number(!!a.pinnedAt) ||
-      (order.value === 'oldest'
-        ? a.createdAt.localeCompare(b.createdAt)
-        : b.createdAt.localeCompare(a.createdAt))
-  )
-);
+interface Pushed {
+  kind: 'commit' | 'merge';
+  by: string | null;
+  author: string | null;
+  branch: string | null;
+  from: string | null;
+  at: string;
+  commits: IssueCommit[];
+}
+type Entry = { key: string; at: string; comment?: Comment; event?: Pushed };
+
+const thread = computed<Entry[]>(() => {
+  const comments = issue.value?.comments ?? [];
+  const pinned = comments.filter((c) => c.pinnedAt).map((c) => ({ key: c.id, at: c.createdAt, comment: c }));
+  const flow: Entry[] = [
+    ...comments.filter((c) => !c.pinnedAt).map((c) => ({ key: c.id, at: c.createdAt, comment: c })),
+    ...(issue.value?.commits ?? []).map((k) => ({
+      key: k.id,
+      at: k.at,
+      event: {
+        kind: k.kind,
+        by: k.by,
+        author: k.author,
+        branch: k.branch,
+        from: k.mergedFrom,
+        at: k.at,
+        commits: [k],
+      },
+    })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+  const merged: Entry[] = [];
+  for (const entry of flow) {
+    const last = merged[merged.length - 1]?.event;
+    const now = entry.event;
+    if (
+      now?.kind === 'commit' &&
+      last?.kind === 'commit' &&
+      (last.by ?? last.author) === (now.by ?? now.author) &&
+      last.branch === now.branch
+    ) {
+      last.commits.push(...now.commits);
+      last.at = now.at;
+      continue;
+    }
+    merged.push(entry);
+  }
+  return [...pinned, ...(order.value === 'oldest' ? merged : merged.reverse())];
+});
 
 function flipOrder(): void {
   order.value = order.value === 'oldest' ? 'newest' : 'oldest';
@@ -656,7 +698,7 @@ useLive((ev) => {
     return;
   }
   void reload().then(() => {
-    if (ev.type.startsWith('comment.')) flash(['comments']);
+    if (ev.type.startsWith('comment.') || ev.type.startsWith('commit.')) flash(['comments']);
     else if (ev.type.startsWith('attachment.')) flash(['files']);
     else flash((ev.fields ?? []).map((f) => FIELD_OF[f] ?? f));
   });
@@ -1535,143 +1577,169 @@ async function removeIssue(): Promise<void> {
               class="iv__list"
               :class="{ 'is-fresh': fresh.has('comments') }"
             >
-              <article
-                v-for="c in thread"
-                :id="`comment-${c.id}`"
-                :class="{ 'is-fresh': litComment === c.id }"
-                :key="c.id"
-                class="cm"
-              >
-                <span class="av av--lg" :style="buddyAvatarStyle(c.author.login)"></span>
-                <div>
-                  <div class="cm__head">
-                    <span class="cm__who" :style="{ color: ink(colorOf(c.author.login)) }">
-                      {{ nameOf(c.author.login) }}
-                    </span>
-                    <time class="stamp">{{ stampAt(c.createdAt) }}</time>
-                    <span v-if="c.editedAt" class="cm__edited">
-                      edited
-                      <span class="selbar cm__when">{{ stampAt(c.editedAt) }}</span>
-                    </span>
-                    <Pin
-                      v-if="c.pinnedAt"
-                      class="ic ic--sm cm__pin"
-                      :aria-label="c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned'"
-                    />
-                    <span class="cm__acts">
-                      <span class="cm__react">
-                      <span v-for="r in reactionsOf(c)" :key="r.emoji" class="react__one">
-                        <button
-                          class="react"
-                          :class="{ 'is-mine': r.mine }"
-                          type="button"
-                          @click="react(c, r.emoji)"
-                        >{{ r.emoji }}<span class="react__n">{{ r.n }}</span></button>
-                        <span class="selbar react__who">{{ r.who }}</span>
+              <template v-for="{ key, comment: c, event: e } in thread" :key="key">
+                <div v-if="e" class="ev">
+                  <component :is="e.kind === 'merge' ? GitMerge : GitCommitHorizontal" class="ic ev__ic" />
+                  <div>
+                    <div class="ev__head">
+                      <span class="cm__who" :style="{ color: ink(colorOf(e.by)) }">{{ e.by ? nameOf(e.by) : e.author }}</span>
+                      <span v-if="e.by && nameOf(e.by) !== e.by" class="nick">{{ e.by }}</span>
+                      <span v-if="e.kind === 'merge'">
+                        merged <span class="ev__ref">{{ e.from }}</span> into <span class="ev__ref">{{ e.branch }}</span>
                       </span>
-                        <button
-                          class="btn btn--sm btn--icon btn--ghost react__hold"
-                          type="button"
-                          aria-label="React"
-                          @click="openReactions(c, $event)"
-                        ><SmilePlus class="ic ic--sm" /></button>
+                      <span v-else>
+                        pushed {{ e.commits.length }} {{ e.commits.length === 1 ? 'commit' : 'commits' }} to
+                        <span class="ev__ref">{{ e.branch }}</span>
                       </span>
-                      <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
-                        {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
-                      </button>
-                      <button
-                        v-if="c.author.id === session.me.value?.id"
-                        class="btn btn--sm btn--ghost"
-                        type="button"
-                        @click="editingComment = c.id; commentEdit = c.text"
-                      >Edit</button>
-                      <button
-                        v-if="c.author.id === session.me.value?.id || session.canDelete.value"
-                        class="btn btn--sm btn--ghost"
-                        type="button"
-                        @click="deletingComment = c"
-                      >Delete</button>
-                    </span>
-                  </div>
-                  <template v-if="editingComment === c.id">
-                    <RichText
-                      v-model="commentEdit"
-                      class="cm__edit"
-                      min-height="90px"
-                      @files="(list) => addToComment(c.id, list)"
-                    >
-                      <template #tools>
-                        <label class="rt__clip" title="Attach files">
-                          <input
-                            type="file"
-                            multiple
-                            class="sr"
-                            :disabled="uploading"
-                            @change="addToComment(c.id, picked($event))"
-                          />
-                          <Paperclip class="ic" />
-                        </label>
-                      </template>
-                    </RichText>
-                    <div class="composer__row">
-                      <div class="sp"></div>
-                      <button class="btn btn--sm" type="button" @click="editingComment = null">Cancel</button>
-                      <button class="btn btn--sm btn--primary" type="button" @click="saveComment(c)">Save</button>
+                      <time class="stamp">{{ stampAt(e.at) }}</time>
                     </div>
-                  </template>
-                  <div v-else class="md cm__body" @click="followKey" v-html="asHtml(c.text)"></div>
-
-                  <div v-if="filesOf(c.id).length" class="cm__files">
-                    <div v-if="filesOf(c.id).length > 1" class="att__cap att__row att__all">
-                      <div></div>
-                      <div class="att__all__what">
-                        {{ filesOf(c.id).length }} files
-                        <span class="stamp">{{ fileSize(bytesOf(c.id)) }}</span>
-                      </div>
-                      <div class="att__all__go">
-                        <a
-                          class="btn btn--sm btn--icon btn--ghost"
-                          :href="`/api/comments/${c.id}/files.zip`"
-                          download
-                          aria-label="Download all"
-                        ><FileArchive class="ic ic--sm" /></a>
-                        <div class="selbar att__all__tip">Download all</div>
-                      </div>
-                    </div>
-                    <span
-                      v-for="a in filesOf(c.id).filter((x) => !isPicture(x.mime))"
-                      :key="a.id"
-                      class="att__cap att__row"
-                    >
-                      <a
-                        :href="`/api/attachments/${a.id}`"
-                        target="_blank"
-                        @click="onFileClick($event, a)"
-                      >{{ a.filename }}</a>
-                      <span class="stamp">{{ fileSize(a.size) }}</span>
-                      <a
-                        class="btn btn--sm btn--icon btn--ghost"
-                        :href="`/api/attachments/${a.id}`"
-                        download
-                        :aria-label="`Download ${a.filename}`"
-                      ><FileDown class="ic ic--sm" /></a>
-                      <button
-                        v-if="editingComment === c.id"
-                        class="btn btn--sm btn--icon btn--ghost"
-                        type="button"
-                        :aria-label="`Delete ${a.filename}`"
-                        @click="removeAttachment(a)"
-                      ><X class="ic ic--sm" /></button>
-                    </span>
-                    <FileWall
-                      :shots="shotsOf(c.id)"
-                      :removable="editingComment === c.id"
-                      @open="shown = galleryIndex($event)"
-                      @remove="removeAttachmentKey"
-                    />
+                    <a
+                      v-for="k in e.commits"
+                      :key="k.id"
+                      class="ev__commit"
+                      :href="k.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    ><span class="ev__sha">{{ k.sha.slice(0, 7) }}</span><span class="ev__msg">{{ k.message }}</span></a>
                   </div>
                 </div>
-              </article>
+                <article
+                  v-else-if="c"
+                  :id="`comment-${c.id}`"
+                  :class="{ 'is-fresh': litComment === c.id }"
+                  class="cm"
+                >
+                  <span class="av av--lg" :style="buddyAvatarStyle(c.author.login)"></span>
+                  <div>
+                    <div class="cm__head">
+                      <span class="cm__who" :style="{ color: ink(colorOf(c.author.login)) }">
+                        {{ nameOf(c.author.login) }}
+                      </span>
+                      <time class="stamp">{{ stampAt(c.createdAt) }}</time>
+                      <span v-if="c.editedAt" class="cm__edited">
+                        edited
+                        <span class="selbar cm__when">{{ stampAt(c.editedAt) }}</span>
+                      </span>
+                      <Pin
+                        v-if="c.pinnedAt"
+                        class="ic ic--sm cm__pin"
+                        :aria-label="c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned'"
+                      />
+                      <span class="cm__acts">
+                        <span class="cm__react">
+                        <span v-for="r in reactionsOf(c)" :key="r.emoji" class="react__one">
+                          <button
+                            class="react"
+                            :class="{ 'is-mine': r.mine }"
+                            type="button"
+                            @click="react(c, r.emoji)"
+                          >{{ r.emoji }}<span class="react__n">{{ r.n }}</span></button>
+                          <span class="selbar react__who">{{ r.who }}</span>
+                        </span>
+                          <button
+                            class="btn btn--sm btn--icon btn--ghost react__hold"
+                            type="button"
+                            aria-label="React"
+                            @click="openReactions(c, $event)"
+                          ><SmilePlus class="ic ic--sm" /></button>
+                        </span>
+                        <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
+                          {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
+                        </button>
+                        <button
+                          v-if="c.author.id === session.me.value?.id"
+                          class="btn btn--sm btn--ghost"
+                          type="button"
+                          @click="editingComment = c.id; commentEdit = c.text"
+                        >Edit</button>
+                        <button
+                          v-if="c.author.id === session.me.value?.id || session.canDelete.value"
+                          class="btn btn--sm btn--ghost"
+                          type="button"
+                          @click="deletingComment = c"
+                        >Delete</button>
+                      </span>
+                    </div>
+                    <template v-if="editingComment === c.id">
+                      <RichText
+                        v-model="commentEdit"
+                        class="cm__edit"
+                        min-height="90px"
+                        @files="(list) => addToComment(c.id, list)"
+                      >
+                        <template #tools>
+                          <label class="rt__clip" title="Attach files">
+                            <input
+                              type="file"
+                              multiple
+                              class="sr"
+                              :disabled="uploading"
+                              @change="addToComment(c.id, picked($event))"
+                            />
+                            <Paperclip class="ic" />
+                          </label>
+                        </template>
+                      </RichText>
+                      <div class="composer__row">
+                        <div class="sp"></div>
+                        <button class="btn btn--sm" type="button" @click="editingComment = null">Cancel</button>
+                        <button class="btn btn--sm btn--primary" type="button" @click="saveComment(c)">Save</button>
+                      </div>
+                    </template>
+                    <div v-else class="md cm__body" @click="followKey" v-html="asHtml(c.text)"></div>
+
+                    <div v-if="filesOf(c.id).length" class="cm__files">
+                      <div v-if="filesOf(c.id).length > 1" class="att__cap att__row att__all">
+                        <div></div>
+                        <div class="att__all__what">
+                          {{ filesOf(c.id).length }} files
+                          <span class="stamp">{{ fileSize(bytesOf(c.id)) }}</span>
+                        </div>
+                        <div class="att__all__go">
+                          <a
+                            class="btn btn--sm btn--icon btn--ghost"
+                            :href="`/api/comments/${c.id}/files.zip`"
+                            download
+                            aria-label="Download all"
+                          ><FileArchive class="ic ic--sm" /></a>
+                          <div class="selbar att__all__tip">Download all</div>
+                        </div>
+                      </div>
+                      <span
+                        v-for="a in filesOf(c.id).filter((x) => !isPicture(x.mime))"
+                        :key="a.id"
+                        class="att__cap att__row"
+                      >
+                        <a
+                          :href="`/api/attachments/${a.id}`"
+                          target="_blank"
+                          @click="onFileClick($event, a)"
+                        >{{ a.filename }}</a>
+                        <span class="stamp">{{ fileSize(a.size) }}</span>
+                        <a
+                          class="btn btn--sm btn--icon btn--ghost"
+                          :href="`/api/attachments/${a.id}`"
+                          download
+                          :aria-label="`Download ${a.filename}`"
+                        ><FileDown class="ic ic--sm" /></a>
+                        <button
+                          v-if="editingComment === c.id"
+                          class="btn btn--sm btn--icon btn--ghost"
+                          type="button"
+                          :aria-label="`Delete ${a.filename}`"
+                          @click="removeAttachment(a)"
+                        ><X class="ic ic--sm" /></button>
+                      </span>
+                      <FileWall
+                        :shots="shotsOf(c.id)"
+                        :removable="editingComment === c.id"
+                        @open="shown = galleryIndex($event)"
+                        @remove="removeAttachmentKey"
+                      />
+                    </div>
+                  </div>
+                </article>
+              </template>
 
               <form class="cm" :class="{ 'cm--lead': order === 'newest' }" @submit.prevent="postComment">
                 <span class="av av--lg" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
@@ -2395,6 +2463,52 @@ async function removeIssue(): Promise<void> {
 }
 .props__all {
   display: contents;
+}
+.ev {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.ev__ic {
+  justify-self: center;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+.ev__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.ev__head .nick {
+  margin-left: 0;
+}
+.ev__ref {
+  font: 12px var(--font-num);
+  color: var(--text-dim);
+}
+.ev__commit {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 4px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.ev__commit:hover {
+  color: var(--text);
+}
+.ev__sha {
+  flex: none;
+  font: 12px var(--font-num);
+  color: var(--text-muted);
+}
+.ev__msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @media (max-width: 760px) {
   .iv__scrim {
