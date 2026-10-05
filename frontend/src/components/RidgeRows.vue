@@ -131,4 +131,20 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
 .rg-axis :slotted(*) {
   padding: 0 5px;
 }
+@media (max-width: 760px) {
+  .rg-row {
+    grid-template-columns: 72px 1fr 36px;
+  }
+  .rg-axis {
+    margin: 10px 50px 0 86px;
+    letter-spacing: 0.06em;
+  }
+  .rg-axis :slotted(*) {
+    justify-self: center;
+    padding: 0;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+  }
+}
 </style>

@@ -614,14 +614,16 @@ function followKey(ev: MouseEvent): void {
 }
 
 const mainBox = ref<HTMLDivElement | null>(null);
+const ivBox = ref<HTMLDivElement | null>(null);
 const scrolled = ref(false);
 
-function onMainScroll(): void {
-  scrolled.value = (mainBox.value?.scrollTop ?? 0) > 8;
+function onMainScroll(ev: Event): void {
+  scrolled.value = (ev.currentTarget as HTMLElement).scrollTop > 8;
 }
 
 function toTop(): void {
   mainBox.value?.scrollTo({ top: 0, behavior: 'smooth' });
+  ivBox.value?.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 watch(
@@ -1331,7 +1333,7 @@ async function removeIssue(): Promise<void> {
           <span class="empty__g">✕</span>{{ error }}
         </div>
 
-        <div v-else class="iv">
+        <div v-else ref="ivBox" class="iv" @scroll="onMainScroll">
           <div ref="mainBox" class="iv__main" @scroll="onMainScroll">
             <input
               v-if="editing"
@@ -2362,5 +2364,34 @@ async function removeIssue(): Promise<void> {
   font-size: 13px;
   line-height: 1.55;
   color: var(--text-dim);
+}
+@media (max-width: 760px) {
+  .iv__scrim {
+    padding: 0;
+  }
+  .iv {
+    display: block;
+    overflow-y: auto;
+  }
+  .iv__main,
+  .props {
+    overflow: visible;
+  }
+  .iv__main {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .iv__project,
+  .iv__project + .iv__sep {
+    display: none;
+  }
+  .hi {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 12px;
+    padding: 8px 0;
+  }
+  .hi__what {
+    grid-column: 1 / -1;
+  }
 }
 </style>

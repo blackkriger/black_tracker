@@ -535,7 +535,7 @@ async function saveAccess(): Promise<void> {
           <div class="sp"></div>
           <span class="sk sk--field" style="flex: 0 0 96px"></span>
         </div>
-        <div v-else-if="!freshLink" class="addrow">
+        <div v-else-if="!freshLink" class="addrow invite__row">
           <Select v-model="linkKind" class="invite__role" :options="KIND_CHOICES" />
           <Select
             v-if="linkKind === 'invite'"
@@ -742,5 +742,14 @@ async function saveAccess(): Promise<void> {
 }
 .access__row input:disabled {
   opacity: 0.4;
+}
+@media (max-width: 760px) {
+  .invite__row {
+    flex-wrap: wrap;
+  }
+  .invite__role {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
 }
 </style>

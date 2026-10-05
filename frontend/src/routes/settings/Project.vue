@@ -595,4 +595,25 @@ async function onDrop(b: Board, target: State): Promise<void> {
 .c-del {
   width: 44px;
 }
+@media (max-width: 760px) {
+  .board-prefs {
+    gap: 12px;
+    padding: 12px 16px 14px;
+  }
+  .board-prefs .field {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .default-pick,
+  .default-pick-sk {
+    width: 100%;
+  }
+  .tbl th,
+  .tbl td {
+    padding: 0 6px;
+  }
+  .c-flag {
+    width: 56px;
+  }
+}
 </style>

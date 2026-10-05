@@ -216,4 +216,26 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
 .tagmap__row + .tagmap__row {
   border-top: 1px solid var(--line);
 }
+@media (max-width: 760px) {
+  .panel__h {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 48px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .tagmap__head {
+    width: 100%;
+    margin-left: 0;
+  }
+  .tagmap__head,
+  .tagmap__row {
+    grid-template-columns: repeat(var(--boards), minmax(0, 1fr));
+  }
+  .tagmap__row .taglabel {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
 </style>

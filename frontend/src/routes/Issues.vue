@@ -547,7 +547,7 @@ onMounted(() => {
                       Priority <component :is="arrowOf('priority')" class="ic ic--sm" />
                     </button>
                   </th>
-                  <th>Summary</th>
+                  <th class="list__summary">Summary</th>
                   <th class="list__board">
                     <button type="button" :class="{ sorted: sortCol === 'board' }" @click="sortBy('board')">
                       Board <component :is="arrowOf('board')" class="ic ic--sm" />
@@ -558,7 +558,7 @@ onMounted(() => {
                       Status <component :is="arrowOf('status')" class="ic ic--sm" />
                     </button>
                   </th>
-                  <th class="list__due-h">
+                  <th class="list__when">
                     <button type="button" :class="{ sorted: sortCol === 'due' }" @click="sortBy('due')">
                       Due <component :is="arrowOf('due')" class="ic ic--sm" />
                     </button>
@@ -573,13 +573,13 @@ onMounted(() => {
               <tbody v-if="loading" ref="skBody">
                 <tr v-for="n in skRows" :key="n">
                   <td class="list__pick"><span class="sk sk--line" style="width: 13px"></span></td>
-                  <td><span class="sk sk--line" style="width: 42px"></span></td>
-                  <td><span class="sk sk--line" style="width: 18px"></span></td>
+                  <td class="list__key"><span class="sk sk--line" style="width: 42px"></span></td>
+                  <td class="list__prio"><span class="sk sk--line" style="width: 18px"></span></td>
                   <td class="list__what"><span class="sk sk--line" :style="{ width: `${40 + ((n * 17) % 45)}%` }"></span></td>
-                  <td><span class="sk sk--line" style="width: 73px"></span></td>
-                  <td><span class="sk sk--line" style="width: 66px"></span></td>
-                  <td><span class="sk sk--line" style="width: 40px"></span></td>
-                  <td><span class="sk sk--line" style="width: 48px"></span></td>
+                  <td class="list__board"><span class="sk sk--line" style="width: 73px"></span></td>
+                  <td class="list__state"><span class="sk sk--line" style="width: 66px"></span></td>
+                  <td class="list__when"><span class="sk sk--line" style="width: 40px"></span></td>
+                  <td class="list__who"><span class="sk sk--line" style="width: 48px"></span></td>
                 </tr>
               </tbody>
               <tbody v-else>
@@ -598,8 +598,8 @@ onMounted(() => {
                       @change="togglePick(r.id)"
                     />
                   </td>
-                  <td class="key" :style="{ color: ink(r.stateColor) }">{{ r.key }}</td>
-                  <td>
+                  <td class="key list__key" :style="{ color: ink(r.stateColor) }">{{ r.key }}</td>
+                  <td class="list__prio">
                     <span class="prio" :class="priorityClass(r.priority)" :aria-label="r.priority">
                       <i></i><i></i><i></i><i></i>
                     </span>
@@ -613,12 +613,12 @@ onMounted(() => {
                       :style="{ '--c': t.color }"
                     >{{ t.name }}</span>
                   </td>
-                  <td class="list__dim">{{ r.boardName }}</td>
-                  <td :style="{ color: ink(r.stateColor) }">{{ r.stateName }}</td>
-                  <td class="stamp" :class="{ 'is-late': dueLabel(r.dueDate)?.late && !r.resolved }">
+                  <td class="list__dim list__board">{{ r.boardName }}</td>
+                  <td class="list__state" :style="{ color: ink(r.stateColor) }">{{ r.stateName }}</td>
+                  <td class="stamp list__when" :class="{ 'is-late': dueLabel(r.dueDate)?.late && !r.resolved }">
                     {{ dueLabel(r.dueDate)?.text }}
                   </td>
-                  <td :style="{ color: ink(colorOf(r.assignee?.login)) }">
+                  <td class="list__who" :style="{ color: ink(colorOf(r.assignee?.login)) }">
                     {{ r.assignee ? nameOf(r.assignee.login) : '' }}
                   </td>
                 </tr>
@@ -777,5 +777,81 @@ onMounted(() => {
 }
 .prio {
   margin-left: 0;
+}
+@media (max-width: 760px) {
+  .list__sep {
+    display: none;
+  }
+}
+.panel__table {
+  container-type: inline-size;
+}
+@container (max-width: 720px) {
+  .list,
+  .list thead,
+  .list tbody {
+    display: block;
+  }
+  .list thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+  }
+  .list th {
+    height: 32px;
+    border-bottom: 0;
+  }
+  .list th.list__summary {
+    display: none;
+  }
+  .list tbody tr {
+    display: grid;
+    grid-template-columns: 28px auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'pick key prio . state'
+      'pick what what what what'
+      'pick board when . who';
+    align-items: center;
+    gap: 6px 10px;
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .list tbody td {
+    height: auto;
+    padding: 0;
+    border-bottom: 0;
+  }
+  .list tbody .list__pick {
+    grid-area: pick;
+    align-self: start;
+    padding-left: 12px;
+  }
+  .list tbody .list__key {
+    grid-area: key;
+  }
+  .list tbody .list__prio {
+    grid-area: prio;
+  }
+  .list tbody .list__what {
+    grid-area: what;
+    width: auto;
+    max-width: none;
+    white-space: normal;
+  }
+  .list tbody .list__board {
+    grid-area: board;
+  }
+  .list tbody .list__state {
+    grid-area: state;
+    justify-self: end;
+  }
+  .list tbody .list__when {
+    grid-area: when;
+  }
+  .list tbody .list__who {
+    grid-area: who;
+    justify-self: end;
+  }
 }
 </style>

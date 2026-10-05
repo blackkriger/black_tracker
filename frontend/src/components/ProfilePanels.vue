@@ -340,4 +340,8 @@ async function changePassword(): Promise<void> {
   color: var(--text);
   font-size: 13px;
 }
+.sess__i .hint {
+  flex: none;
+  white-space: nowrap;
+}
 </style>

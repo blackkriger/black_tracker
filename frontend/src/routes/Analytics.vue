@@ -325,7 +325,7 @@ async function openIssue(w: Where): Promise<void> {
         <section class="panel sheet__wide">
           <header class="panel__h">
             Boards
-            <span class="panel__end">
+            <span class="panel__end an__filters">
               <Select
                 v-model="tag"
                 :options="tagChoices"
@@ -841,5 +841,42 @@ async function openIssue(w: Where): Promise<void> {
 .skel__n {
   justify-self: end;
   width: 18px;
+}
+@media (max-width: 760px) {
+  .panel__h {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 48px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .an__filters {
+    flex-wrap: wrap;
+    width: 100%;
+    margin-left: 0;
+  }
+  .skel__ridge {
+    grid-template-columns: 72px 1fr 36px;
+  }
+  .who {
+    grid-template-columns: minmax(0, 1fr) 32px 32px 40px 44px;
+    gap: 6px;
+  }
+  .who--worked {
+    grid-template-columns: minmax(0, 1fr) 40px 44px;
+  }
+  .who__head {
+    grid-template-columns: 32px 32px 40px 44px;
+    gap: 6px;
+  }
+  .who__head--worked {
+    grid-template-columns: 40px 44px;
+  }
+  .who__name {
+    min-width: 0;
+  }
+  .who__login {
+    display: none;
+  }
 }
 </style>

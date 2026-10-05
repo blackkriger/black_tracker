@@ -253,4 +253,13 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   overflow-x: auto;
   white-space: pre;
 }
+@media (max-width: 760px) {
+  .api__table {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+  .api__what {
+    grid-column: 2;
+    margin-bottom: 6px;
+  }
+}
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ExternalLink } from 'lucide-vue-next';
 import { api } from '../lib/api';
 import { stamp } from '../lib/issues';
@@ -9,12 +9,24 @@ import { useProjects } from '../lib/projects';
 const { projects, loaded, load } = useProjects();
 
 const updated = ref<string | null>(null);
+const nav = ref<HTMLElement | null>(null);
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const archived = computed(() => projects.value.filter((p) => p.archived));
 
+async function showCurrent(): Promise<void> {
+  await nextTick();
+  const box = nav.value;
+  const here = box?.querySelector<HTMLElement>('[aria-current]');
+  if (!box || !here || box.scrollWidth <= box.clientWidth) return;
+  const offset = here.getBoundingClientRect().left - box.getBoundingClientRect().left;
+  box.scrollLeft += offset - (box.clientWidth - here.offsetWidth) / 2;
+}
+watch(loaded, () => void showCurrent());
+
 onMounted(async () => {
   void load();
+  void showCurrent();
   try {
     const got = await api<{ updatedAt: string }>('/version');
     updated.value = got.updatedAt;
@@ -33,7 +45,7 @@ useLive(
   <div class="page">
 
     <div class="page__body">
-      <nav class="side settings__side" aria-label="Settings sections">
+      <nav ref="nav" class="side settings__side" aria-label="Settings sections">
         <div class="side__h">Profile</div>
         <RouterLink to="/settings/profile">Profile</RouterLink>
         <RouterLink to="/settings/preferences">Preferences</RouterLink>
@@ -120,6 +132,20 @@ useLive(
     position: static;
     width: 100%;
     height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .settings__side .side__h,
+  .side__foot {
+    display: none;
+  }
+  .settings__side a {
+    flex: none;
+    white-space: nowrap;
+  }
+  .settings__side .side__sk {
+    flex: 0 0 120px;
   }
 }
 </style>

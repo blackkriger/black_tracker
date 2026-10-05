@@ -364,11 +364,11 @@ function closeIssue(): void {
             <div class="panel__b mine">
               <template v-if="mineLoading">
                 <div v-for="w in [58, 44, 66]" :key="w" class="mine__row mine__sk">
-                  <span class="sk sk--line" style="width: 46px"></span>
-                  <span class="sk sk--line" style="width: 44px"></span>
-                  <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
-                  <span class="sk sk--line" style="width: 80px"></span>
-                  <span class="sk sk--line" style="width: 64px"></span>
+                  <span class="sk sk--line mine__key" style="width: 46px"></span>
+                  <span class="sk sk--line mine__pri" style="width: 44px"></span>
+                  <span class="sk sk--line mine__what" :style="{ width: `${w}%` }"></span>
+                  <span class="sk sk--line mine__board" style="width: 80px"></span>
+                  <span class="sk sk--line mine__state" style="width: 64px"></span>
                   <span class="sk sk--line mine__due" style="width: 72px"></span>
                 </div>
               </template>
@@ -379,13 +379,13 @@ function closeIssue(): void {
                 type="button"
                 @click="openFromDay({ key: i.key, projectShort: i.projectShort, boardSlug: i.boardSlug })"
               >
-                <span class="key" :style="{ color: ink(i.color) }">{{ i.key }}</span>
+                <span class="key mine__key" :style="{ color: ink(i.color) }">{{ i.key }}</span>
                 <span class="mine__pri" :style="{ color: priorityColor(i.priority as Priority) }">
                   {{ i.priority }}
                 </span>
                 <span class="mine__what">{{ i.summary }}</span>
                 <span class="mine__board">{{ i.boardName }}</span>
-                <span class="stamp" :style="{ color: ink(i.color) }">{{ i.stateName }}</span>
+                <span class="stamp mine__state" :style="{ color: ink(i.color) }">{{ i.stateName }}</span>
                 <span
                   class="stamp mine__due"
                   :class="{ 'is-late': i.due && i.due < today }"
@@ -787,4 +787,39 @@ function closeIssue(): void {
   align-items: center;
 }
 
+@media (max-width: 760px) {
+  .mine__row {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'key pri . state'
+      'what what what what'
+      'board board . due';
+    gap: 4px 10px;
+    padding: 8px 10px;
+  }
+  .mine__key {
+    grid-area: key;
+  }
+  .mine__pri {
+    grid-area: pri;
+  }
+  .mine__what {
+    grid-area: what;
+    white-space: normal;
+  }
+  .mine__board {
+    grid-area: board;
+  }
+  .mine__state {
+    grid-area: state;
+    justify-self: end;
+  }
+  .mine__due {
+    grid-area: due;
+    justify-self: end;
+  }
+  .year-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 </style>
