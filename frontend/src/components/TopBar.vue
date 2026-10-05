@@ -14,6 +14,7 @@ import { api } from '../lib/api';
 import { todayKey, type Mark } from '../lib/calendar';
 import { stamp } from '../lib/issues';
 import { buddyAvatarStyle } from '../lib/avatar';
+import { linkQuery, monthFilters, noFilters } from '../lib/filters';
 import { layout, narrow } from '../lib/layout';
 import { AtSign, ChartColumn, ContactRound, ListChecks, Menu, Moon, Smile, Star, Sun } from 'lucide-vue-next';
 import { ink, setTheme, shownTheme } from '../lib/theme';
@@ -32,12 +33,8 @@ const live = computed(() => projects.value.filter((p) => !p.archived));
 const PLACES = ['project-board', 'board', 'issue'];
 const here = computed(() => PLACES.includes(String(route.name)));
 const currentShort = computed(() => (here.value ? String(route.params.short) : null));
-const issuesTo = computed(() =>
-  currentShort.value ? { name: 'issues', query: { projects: currentShort.value } } : { name: 'issues' }
-);
-const analyticsTo = computed(() =>
-  currentShort.value ? { name: 'analytics', query: { projects: currentShort.value } } : { name: 'analytics' }
-);
+const issuesTo = computed(() => ({ name: 'issues', query: linkQuery(noFilters(), currentShort.value) }));
+const analyticsTo = computed(() => ({ name: 'analytics', query: linkQuery(monthFilters(), currentShort.value) }));
 const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
 const section = computed(() => {
   const name = String(route.name ?? '');

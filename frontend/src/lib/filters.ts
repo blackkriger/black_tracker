@@ -1,3 +1,4 @@
+import { ref } from 'vue';
 import type { LocationQuery } from 'vue-router';
 
 export interface Filters {
@@ -10,8 +11,18 @@ export interface Filters {
   to: string;
 }
 
-const KEPT = 'tracker:filter-projects';
+interface Remembered {
+  projects: string[];
+  states: string[];
+  assignees: string[];
+  authors: string[];
+  tags: string[];
+  period: { from: string; to: string } | null;
+}
+
+const KEPT = 'tracker:filters';
 const LISTS = ['projects', 'states', 'assignees', 'authors', 'tags'] as const;
+const KEYS = [...LISTS, 'from', 'to'];
 
 const listOf = (v: unknown): string[] => (typeof v === 'string' && v ? v.split(',').filter(Boolean) : []);
 
@@ -25,23 +36,58 @@ export const noFilters = (): Filters => ({
   to: '',
 });
 
-function keptProjects(): string[] {
+export function monthFilters(): Filters {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const last = new Date(y, now.getMonth() + 1, 0).getDate();
+  return { ...noFilters(), from: `${y}-${m}-01`, to: `${y}-${m}-${last}` };
+}
+
+function readRemembered(): Remembered {
+  const empty: Remembered = { projects: [], states: [], assignees: [], authors: [], tags: [], period: null };
   try {
-    return JSON.parse(localStorage.getItem(KEPT) ?? '[]') as string[];
+    const raw = JSON.parse(localStorage.getItem(KEPT) ?? 'null') as Partial<Remembered> | null;
+    return raw ? { ...empty, ...raw } : empty;
   } catch {
-    return [];
+    return empty;
   }
 }
 
-export function keepProjects(projects: string[]): void {
+const remembered = ref<Remembered>(readRemembered());
+
+export function remember(f: Filters, base: Filters): void {
+  const picked = f.from !== base.from || f.to !== base.to;
+  remembered.value = {
+    projects: f.projects,
+    states: f.states,
+    assignees: f.assignees,
+    authors: f.authors,
+    tags: f.tags,
+    period: picked ? { from: f.from, to: f.to } : null,
+  };
   try {
-    localStorage.setItem(KEPT, JSON.stringify(projects));
+    localStorage.setItem(KEPT, JSON.stringify(remembered.value));
   } catch {}
 }
 
-export function filtersOf(query: LocationQuery, base: Filters = noFilters()): Filters {
+function rememberedFilters(base: Filters): Filters {
+  const r = remembered.value;
   return {
-    projects: query.projects !== undefined ? listOf(query.projects) : keptProjects(),
+    projects: [...r.projects],
+    states: [...r.states],
+    assignees: [...r.assignees],
+    authors: [...r.authors],
+    tags: [...r.tags],
+    from: r.period ? r.period.from : base.from,
+    to: r.period ? r.period.to : base.to,
+  };
+}
+
+export function filtersOf(query: LocationQuery, base: Filters = noFilters()): Filters {
+  if (!KEYS.some((key) => query[key] !== undefined)) return rememberedFilters(base);
+  return {
+    projects: listOf(query.projects),
     states: listOf(query.states),
     assignees: listOf(query.assignees),
     authors: listOf(query.authors),
@@ -57,6 +103,12 @@ export function filtersQuery(f: Filters, base: Filters = noFilters()): Record<st
   if (f.from !== base.from) out.from = f.from;
   if (f.to !== base.to) out.to = f.to;
   return out;
+}
+
+export function linkQuery(base: Filters, project?: string | null): Record<string, string> {
+  const f = rememberedFilters(base);
+  if (project) f.projects = [project];
+  return filtersQuery(f, base);
 }
 
 export const sameQuery = (a: Record<string, unknown>, b: Record<string, unknown>): boolean =>

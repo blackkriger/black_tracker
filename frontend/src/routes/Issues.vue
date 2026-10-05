@@ -6,7 +6,7 @@ import FilterBar from '../components/FilterBar.vue';
 import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
 import { useBoards, type BoardFull } from '../lib/boards';
-import { filtersOf, filtersQuery, keepProjects, sameQuery, type Filters } from '../lib/filters';
+import { filtersOf, filtersQuery, noFilters, remember, sameQuery, type Filters } from '../lib/filters';
 import { PRIORITIES, dueLabel, priorityClass, type Issue, type IssueTag } from '../lib/issues';
 import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
@@ -90,7 +90,7 @@ watch(
   [filters, q, closed, sort],
   () => {
     const next = toQuery();
-    keepProjects(filters.value.projects);
+    remember(filters.value, noFilters());
     if (!sameQuery(next, route.query as Record<string, unknown>)) {
       void router.replace({ name: 'issues', params: route.params, query: next });
     }
@@ -201,7 +201,7 @@ useLive(
 );
 
 onMounted(() => {
-  keepProjects(filters.value.projects);
+  remember(filters.value, noFilters());
   const next = toQuery();
   if (!sameQuery(next, route.query as Record<string, unknown>)) {
     void router.replace({ name: 'issues', params: route.params, query: next });

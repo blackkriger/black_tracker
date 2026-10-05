@@ -6,7 +6,7 @@ import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import FilterBar from '../components/FilterBar.vue';
 import { api } from '../lib/api';
-import { filtersOf, filtersQuery, keepProjects, noFilters, sameQuery, type Filters } from '../lib/filters';
+import { filtersOf, filtersQuery, monthFilters, remember, sameQuery, type Filters } from '../lib/filters';
 import { dayAndMonth } from '../lib/calendar';
 import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/issues';
 import { RIDGE_SMOOTH_KERNEL, smoothRidge } from '../lib/ridge';
@@ -81,22 +81,14 @@ const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 const { nameOf, load: loadPeople } = usePeople();
 
-function thisMonth(): { from: string; to: string } {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const last = new Date(y, now.getMonth() + 1, 0).getDate();
-  return { from: `${y}-${m}-01`, to: `${y}-${m}-${last}` };
-}
-
 const route = useRoute();
 const router = useRouter();
-const base: Filters = { ...noFilters(), ...thisMonth() };
+const base = monthFilters();
 const filters = ref<Filters>(filtersOf(route.query, base));
 watch(
   filters,
   (now) => {
-    keepProjects(now.projects);
+    remember(now, base);
     const next = filtersQuery(now, base);
     if (!sameQuery(next, route.query as Record<string, unknown>)) {
       void router.replace({ name: 'analytics', query: next });
