@@ -17,4 +17,5 @@ export const env = {
     .filter(Boolean),
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
   secureCookies: process.env.SECURE_COOKIES === 'true',
+  githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? '',
 };

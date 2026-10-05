@@ -80,6 +80,20 @@ interface ListedRow extends IssueRow {
   short_name: string;
 }
 
+interface CommitRow {
+  id: string;
+  kind: 'commit' | 'merge';
+  repo: string;
+  sha: string;
+  message: string;
+  branch: string | null;
+  merged_from: string | null;
+  author_name: string | null;
+  author_login: string | null;
+  at: Date;
+  by_login: string | null;
+}
+
 interface TagRow {
   id: string;
   name: string;
@@ -759,7 +773,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
 
-    const [tags, comments, history, attachments, links, stars] = await Promise.all([
+    const [tags, comments, history, attachments, links, stars, commits] = await Promise.all([
       tagsFor([issue.id]),
       pool.query(
         `select c.id, c.text, c.created_at, c.edited_at, c.author_id, c.pinned_at,
@@ -795,6 +809,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       ),
       linksOf(issue.id, auth),
       starredBy(auth.userId, [issue.id]),
+      pool.query<CommitRow>(
+        `select c.id, c.kind, c.repo, c.sha, c.message, c.branch, c.merged_from, c.author_name,
+                c.author_login, c.at, u.login as by_login
+           from issue_commits c
+           left join users u on u.github_login is not null
+            and lower(u.github_login) = lower(coalesce(c.author_login, c.author_name))
+          where c.issue_id = $1
+          order by c.at`,
+        [issue.id]
+      ),
     ]);
 
     return reply.send({
@@ -819,6 +843,18 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           at: h.created_at.toISOString(),
         })),
         links: links.map(publicLink),
+        commits: commits.rows.map((c) => ({
+          id: c.id,
+          kind: c.kind,
+          sha: c.sha,
+          message: c.message.split('\n')[0],
+          branch: c.branch,
+          mergedFrom: c.merged_from,
+          author: c.author_login ?? c.author_name,
+          by: c.by_login,
+          at: c.at.toISOString(),
+          url: `https://github.com/${c.repo}/commit/${c.sha}`,
+        })),
         attachments: attachments.rows.map((a) => ({
           id: a.id,
           filename: a.filename,

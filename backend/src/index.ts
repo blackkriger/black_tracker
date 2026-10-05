@@ -18,6 +18,7 @@ import { registerCalendarRoutes } from './calendar-routes.js';
 import { registerAnalyticsRoutes } from './analytics-routes.js';
 import { registerNoticeRoutes } from './notice-routes.js';
 import { registerChangeFeed, registerEventRoutes } from './events.js';
+import { registerGitRoutes } from './git-routes.js';
 
 const app = Fastify({
   logger: {
@@ -67,6 +68,7 @@ registerIssueRoutes(app);
 registerCalendarRoutes(app);
 registerAnalyticsRoutes(app);
 registerNoticeRoutes(app);
+registerGitRoutes(app);
 registerEventRoutes(app);
 registerChangeFeed(app);
 

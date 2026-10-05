@@ -7,7 +7,8 @@
     "start": "tsx src/index.ts",
     "migrate": "tsx src/migrate.ts",
     "typecheck": "tsc --noEmit",
-    "create-user": "tsx src/create-user.ts"
+    "create-user": "tsx src/create-user.ts",
+    "import-commits": "tsx src/import-commits.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
