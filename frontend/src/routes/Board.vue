@@ -215,7 +215,7 @@ function byOrder(a: Issue, b: Issue): number {
     if (!b.dueDate) return -1;
     return a.dueDate < b.dueDate ? -1 : 1;
   }
-  return a.position - b.position;
+  return a.position - b.position || a.createdAt.localeCompare(b.createdAt);
 }
 
 const issuesOf = (stateId: string): Issue[] =>
@@ -314,7 +314,7 @@ async function onDrop(): Promise<void> {
   column.splice(at < 0 ? column.length : at, 0, moved);
 
   moved.stateId = target.stateId;
-  column.forEach((i, n) => (i.position = n));
+  column.forEach((i, n) => (i.position = n + 1));
   try {
     await api(`/boards/${board.id}/issues/order`, {
       method: 'POST',
