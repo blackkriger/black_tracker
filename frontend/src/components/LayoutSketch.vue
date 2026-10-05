@@ -76,10 +76,10 @@ const days = Array.from({ length: 35 }, (_, i) => ({ col: i % 7, row: Math.floor
       <rect class="m" x="29" y="134" width="24" height="2" />
       <rect class="t" x="7" y="143" width="6" height="6" />
       <rect class="t" x="16" y="145" width="18" height="2" />
-      <circle class="m" cx="56" cy="146" r="2" />
-      <circle class="t" cx="64" cy="146" r="2" />
+      <rect class="t" x="52" y="145" width="14" height="2" />
       <rect class="m" x="7" y="153" width="16" height="2" />
-      <rect class="t" x="52" y="153" width="14" height="2" />
+      <circle class="m" cx="56" cy="154" r="2" />
+      <circle class="t" cx="64" cy="154" r="2" />
       <rect class="f" x="82" y="8" width="24" height="6" />
       <line class="f" x1="110.5" y1="8" x2="110.5" y2="14" />
       <rect class="f" x="115" y="8" width="36" height="6" />

@@ -255,6 +255,11 @@ async function signOut(): Promise<void> {
           {{ session.me.value?.login }}
         </RouterLink>
         <div class="sp"></div>
+        <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
+      </div>
+      <div class="rail__row">
+        <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
+        <div class="sp"></div>
         <button
           class="topitem rail__theme"
           :class="{ 'is-on': shownTheme === 'light' }"
@@ -271,11 +276,6 @@ async function signOut(): Promise<void> {
           :aria-pressed="shownTheme === 'dark'"
           @click="setTheme('dark')"
         ><Moon class="ic" /></button>
-      </div>
-      <div class="rail__row">
-        <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
-        <div class="sp"></div>
-        <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
       </div>
     </nav>
   </aside>
