@@ -53,8 +53,10 @@ export interface Worked {
 export interface WorkFilter {
   boards: string[];
   projects: string[];
-  project?: string | null;
-  tag?: string | null;
+  projectNames?: string[] | null;
+  states?: string[] | null;
+  tags?: string[] | null;
+  authors?: string[] | null;
   from: string | null;
   to: string | null;
   login?: string | null;
@@ -87,14 +89,28 @@ export async function workOf(f: WorkFilter): Promise<Worked[]> {
         and (i.resolved_at is null
              or i.resolved_at >= coalesce($4::date::timestamp at time zone '${ZONE}', '-infinity'))
         and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
-        and ($3::text is null or p.short_name = $3)
-        and ($6::uuid is null or exists (select 1 from issue_tags it where it.issue_id = i.id and it.tag_id = $6))
+        and ($3::text[] is null or p.short_name = any($3))
+        and ($6::uuid[] is null or (
+              select count(*) from issue_tags it where it.issue_id = i.id and it.tag_id = any($6)
+            ) = cardinality($6))
         and ($7::text is null or u.login = $7 or exists (
               select 1 from issue_history ah
                where ah.issue_id = i.id and ah.field = 'assignee'
                  and (ah.old_value = $7 or ah.new_value = $7)
-            ))`,
-    [f.boards, f.projects, f.project ?? null, f.from, f.to, f.tag ?? null, f.login ?? null]
+            ))
+        and ($8::text[] is null or s.name = any($8))
+        and ($9::text[] is null or i.author_id in (select id from users where login = any($9)))`,
+    [
+      f.boards,
+      f.projects,
+      f.projectNames ?? null,
+      f.from,
+      f.to,
+      f.tags ?? null,
+      f.login ?? null,
+      f.states ?? null,
+      f.authors ?? null,
+    ]
   );
   if (!issues.rows.length) return [];
 

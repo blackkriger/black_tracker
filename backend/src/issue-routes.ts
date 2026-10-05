@@ -6,7 +6,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { DAY_RE, inTransaction, pool, ZONE } from './db.js';
+import { DAY_RE, inTransaction, listOf, pool, ZONE } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { DENIES_NOTHING, deniedFor, mayOpenBoard } from './board-service.js';
@@ -79,14 +79,6 @@ interface ListedRow extends IssueRow {
   slug: string;
   short_name: string;
 }
-
-const listOf = (value: string | undefined): string[] | null => {
-  const items = (value ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return items.length ? items.slice(0, 100) : null;
-};
 
 interface TagRow {
   id: string;

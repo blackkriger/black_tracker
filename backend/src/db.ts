@@ -35,3 +35,11 @@ export async function inTransaction<T>(
 
 export const ZONE = 'Europe/Moscow';
 export const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export const listOf = (value: string | undefined): string[] | null => {
+  const items = (value ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return items.length ? items.slice(0, 100) : null;
+};
