@@ -2,15 +2,17 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-vue-next';
-import DateRangePicker from '../components/DateRangePicker.vue';
-import FilterMenu from '../components/FilterMenu.vue';
+import FilterBar from '../components/FilterBar.vue';
 import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
+import { useBoards, type BoardFull } from '../lib/boards';
+import { filtersOf, filtersQuery, keepProjects, sameQuery, type Filters } from '../lib/filters';
 import { PRIORITIES, dueLabel, priorityClass, type Issue, type IssueTag } from '../lib/issues';
 import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
+import { useTags } from '../lib/tags';
 import { ink } from '../lib/theme';
 
 interface Row extends Omit<Issue, 'description'> {
@@ -21,85 +23,38 @@ interface Row extends Omit<Issue, 'description'> {
   boardSlug: string;
   projectShort: string;
 }
-interface TagOption extends IssueTag {
-  boardIds: string[];
-}
-interface BoardFull {
-  id: string;
-  name: string;
-  slug: string;
-  states: { id: string; name: string; color: string }[];
-  tagIds: string[];
-  defaultStateId?: string | null;
-  defaultAssigneeId?: string | null;
-}
 type Column = 'key' | 'priority' | 'board' | 'status' | 'due' | 'assignee';
 
 const route = useRoute();
 const router = useRouter();
-const { projects, loaded: projectsLoaded, load: loadProjects } = useProjects();
-const { people, nameOf, colorOf, load: loadPeople } = usePeople();
+const { projects, load: loadProjects } = useProjects();
+const { nameOf, colorOf, load: loadPeople } = usePeople();
+const { tags, load: loadTags } = useTags();
+const { boardOf, forget } = useBoards();
 const { errors, fail, clear } = usePanelErrors();
 
-const KEPT = 'tracker:issues-projects';
-const listOf = (v: unknown): string[] => (typeof v === 'string' && v ? v.split(',').filter(Boolean) : []);
-
-function keptProjects(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(KEPT) ?? '[]') as string[];
-  } catch {
-    return [];
-  }
-}
-
-const byProjects = ref<string[]>([]);
-const byStates = ref<string[]>([]);
-const byAssignees = ref<string[]>([]);
-const byAuthors = ref<string[]>([]);
-const byTags = ref<string[]>([]);
+const filters = ref<Filters>(filtersOf(route.query));
 const q = ref('');
 const typed = ref('');
 const closed = ref(false);
-const period = ref({ from: '', to: '' });
 const sort = ref('');
-
-function keepProjects(): void {
-  try {
-    localStorage.setItem(KEPT, JSON.stringify(byProjects.value));
-  } catch {}
-}
 
 function fromQuery(): void {
   const query = route.query;
-  byProjects.value = query.projects !== undefined ? listOf(query.projects) : keptProjects();
-  byStates.value = listOf(query.states);
-  byAssignees.value = listOf(query.assignees);
-  byAuthors.value = listOf(query.authors);
-  byTags.value = listOf(query.tags);
+  filters.value = filtersOf(query);
   q.value = String(query.q ?? '');
   typed.value = q.value;
   closed.value = query.closed === '1';
-  period.value = { from: String(query.from ?? ''), to: String(query.to ?? '') };
   sort.value = String(query.sort ?? '');
 }
 
 function toQuery(): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (byProjects.value.length) out.projects = byProjects.value.join(',');
-  if (byStates.value.length) out.states = byStates.value.join(',');
-  if (byAssignees.value.length) out.assignees = byAssignees.value.join(',');
-  if (byAuthors.value.length) out.authors = byAuthors.value.join(',');
-  if (byTags.value.length) out.tags = byTags.value.join(',');
+  const out = filtersQuery(filters.value);
   if (q.value) out.q = q.value;
   if (closed.value) out.closed = '1';
-  if (period.value.from) out.from = period.value.from;
-  if (period.value.to) out.to = period.value.to;
   if (sort.value) out.sort = sort.value;
   return out;
 }
-
-const sameQuery = (a: Record<string, unknown>, b: Record<string, unknown>): boolean =>
-  JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
 
 fromQuery();
 
@@ -132,10 +87,10 @@ async function load(): Promise<void> {
 }
 
 watch(
-  [byProjects, byStates, byAssignees, byAuthors, byTags, q, closed, period, sort],
+  [filters, q, closed, sort],
   () => {
     const next = toQuery();
-    keepProjects();
+    keepProjects(filters.value.projects);
     if (!sameQuery(next, route.query as Record<string, unknown>)) {
       void router.replace({ name: 'issues', params: route.params, query: next });
     }
@@ -151,88 +106,16 @@ watch(
   }
 );
 
-watch([byProjects, byStates, byAssignees, byAuthors, byTags, q, closed, period], () => void load(), {
+watch([filters, q, closed], () => void load(), {
   deep: true,
 });
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
-const scope = computed(() =>
-  byProjects.value.length ? live.value.filter((p) => byProjects.value.includes(p.shortName)) : live.value
-);
 
-const boardCache = ref(new Map<string, BoardFull>());
-async function boardOf(id: string): Promise<BoardFull> {
-  const kept = boardCache.value.get(id);
-  if (kept) return kept;
-  const got = await api<BoardFull>(`/boards/${id}`);
-  boardCache.value = new Map(boardCache.value).set(id, got);
-  return got;
-}
-watch(
-  scope,
-  (now) => {
-    for (const p of now) for (const b of p.boards) void boardOf(b.id).catch(() => {});
-  },
-  { immediate: true }
-);
-
-const tags = ref<TagOption[]>([]);
-const tagsLoaded = ref(false);
-async function loadTags(): Promise<void> {
-  try {
-    tags.value = await api<TagOption[]>('/tags');
-  } catch {
-  } finally {
-    tagsLoaded.value = true;
-  }
-}
-
-const projectChoices = computed(() =>
-  live.value.map((p) => ({ value: p.shortName, key: p.shortName, label: p.name }))
-);
-const stateChoices = computed(() => {
-  const seen = new Map<string, string>();
-  for (const p of scope.value)
-    for (const b of p.boards)
-      for (const s of boardCache.value.get(b.id)?.states ?? []) if (!seen.has(s.name)) seen.set(s.name, s.color);
-  return [...seen].map(([name, color]) => ({ value: name, label: name, color }));
-});
-const personChoices = computed(() =>
-  people.value.map((p) => ({ value: p.login, label: p.fullName || p.login, color: p.roleColor }))
-);
-const assigneeChoices = computed(() => [{ value: '-', label: 'Nobody' }, ...personChoices.value]);
-const tagChoices = computed(() => {
-  const boards = new Set(scope.value.flatMap((p) => p.boards.map((b) => b.id)));
-  return tags.value.filter((t) => t.boardIds.some((id) => boards.has(id)));
-});
-
-function toggleTag(id: string): void {
-  byTags.value = byTags.value.includes(id) ? byTags.value.filter((t) => t !== id) : [...byTags.value, id];
-}
-
-const anyFilter = computed(
-  () =>
-    byProjects.value.length > 0 ||
-    byStates.value.length > 0 ||
-    byAssignees.value.length > 0 ||
-    byAuthors.value.length > 0 ||
-    byTags.value.length > 0 ||
-    !!q.value ||
-    closed.value ||
-    !!period.value.from ||
-    !!period.value.to
-);
-
-function clearAll(): void {
-  byProjects.value = [];
-  byStates.value = [];
-  byAssignees.value = [];
-  byAuthors.value = [];
-  byTags.value = [];
+function clearOwn(): void {
   typed.value = '';
   q.value = '';
   closed.value = false;
-  period.value = { from: '', to: '' };
 }
 
 const numberOf = (key: string): number => Number(key.split('-')[1] ?? 0);
@@ -284,7 +167,7 @@ async function showIssue(key: string | null): Promise<void> {
       boardId = got.boardId;
       project = projects.value.find((p) => p.id === got.projectId)?.shortName;
     }
-    boardCache.value.delete(boardId);
+    forget(boardId);
     open.value = { key, project: project ?? '', board: await boardOf(boardId) };
   } catch (err) {
     fail('list', err);
@@ -305,20 +188,20 @@ function closeIssue(): void {
 const reload = settled(() => void load());
 useLive(
   (ev) => {
-    if (ev.type === 'tag.changed') void loadTags();
-    if (['board.changed', 'state.changed'].includes(ev.type)) boardCache.value = new Map();
+    if (ev.type === 'tag.changed') void loadTags(true);
+    if (['board.changed', 'state.changed'].includes(ev.type)) forget();
     if (ev.type.startsWith('issue.') || ['board.changed', 'state.changed', 'project.changed'].includes(ev.type)) {
       reload();
     }
   },
   () => {
-    void loadTags();
+    void loadTags(true);
     reload();
   }
 );
 
 onMounted(() => {
-  keepProjects();
+  keepProjects(filters.value.projects);
   const next = toQuery();
   if (!sameQuery(next, route.query as Record<string, unknown>)) {
     void router.replace({ name: 'issues', params: route.params, query: next });
@@ -364,32 +247,7 @@ onMounted(() => {
                 With closed
               </label>
             </div>
-            <div class="list__row">
-              <FilterMenu v-model="byProjects" label="Projects" :options="projectChoices" />
-              <FilterMenu v-model="byStates" label="Status" :options="stateChoices" />
-              <FilterMenu v-model="byAssignees" label="Assignee" :options="assigneeChoices" />
-              <FilterMenu v-model="byAuthors" label="Author" :options="personChoices" />
-              <span class="list__sep" aria-hidden="true"></span>
-              <span class="list__period" :class="{ 'is-on': period.from || period.to }">
-                <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
-              </span>
-              <button
-                v-for="t in tagChoices"
-                :key="t.id"
-                class="taglabel taglabel--plain taglabel--pick"
-                :class="{ 'is-off': byTags.length && !byTags.includes(t.id) }"
-                type="button"
-                :aria-pressed="byTags.includes(t.id)"
-                :style="{ '--c': t.color }"
-                @click="toggleTag(t.id)"
-              >{{ t.name }}</button>
-              <template v-if="!tagsLoaded || !projectsLoaded">
-                <span v-for="w in [40, 62]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
-              </template>
-              <button v-if="anyFilter" class="btn btn--sm btn--ghost" type="button" @click="clearAll">
-                Clear all
-              </button>
-            </div>
+            <FilterBar v-model="filters" :dirty="!!q || closed" @clear="clearOwn" />
           </div>
 
           <div class="panel__table">
@@ -543,28 +401,6 @@ onMounted(() => {
   gap: 8px;
   font-size: 13px;
 }
-.taglabel--pick {
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-.taglabel--pick.is-off {
-  opacity: 0.35;
-}
-.list__sep {
-  flex: none;
-  width: 1px;
-  height: 16px;
-  margin: 0 6px;
-  background: var(--line-2);
-}
-.tag-sk {
-  display: block;
-  height: 24px;
-}
-.list__period:not(.is-on) :deep(.drp__trigger) {
-  color: var(--text-muted);
-}
 .list {
   table-layout: auto;
 }
@@ -599,11 +435,6 @@ onMounted(() => {
 }
 .prio {
   margin-left: 0;
-}
-@media (max-width: 760px) {
-  .list__sep {
-    display: none;
-  }
 }
 .panel__table {
   container-type: inline-size;

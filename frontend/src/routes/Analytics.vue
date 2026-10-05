@@ -4,9 +4,9 @@ import { useRoute, useRouter } from 'vue-router';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
 import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
-import Select from '../components/Select.vue';
-import DateRangePicker from '../components/DateRangePicker.vue';
+import FilterBar from '../components/FilterBar.vue';
 import { api } from '../lib/api';
+import { filtersOf, filtersQuery, keepProjects, noFilters, sameQuery, type Filters } from '../lib/filters';
 import { dayAndMonth } from '../lib/calendar';
 import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/issues';
 import { RIDGE_SMOOTH_KERNEL, smoothRidge } from '../lib/ridge';
@@ -54,12 +54,6 @@ interface Worker {
   days: number;
   issues: (Where & { states: { name: string; color: string | null; days: number }[]; days: number })[];
 }
-interface TagOption {
-  id: string;
-  name: string;
-  color: string;
-  boardIds: string[];
-}
 interface Numbers {
   statuses: { name: string; color: string }[];
   boards: {
@@ -97,44 +91,28 @@ function thisMonth(): { from: string; to: string } {
 
 const route = useRoute();
 const router = useRouter();
-const KEPT = 'tracker:analytics-project';
-
-function keptProject(): string {
-  try {
-    return localStorage.getItem(KEPT) ?? '';
-  } catch {
-    return '';
-  }
-}
-const projectOf = (asked: unknown): string => (typeof asked === 'string' ? asked : keptProject());
-const showProject = (shortName: string): void => {
-  void router.replace({ name: 'analytics', query: shortName ? { project: shortName } : {} });
-};
-
-const project = ref(projectOf(route.query.project));
+const base: Filters = { ...noFilters(), ...thisMonth() };
+const filters = ref<Filters>(filtersOf(route.query, base));
 watch(
-  project,
+  filters,
   (now) => {
-    try {
-      localStorage.setItem(KEPT, now);
-    } catch {}
-    if ((route.query.project ?? '') !== now) showProject(now);
+    keepProjects(now.projects);
+    const next = filtersQuery(now, base);
+    if (!sameQuery(next, route.query as Record<string, unknown>)) {
+      void router.replace({ name: 'analytics', query: next });
+    }
   },
-  { immediate: true }
+  { deep: true, immediate: true }
 );
 watch(
-  () => route.query.project,
-  (asked) => {
+  () => route.query,
+  (query) => {
     if (route.name !== 'analytics') return;
-    const next = projectOf(asked);
-    if (next !== project.value) project.value = next;
-    else if ((asked ?? '') !== next) showProject(next);
+    if (!sameQuery(filtersQuery(filters.value, base), query as Record<string, unknown>)) {
+      filters.value = filtersOf(query, base);
+    }
   }
 );
-const status = ref('');
-const tag = ref('');
-const tags = ref<TagOption[]>([]);
-const period = ref(thisMonth());
 const loading = ref(true);
 const data = ref<Numbers | null>(null);
 const openPeople = ref<string[]>([]);
@@ -142,39 +120,13 @@ const openWorkers = ref<string[]>([]);
 const foldedSplits = ref<string[]>([]);
 const flippedIssues = ref<string[]>([]);
 
-const projectChoices = computed(() =>
-  projects.value.map((p) => ({ value: p.shortName, label: p.name }))
-);
-const statusChoices = computed(() =>
-  (data.value?.statuses ?? []).map((s) => ({ value: s.name, label: s.name, color: s.color }))
-);
-const tagChoices = computed(() => {
-  const chosen = projects.value.find((p) => p.shortName === project.value);
-  const onBoards = chosen ? new Set(chosen.boards.map((b) => b.id)) : null;
-  return tags.value
-    .filter((t) => !onBoards || t.boardIds.some((id) => onBoards.has(id)))
-    .map((t) => ({ value: t.id, label: t.name, color: t.color }));
-});
-watch(tagChoices, (choices) => {
-  if (tag.value && !choices.some((c) => c.value === tag.value)) tag.value = '';
-});
-watch(statusChoices, (choices) => {
-  if (status.value && !choices.some((c) => c.value === status.value)) status.value = '';
-});
-
 let reads = 0;
 
 async function load(): Promise<void> {
   clear('numbers');
   const mine = ++reads;
   try {
-    const q = new URLSearchParams();
-    if (project.value) q.set('project', project.value);
-    if (status.value) q.set('status', status.value);
-    if (tag.value) q.set('tag', tag.value);
-    if (period.value.from) q.set('from', period.value.from);
-    if (period.value.to) q.set('to', period.value.to);
-    const query = q.toString();
+    const query = new URLSearchParams(filtersQuery(filters.value)).toString();
     const got = await api<Numbers>(`/analytics${query ? `?${query}` : ''}`);
     if (mine !== reads) return;
     data.value = got;
@@ -185,20 +137,13 @@ async function load(): Promise<void> {
   }
 }
 
-async function loadTags(): Promise<void> {
-  try {
-    tags.value = await api<TagOption[]>('/tags');
-  } catch {}
-}
-
 onMounted(async () => {
   void loadPeople();
-  await Promise.all([loadProjects(), loadTags(), load()]);
+  await Promise.all([loadProjects(), load()]);
 });
-watch([project, status, tag, period], () => void load());
+watch(filters, () => void load(), { deep: true });
 const reload = settled(() => void load());
 useLive((ev) => {
-  if (ev.type === 'tag.changed') void loadTags();
   if (
     ev.type.startsWith('issue.') ||
     ['state.changed', 'board.changed', 'project.changed', 'role.changed', 'user.changed'].includes(
@@ -208,7 +153,6 @@ useLive((ev) => {
     reload();
   }
 }, () => {
-  void loadTags();
   reload();
 });
 
@@ -231,13 +175,14 @@ const boardRows = computed<RidgeRow[]>(() => {
   const busiest = Math.max(0, ...(data.value?.boards ?? []).map((b) => b.open));
   return (data.value?.boards ?? []).map((b) => {
     const byName = new Map(b.states.map((s) => [s.name, s.count]));
-    const tint = status.value ? b.states.find((s) => s.name === status.value)?.color : undefined;
+    const picked = filters.value.states;
+    const tint = picked.length === 1 ? b.states.find((s) => s.name === picked[0])?.color : undefined;
     return {
       key: b.id,
       label: b.name,
       profile: shape(axis.value.map((name) => byName.get(name) ?? 0)),
-      value: status.value ? b.total : b.open,
-      highlight: !status.value && b.open === busiest && busiest > 0,
+      value: picked.length ? b.total : b.open,
+      highlight: !picked.length && b.open === busiest && busiest > 0,
       color: tint,
     };
   });
@@ -358,37 +303,9 @@ async function openIssue(w: Where): Promise<void> {
   <div class="page">
     <div class="page__body">
       <div class="sheet">
+        <FilterBar v-model="filters" class="sheet__wide" :base="base" />
         <section class="panel sheet__wide">
-          <header class="panel__h">
-            Boards
-            <span class="panel__end an__filters">
-              <Select
-                v-model="tag"
-                :options="tagChoices"
-                placeholder="Any tag"
-                keep-placeholder
-                small
-                label="Which tag to count"
-              />
-              <Select
-                v-model="status"
-                :options="statusChoices"
-                placeholder="Any status"
-                keep-placeholder
-                small
-                label="Which status to count"
-              />
-              <Select
-                v-model="project"
-                :options="projectChoices"
-                placeholder="All projects"
-                keep-placeholder
-                small
-                label="Which project to count"
-              />
-              <DateRangePicker :from="period.from" :to="period.to" @change="period = $event" />
-            </span>
-          </header>
+          <header class="panel__h">Boards</header>
           <div class="panel__b">
             <div v-if="loading" class="skel">
               <div v-for="n in 3" :key="n" class="skel__ridge">
@@ -885,11 +802,6 @@ async function openIssue(w: Where): Promise<void> {
     min-height: 48px;
     padding-top: 8px;
     padding-bottom: 8px;
-  }
-  .an__filters {
-    flex-wrap: wrap;
-    width: 100%;
-    margin-left: 0;
   }
   .skel__ridge {
     grid-template-columns: 72px 1fr 36px;

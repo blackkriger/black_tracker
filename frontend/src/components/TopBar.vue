@@ -36,7 +36,7 @@ const issuesTo = computed(() =>
   currentShort.value ? { name: 'issues', query: { projects: currentShort.value } } : { name: 'issues' }
 );
 const analyticsTo = computed(() =>
-  currentShort.value ? { name: 'analytics', query: { project: currentShort.value } } : { name: 'analytics' }
+  currentShort.value ? { name: 'analytics', query: { projects: currentShort.value } } : { name: 'analytics' }
 );
 const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
 const section = computed(() => {
