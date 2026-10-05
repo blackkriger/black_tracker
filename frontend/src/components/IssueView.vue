@@ -1591,7 +1591,6 @@ async function removeIssue(): Promise<void> {
                         pushed {{ e.commits.length }} {{ e.commits.length === 1 ? 'commit' : 'commits' }} to
                         <span class="ev__ref">{{ e.branch }}</span>
                       </span>
-                      <time class="stamp">{{ stampAt(e.at) }}</time>
                     </div>
                     <a
                       v-for="k in e.commits"
@@ -1600,7 +1599,9 @@ async function removeIssue(): Promise<void> {
                       :href="k.url"
                       target="_blank"
                       rel="noopener noreferrer"
-                    ><span class="ev__sha">{{ k.sha.slice(0, 7) }}</span><span class="ev__msg">{{ k.message }}</span></a>
+                    ><span class="ev__sha">{{ k.sha.slice(0, 7) }}</span><time class="stamp ev__at">{{
+                      stampAt(k.at)
+                    }}</time><span class="ev__msg">{{ k.message }}</span></a>
                   </div>
                 </div>
                 <article
@@ -2500,6 +2501,9 @@ async function removeIssue(): Promise<void> {
 .ev__commit:hover {
   color: var(--text);
 }
+.ev__at {
+  flex: none;
+}
 .ev__sha {
   flex: none;
   font: 12px var(--font-num);
@@ -2579,6 +2583,14 @@ async function removeIssue(): Promise<void> {
   }
   .hi__what {
     grid-column: 1 / -1;
+  }
+  .ev__commit {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .ev__msg {
+    flex-basis: 100%;
+    white-space: normal;
   }
 }
 </style>
