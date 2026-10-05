@@ -3,17 +3,14 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-vue-next';
 import DateRangePicker from '../components/DateRangePicker.vue';
-import Dialog from '../components/Dialog.vue';
 import FilterMenu from '../components/FilterMenu.vue';
 import IssueView from '../components/IssueView.vue';
-import Select from '../components/Select.vue';
 import { api } from '../lib/api';
 import { PRIORITIES, dueLabel, priorityClass, type Issue, type IssueTag } from '../lib/issues';
 import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
-import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
 
 interface Row extends Omit<Issue, 'description'> {
@@ -40,7 +37,6 @@ type Column = 'key' | 'priority' | 'board' | 'status' | 'due' | 'assignee';
 
 const route = useRoute();
 const router = useRouter();
-const session = useSession();
 const { projects, loaded: projectsLoaded, load: loadProjects } = useProjects();
 const { people, nameOf, colorOf, load: loadPeople } = usePeople();
 const { errors, fail, clear } = usePanelErrors();
@@ -128,8 +124,6 @@ async function load(): Promise<void> {
     const got = await api<Row[]>(`/issues?${query}`);
     if (mine !== reads) return;
     rows.value = got;
-    const alive = new Set(got.map((r) => r.id));
-    picked.value = new Set([...picked.value].filter((id) => alive.has(id)));
   } catch (err) {
     if (mine === reads) fail('list', err);
   } finally {
@@ -273,84 +267,6 @@ const sorted = computed(() => {
   });
 });
 
-const picked = ref(new Set<string>());
-const pickedRows = computed(() => rows.value.filter((r) => picked.value.has(r.id)));
-const allPicked = computed(() => sorted.value.length > 0 && sorted.value.every((r) => picked.value.has(r.id)));
-
-function togglePick(id: string): void {
-  const next = new Set(picked.value);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  picked.value = next;
-}
-function toggleAll(): void {
-  picked.value = allPicked.value ? new Set() : new Set(sorted.value.map((r) => r.id));
-}
-
-watch(pickedRows, (now) => {
-  for (const id of new Set(now.map((r) => r.boardId))) void boardOf(id).catch(() => {});
-});
-
-const bulkStates = computed(() => {
-  const boards = [...new Set(pickedRows.value.map((r) => r.boardId))].map((id) => boardCache.value.get(id));
-  if (!boards.length || boards.some((b) => !b)) return [];
-  const [first, ...others] = boards as BoardFull[];
-  return first.states
-    .filter((s) => others.every((b) => b.states.some((o) => o.name === s.name)))
-    .map((s) => ({ value: s.name, label: s.name, color: s.color }));
-});
-const pickedProject = computed(() => {
-  const shorts = new Set(pickedRows.value.map((r) => r.projectShort));
-  return shorts.size === 1 ? live.value.find((p) => shorts.has(p.shortName)) ?? null : null;
-});
-const moveChoices = computed(() =>
-  (pickedProject.value?.boards ?? []).map((b) => ({ value: b.id, label: `${pickedProject.value?.shortName} ${b.name}` }))
-);
-
-const busy = ref(false);
-
-async function each(work: (r: Row) => Promise<unknown> | null): Promise<void> {
-  busy.value = true;
-  clear('list');
-  try {
-    for (const r of pickedRows.value) {
-      const job = work(r);
-      if (job) await job;
-    }
-  } catch (err) {
-    fail('list', err);
-  } finally {
-    busy.value = false;
-    await load();
-  }
-}
-
-const patch = (r: Row, body: Record<string, unknown>) => api(`/issues/${r.id}`, { method: 'PATCH', body });
-
-function bulkStatus(name: string): void {
-  void each((r) => {
-    const state = boardCache.value.get(r.boardId)?.states.find((s) => s.name === name);
-    return state && state.id !== r.stateId ? patch(r, { stateId: state.id }) : null;
-  });
-}
-function bulkAssignee(login: string): void {
-  const id = login === '-' ? null : (people.value.find((p) => p.login === login)?.id ?? null);
-  void each((r) => ((r.assignee?.id ?? null) !== id ? patch(r, { assigneeId: id }) : null));
-}
-function bulkMove(boardId: string): void {
-  void each((r) => (r.boardId !== boardId ? patch(r, { boardId }) : null));
-}
-function bulkDue(day: string | null): void {
-  void each((r) => (r.dueDate !== day ? patch(r, { dueDate: day }) : null));
-}
-
-const deleting = ref(false);
-async function bulkDelete(): Promise<void> {
-  deleting.value = false;
-  await each((r) => api(`/issues/${r.id}`, { method: 'DELETE' }));
-  picked.value = new Set();
-}
-
 const openKey = computed(() => (route.name === 'issues' && route.params.key ? String(route.params.key) : null));
 const open = ref<{ key: string; project: string; board: BoardFull } | null>(null);
 
@@ -476,67 +392,10 @@ onMounted(() => {
             </div>
           </div>
 
-          <div v-if="picked.size" class="list__bulk">
-            <span>Selected: {{ picked.size }}</span>
-            <Select
-              model-value=""
-              :options="bulkStates"
-              placeholder="Status…"
-              small
-              :disabled="busy || !bulkStates.length"
-              @update:model-value="bulkStatus"
-            />
-            <Select
-              model-value=""
-              :options="assigneeChoices"
-              placeholder="Assignee…"
-              small
-              :disabled="busy"
-              @update:model-value="bulkAssignee"
-            />
-            <Select
-              model-value=""
-              :options="moveChoices"
-              placeholder="Move to…"
-              small
-              :disabled="busy || !moveChoices.length"
-              @update:model-value="bulkMove"
-            />
-            <input
-              class="input input--sm list__due"
-              type="date"
-              :disabled="busy"
-              @change="bulkDue(($event.target as HTMLInputElement).value || null); ($event.target as HTMLInputElement).value = ''"
-            />
-            <button class="btn btn--sm btn--ghost" type="button" :disabled="busy" @click="bulkDue(null)">
-              Clear due
-            </button>
-            <div class="sp"></div>
-            <button
-              v-if="session.canDelete.value"
-              class="btn btn--sm btn--ghost list__delete"
-              type="button"
-              :disabled="busy"
-              @click="deleting = true"
-            >Delete</button>
-            <button class="btn btn--sm btn--ghost" type="button" @click="picked = new Set()">
-              Clear selection
-            </button>
-          </div>
-
           <div class="panel__table">
             <table class="tbl list">
               <thead>
                 <tr>
-                  <th class="list__pick">
-                    <input
-                      type="checkbox"
-                      :checked="allPicked"
-                      :disabled="!sorted.length"
-                      aria-label="Select all"
-                      @change="toggleAll"
-                    />
-                  </th>
                   <th class="list__key">
                     <button type="button" :class="{ sorted: sortCol === 'key' }" @click="sortBy('key')">
                       Key <component :is="arrowOf('key')" class="ic ic--sm" />
@@ -572,7 +431,6 @@ onMounted(() => {
               </thead>
               <tbody v-if="loading" ref="skBody">
                 <tr v-for="n in skRows" :key="n">
-                  <td class="list__pick"><span class="sk sk--line" style="width: 13px"></span></td>
                   <td class="list__key"><span class="sk sk--line" style="width: 42px"></span></td>
                   <td class="list__prio"><span class="sk sk--line" style="width: 18px"></span></td>
                   <td class="list__what"><span class="sk sk--line" :style="{ width: `${40 + ((n * 17) % 45)}%` }"></span></td>
@@ -590,14 +448,6 @@ onMounted(() => {
                   :class="{ 'is-closed': r.resolved }"
                   @click="openIssue(r)"
                 >
-                  <td class="list__pick" @click.stop>
-                    <input
-                      type="checkbox"
-                      :checked="picked.has(r.id)"
-                      :aria-label="`Select ${r.key}`"
-                      @change="togglePick(r.id)"
-                    />
-                  </td>
                   <td class="key list__key" :style="{ color: ink(r.stateColor) }">{{ r.key }}</td>
                   <td class="list__prio">
                     <span class="prio" :class="priorityClass(r.priority)" :aria-label="r.priority">
@@ -645,13 +495,6 @@ onMounted(() => {
       @deleted="closeIssue(); reload()"
     />
 
-    <Dialog v-if="deleting" :title="`Delete ${picked.size} issues`" @close="deleting = false">
-      <p>This takes their comments, files and history with them. This cannot be undone.</p>
-      <template #footer>
-        <button class="btn" type="button" @click="deleting = false">Cancel</button>
-        <button class="btn btn--danger" type="button" @click="bulkDelete">Delete issues</button>
-      </template>
-    </Dialog>
   </div>
 </template>
 
@@ -722,29 +565,8 @@ onMounted(() => {
 .list__period:not(.is-on) :deep(.drp__trigger) {
   color: var(--text-muted);
 }
-.list__bulk {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 20px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  color: var(--text);
-  font-size: 13px;
-}
-.list__due {
-  width: auto;
-}
-.list__delete:hover:enabled {
-  color: var(--danger-text);
-}
 .list {
   table-layout: auto;
-}
-.list__pick {
-  width: 28px;
-  padding-right: 0;
 }
 .list__row-i {
   cursor: pointer;
@@ -807,25 +629,20 @@ onMounted(() => {
   }
   .list tbody tr {
     display: grid;
-    grid-template-columns: 28px auto auto minmax(0, 1fr) auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
     grid-template-areas:
-      'pick key prio . state'
-      'pick what what what what'
-      'pick board when . who';
+      'key prio . state'
+      'what what what what'
+      'board when . who';
     align-items: center;
     gap: 6px 10px;
-    padding: 10px 12px 10px 0;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--line);
   }
   .list tbody td {
     height: auto;
     padding: 0;
     border-bottom: 0;
-  }
-  .list tbody .list__pick {
-    grid-area: pick;
-    align-self: start;
-    padding-left: 12px;
   }
   .list tbody .list__key {
     grid-area: key;
