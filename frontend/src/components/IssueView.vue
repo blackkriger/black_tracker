@@ -19,8 +19,9 @@ import { useFocus } from '../lib/focus';
 import { useNotices } from '../lib/notices';
 import { useSession } from '../lib/session';
 import {
-  ArrowDown,
+  ArrowDownWideNarrow,
   ArrowUp,
+  ArrowUpNarrowWide,
   ChevronDown,
   ChevronRight,
   FileArchive,
@@ -1525,7 +1526,7 @@ async function removeIssue(): Promise<void> {
                 :title="order === 'oldest' ? 'Oldest first' : 'Newest first'"
                 @click="flipOrder"
               >
-                <component :is="order === 'oldest' ? ArrowUp : ArrowDown" class="ic" />
+                <component :is="order === 'oldest' ? ArrowUpNarrowWide : ArrowDownWideNarrow" class="ic" />
               </button>
             </nav>
 
