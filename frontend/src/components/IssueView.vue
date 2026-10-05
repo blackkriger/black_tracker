@@ -21,6 +21,8 @@ import { useSession } from '../lib/session';
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
+  ChevronRight,
   FileArchive,
   FileDown,
   Link2,
@@ -536,6 +538,17 @@ const shownPriority = computed(() =>
 const shownAssignee = computed(() =>
   creating.value ? draft.value.assigneeId : (issue.value?.assignee?.id ?? null)
 );
+const propsOpen = ref(false);
+const propsSummary = computed(() => {
+  const state = stateChoices.value.find((s) => s.value === shownStateId.value);
+  const person = people.value.find((p) => p.id === shownAssignee.value);
+  return [
+    ...(state ? [{ text: state.label, color: state.color }] : []),
+    { text: shownPriority.value, color: priorityColor(shownPriority.value) },
+    ...(person ? [{ text: person.fullName || person.login, color: person.roleColor }] : []),
+  ];
+});
+
 const shownDue = computed(() => (creating.value ? draft.value.dueDate : (issue.value?.dueDate ?? null)));
 const wornTags = computed(() =>
   creating.value
@@ -1322,7 +1335,7 @@ async function removeIssue(): Promise<void> {
               </div>
             </div>
           </div>
-          <aside class="props">
+          <aside class="props props--sk">
             <div v-for="n in 6" :key="n" class="prop">
               <span class="sk sk--line" style="width: 54px"></span>
               <span class="sk sk--line" style="height: 30px"></span>
@@ -1742,110 +1755,121 @@ async function removeIssue(): Promise<void> {
           </div>
 
           <aside class="props">
-            <template v-if="issue && boards.length > 1">
-              <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('board') }">
-                <span class="prop__k">Board</span>
-                <div class="prop__stack">
-                  <Select
-                    :model-value="issue.boardId"
-                    :options="boardChoices"
-                    small
-                    @update:model-value="moveBoard"
-                  />
-                  <span class="hint">Moving it resets the status.</span>
+            <button class="props__toggle" type="button" :aria-expanded="propsOpen" @click="propsOpen = !propsOpen">
+              <span class="props__sum">
+                <template v-for="(part, i) in propsSummary" :key="i"><template v-if="i">, </template><span
+                  :style="{ color: ink(part.color) }"
+                >{{ part.text }}</span></template>
+              </span>
+              <ChevronDown v-if="propsOpen" class="ic" />
+              <ChevronRight v-else class="ic" />
+            </button>
+            <div class="props__all" :class="{ 'is-open': propsOpen }">
+              <template v-if="issue && boards.length > 1">
+                <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('board') }">
+                  <span class="prop__k">Board</span>
+                  <div class="prop__stack">
+                    <Select
+                      :model-value="issue.boardId"
+                      :options="boardChoices"
+                      small
+                      @update:model-value="moveBoard"
+                    />
+                    <span class="hint">Moving it resets the status.</span>
+                  </div>
                 </div>
-              </div>
-              <div class="hr"></div>
-            </template>
-            <div class="prop" :class="{ 'is-fresh': fresh.has('status') }">
-              <span class="prop__k">Status</span>
-              <Select
-                :model-value="shownStateId ?? ''"
-                :options="stateChoices"
-                small
-                @update:model-value="setProp({ stateId: $event })"
-              />
-            </div>
-            <div class="prop" :class="{ 'is-fresh': fresh.has('priority') }">
-              <span class="prop__k">Priority</span>
-              <Select
-                :model-value="shownPriority"
-                :options="priorityChoices"
-                small
-                @update:model-value="setProp({ priority: $event as Priority })"
-              />
-            </div>
-            <div class="prop" :class="{ 'is-fresh': fresh.has('assignee') }">
-              <span class="prop__k">Assignee</span>
-              <Select
-                :model-value="shownAssignee ?? ''"
-                :options="assigneeChoices"
-                small
-                @update:model-value="setProp({ assigneeId: $event || null })"
-              />
-            </div>
-            <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
-              <span class="prop__k">Due</span>
-              <input
-                class="input input--sm"
-                :class="{ 'is-late': dueLabel(shownDue)?.late }"
-                type="date"
-                :value="shownDue ?? ''"
-                @change="setProp({ dueDate: ($event.target as HTMLInputElement).value || null })"
-              />
-            </div>
-
-            <div class="hr"></div>
-
-            <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('tags') }">
-              <span class="prop__k">Tags</span>
-              <div class="prop__tags">
-                <span
-                  v-for="t in wornTags"
-                  :key="t.id"
-                  class="taglabel"
-                  :style="{ '--c': t.color }"
-                >
-                  {{ t.name }}
-                  <button
-                    class="taglabel__x"
-                    type="button"
-                    :aria-label="`Remove ${t.name}`"
-                    @click="toggleTag(t.id, false)"
-                  ><X class="ic ic--sm" /></button>
-                </span>
+                <div class="hr"></div>
+              </template>
+              <div class="prop" :class="{ 'is-fresh': fresh.has('status') }">
+                <span class="prop__k">Status</span>
                 <Select
-                  model-value=""
-                  :options="tagChoices"
-                  placeholder="Add tag…"
+                  :model-value="shownStateId ?? ''"
+                  :options="stateChoices"
                   small
-                  @update:model-value="pickTag"
+                  @update:model-value="setProp({ stateId: $event })"
                 />
               </div>
-            </div>
+              <div class="prop" :class="{ 'is-fresh': fresh.has('priority') }">
+                <span class="prop__k">Priority</span>
+                <Select
+                  :model-value="shownPriority"
+                  :options="priorityChoices"
+                  small
+                  @update:model-value="setProp({ priority: $event as Priority })"
+                />
+              </div>
+              <div class="prop" :class="{ 'is-fresh': fresh.has('assignee') }">
+                <span class="prop__k">Assignee</span>
+                <Select
+                  :model-value="shownAssignee ?? ''"
+                  :options="assigneeChoices"
+                  small
+                  @update:model-value="setProp({ assigneeId: $event || null })"
+                />
+              </div>
+              <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
+                <span class="prop__k">Due</span>
+                <input
+                  class="input input--sm"
+                  :class="{ 'is-late': dueLabel(shownDue)?.late }"
+                  type="date"
+                  :value="shownDue ?? ''"
+                  @change="setProp({ dueDate: ($event.target as HTMLInputElement).value || null })"
+                />
+              </div>
 
-            <template v-if="issue">
               <div class="hr"></div>
 
-              <div class="prop">
-                <span class="prop__k">Author</span>
-                <span class="pv pv--ro">
-                  <span>
-                    <span :style="{ color: ink(colorOfId(issue.author?.id)) }">{{
-                      issue.author ? nameOf(issue.author.login) : '—'
-                    }}</span>
-                    <span
-                      v-if="issue.author && nameOf(issue.author.login) !== issue.author.login"
-                      class="nick"
-                    >{{ issue.author.login }}</span>
+              <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('tags') }">
+                <span class="prop__k">Tags</span>
+                <div class="prop__tags">
+                  <span
+                    v-for="t in wornTags"
+                    :key="t.id"
+                    class="taglabel"
+                    :style="{ '--c': t.color }"
+                  >
+                    {{ t.name }}
+                    <button
+                      class="taglabel__x"
+                      type="button"
+                      :aria-label="`Remove ${t.name}`"
+                      @click="toggleTag(t.id, false)"
+                    ><X class="ic ic--sm" /></button>
                   </span>
-                </span>
+                  <Select
+                    model-value=""
+                    :options="tagChoices"
+                    placeholder="Add tag…"
+                    small
+                    @update:model-value="pickTag"
+                  />
+                </div>
               </div>
-              <div class="prop">
-                <span class="prop__k">Created</span>
-                <span class="pv pv--ro stamp">{{ stampAt(issue.createdAt) }}</span>
-              </div>
-            </template>
+
+              <template v-if="issue">
+                <div class="hr"></div>
+
+                <div class="prop">
+                  <span class="prop__k">Author</span>
+                  <span class="pv pv--ro">
+                    <span>
+                      <span :style="{ color: ink(colorOfId(issue.author?.id)) }">{{
+                        issue.author ? nameOf(issue.author.login) : '—'
+                      }}</span>
+                      <span
+                        v-if="issue.author && nameOf(issue.author.login) !== issue.author.login"
+                        class="nick"
+                      >{{ issue.author.login }}</span>
+                    </span>
+                  </span>
+                </div>
+                <div class="prop">
+                  <span class="prop__k">Created</span>
+                  <span class="pv pv--ro stamp">{{ stampAt(issue.createdAt) }}</span>
+                </div>
+              </template>
+            </div>
           </aside>
         </div>
 
@@ -2365,21 +2389,69 @@ async function removeIssue(): Promise<void> {
   line-height: 1.55;
   color: var(--text-dim);
 }
+.props__toggle {
+  display: none;
+}
+.props__all {
+  display: contents;
+}
 @media (max-width: 760px) {
   .iv__scrim {
     padding: 0;
   }
   .iv {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 20px 24px 24px;
     overflow-y: auto;
   }
-  .iv__main,
-  .props {
-    overflow: visible;
-  }
   .iv__main {
-    border-right: 0;
+    display: contents;
+  }
+  .iv__main > * {
+    order: 2;
+  }
+  .iv__main > .iv__title,
+  .iv__main > .iv__title-edit {
+    order: 0;
+  }
+  .props {
+    order: 1;
+    padding: 0;
+    overflow: visible;
+    border-top: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
+  }
+  .props--sk .prop:nth-child(n + 2) {
+    display: none;
+  }
+  .props__toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 40px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-dim);
+    font: 13px var(--font-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .props__sum {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .props__all:not(.is-open) {
+    display: none;
+  }
+  .props__all.is-open {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 10px;
   }
   .iv__project,
   .iv__project + .iv__sep {
