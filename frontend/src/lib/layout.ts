@@ -14,6 +14,10 @@ function readLayout(): Layout {
 
 export const layout = ref<Layout>(readLayout());
 
+const narrowQuery = window.matchMedia('(max-width: 900px)');
+export const narrow = ref(narrowQuery.matches);
+narrowQuery.addEventListener('change', (ev) => (narrow.value = ev.matches));
+
 function applyLayout(): void {
   document.documentElement.dataset.layout = layout.value;
 }

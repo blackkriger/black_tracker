@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
@@ -14,8 +14,8 @@ import { api } from '../lib/api';
 import { todayKey, type Mark } from '../lib/calendar';
 import { stamp } from '../lib/issues';
 import { buddyAvatarStyle } from '../lib/avatar';
-import { layout } from '../lib/layout';
-import { AtSign, ChartColumn, ContactRound, ListChecks, Moon, Smile, Star, Sun } from 'lucide-vue-next';
+import { layout, narrow } from '../lib/layout';
+import { AtSign, ChartColumn, ContactRound, ListChecks, Menu, Moon, Smile, Star, Sun } from 'lucide-vue-next';
 import { ink, setTheme, shownTheme } from '../lib/theme';
 
 const session = useSession();
@@ -41,6 +41,20 @@ const section = computed(() => {
   return name.startsWith('settings') ? 'settings' : name;
 });
 const at = (name: string): 'page' | undefined => (section.value === name ? 'page' : undefined);
+
+const drawer = ref(false);
+watch([() => route.fullPath, narrow], () => (drawer.value = false));
+const SECTION_NAMES: Record<string, string> = { issues: 'Issues', analytics: 'Analytics', settings: 'Settings' };
+const place = computed(() => {
+  if (here.value) {
+    const p = live.value.find((x) => x.shortName === currentShort.value);
+    const b = p?.boards.find((x) => x.slug.toLowerCase() === currentSlug.value);
+    return p ? { key: p.shortName, name: b?.name ?? p.name } : null;
+  }
+  if (section.value === 'me') return { key: null, name: session.me.value?.login ?? '' };
+  const name = SECTION_NAMES[section.value];
+  return name ? { key: null, name } : null;
+});
 
 const today = stamp(new Date().toISOString());
 const dateOpen = ref(false);
@@ -89,6 +103,7 @@ const pickedDay = ref<string | null>(null);
 
 function toDay(key: string): void {
   dateOpen.value = false;
+  drawer.value = false;
   pickedDay.value = key;
 }
 
@@ -119,7 +134,9 @@ function closeMenu(): void {
   dateOpen.value = false;
 }
 function onKeydown(ev: KeyboardEvent): void {
-  if (ev.key === 'Escape') dateOpen.value = false;
+  if (ev.key !== 'Escape') return;
+  dateOpen.value = false;
+  drawer.value = false;
 }
 
 useLive((ev) => {
@@ -155,7 +172,31 @@ async function signOut(): Promise<void> {
 </script>
 
 <template>
-  <header v-if="layout === 'top'" class="top">
+  <header v-if="narrow" class="top top--narrow">
+    <button
+      class="topitem"
+      type="button"
+      aria-label="Menu"
+      :aria-expanded="drawer"
+      @click="drawer = !drawer"
+    ><Menu class="ic" /></button>
+    <span v-if="place" class="topplace">
+      <span v-if="place.key" class="proj__k">{{ place.key }}</span>
+      <span class="topitem__name">{{ place.name }}</span>
+    </span>
+    <div class="sp"></div>
+    <button v-if="unreadKinds.length" class="topitem" type="button" aria-label="Notices" @click="drawer = true">
+      <span
+        v-for="k in unreadKinds"
+        :key="k.kind"
+        class="stamp topat"
+        :style="{ color: ink(mine) }"
+        :aria-label="k.label"
+      ><component :is="k.icon" class="ic ic--sm" />{{ k.count }}</span>
+    </button>
+  </header>
+
+  <header v-else-if="layout === 'top'" class="top">
     <nav v-if="live.length" class="topitems" aria-label="Projects">
       <span v-for="p in live" :key="p.id" class="topproj">
         <RouterLink
@@ -217,7 +258,8 @@ async function signOut(): Promise<void> {
     </nav>
   </header>
 
-  <aside v-else class="rail">
+  <div v-if="narrow && drawer" class="rail__scrim" @click="drawer = false"></div>
+  <aside v-if="narrow ? drawer : layout === 'side'" class="rail" :class="{ 'rail--drawer': narrow }">
     <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
       <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />Issues</RouterLink>
       <RouterLink class="topitem" to="/analytics" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
@@ -420,6 +462,35 @@ async function signOut(): Promise<void> {
   border-right: 1px solid var(--line);
   background: var(--bg);
   overflow-y: auto;
+}
+.top--narrow {
+  gap: 8px;
+  padding: 0 8px;
+}
+.topplace {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  white-space: nowrap;
+}
+.topplace .topitem__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rail--drawer {
+  z-index: 40;
+  width: min(300px, 86vw);
+  box-shadow: var(--shadow-lg);
+  overscroll-behavior: contain;
+}
+.rail__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: var(--scrim);
 }
 .rail__projects {
   display: flex;

@@ -59,6 +59,13 @@ onUnmounted(() => {
   background: var(--scrim);
 }
 .dialog {
+  display: flex;
+  flex-direction: column;
   max-width: 100%;
+  max-height: 100%;
+}
+.dlg__b {
+  min-height: 0;
+  overflow-y: auto;
 }
 </style>

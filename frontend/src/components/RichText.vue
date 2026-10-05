@@ -643,4 +643,9 @@ function addLink(): void {
 .rt__editor :deep(.ikey.is-closed) {
   text-decoration: line-through;
 }
+@media (max-width: 760px) {
+  .rt__editor {
+    font-size: 16px;
+  }
+}
 </style>
