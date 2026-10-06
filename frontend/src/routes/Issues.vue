@@ -242,10 +242,16 @@ onMounted(() => {
                   aria-label="Search the issues"
                 />
               </span>
-              <label class="flag">
-                <input v-model="closed" type="checkbox" />
-                With closed
-              </label>
+              <div class="seg" role="radiogroup" aria-label="Issues shown">
+                <label class="seg__i" :class="{ 'is-on': !closed }">
+                  <input v-model="closed" class="sr" type="radio" name="issues-shown" :value="false" />
+                  Open
+                </label>
+                <label class="seg__i" :class="{ 'is-on': closed }">
+                  <input v-model="closed" class="sr" type="radio" name="issues-shown" :value="true" />
+                  All
+                </label>
+              </div>
             </div>
             <FilterBar v-model="filters" :dirty="!!q || closed" @clear="clearOwn" />
           </div>
@@ -395,11 +401,29 @@ onMounted(() => {
 .search__f::placeholder {
   color: var(--text-muted);
 }
-.flag {
-  display: flex;
+.seg {
+  display: inline-flex;
+  height: 30px;
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+}
+.seg__i {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  padding: 0 10px;
+  color: var(--text-muted);
   font-size: 13px;
+  cursor: pointer;
+}
+.seg__i + .seg__i {
+  border-left: 1px solid var(--line-2);
+}
+.seg__i:hover,
+.seg__i.is-on {
+  color: var(--text);
+}
+.seg__i:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
 }
 .list {
   table-layout: auto;
