@@ -18,7 +18,7 @@ const narrowQuery = window.matchMedia('(max-width: 900px)');
 export const narrow = ref(narrowQuery.matches);
 narrowQuery.addEventListener('change', (ev) => (narrow.value = ev.matches));
 
-const smallQuery = window.matchMedia('(max-width: 500px)');
+const smallQuery = window.matchMedia('(max-width: 412px)');
 export const small = ref(smallQuery.matches);
 smallQuery.addEventListener('change', (ev) => (small.value = ev.matches));
 
