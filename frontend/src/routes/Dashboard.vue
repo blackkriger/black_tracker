@@ -397,7 +397,7 @@ function closeIssue(): void {
           <div v-if="errors.mine" class="err panel__err sheet__wide">{{ errors.mine }}</div>
           <div v-if="errors.day" class="err panel__err sheet__wide">{{ errors.day }}</div>
 
-        <div class="stack">
+        <div class="stack dates">
           <section class="panel">
             <header class="panel__h">
               <span class="key year">{{ wide ? year : monthName(now.getFullYear(), now.getMonth()) }}</span>
@@ -678,6 +678,9 @@ function closeIssue(): void {
 @media (max-width: 880px) {
   .sheet--cal {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .dates {
+    order: 1;
   }
 }
 .year-grid {
