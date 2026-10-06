@@ -482,6 +482,9 @@ async function signOut(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.topplace .av {
+  align-self: center;
+}
 .rail--drawer {
   z-index: 40;
   width: min(300px, 86vw);
