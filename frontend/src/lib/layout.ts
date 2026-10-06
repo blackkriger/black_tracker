@@ -18,7 +18,11 @@ const narrowQuery = window.matchMedia('(max-width: 900px)');
 export const narrow = ref(narrowQuery.matches);
 narrowQuery.addEventListener('change', (ev) => (narrow.value = ev.matches));
 
-const tinyQuery = window.matchMedia('(max-width: 320px)');
+const smallQuery = window.matchMedia('(max-width: 500px)');
+export const small = ref(smallQuery.matches);
+smallQuery.addEventListener('change', (ev) => (small.value = ev.matches));
+
+const tinyQuery = window.matchMedia('(max-width: 340px)');
 export const tiny = ref(tinyQuery.matches);
 tinyQuery.addEventListener('change', (ev) => (tiny.value = ev.matches));
 
