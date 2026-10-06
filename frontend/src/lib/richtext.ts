@@ -1,4 +1,4 @@
-import DOMPurify from 'dompurify';
+import DOMPurify from './purify';
 import { paintKeys } from './issueKeys';
 import { paintNames } from './mentions';
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue';
 import { ChevronLeft, ChevronRight, FileDown, Scan, WrapText, X, ZoomIn, ZoomOut } from 'lucide-vue-next';
-import DOMPurify from 'dompurify';
+import DOMPurify from '../lib/purify';
 import { api } from '../lib/api';
 import { langOf, setWrapLines, wrapLines as wrapped } from '../lib/files';
 import { shownTheme } from '../lib/theme';
