@@ -283,25 +283,28 @@ async function changePassword(): Promise<void> {
         <template v-if="me?.telegramReady">
           <div class="hr"></div>
           <div class="field">
-            <span class="label">Telegram</span>
-            <div class="tg">
-              <template v-if="me.telegram !== null">
-                <span class="tg__who">{{ me.telegram }}</span>
-                <button
-                  class="btn btn--sm btn--danger"
-                  type="button"
-                  :disabled="telegramBusy"
-                  @click="unlinkTelegram"
-                >
-                  Unlink
-                </button>
-              </template>
-              <template v-else>
-                <span class="hint">Not linked</span>
-                <button class="btn btn--primary" type="button" :disabled="telegramBusy" @click="linkTelegram">
-                  Link
-                </button>
-              </template>
+            <label class="label" for="telegram">Telegram</label>
+            <div class="addrow tg">
+              <input
+                id="telegram"
+                class="input"
+                :value="me.telegram ?? ''"
+                placeholder="Not linked"
+                tabindex="-1"
+                readonly
+              />
+              <button
+                v-if="me.telegram !== null"
+                class="btn btn--danger"
+                type="button"
+                :disabled="telegramBusy"
+                @click="unlinkTelegram"
+              >
+                Unlink
+              </button>
+              <button v-else class="btn btn--primary" type="button" :disabled="telegramBusy" @click="linkTelegram">
+                Link
+              </button>
             </div>
           </div>
         </template>
@@ -358,15 +361,7 @@ async function changePassword(): Promise<void> {
   gap: var(--space-4);
 }
 .tg {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 32px;
-}
-.tg__who {
-  color: var(--text);
-  font-size: 13px;
+  margin-top: 0;
 }
 .who {
   display: flex;
