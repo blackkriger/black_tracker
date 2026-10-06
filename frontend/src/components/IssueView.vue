@@ -20,6 +20,7 @@ import { useNotices } from '../lib/notices';
 import { useSession } from '../lib/session';
 import {
   ArrowDownWideNarrow,
+  Bot,
   ArrowUp,
   ArrowUpNarrowWide,
   ChevronDown,
@@ -1934,6 +1935,7 @@ async function removeIssue(): Promise<void> {
                         v-if="issue.author && nameOf(issue.author.login) !== issue.author.login"
                         class="nick"
                       >{{ issue.author.login }}</span>
+                      <span v-if="issue.viaBot" class="via" title="Created via bot"><Bot class="ic ic--sm" /></span>
                     </span>
                   </span>
                 </div>
@@ -2467,6 +2469,13 @@ async function removeIssue(): Promise<void> {
 }
 .props__all {
   display: contents;
+}
+.via {
+  margin-left: 8px;
+  color: var(--text-muted);
+}
+.via .ic {
+  vertical-align: -2px;
 }
 .ev {
   display: grid;

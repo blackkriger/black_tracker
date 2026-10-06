@@ -1,15 +1,21 @@
 import { timingSafeEqual } from 'node:crypto';
+import { Readable } from 'node:stream';
+import type { ReadableStream as WebStream } from 'node:stream/web';
 import type { FastifyInstance } from 'fastify';
 import { hashToken, newRawToken, requireSession } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 import { inTransaction, pool } from './db.js';
 import { env, telegramReady } from './env.js';
 import { publish, tabOf } from './events.js';
+import { boardDefaults, createIssue, recordFile, storeFile } from './issue-routes.js';
 import { plain } from './notice-routes.js';
 
 const LINK_MINUTES = 15;
 const QUOTE_LIMIT = 300;
 const MAX_ATTEMPTS = 8;
+const FILE_LIMIT = 20 * 1024 * 1024;
+const START = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{1,64})\s*$/;
+const ISSUE = /^\/issue(?:@(\w+))?(?=\s|$)([\s\S]*)$/i;
 
 interface BotReply<T> {
   ok: boolean;
@@ -20,15 +26,60 @@ interface BotReply<T> {
 }
 
 interface TelegramUser {
+  id: number;
   username?: string;
   first_name?: string;
   last_name?: string;
 }
 
+interface TelegramFile {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+}
+
 interface TelegramMessage {
+  message_id: number;
   chat?: { id: number; type: string };
   from?: TelegramUser;
   text?: string;
+  caption?: string;
+  photo?: TelegramFile[];
+  document?: TelegramFile;
+  video?: TelegramFile;
+  reply_to_message?: TelegramMessage;
+}
+
+interface CallbackQuery {
+  id: string;
+  from: TelegramUser;
+  data?: string;
+}
+
+interface DraftFile {
+  id: string;
+  name: string;
+  mime: string;
+}
+
+interface Draft {
+  summary: string;
+  description: string;
+  files: DraftFile[];
+}
+
+interface DraftRow extends Draft {
+  chat_id: number;
+  message_id: number | null;
+  boards: string[];
+}
+
+interface Teller {
+  id: string;
+  login: string;
+  is_admin: boolean;
+  role_id: string | null;
 }
 
 interface SendRow {
@@ -67,12 +118,13 @@ async function bot<T>(method: string, body: object): Promise<BotReply<T>> {
   return (await res.json()) as BotReply<T>;
 }
 
-const say = (chatId: number, text: string) =>
+const say = (chatId: number, text: string, extra: object = {}) =>
   bot<{ message_id: number }>('sendMessage', {
     chat_id: chatId,
     text,
     parse_mode: 'HTML',
     link_preview_options: { is_disabled: true },
+    ...extra,
   });
 
 const esc = (s: string): string =>
@@ -306,18 +358,191 @@ async function onStart(chatId: number, from: TelegramUser | undefined, code: str
   await say(chatId, `<b>${esc(linked.login)} is linked</b>\nI'll notify you here.`);
 }
 
+const tellerOf = async (telegramId: number): Promise<Teller | null> =>
+  (
+    await pool.query<Teller>(
+      'select id, login, is_admin, role_id from users where telegram_chat_id = $1 and active',
+      [telegramId]
+    )
+  ).rows[0] ?? null;
+
+const paragraphs = (text: string): string =>
+  text
+    ? text
+        .split('\n')
+        .map((line) => (line.trim() ? `<p>${esc(line)}</p>` : '<p><br></p>'))
+        .join('')
+    : '';
+
+function filesOf(m: TelegramMessage | undefined): DraftFile[] {
+  if (!m) return [];
+  const photo = m.photo?.at(-1);
+  const found = [
+    ...(photo ? [{ id: photo.file_id, name: 'photo.jpg', mime: 'image/jpeg', size: photo.file_size }] : []),
+    ...(m.document ? [{ ...fileOf(m.document, 'file') }] : []),
+    ...(m.video ? [{ ...fileOf(m.video, 'video.mp4') }] : []),
+  ];
+  return found.filter((f) => !f.size || f.size <= FILE_LIMIT).map(({ id, name, mime }) => ({ id, name, mime }));
+}
+
+const fileOf = (f: TelegramFile, name: string) => ({
+  id: f.file_id,
+  name: f.file_name ?? name,
+  mime: f.mime_type ?? 'application/octet-stream',
+  size: f.file_size,
+});
+
+async function boardsFor(user: Teller): Promise<{ id: string; label: string }[]> {
+  const denied = user.is_admin ? DENIES_NOTHING : await deniedFor(user.role_id);
+  if (denied.everything) return [];
+  const res = await pool.query<{ id: string; name: string; short_name: string; project_id: string }>(
+    `select b.id, b.name, p.short_name, p.id as project_id
+       from boards b join projects p on p.id = b.project_id
+      where not p.archived and b.default_state_id is not null
+      order by p.position, p.short_name, b.position, b.created_at`
+  );
+  return res.rows
+    .filter((b) => !denied.projects.has(b.project_id) && !denied.boards.has(b.id))
+    .map((b) => ({ id: b.id, label: `${b.short_name} ${b.name}` }));
+}
+
+async function attach(issue: Parameters<typeof recordFile>[0], file: DraftFile, user: Teller): Promise<void> {
+  const info = await bot<{ file_path?: string }>('getFile', { file_id: file.id });
+  if (!info.ok || !info.result?.file_path) return;
+  const res = await fetch(`https://api.telegram.org/file/bot${env.telegramBotToken}/${info.result.file_path}`, {
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!res.ok || !res.body) return;
+  const stored = await storeFile(issue.id, Readable.fromWeb(res.body as WebStream), file.name);
+  await recordFile(
+    issue,
+    { stored, filename: file.name, mime: file.mime, commentId: null },
+    { userId: user.id, login: user.login }
+  );
+}
+
+async function fileIssue(user: Teller, boardId: string, draft: Draft): Promise<string | null> {
+  if (!(await boardsFor(user)).some((b) => b.id === boardId)) return null;
+  const board = await boardDefaults(boardId);
+  if (!board) return null;
+  const made = await createIssue(
+    { userId: user.id, login: user.login },
+    boardId,
+    board,
+    { summary: draft.summary, description: draft.description },
+    { viaBot: true }
+  );
+  if ('error' in made) return null;
+  for (const file of draft.files) {
+    await attach(made.issue, file, user).catch((err) =>
+      console.error('[telegram] file not attached', (err as Error).message)
+    );
+  }
+  const place = await pool.query<{ short_name: string; slug: string }>(
+    'select p.short_name, b.slug from boards b join projects p on p.id = b.project_id where b.id = $1',
+    [boardId]
+  );
+  const { short_name: short, slug } = place.rows[0];
+  const key = made.issue.readable_id;
+  const url = `${env.publicUrl}/${short}/${slug}/${key}`;
+  return `Created <a href="${esc(url)}">${esc(key)}</a> ${esc(made.issue.summary)}`;
+}
+
+async function onIssue(m: TelegramMessage): Promise<void> {
+  const hit = ISSUE.exec(m.text ?? m.caption ?? '');
+  if (!hit || !m.chat || !m.from) return;
+  if (hit[1] && hit[1].toLowerCase() !== env.telegramBotName.toLowerCase()) return;
+  const user = await tellerOf(m.from.id);
+  if (!user) return;
+  const source = m.reply_to_message;
+  const told = (source?.text ?? source?.caption ?? '').trim();
+  const [head = '', ...more] = hit[2].trim().split('\n');
+  let summary = head.trim();
+  let rest = [more.join('\n').trim(), told];
+  if (!summary) {
+    const [first = '', ...after] = told.split('\n');
+    summary = first.trim();
+    rest = [after.join('\n').trim()];
+  }
+  if (!summary) return;
+  const boards = await boardsFor(user);
+  if (!boards.length) return;
+  const draft: Draft = {
+    summary: summary.slice(0, 300),
+    description: paragraphs(rest.filter(Boolean).join('\n\n').slice(0, 15000)),
+    files: [...filesOf(m), ...filesOf(source)],
+  };
+  const answer = { reply_parameters: { message_id: m.message_id, allow_sending_without_reply: true } };
+  if (boards.length === 1) {
+    const created = await fileIssue(user, boards[0].id, draft);
+    if (created) await say(m.chat.id, created, answer);
+    return;
+  }
+  await pool.query("delete from telegram_drafts where created_at < now() - interval '1 day'");
+  const saved = await pool.query<{ id: string }>(
+    `insert into telegram_drafts (user_id, chat_id, summary, description, files, boards)
+     values ($1, $2, $3, $4, $5, $6) returning id`,
+    [user.id, m.chat.id, draft.summary, draft.description, JSON.stringify(draft.files), boards.map((b) => b.id)]
+  );
+  const id = saved.rows[0].id;
+  const rows: { text: string; callback_data: string }[][] = [];
+  boards.forEach((b, i) => {
+    const button = { text: b.label, callback_data: `i:${id}:${i}` };
+    if (i % 2) rows[rows.length - 1].push(button);
+    else rows.push([button]);
+  });
+  const sent = await say(m.chat.id, `<b>${esc(draft.summary)}</b>`, {
+    ...answer,
+    reply_markup: { inline_keyboard: [...rows, [{ text: 'Cancel', callback_data: `x:${id}` }]] },
+  });
+  if (sent.ok && sent.result) {
+    await pool.query('update telegram_drafts set message_id = $2 where id = $1', [id, sent.result.message_id]);
+  }
+}
+
+async function onPick(q: CallbackQuery): Promise<void> {
+  await bot('answerCallbackQuery', { callback_query_id: q.id }).catch(() => {});
+  const [kind, draftId, index] = (q.data ?? '').split(':');
+  if (!/^[0-9a-f-]{36}$/i.test(draftId ?? '')) return;
+  const user = await tellerOf(q.from.id);
+  if (!user) return;
+  const res = await pool.query<DraftRow>('delete from telegram_drafts where id = $1 and user_id = $2 returning *', [
+    draftId,
+    user.id,
+  ]);
+  const draft = res.rows[0];
+  if (!draft?.message_id) return;
+  if (kind === 'x') {
+    await bot('deleteMessage', { chat_id: draft.chat_id, message_id: draft.message_id });
+    return;
+  }
+  const boardId = kind === 'i' ? draft.boards[Number(index)] : undefined;
+  if (!boardId) return;
+  const created = await fileIssue(user, boardId, draft);
+  if (!created) return;
+  await bot('editMessageText', {
+    chat_id: draft.chat_id,
+    message_id: draft.message_id,
+    text: created,
+    parse_mode: 'HTML',
+    link_preview_options: { is_disabled: true },
+  });
+}
+
 export function registerTelegramRoutes(app: FastifyInstance): void {
   app.post('/telegram', async (req, reply) => {
     if (!telegramReady() || !secretRight(req.headers['x-telegram-bot-api-secret-token'])) {
       return reply.code(401).send({ error: 'Bad secret.' });
     }
-    const message = (req.body as { message?: TelegramMessage } | null)?.message;
-    const code = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{1,64})\s*$/.exec(message?.text ?? '')?.[1];
-    if (message?.chat?.type === 'private' && code) {
-      await onStart(message.chat.id, message.from, code).catch((err) =>
-        console.error('[telegram] linking failed', (err as Error).message)
-      );
-    }
+    const update = req.body as { message?: TelegramMessage; callback_query?: CallbackQuery } | null;
+    const message = update?.message;
+    const code = START.exec(message?.text ?? '')?.[1];
+    const failed = (what: string) => (err: unknown) =>
+      console.error(`[telegram] ${what} failed`, (err as Error).message);
+    if (update?.callback_query) void onPick(update.callback_query).catch(failed('board pick'));
+    else if (message?.chat?.type === 'private' && code) {
+      void onStart(message.chat.id, message.from, code).catch(failed('linking'));
+    } else if (message) void onIssue(message).catch(failed('issue'));
     return reply.send({ data: { ok: true } });
   });
 
@@ -362,9 +587,11 @@ export async function startTelegram(): Promise<void> {
     const reply = await bot('setWebhook', {
       url: `${env.publicUrl}/api/telegram`,
       secret_token: env.telegramWebhookSecret,
-      allowed_updates: ['message'],
+      allowed_updates: ['message', 'callback_query'],
     });
     if (!reply.ok) console.error('[telegram] setWebhook failed', reply.description);
+    const commands = await bot('setMyCommands', { commands: [{ command: 'issue', description: 'Create an issue' }] });
+    if (!commands.ok) console.error('[telegram] setMyCommands failed', commands.description);
   } catch (err) {
     console.error('[telegram] setWebhook failed', (err as Error).message);
   }

@@ -36,6 +36,7 @@ export interface Issue {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  viaBot?: boolean;
   favourite: boolean;
   tags: IssueTag[];
   subtasks?: { done: number; total: number } | null;

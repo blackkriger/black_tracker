@@ -67,6 +67,7 @@ interface IssueRow {
   created_at: Date;
   updated_at: Date;
   resolved_at: Date | null;
+  via_bot: boolean;
   assignee_login: string | null;
   author_login: string | null;
 }
@@ -119,6 +120,7 @@ const publicIssue = (r: IssueRow, tags: TagRow[] = [], favourite = false) => ({
   createdAt: r.created_at.toISOString(),
   updatedAt: r.updated_at.toISOString(),
   resolvedAt: r.resolved_at?.toISOString() ?? null,
+  viaBot: r.via_bot,
   favourite,
   tags,
 });
@@ -547,6 +549,167 @@ export async function sweepFiles(issueIds: string[], paths: string[]): Promise<v
   );
 }
 
+interface BoardDefaults {
+  project_id: string;
+  default_state_id: string | null;
+  default_assignee_id: string | null;
+}
+
+export async function boardDefaults(boardId: string): Promise<BoardDefaults | null> {
+  const res = await pool.query<BoardDefaults>(
+    'select project_id, default_state_id, default_assignee_id from boards where id = $1',
+    [boardId]
+  );
+  return res.rows[0] ?? null;
+}
+
+export type IssueDraft = z.infer<typeof issueCreate>;
+
+export async function createIssue(
+  by: { userId: string; login: string },
+  boardId: string,
+  board: BoardDefaults,
+  p: IssueDraft,
+  options: { viaBot?: boolean; origin?: string } = {}
+): Promise<{ issue: IssueRow; tags: TagRow[] } | { error: string }> {
+  const projectId = board.project_id;
+  const assigneeId = p.assigneeId !== undefined ? p.assigneeId : board.default_assignee_id;
+  const stateId = p.stateId ?? board.default_state_id;
+  if (!stateId) return { error: 'This board has no statuses yet.' };
+  const state = await pool.query('select 1 from states where id = $1 and board_id = $2', [
+    stateId,
+    boardId,
+  ]);
+  if (!state.rowCount) return { error: 'That status is on another board.' };
+
+  const autoStarred: string[] = [];
+  const created = await inTransaction(async (client) => {
+    // Bump and read in one UPDATE ... RETURNING so concurrent creates never share a number.
+    const counter = await client.query<{ short_name: string; next_issue_number: number }>(
+      `update projects set next_issue_number = next_issue_number + 1
+        where id = $1
+        returning short_name, next_issue_number - 1 as next_issue_number`,
+      [projectId]
+    );
+    const { short_name: short, next_issue_number: number } = counter.rows[0];
+    const top = await client.query<{ pos: number }>(
+      'select coalesce(min(position), 0) - 1 as pos from issues where board_id = $1 and state_id = $2',
+      [boardId, stateId]
+    );
+    const row = await client.query<{ id: string }>(
+      `insert into issues
+         (readable_id, project_id, board_id, number, summary, description, state_id,
+          priority, assignee_id, author_id, due_date, position, via_bot)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       returning id`,
+      [
+        `${short}-${number}`,
+        projectId,
+        boardId,
+        number,
+        p.summary,
+        p.description ?? '',
+        stateId,
+        p.priority ?? 'Normal',
+        assigneeId ?? null,
+        by.userId,
+        p.dueDate ?? null,
+        top.rows[0].pos,
+        options.viaBot ?? false,
+      ]
+    );
+    if (p.tagIds?.length) {
+      await client.query(
+        `insert into issue_tags (issue_id, tag_id)
+         select $1, t from unnest($2::uuid[]) as t on conflict do nothing`,
+        [row.rows[0].id, p.tagIds]
+      );
+    }
+    await writeHistory(client, row.rows[0].id, by.userId, 'created', null, null);
+    if (assigneeId && assigneeId !== by.userId) {
+      await client.query(
+        `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
+        [assigneeId, row.rows[0].id, by.userId]
+      );
+    }
+    if (await autoStar(client, by.userId, row.rows[0].id, 'star_created')) {
+      autoStarred.push(by.userId);
+    }
+    if (assigneeId && (await autoStar(client, assigneeId, row.rows[0].id, 'star_assigned'))) {
+      autoStarred.push(assigneeId);
+    }
+    return row.rows[0].id;
+  });
+  if (assigneeId && assigneeId !== by.userId) {
+    void publish({ type: 'notice.changed', only: assigneeId });
+  }
+
+  const row = await issueById(created);
+  for (const who of autoStarred) tellStarred(who, row as IssueRow);
+  const tags = await tagsFor([created]);
+  void publish({
+    type: 'issue.created',
+    boardId,
+    projectId,
+    issueId: created,
+    issueKey: row?.readable_id,
+    by: by.login,
+    origin: options.origin,
+  });
+  return { issue: row as IssueRow, tags: tags.get(created) ?? [] };
+}
+
+export async function storeFile(issueId: string, source: NodeJS.ReadableStream, filename: string): Promise<string> {
+  const folder = issueId.toLowerCase();
+  await mkdir(onDisk(folder), { recursive: true });
+  // Stored under our own name: the uploaded one may collide or carry a path out of the folder.
+  const ext = path.extname(filename).slice(0, 12).replace(/[^a-zA-Z0-9.]/g, '');
+  const name = `${folder}/${randomUUID()}${ext}`;
+  try {
+    await pipeline(source, createWriteStream(onDisk(name)));
+  } catch (err) {
+    await unlink(onDisk(name)).catch(() => {});
+    throw err;
+  }
+  return name;
+}
+
+export async function recordFile(
+  issue: Pick<IssueRow, 'id' | 'board_id' | 'project_id' | 'readable_id'>,
+  file: { stored: string; filename: string; mime: string; commentId: string | null },
+  by: { userId: string; login: string },
+  origin?: string
+): Promise<{ id: string; filename: string; size: number; createdAt: Date }> {
+  const { size } = await stat(onDisk(file.stored));
+  const filename = file.filename.slice(0, 200);
+  let res;
+  try {
+    res = await pool.query<{ id: string; created_at: Date }>(
+      `insert into issue_attachments (issue_id, comment_id, filename, mime, size, storage_path, uploaded_by)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       returning id, created_at`,
+      [issue.id, file.commentId, filename, file.mime, size, file.stored, by.userId]
+    );
+  } catch (err) {
+    await unlink(onDisk(file.stored)).catch(() => {});
+    throw err;
+  }
+  if (file.commentId) {
+    await pool.query('update issue_comments set edited_at = now() where id = $1', [file.commentId]);
+  }
+  await writeHistory(pool, issue.id, by.userId, 'file added', null, filename);
+  void publish({
+    type: 'attachment.added',
+    boardId: issue.board_id,
+    projectId: issue.project_id,
+    issueId: issue.id,
+    issueKey: issue.readable_id,
+    by: by.login,
+    origin,
+  });
+  return { id: res.rows[0].id, filename, size, createdAt: res.rows[0].created_at };
+}
+
 export function registerIssueRoutes(app: FastifyInstance): void {
   app.get('/boards/:id/issues', async (req, reply) => {
     const auth = await requireAuth(req, reply);
@@ -585,101 +748,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad issue.' });
     }
-    const p = parsed.data;
-    const board = await pool.query<{
-      project_id: string;
-      default_state_id: string | null;
-      default_assignee_id: string | null;
-    }>('select project_id, default_state_id, default_assignee_id from boards where id = $1', [id]);
-    if (!board.rowCount) return reply.code(404).send({ error: 'No such board.' });
-    const { project_id: projectId, default_state_id: defaultStateId } = board.rows[0];
-    const assigneeId = p.assigneeId !== undefined ? p.assigneeId : board.rows[0].default_assignee_id;
-    if (!(await mayOpenBoard(auth, id, projectId))) {
+    const board = await boardDefaults(id);
+    if (!board) return reply.code(404).send({ error: 'No such board.' });
+    if (!(await mayOpenBoard(auth, id, board.project_id))) {
       return reply.code(403).send({ error: 'This board is not open to you.' });
     }
-
-    const stateId = p.stateId ?? defaultStateId;
-    if (!stateId) return reply.code(400).send({ error: 'This board has no statuses yet.' });
-    const state = await pool.query('select 1 from states where id = $1 and board_id = $2', [
-      stateId,
-      id,
-    ]);
-    if (!state.rowCount) return reply.code(400).send({ error: 'That status is on another board.' });
-
-    const autoStarred: string[] = [];
-    const created = await inTransaction(async (client) => {
-      // Bump and read in one UPDATE ... RETURNING so concurrent creates never share a number.
-      const counter = await client.query<{ short_name: string; next_issue_number: number }>(
-        `update projects set next_issue_number = next_issue_number + 1
-          where id = $1
-          returning short_name, next_issue_number - 1 as next_issue_number`,
-        [projectId]
-      );
-      const { short_name: short, next_issue_number: number } = counter.rows[0];
-      const top = await client.query<{ pos: number }>(
-        'select coalesce(min(position), 0) - 1 as pos from issues where board_id = $1 and state_id = $2',
-        [id, stateId]
-      );
-      const row = await client.query<{ id: string }>(
-        `insert into issues
-           (readable_id, project_id, board_id, number, summary, description, state_id,
-            priority, assignee_id, author_id, due_date, position)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         returning id`,
-        [
-          `${short}-${number}`,
-          projectId,
-          id,
-          number,
-          p.summary,
-          p.description ?? '',
-          stateId,
-          p.priority ?? 'Normal',
-          assigneeId ?? null,
-          auth.userId,
-          p.dueDate ?? null,
-          top.rows[0].pos,
-        ]
-      );
-      if (p.tagIds?.length) {
-        await client.query(
-          `insert into issue_tags (issue_id, tag_id)
-           select $1, t from unnest($2::uuid[]) as t on conflict do nothing`,
-          [row.rows[0].id, p.tagIds]
-        );
-      }
-      await writeHistory(client, row.rows[0].id, auth.userId, 'created', null, null);
-      if (assigneeId && assigneeId !== auth.userId) {
-        await client.query(
-          `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
-          [assigneeId, row.rows[0].id, auth.userId]
-        );
-      }
-      if (await autoStar(client, auth.userId, row.rows[0].id, 'star_created')) {
-        autoStarred.push(auth.userId);
-      }
-      if (assigneeId && (await autoStar(client, assigneeId, row.rows[0].id, 'star_assigned'))) {
-        autoStarred.push(assigneeId);
-      }
-      return row.rows[0].id;
-    });
-    if (assigneeId && assigneeId !== auth.userId) {
-      void publish({ type: 'notice.changed', only: assigneeId });
-    }
-
-    const row = await issueById(created);
-    for (const who of autoStarred) tellStarred(who, row as IssueRow);
-    const tags = await tagsFor([created]);
-    void publish({
-      type: 'issue.created',
-      boardId: id,
-      projectId,
-      issueId: created,
-      issueKey: row?.readable_id,
-      by: auth.login,
-      origin: tabOf(req),
-    });
-    return reply.code(201).send({ data: publicIssue(row as IssueRow, tags.get(created) ?? []) });
+    const made = await createIssue(auth, id, board, parsed.data, { origin: tabOf(req) });
+    if ('error' in made) return reply.code(400).send({ error: made.error });
+    return reply.code(201).send({ data: publicIssue(made.issue, made.tags) });
   });
 
   app.post('/boards/:id/issues/order', async (req, reply) => {
@@ -1702,59 +1778,26 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: 'Send a file.' });
 
-    const folder = found.issue.id.toLowerCase();
-    await mkdir(onDisk(folder), { recursive: true });
-    // Stored under our own name: the uploaded one may collide or carry a path out of the folder.
-    const ext = path.extname(file.filename).slice(0, 12).replace(/[^a-zA-Z0-9.]/g, '');
-    const name = `${folder}/${randomUUID()}${ext}`;
-    const stored = onDisk(name);
-    try {
-      await pipeline(file.file, createWriteStream(stored));
-    } catch (err) {
-      await unlink(stored).catch(() => {});
-      throw err;
-    }
+    const stored = await storeFile(found.issue.id, file.file, file.filename);
     if (file.file.truncated) {
-      await unlink(stored).catch(() => {});
+      await unlink(onDisk(stored)).catch(() => {});
       return reply.code(413).send({ error: '100mb max for file' });
     }
-    const { size } = await stat(stored);
-    const filename = file.filename.slice(0, 200);
-
-    let res;
-    try {
-      res = await pool.query(
-        `insert into issue_attachments (issue_id, comment_id, filename, mime, size, storage_path, uploaded_by)
-         values ($1, $2, $3, $4, $5, $6, $7)
-         returning id, created_at`,
-        [id, comment ?? null, filename, file.mimetype, size, name, found.auth.userId]
-      );
-    } catch (err) {
-      await unlink(stored).catch(() => {});
-      throw err;
-    }
-    if (comment) {
-      await pool.query('update issue_comments set edited_at = now() where id = $1', [comment]);
-    }
-    await writeHistory(pool, id, found.auth.userId, 'file added', null, filename);
-    void publish({
-      type: 'attachment.added',
-      boardId: found.issue.board_id,
-      projectId: found.issue.project_id,
-      issueId: id,
-      issueKey: found.issue.readable_id,
-      by: found.auth.login,
-      origin: tabOf(req),
-    });
+    const saved = await recordFile(
+      found.issue,
+      { stored, filename: file.filename, mime: file.mimetype, commentId: comment ?? null },
+      found.auth,
+      tabOf(req)
+    );
     return reply.code(201).send({
       data: {
-        id: res.rows[0].id,
-        filename,
+        id: saved.id,
+        filename: saved.filename,
         mime: file.mimetype,
-        size,
+        size: saved.size,
         commentId: comment ?? null,
         uploadedBy: found.auth.login,
-        createdAt: res.rows[0].created_at.toISOString(),
+        createdAt: saved.createdAt.toISOString(),
       },
     });
   });
