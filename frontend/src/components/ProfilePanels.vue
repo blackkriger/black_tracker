@@ -262,7 +262,26 @@ async function changePassword(): Promise<void> {
     <section class="panel">
       <header class="panel__h">Integrations</header>
       <div class="panel__b form">
+        <form class="form" @submit.prevent="saveGithub">
+          <div class="field">
+            <label class="label" for="github">GitHub login</label>
+            <input
+              id="github"
+              v-model="github"
+              class="input"
+              maxlength="200"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <span class="hint">The name in github.com/name, so your commits show up under your name.</span>
+          </div>
+          <div class="row-end">
+            <span v-if="githubSaved" class="hint">Saved.</span>
+            <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
+          </div>
+        </form>
         <template v-if="me?.telegramReady">
+          <div class="hr"></div>
           <div class="field">
             <span class="label">Telegram</span>
             <div class="tg">
@@ -285,26 +304,7 @@ async function changePassword(): Promise<void> {
               </template>
             </div>
           </div>
-          <div class="hr"></div>
         </template>
-        <form class="form" @submit.prevent="saveGithub">
-          <div class="field">
-            <label class="label" for="github">GitHub login</label>
-            <input
-              id="github"
-              v-model="github"
-              class="input"
-              maxlength="200"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <span class="hint">The name in github.com/name, so your commits show up under your name.</span>
-          </div>
-          <div class="row-end">
-            <span v-if="githubSaved" class="hint">Saved.</span>
-            <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
-          </div>
-        </form>
       </div>
     </section>
     <div v-if="errors.integrations" class="err panel__err">{{ errors.integrations }}</div>
