@@ -69,6 +69,7 @@ const below = ref(false);
 
 const EDGE = 8;
 const GAP = 8;
+const canHover = window.matchMedia('(hover: hover)');
 
 function fit(): void {
   const el = pop.value;
@@ -82,8 +83,8 @@ function fit(): void {
   below.value = at.y - GAP - el.offsetHeight < EDGE;
 }
 
-function onEnter(ev: MouseEvent, c: Cell): void {
-  if (!c.key) return;
+function onEnter(ev: PointerEvent, c: Cell): void {
+  if (!c.key || ev.pointerType !== 'mouse' || !canHover.matches) return;
   const box = (ev.currentTarget as HTMLElement).getBoundingClientRect();
   hover.value = { key: c.key, x: box.left + box.width / 2, y: box.top, bottom: box.bottom };
   shift.value = 0;
@@ -115,8 +116,8 @@ function onEnter(ev: MouseEvent, c: Cell): void {
       :data-key="c.key"
       @click="c.key && emit('pick', c.key)"
       @pointerdown="c.key && range && emit('down', c.key)"
-      @mouseenter="onEnter($event, c)"
-      @mouseleave="hover = null"
+      @pointerenter="onEnter($event, c)"
+      @pointerleave="hover = null"
     >
       <template v-if="c.day">
         <AtSign
