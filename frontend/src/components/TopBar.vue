@@ -104,7 +104,6 @@ const pickedDay = ref<string | null>(null);
 
 function toDay(key: string): void {
   dateOpen.value = false;
-  drawer.value = false;
   pickedDay.value = key;
 }
 
@@ -135,7 +134,7 @@ function closeMenu(): void {
   dateOpen.value = false;
 }
 function onKeydown(ev: KeyboardEvent): void {
-  if (ev.key !== 'Escape') return;
+  if (ev.key !== 'Escape' || pickedDay.value) return;
   dateOpen.value = false;
   drawer.value = false;
 }
