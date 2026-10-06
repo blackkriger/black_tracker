@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
 import { api, onUnauthorized } from './api';
+import type { NoticeKind } from './notices';
 
 export interface Me {
   id: string;
@@ -16,6 +17,9 @@ export interface Me {
   token: { hint: string | null; createdAt: string | null; lastUsedAt: string | null } | null;
   autoStar: { created: boolean; assigned: boolean; commented: boolean };
   githubLogin: string | null;
+  telegram: string | null;
+  telegramReady: boolean;
+  noticesOff: NoticeKind[];
 }
 
 const me = ref<Me | null>(null);

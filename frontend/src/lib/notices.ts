@@ -1,6 +1,7 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { api } from './api';
 import { shortDate } from './calendar';
+import { useSession, type Me } from './session';
 
 export type NoticeKind = 'mention' | 'reaction' | 'assigned' | 'starred';
 
@@ -57,17 +58,37 @@ const notices = ref<Notice[]>([]);
 const loaded = ref(false);
 const hasMore = ref(true);
 const counts = ref<Partial<Record<NoticeKind, number>>>({});
-const off = ref<NoticeKind[]>(read());
+const session = useSession();
+const off = computed<NoticeKind[]>(() => session.me.value?.noticesOff ?? []);
 let reads = 0;
 let paging: Promise<void> | null = null;
 
-function read(): NoticeKind[] {
+async function setOff(next: NoticeKind[]): Promise<void> {
+  const before = session.me.value;
+  if (!before) return;
+  session.me.value = { ...before, noticesOff: next };
   try {
-    return JSON.parse(localStorage.getItem(OFF) ?? '[]') as NoticeKind[];
-  } catch {
-    return [];
+    const updated = await api<Me>('/me', { method: 'PATCH', body: { noticesOff: next } });
+    if (session.me.value) session.me.value = { ...session.me.value, ...updated };
+  } catch (err) {
+    if (session.me.value) session.me.value = { ...session.me.value, noticesOff: before.noticesOff };
+    throw err;
   }
 }
+
+watch(
+  () => session.me.value?.id,
+  (id) => {
+    if (!id) return;
+    let kept: NoticeKind[] = [];
+    try {
+      kept = JSON.parse(localStorage.getItem(OFF) ?? '[]') as NoticeKind[];
+      localStorage.removeItem(OFF);
+    } catch {}
+    if (kept.length && !session.me.value?.noticesOff.length) void setOff(kept).catch(() => {});
+  },
+  { immediate: true }
+);
 
 async function readCounts(): Promise<void> {
   try {
@@ -120,13 +141,8 @@ export function useNotices() {
     hasMore,
     loadMore,
     unreadOf,
-    toggleKind(kind: NoticeKind): void {
-      off.value = off.value.includes(kind)
-        ? off.value.filter((k) => k !== kind)
-        : [...off.value, kind];
-      try {
-        localStorage.setItem(OFF, JSON.stringify(off.value));
-      } catch {}
+    toggleKind(kind: NoticeKind): Promise<void> {
+      return setOff(off.value.includes(kind) ? off.value.filter((k) => k !== kind) : [...off.value, kind]);
     },
     load: refresh,
     async markRead(id?: string): Promise<void> {

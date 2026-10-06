@@ -51,6 +51,7 @@ const others = computed(() => sessions.value?.some((s) => !s.current) ?? false);
 const github = ref(me.value?.githubLogin ?? '');
 const githubBusy = ref(false);
 const githubSaved = ref(false);
+const telegramBusy = ref(false);
 
 const since = computed(() => stamp(me.value?.createdAt ?? null));
 const role = computed(() => me.value?.role ?? null);
@@ -98,7 +99,7 @@ async function endSessions(body: { id: string } | { others: true }): Promise<voi
 async function saveGithub(): Promise<void> {
   if (githubBusy.value) return;
   githubBusy.value = true;
-  clear('github');
+  clear('integrations');
   githubSaved.value = false;
   try {
     const updated = await api<Me>('/me', { method: 'PATCH', body: { githubLogin: github.value } });
@@ -106,18 +107,64 @@ async function saveGithub(): Promise<void> {
     github.value = updated.githubLogin ?? '';
     githubSaved.value = true;
   } catch (err) {
-    fail('github', err, 'Could not save the GitHub login.');
+    fail('integrations', err, 'Could not save the GitHub login.');
   } finally {
     githubBusy.value = false;
   }
 }
 
+async function linkTelegram(): Promise<void> {
+  if (telegramBusy.value) return;
+  telegramBusy.value = true;
+  clear('integrations');
+  const tab = window.open('', '_blank');
+  try {
+    const { url } = await api<{ url: string }>('/me/telegram/link', { method: 'POST' });
+    if (tab) {
+      tab.opener = null;
+      tab.location.href = url;
+    } else {
+      window.location.href = url;
+    }
+  } catch (err) {
+    tab?.close();
+    fail('integrations', err);
+  } finally {
+    telegramBusy.value = false;
+  }
+}
+
+async function unlinkTelegram(): Promise<void> {
+  if (telegramBusy.value) return;
+  telegramBusy.value = true;
+  clear('integrations');
+  try {
+    await api('/me/telegram', { method: 'DELETE' });
+    me.value = { ...(me.value as Me), telegram: null };
+  } catch (err) {
+    fail('integrations', err);
+  } finally {
+    telegramBusy.value = false;
+  }
+}
+
+async function readMe(): Promise<void> {
+  try {
+    me.value = await api<Me>('/me');
+  } catch {}
+}
+
 onMounted(() => void readSessions());
 useLive(
   (ev) => {
-    if (ev.type === 'session.changed') void readSessions();
+    if (ev.type !== 'session.changed') return;
+    void readSessions();
+    void readMe();
   },
-  () => void readSessions()
+  () => {
+    void readSessions();
+    void readMe();
+  }
 );
 
 async function changePassword(): Promise<void> {
@@ -213,27 +260,54 @@ async function changePassword(): Promise<void> {
 
   <div class="stack">
     <section class="panel">
-      <header class="panel__h">GitHub</header>
-      <form class="panel__b form" @submit.prevent="saveGithub">
-        <div class="field">
-          <label class="label" for="github">GitHub login</label>
-          <input
-            id="github"
-            v-model="github"
-            class="input"
-            maxlength="200"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <span class="hint">The name in github.com/name, so your commits show up under your name.</span>
-        </div>
-        <div class="row-end">
-          <span v-if="githubSaved" class="hint">Saved.</span>
-          <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
-        </div>
-      </form>
+      <header class="panel__h">Integrations</header>
+      <div class="panel__b form">
+        <template v-if="me?.telegramReady">
+          <div class="field">
+            <span class="label">Telegram</span>
+            <div class="tg">
+              <template v-if="me.telegram !== null">
+                <span class="tg__who">{{ me.telegram }}</span>
+                <button
+                  class="btn btn--sm btn--danger"
+                  type="button"
+                  :disabled="telegramBusy"
+                  @click="unlinkTelegram"
+                >
+                  Unlink
+                </button>
+              </template>
+              <template v-else>
+                <span class="hint">Not linked</span>
+                <button class="btn btn--primary" type="button" :disabled="telegramBusy" @click="linkTelegram">
+                  Link
+                </button>
+              </template>
+            </div>
+          </div>
+          <div class="hr"></div>
+        </template>
+        <form class="form" @submit.prevent="saveGithub">
+          <div class="field">
+            <label class="label" for="github">GitHub login</label>
+            <input
+              id="github"
+              v-model="github"
+              class="input"
+              maxlength="200"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <span class="hint">The name in github.com/name, so your commits show up under your name.</span>
+          </div>
+          <div class="row-end">
+            <span v-if="githubSaved" class="hint">Saved.</span>
+            <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
+          </div>
+        </form>
+      </div>
     </section>
-    <div v-if="errors.github" class="err panel__err">{{ errors.github }}</div>
+    <div v-if="errors.integrations" class="err panel__err">{{ errors.integrations }}</div>
 
     <section class="panel">
       <header class="panel__h">Sessions</header>
@@ -282,6 +356,17 @@ async function changePassword(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+.tg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 32px;
+}
+.tg__who {
+  color: var(--text);
+  font-size: 13px;
 }
 .who {
   display: flex;

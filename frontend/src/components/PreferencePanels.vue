@@ -120,7 +120,7 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
                 <input
                   type="checkbox"
                   :checked="!off.includes(k.kind)"
-                  @change="toggleKind(k.kind)"
+                  @change="toggleKind(k.kind).catch((err) => fail('prefs', err))"
                 />
                 {{ k.label }}
               </label>

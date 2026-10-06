@@ -19,6 +19,7 @@ import { registerAnalyticsRoutes } from './analytics-routes.js';
 import { registerNoticeRoutes } from './notice-routes.js';
 import { registerChangeFeed, registerEventRoutes } from './events.js';
 import { registerGitRoutes } from './git-routes.js';
+import { registerTelegramRoutes, startTelegram } from './telegram.js';
 
 const app = Fastify({
   logger: {
@@ -69,6 +70,7 @@ registerCalendarRoutes(app);
 registerAnalyticsRoutes(app);
 registerNoticeRoutes(app);
 registerGitRoutes(app);
+registerTelegramRoutes(app);
 registerEventRoutes(app);
 registerChangeFeed(app);
 
@@ -88,5 +90,6 @@ app.setErrorHandler((err: Error & { statusCode?: number; code?: string }, _req, 
 await mkdir(env.uploadDir, { recursive: true });
 await pruneSessions();
 setInterval(pruneSessions, 24 * 60 * 60 * 1000).unref();
+await startTelegram();
 
 await app.listen({ port: env.port, host: '127.0.0.1' });

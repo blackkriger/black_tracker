@@ -18,4 +18,11 @@ export const env = {
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
   secureCookies: process.env.SECURE_COOKIES === 'true',
   githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? '',
+  publicUrl: (process.env.PUBLIC_URL ?? 'https://tracker.example.com').replace(/\/$/, ''),
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
+  telegramBotName: process.env.TELEGRAM_BOT_NAME ?? '',
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? '',
 };
+
+export const telegramReady = (): boolean =>
+  !!(env.telegramBotToken && env.telegramBotName && env.telegramWebhookSecret);

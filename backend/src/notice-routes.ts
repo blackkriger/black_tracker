@@ -7,7 +7,7 @@ import { DENIES_NOTHING, deniedFor } from './board-service.js';
 
 const NAME = /(?:^|\s)@([a-zA-Z0-9_.-]{2,32})/g;
 
-const plain = (html: string): string =>
+export const plain = (html: string): string =>
   html
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/g, ' ')

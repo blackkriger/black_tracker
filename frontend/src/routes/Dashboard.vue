@@ -518,7 +518,7 @@ function closeIssue(): void {
                   :class="{ 'is-off': off.includes('mention') }"
                   type="button"
                   aria-label="Mentions"
-                  @click="toggleKind('mention')"
+                  @click="toggleKind('mention').catch(() => {})"
                 ><AtSign class="ic" /></button>
                 <span class="selbar kind__what">Mentions</span>
               </span>
@@ -528,7 +528,7 @@ function closeIssue(): void {
                   :class="{ 'is-off': off.includes('reaction') }"
                   type="button"
                   aria-label="Reactions"
-                  @click="toggleKind('reaction')"
+                  @click="toggleKind('reaction').catch(() => {})"
                 ><Smile class="ic" /></button>
                 <span class="selbar kind__what">Reactions</span>
               </span>
@@ -538,7 +538,7 @@ function closeIssue(): void {
                   :class="{ 'is-off': off.includes('assigned') }"
                   type="button"
                   aria-label="Assigned to you"
-                  @click="toggleKind('assigned')"
+                  @click="toggleKind('assigned').catch(() => {})"
                 ><ContactRound class="ic" /></button>
                 <span class="selbar kind__what">Assigned to you</span>
               </span>
@@ -548,7 +548,7 @@ function closeIssue(): void {
                   :class="{ 'is-off': off.includes('starred') }"
                   type="button"
                   aria-label="Starred issues"
-                  @click="toggleKind('starred')"
+                  @click="toggleKind('starred').catch(() => {})"
                 ><Star class="ic" /></button>
                 <span class="selbar kind__what">Starred issues</span>
               </span>

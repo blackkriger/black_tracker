@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
-import { env } from './env.js';
+import { env, telegramReady } from './env.js';
 import { publish, tabOf } from './events.js';
 
 export const SESSION_COOKIE = 'tracker_session';
@@ -84,6 +84,9 @@ interface UserRow {
   star_assigned: boolean;
   star_commented: boolean;
   github_login: string | null;
+  telegram_chat_id: number | null;
+  telegram_name: string | null;
+  notices_off: string[];
 }
 
 export const USER_SELECT = `
@@ -126,7 +129,12 @@ const publicMe = (row: UserRow) => ({
   ...publicUser(row),
   autoStar: { created: row.star_created, assigned: row.star_assigned, commented: row.star_commented },
   githubLogin: row.github_login,
+  telegram: row.telegram_chat_id ? (row.telegram_name ?? '') : null,
+  telegramReady: telegramReady(),
+  noticesOff: row.notices_off,
 });
+
+const NOTICE_KINDS = ['mention', 'assigned', 'reaction', 'starred'] as const;
 
 const lastSeenWrites = new Map<string, number>();
 function touchLastSeen(userId: string): void {
@@ -462,6 +470,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
         starAssigned: z.boolean().optional(),
         starCommented: z.boolean().optional(),
         githubLogin: z.string().max(200).optional(),
+        noticesOff: z.array(z.enum(NOTICE_KINDS)).optional(),
       })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Name is too long.' });
@@ -477,7 +486,8 @@ export function registerAuthRoutes(app: FastifyInstance): void {
                 star_created = coalesce($3, star_created),
                 star_assigned = coalesce($4, star_assigned),
                 star_commented = coalesce($5, star_commented),
-                github_login = case when $6 then $7 else github_login end
+                github_login = case when $6 then $7 else github_login end,
+                notices_off = coalesce($8, notices_off)
           where id = $1`,
         [
           auth.userId,
@@ -487,6 +497,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
           p.starCommented ?? null,
           github !== undefined,
           github || null,
+          p.noticesOff ? [...new Set(p.noticesOff)] : null,
         ]
       );
     } catch (err) {
