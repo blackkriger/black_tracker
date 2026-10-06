@@ -8,7 +8,7 @@ import { api } from '../lib/api';
 import { useBoards, type BoardFull } from '../lib/boards';
 import { filtersOf, filtersQuery, noFilters, remember, sameQuery, type Filters } from '../lib/filters';
 import { PRIORITIES, dueLabel, priorityClass, type Issue, type IssueTag } from '../lib/issues';
-import { narrow } from '../lib/layout';
+import { narrow, tiny } from '../lib/layout';
 import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
@@ -238,7 +238,7 @@ onMounted(() => {
                 <input
                   v-model="typed"
                   class="input input--sm search__f"
-                  :placeholder="narrow ? 'Summary or key…' : 'Search by summary or key…'"
+                  :placeholder="tiny ? 'Search…' : narrow ? 'Summary or key…' : 'Search by summary or key…'"
                   maxlength="100"
                   aria-label="Search the issues"
                 />
