@@ -582,17 +582,19 @@ const shownAssignee = computed(() =>
   creating.value ? draft.value.assigneeId : (issue.value?.assignee?.id ?? null)
 );
 const propsOpen = ref(false);
+const shownDue = computed(() => (creating.value ? draft.value.dueDate : (issue.value?.dueDate ?? null)));
+
 const propsSummary = computed(() => {
   const state = stateChoices.value.find((s) => s.value === shownStateId.value);
   const person = people.value.find((p) => p.id === shownAssignee.value);
+  const due = dueLabel(shownDue.value);
   return [
     ...(state ? [{ text: state.label, color: state.color }] : []),
     { text: shownPriority.value, color: priorityColor(shownPriority.value) },
     ...(person ? [{ text: person.fullName || person.login, color: person.roleColor }] : []),
+    ...(due ? [{ text: due.text, date: true, late: due.late }] : []),
   ];
 });
-
-const shownDue = computed(() => (creating.value ? draft.value.dueDate : (issue.value?.dueDate ?? null)));
 const wornTags = computed(() =>
   creating.value
     ? props.tags.filter((t) => draft.value.tagIds.includes(t.id))
@@ -1828,6 +1830,7 @@ async function removeIssue(): Promise<void> {
             <button class="props__toggle" type="button" :aria-expanded="propsOpen" @click="propsOpen = !propsOpen">
               <span class="props__sum">
                 <template v-for="(part, i) in propsSummary" :key="i"><template v-if="i">, </template><span
+                  :class="{ props__date: part.date, 'is-late': part.late }"
                   :style="{ color: ink(part.color) }"
                 >{{ part.text }}</span></template>
               </span>
@@ -2564,6 +2567,9 @@ async function removeIssue(): Promise<void> {
   .props__sum {
     flex: 1 1 auto;
     min-width: 0;
+  }
+  .props__date {
+    font: 12px var(--font-num);
   }
   .props__all:not(.is-open) {
     display: none;
