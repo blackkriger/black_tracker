@@ -21,7 +21,6 @@ const ABILITIES: [string, string | null][] = [
   ['Delete, if your role can', 'Change your account, sessions or the token itself'],
   ['Read projects, boards, issues, notices, the calendar and analytics', null],
   ['Link issues, attach files, star issues', null],
-  ['Mark notices as read', null],
 ];
 
 const tokenCreated = computed(() => stamp(me.value?.token?.createdAt ?? null));
