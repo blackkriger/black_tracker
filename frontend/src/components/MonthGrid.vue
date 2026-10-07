@@ -301,9 +301,8 @@ function onEnter(ev: PointerEvent, c: Cell): void {
 }
 .cal__pop-head {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
+  gap: 8px;
 }
 .cal__pop-day {
   color: var(--text);
