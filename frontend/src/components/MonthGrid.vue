@@ -151,7 +151,12 @@ function onEnter(ev: PointerEvent, c: Cell): void {
         '--tip': `calc(50% - ${shift}px)`,
       }"
     >
-      <span class="cal__pop-day">{{ longDate(hover.key) }}</span>
+      <span class="cal__pop-head">
+        <span class="cal__pop-day">{{ longDate(hover.key) }}</span>
+        <span v-if="hovered.said" class="cal__pop-at" :style="{ color: ink(mine) }">
+          {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
+        </span>
+      </span>
       <span v-for="m in hovered.marks" :key="m.id" class="cal__pop-mark">
         <span v-if="m.project" class="key">{{ m.project.shortName }}</span>
         {{ m.title }}
@@ -163,9 +168,6 @@ function onEnter(ev: PointerEvent, c: Cell): void {
       <span v-if="hovered.worked || hovered.created || hovered.resolved" class="cal__pop-work">
         {{ hovered.worked }} worked, {{ hovered.created }} opened,
         {{ hovered.resolved }} closed
-      </span>
-      <span v-if="hovered.said" class="cal__pop-at" :style="{ color: ink(mine) }">
-        {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
       </span>
       <span
         v-if="!hovered.marks.length && !hovered.dues.length && !hovered.worked && !hovered.created && !hovered.resolved && !hovered.said"
@@ -296,6 +298,12 @@ function onEnter(ev: PointerEvent, c: Cell): void {
   font-size: 12.5px;
   color: var(--text-dim);
   pointer-events: none;
+}
+.cal__pop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
 }
 .cal__pop-day {
   color: var(--text);
