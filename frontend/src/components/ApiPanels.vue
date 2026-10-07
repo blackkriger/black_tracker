@@ -16,11 +16,11 @@ const { errors, fail, clear } = usePanelErrors();
 
 const ABILITIES: [string, string | null][] = [
   ['Post, edit, delete and pin comments, attach files to them', 'React to comments'],
-  ['Read projects, boards, issues, the calendar and analytics', null],
   ['Create issues, change status, priority, assignee, due date, tags, board', 'Ping people or mark notices as read'],
-  ['Link issues, attach files, star issues', null],
   ['Manage projects, boards, statuses, tags and marked days', 'Manage roles, people and invite links'],
   ['Delete, if your role can', 'Change your account, sessions or the token itself'],
+  ['Read projects, boards, issues, the calendar and analytics', null],
+  ['Link issues, attach files, star issues', null],
 ];
 
 const tokenCreated = computed(() => stamp(me.value?.token?.createdAt ?? null));
