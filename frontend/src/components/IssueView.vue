@@ -22,9 +22,11 @@ import { useNotices } from '../lib/notices';
 import { useSession } from '../lib/session';
 import {
   ArrowDownWideNarrow,
-  Bot,
   ArrowUp,
   ArrowUpNarrowWide,
+  Bell,
+  BellRing,
+  Bot,
   ChevronDown,
   ChevronRight,
   FileArchive,
@@ -581,6 +583,23 @@ const shownStateId = computed(() => (creating.value ? draft.value.stateId : issu
 const shownPriority = computed(() =>
   creating.value ? draft.value.priority : (issue.value?.priority ?? 'Normal')
 );
+const pingable = computed(
+  () => !creating.value && !!issue.value?.assignee && issue.value.assignee.id !== session.me.value?.id
+);
+const rang = ref(false);
+
+async function ping(): Promise<void> {
+  if (!issue.value) return;
+  error.value = null;
+  try {
+    await api(`/issues/${issue.value.id}/ping`, { method: 'POST' });
+    rang.value = true;
+    setTimeout(() => (rang.value = false), 2000);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Something went wrong.';
+  }
+}
+
 const shownAssignee = computed(() =>
   creating.value ? draft.value.assigneeId : (issue.value?.assignee?.id ?? null)
 );
@@ -1893,12 +1912,25 @@ async function removeIssue(): Promise<void> {
               </div>
               <div class="prop" :class="{ 'is-fresh': fresh.has('assignee') }">
                 <span class="prop__k">Assignee</span>
-                <Select
-                  :model-value="shownAssignee ?? ''"
-                  :options="assigneeChoices"
-                  small
-                  @update:model-value="setProp({ assigneeId: $event || null })"
-                />
+                <div class="prop__pair">
+                  <Select
+                    :model-value="shownAssignee ?? ''"
+                    :options="assigneeChoices"
+                    small
+                    @update:model-value="setProp({ assigneeId: $event || null })"
+                  />
+                  <button
+                    v-if="pingable"
+                    class="btn btn--sm btn--icon btn--ghost"
+                    type="button"
+                    :title="`Ping ${nameOf(issue?.assignee?.login)}`"
+                    :aria-label="`Ping ${nameOf(issue?.assignee?.login)}`"
+                    @click="ping"
+                  >
+                    <BellRing v-if="rang" class="ic" />
+                    <Bell v-else class="ic" />
+                  </button>
+                </div>
               </div>
               <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
                 <span class="prop__k">Due</span>
@@ -2488,6 +2520,16 @@ async function removeIssue(): Promise<void> {
 }
 .props__all {
   display: contents;
+}
+.prop__pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.prop__pair > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .iv__who {
   margin-right: 8px;

@@ -21,12 +21,15 @@ const address = z
   .nullable()
   .optional();
 
+const MARK_ICONS = ['flag', 'milestone', 'gem', 'sparkles', 'swords', 'rocket', 'calendar-heart', 'crown'] as const;
+
 const markBody = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   title: z.string().trim().min(1).max(120),
   project: z.string().trim().max(20).nullable().optional(),
   url: address,
   banner: address,
+  icon: z.enum(MARK_ICONS).optional(),
 });
 
 const markPatch = markBody.partial();
@@ -37,6 +40,7 @@ interface MarkRow {
   title: string;
   url: string | null;
   banner: string | null;
+  icon: string;
   short_name: string | null;
   project_name: string | null;
   by_login: string | null;
@@ -48,6 +52,7 @@ const publicMark = (r: MarkRow) => ({
   title: r.title,
   url: r.url,
   banner: r.banner,
+  icon: r.icon,
   project: r.short_name ? { shortName: r.short_name, name: r.project_name ?? '' } : null,
   by: r.by_login,
 });
@@ -80,7 +85,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
 
     const [marks, dues, activity, mentions, worked, days] = await Promise.all([
       pool.query<MarkRow>(
-        `select k.id, k.day, k.title, k.url, k.banner,
+        `select k.id, k.day, k.title, k.url, k.banner, k.icon,
                 p.short_name, p.name as project_name, u.login as by_login
            from key_dates k
            left join projects p on p.id = k.project_id
@@ -227,7 +232,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
     const denied = await shutOut(auth);
     if (denied.all) return reply.send({ data: null });
     const res = await pool.query<MarkRow>(
-      `select k.id, k.day, k.title, k.url, k.banner,
+      `select k.id, k.day, k.title, k.url, k.banner, k.icon,
               p.short_name, p.name as project_name, u.login as by_login
          from key_dates k
          left join projects p on p.id = k.project_id
@@ -251,14 +256,15 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
     const projectId = await scopeOf(auth, reply, parsed.data.project);
     if (projectId === undefined) return;
     const res = await pool.query<{ id: string }>(
-      `insert into key_dates (project_id, day, title, url, banner, created_by)
-       values ($1, $2, $3, $4, $5, $6) returning id`,
+      `insert into key_dates (project_id, day, title, url, banner, icon, created_by)
+       values ($1, $2, $3, $4, $5, $6, $7) returning id`,
       [
         projectId,
         parsed.data.day,
         parsed.data.title,
         parsed.data.url ?? null,
         parsed.data.banner ?? null,
+        parsed.data.icon ?? 'flag',
         auth.userId,
       ]
     );
@@ -292,7 +298,8 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
               title = coalesce($3, title),
               project_id = case when $4 then $5::uuid else project_id end,
               url = case when $6 then $7 else url end,
-              banner = case when $8 then $9 else banner end
+              banner = case when $8 then $9 else banner end,
+              icon = coalesce($10, icon)
         where id = $1`,
       [
         id,
@@ -304,6 +311,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
         parsed.data.url ?? null,
         parsed.data.banner !== undefined,
         parsed.data.banner ?? null,
+        parsed.data.icon ?? null,
       ]
     );
     return reply.send({ data: await markById(id) });
@@ -328,7 +336,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
 
 async function markById(id: string) {
   const res = await pool.query<MarkRow>(
-    `select k.id, k.day, k.title, k.url, k.banner,
+    `select k.id, k.day, k.title, k.url, k.banner, k.icon,
             p.short_name, p.name as project_name, u.login as by_login
        from key_dates k
        left join projects p on p.id = k.project_id

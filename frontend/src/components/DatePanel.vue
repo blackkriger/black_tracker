@@ -195,6 +195,7 @@ defineExpose({ readMonth });
           <span class="men__said">
             <template v-if="n.kind === 'reaction'">reacted</template>
             <template v-else-if="n.kind === 'assigned'">assigned you</template>
+            <template v-else-if="n.kind === 'ping'">pinged you</template>
             <template v-else-if="n.kind === 'starred' && !n.commentId">
               {{ describeChanges(n.changes, nameOf) }}
             </template>

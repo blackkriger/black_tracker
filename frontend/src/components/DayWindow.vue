@@ -6,6 +6,7 @@ import Select from './Select.vue';
 import { api } from '../lib/api';
 import { tellTab } from '../lib/live';
 import { longDate, type Activity, type Due, type Mark } from '../lib/calendar';
+import { MARK_ICONS, type MarkIconName } from '../lib/markIcons';
 import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
@@ -72,6 +73,7 @@ const adding = ref(false);
 const title = ref('');
 const url = ref('');
 const banner = ref('');
+const icon = ref<MarkIconName>('flag');
 const scope = ref('');
 const busy = ref(false);
 
@@ -89,11 +91,13 @@ async function addMark(): Promise<void> {
         project: scope.value || null,
         url: url.value.trim() || null,
         banner: banner.value.trim() || null,
+        icon: icon.value,
       },
     });
     title.value = '';
     url.value = '';
     banner.value = '';
+    icon.value = 'flag';
     adding.value = false;
     await read();
     emit('changed');
@@ -160,6 +164,7 @@ async function openNotice(n: Notice): Promise<void> {
         <span class="mark__title">
           <template v-if="n.kind === 'reaction'">reacted</template>
           <template v-else-if="n.kind === 'assigned'">assigned you</template>
+          <template v-else-if="n.kind === 'ping'">pinged you</template>
           <template v-else-if="n.kind === 'starred' && !n.commentId">
             {{ describeChanges(n.changes, nameOf) }}
           </template>
@@ -241,6 +246,23 @@ async function openNotice(n: Notice): Promise<void> {
           placeholder="https://"
         />
       </div>
+      <div class="field">
+        <span class="label">Icon</span>
+        <div class="icons" role="radiogroup" aria-label="Icon">
+          <button
+            v-for="m in MARK_ICONS"
+            :key="m.name"
+            class="btn btn--sm btn--icon btn--ghost icons__i"
+            :class="{ 'is-on': icon === m.name }"
+            type="button"
+            role="radio"
+            :aria-checked="icon === m.name"
+            :aria-label="m.label"
+            :title="m.label"
+            @click="icon = m.name"
+          ><component :is="m.icon" class="ic" /></button>
+        </div>
+      </div>
       <div class="addrow">
         <Select v-model="scope" :options="projectChoices" />
         <button class="btn" type="button" @click="adding = false">Cancel</button>
@@ -289,6 +311,14 @@ async function openNotice(n: Notice): Promise<void> {
   align-items: stretch;
   gap: 0;
   padding: 0;
+}
+.icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.icons__i.is-on {
+  color: var(--accent);
 }
 .mark__banner {
   display: block;

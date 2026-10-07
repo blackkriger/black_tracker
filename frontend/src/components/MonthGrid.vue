@@ -11,6 +11,7 @@ import {
   type Cell,
   type DayInfo,
 } from '../lib/calendar';
+import { markIconOf } from '../lib/markIcons';
 import { ink } from '../lib/theme';
 
 const props = defineProps<{
@@ -46,7 +47,7 @@ function heat(key?: string): number {
   return Math.min(5, Math.ceil((worked / props.peak) * 5));
 }
 
-const WAITING = ['mention', 'assigned', 'reaction'];
+const WAITING = ['mention', 'assigned', 'reaction', 'ping'];
 
 function markOf(key?: string): string | null {
   const day = info(key);
@@ -135,7 +136,16 @@ function onEnter(ev: PointerEvent, c: Cell): void {
           class="ic ic--sm cal__at"
           :style="{ color: ink(mine) }"
         />
-        <Bell v-else-if="markOf(c.key) === 'marked'" class="ic ic--sm cal__bell" />
+        <Bell
+          v-else-if="markOf(c.key) === 'ping'"
+          class="ic ic--sm cal__at"
+          :style="{ color: ink(mine) }"
+        />
+        <component
+          :is="markIconOf(info(c.key).marks[0]?.icon)"
+          v-else-if="markOf(c.key) === 'marked'"
+          class="ic ic--sm cal__mark"
+        />
         <span v-else>{{ c.day }}</span>
       </template>
     </button>
@@ -237,7 +247,7 @@ function onEnter(ev: PointerEvent, c: Cell): void {
   color: var(--danger-text);
   font-weight: 600;
 }
-.cal__bell {
+.cal__mark {
   color: var(--accent);
 }
 .cal__at {
@@ -246,10 +256,10 @@ function onEnter(ev: PointerEvent, c: Cell): void {
 .cal__pop-at {
   color: var(--text);
 }
-.cal__day.has-due .cal__bell {
+.cal__day.has-due .cal__mark {
   color: var(--accent-bright);
 }
-.cal__day.is-late .cal__bell {
+.cal__day.is-late .cal__mark {
   color: var(--danger-text);
 }
 .cal__day.heat-1 { background: color-mix(in srgb, var(--accent) 10%, transparent); }

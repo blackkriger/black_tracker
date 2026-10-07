@@ -172,6 +172,8 @@ export function renderNotice(n: SendRow, names: Map<string, string>): string | n
       return lines(`${who} mentioned you`, said(n));
     case 'assigned':
       return lines(`${who} assigned you`, n.due_date ? `Due ${dayOf(n.due_date)}` : '');
+    case 'ping':
+      return lines(`${who} pinged you`, '');
     case 'reaction':
       return lines(`${who} reacted ${esc(n.detail ?? '')} to your comment`, said(n));
     case 'starred':

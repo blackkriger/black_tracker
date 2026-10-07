@@ -16,7 +16,7 @@ import { stamp } from '../lib/issues';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { linkQuery, monthFilters, noFilters } from '../lib/filters';
 import { layout, narrow } from '../lib/layout';
-import { AtSign, ChartColumn, ContactRound, ListChecks, Menu, Moon, Smile, Star, Sun } from 'lucide-vue-next';
+import { AtSign, Bell, ChartColumn, ContactRound, ListChecks, Menu, Moon, Smile, Star, Sun } from 'lucide-vue-next';
 import { ink, setTheme, shownTheme } from '../lib/theme';
 
 const session = useSession();
@@ -84,6 +84,7 @@ const KINDS: { kind: NoticeKind; icon: typeof AtSign; label: string }[] = [
   { kind: 'assigned', icon: ContactRound, label: 'Assigned to you' },
   { kind: 'reaction', icon: Smile, label: 'Reactions' },
   { kind: 'starred', icon: Star, label: 'Starred issues' },
+  { kind: 'ping', icon: Bell, label: 'Pings' },
 ];
 const unreadKinds = computed(() =>
   KINDS.map((k) => ({ ...k, count: unreadOf.value(k.kind) })).filter((k) => k.count)

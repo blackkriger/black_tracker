@@ -11,6 +11,7 @@ export interface Mark {
   title: string;
   url: string | null;
   banner: string | null;
+  icon: string;
   project: { shortName: string; name: string } | null;
   by: string | null;
 }

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   AtSign,
+  Bell,
   ChevronLeft,
   ChevronRight,
   ChevronsDownUp,
@@ -552,6 +553,16 @@ function closeIssue(): void {
                 ><Star class="ic" /></button>
                 <span class="selbar kind__what">Starred issues</span>
               </span>
+              <span class="kind__hold">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost kind"
+                  :class="{ 'is-off': off.includes('ping') }"
+                  type="button"
+                  aria-label="Pings"
+                  @click="toggleKind('ping').catch(() => {})"
+                ><Bell class="ic" /></button>
+                <span class="selbar kind__what">Pings</span>
+              </span>
               <span class="panel__end">{{ spanLabel(pickedDays.from, pickedDays.to, false) }}</span>
             </header>
             <div class="panel__b days">
@@ -581,6 +592,7 @@ function closeIssue(): void {
                   <span class="note__said">
                     <template v-if="n.kind === 'reaction'">reacted</template>
                     <template v-else-if="n.kind === 'assigned'">assigned you</template>
+                    <template v-else-if="n.kind === 'ping'">pinged you</template>
                     <template v-else-if="n.kind === 'starred' && !n.commentId">
                       {{ describeChanges(n.changes, nameOf) }}
                     </template>

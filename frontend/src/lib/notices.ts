@@ -3,7 +3,7 @@ import { api } from './api';
 import { shortDate } from './calendar';
 import { useSession, type Me } from './session';
 
-export type NoticeKind = 'mention' | 'reaction' | 'assigned' | 'starred';
+export type NoticeKind = 'mention' | 'reaction' | 'assigned' | 'starred' | 'ping';
 
 export interface NoticeChange {
   field: string;
@@ -31,7 +31,9 @@ const OFF = 'tracker:notices:off';
 
 export function showsAuthor(n: Notice, me: string | null | undefined): boolean {
   if (!n.by) return false;
-  if (n.kind === 'reaction' || n.kind === 'assigned' || (n.kind === 'starred' && !n.commentId)) return true;
+  if (n.kind === 'reaction' || n.kind === 'assigned' || n.kind === 'ping' || (n.kind === 'starred' && !n.commentId)) {
+    return true;
+  }
   return n.by !== me;
 }
 

@@ -134,7 +134,7 @@ const publicMe = (row: UserRow) => ({
   noticesOff: row.notices_off,
 });
 
-const NOTICE_KINDS = ['mention', 'assigned', 'reaction', 'starred'] as const;
+const NOTICE_KINDS = ['mention', 'assigned', 'reaction', 'starred', 'ping'] as const;
 
 const lastSeenWrites = new Map<string, number>();
 function touchLastSeen(userId: string): void {

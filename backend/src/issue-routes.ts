@@ -1757,6 +1757,24 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: { ok: true } });
   });
 
+  app.post('/issues/:id/ping', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const found = await loadIssueFor(req, reply, id);
+    if (!found) return;
+    if (found.auth.kind !== 'session') {
+      return reply.code(403).send({ error: 'An API token cannot do this — sign in instead.' });
+    }
+    const assignee = found.issue.assignee_id;
+    if (!assignee || assignee === found.auth.userId) return reply.code(400).send({ error: 'Nobody to ping.' });
+    await pool.query(
+      `insert into notices (user_id, kind, issue_id, by_id)
+       select id, 'ping', $2, $3 from users where id = $1 and active`,
+      [assignee, id, found.auth.userId]
+    );
+    void publish({ type: 'notice.changed', only: assignee });
+    return reply.send({ data: { ok: true } });
+  });
+
   app.post('/issues/:id/attachments', async (req, reply) => {
     const { id } = req.params as { id: string };
     const found = await loadIssueFor(req, reply, id);

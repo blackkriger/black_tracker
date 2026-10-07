@@ -37,6 +37,7 @@ const KINDS: { kind: NoticeKind; label: string }[] = [
   { kind: 'assigned', label: 'Assigned to you' },
   { kind: 'reaction', label: 'Reactions' },
   { kind: 'starred', label: 'Starred issues' },
+  { kind: 'ping', label: 'Pings' },
 ];
 
 const STARS: { key: keyof Me['autoStar']; body: string; label: string }[] = [
