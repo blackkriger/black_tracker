@@ -663,13 +663,20 @@ watch(() => props.issueKey, load, { immediate: true });
 const router = useRouter();
 forgetKeys();
 
+function issuePath(to: { key: string; projectShort: string; boardSlug: string }): string {
+  const here = props.boards.find((b) => b.id === props.board.id)?.slug;
+  return to.projectShort === props.project && here
+    ? `/${props.project}/${here}/${to.key}`
+    : `/${to.projectShort}/${to.boardSlug}/${to.key}`;
+}
+
 function followKey(ev: MouseEvent): void {
   if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
   const key = (ev.target as HTMLElement | null)?.closest<HTMLAnchorElement>('a.ikey')?.dataset.key;
   const info = key ? keyInfo(key) : null;
   if (!info) return;
   ev.preventDefault();
-  void router.push(`/${info.projectShort}/${info.boardSlug}/${info.key}`);
+  void router.push(issuePath(info));
 }
 
 const mainBox = ref<HTMLDivElement | null>(null);
@@ -1450,7 +1457,7 @@ async function removeIssue(): Promise<void> {
                       v-for="l in g.links"
                       :key="l.id"
                       class="lk"
-                      :to="`/${l.projectShort}/${l.boardSlug}/${l.key}`"
+                      :to="issuePath(l)"
                       :title="`${l.summary} — ${l.stateName}`"
                     >
                       <span class="key lk__key" :style="{ color: ink(l.stateColor) }">{{ l.key }}</span>
