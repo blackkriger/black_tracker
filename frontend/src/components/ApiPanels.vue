@@ -109,12 +109,12 @@ const CALLS: { verb: string; path: string; what: string }[] = [
           <span class="label token__can-h">What the token can do:</span>
           <div class="token__cols">
             <ul class="token__list">
+              <li><Check class="ic token__yes" />Post, edit, delete and pin comments, attach files to them</li>
               <li><Check class="ic token__yes" />Read projects, boards, issues, the calendar and analytics</li>
               <li><Check class="ic token__yes" />Create issues, change status, priority, assignee, due date, tags, board</li>
               <li><Check class="ic token__yes" />Link issues, attach files, star issues</li>
               <li><Check class="ic token__yes" />Manage projects, boards, statuses, tags and marked days</li>
               <li><Check class="ic token__yes" />Delete, if your role can</li>
-              <li><Check class="ic token__yes" />Post, edit, delete and pin comments, attach files to them</li>
             </ul>
             <ul class="token__list">
               <li><X class="ic token__no" />React to comments</li>
