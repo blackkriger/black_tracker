@@ -603,16 +603,19 @@ const pingable = computed(
   () => !creating.value && !!issue.value?.assignee && issue.value.assignee.id !== session.me.value?.id
 );
 const rang = ref(false);
+let pinging = false;
 
 async function ping(): Promise<void> {
-  if (!issue.value) return;
+  if (!issue.value || rang.value || pinging) return;
+  pinging = true;
   error.value = null;
   try {
     await api(`/issues/${issue.value.id}/ping`, { method: 'POST' });
     rang.value = true;
-    setTimeout(() => (rang.value = false), 2000);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Something went wrong.';
+  } finally {
+    pinging = false;
   }
 }
 
@@ -1946,17 +1949,17 @@ async function removeIssue(): Promise<void> {
                     small
                     @update:model-value="setProp({ assigneeId: $event || null })"
                   />
-                  <button
-                    v-if="pingable"
-                    class="btn btn--sm btn--icon btn--ghost"
-                    type="button"
-                    :title="`Ping ${nameOf(issue?.assignee?.login)}`"
-                    :aria-label="`Ping ${nameOf(issue?.assignee?.login)}`"
-                    @click="ping"
-                  >
-                    <BellRing v-if="rang" class="ic" />
-                    <Bell v-else class="ic" />
-                  </button>
+                  <template v-if="pingable">
+                    <span v-if="rang" class="pinged"><BellRing class="ic" /></span>
+                    <button
+                      v-else
+                      class="btn btn--sm btn--icon btn--ghost"
+                      type="button"
+                      :title="`Ping ${nameOf(issue?.assignee?.login)}`"
+                      :aria-label="`Ping ${nameOf(issue?.assignee?.login)}`"
+                      @click="ping"
+                    ><Bell class="ic" /></button>
+                  </template>
                 </div>
               </div>
               <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
@@ -2557,6 +2560,15 @@ async function removeIssue(): Promise<void> {
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+.pinged {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  color: var(--text-dim);
 }
 .prop__pair > :first-child {
   flex: 1 1 auto;
