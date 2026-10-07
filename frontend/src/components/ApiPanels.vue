@@ -14,6 +14,15 @@ const freshToken = ref<string | null>(null);
 const copied = ref(false);
 const { errors, fail, clear } = usePanelErrors();
 
+const ABILITIES: [string, string | null][] = [
+  ['Post, edit, delete and pin comments, attach files to them', 'React to comments'],
+  ['Read projects, boards, issues, the calendar and analytics', null],
+  ['Create issues, change status, priority, assignee, due date, tags, board', 'Ping people or mark notices as read'],
+  ['Link issues, attach files, star issues', null],
+  ['Manage projects, boards, statuses, tags and marked days', 'Manage roles, people and invite links'],
+  ['Delete, if your role can', 'Change your account, sessions or the token itself'],
+];
+
 const tokenCreated = computed(() => stamp(me.value?.token?.createdAt ?? null));
 const tokenUsed = computed(() => stamp(me.value?.token?.lastUsedAt ?? null));
 
@@ -107,22 +116,13 @@ const CALLS: { verb: string; path: string; what: string }[] = [
 
         <div class="token__can">
           <span class="label token__can-h">What the token can do:</span>
-          <div class="token__cols">
-            <ul class="token__list">
-              <li><Check class="ic token__yes" />Post, edit, delete and pin comments, attach files to them</li>
-              <li><Check class="ic token__yes" />Read projects, boards, issues, the calendar and analytics</li>
-              <li><Check class="ic token__yes" />Create issues, change status, priority, assignee, due date, tags, board</li>
-              <li><Check class="ic token__yes" />Link issues, attach files, star issues</li>
-              <li><Check class="ic token__yes" />Manage projects, boards, statuses, tags and marked days</li>
-              <li><Check class="ic token__yes" />Delete, if your role can</li>
-            </ul>
-            <ul class="token__list">
-              <li><X class="ic token__no" />React to comments</li>
-              <li><X class="ic token__no" />Ping people or mark notices as read</li>
-              <li><X class="ic token__no" />Change your account, sessions or the token itself</li>
-              <li><X class="ic token__no" />Manage roles, people and invite links</li>
-            </ul>
-          </div>
+          <ul class="token__list">
+            <template v-for="[can, cannot] in ABILITIES" :key="can">
+              <li><Check class="ic token__yes" />{{ can }}</li>
+              <li v-if="cannot"><X class="ic token__no" />{{ cannot }}</li>
+              <li v-else class="token__gap" aria-hidden="true"></li>
+            </template>
+          </ul>
         </div>
 
         <div class="token__foot">
@@ -205,25 +205,22 @@ const CALLS: { verb: string; path: string; what: string }[] = [
 .token__can-h {
   color: var(--accent);
 }
-.token__cols {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2) var(--space-5);
-  align-items: start;
-}
-@media (max-width: 760px) {
-  .token__cols {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 .token__list {
   margin: 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-5);
   font-size: 13px;
+}
+@media (max-width: 760px) {
+  .token__list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .token__gap {
+    display: none !important;
+  }
 }
 .token__list li {
   display: flex;
