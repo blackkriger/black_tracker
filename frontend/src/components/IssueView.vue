@@ -586,7 +586,7 @@ const shownPriority = computed(() =>
 );
 function historyValue(field: string, value: string | null): { text: string; login: string | null } {
   if (!value) return { text: '—', login: null };
-  if (field === 'assignee') return { text: value, login: value };
+  if (field === 'assignee' || field === 'pinged') return { text: value, login: value };
   if (field === 'due date') return { text: dueLabel(value)?.text ?? value, login: null };
   return { text: value, login: null };
 }

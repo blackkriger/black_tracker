@@ -1773,11 +1773,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     }
     const assignee = found.issue.assignee_id;
     if (!assignee || assignee === found.auth.userId) return reply.code(400).send({ error: 'Nobody to ping.' });
-    await pool.query(
-      `insert into notices (user_id, kind, issue_id, by_id)
-       select id, 'ping', $2, $3 from users where id = $1 and active`,
+    const sent = await pool.query<{ login: string }>(
+      `with pinged as (select id, login from users where id = $1 and active),
+            notice as (
+              insert into notices (user_id, kind, issue_id, by_id)
+              select id, 'ping', $2, $3 from pinged
+            )
+       select login from pinged`,
       [assignee, id, found.auth.userId]
     );
+    if (sent.rows[0]) await writeHistory(pool, id, found.auth, 'pinged', null, sent.rows[0].login);
     void publish({ type: 'notice.changed', only: assignee });
     return reply.send({ data: { ok: true } });
   });
