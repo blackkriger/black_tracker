@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { Check, X } from 'lucide-vue-next';
 import { api } from '../lib/api';
+import { features } from '../lib/features';
 import { stamp } from '../lib/issues';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useSession } from '../lib/session';
@@ -15,7 +16,7 @@ const copied = ref(false);
 const { errors, fail, clear } = usePanelErrors();
 
 const ABILITIES: [string, string | null][] = [
-  ['Create issues, change status, priority, assignee, due date, tags, board', 'Ping people'],
+  ['Create issues, change status, priority, assignee, due date, tags, board', features.pings ? 'Ping people' : null],
   ['Post, edit, delete and pin comments, attach files to them', 'React to comments'],
   ['Manage projects, boards, statuses, tags and marked days', 'Manage roles, people and invite links'],
   ['Delete, if your role can', 'Change your account, sessions or the token itself'],
