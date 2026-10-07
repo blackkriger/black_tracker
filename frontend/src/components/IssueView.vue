@@ -15,6 +15,7 @@ import Select from './Select.vue';
 import { canRead, isPicture } from '../lib/files';
 import { usePeople } from '../lib/people';
 import { here, issueViewers } from '../lib/presence';
+import PersonName from './PersonName.vue';
 import Viewers from './Viewers.vue';
 import { useProjects } from '../lib/projects';
 import { useFocus } from '../lib/focus';
@@ -583,14 +584,11 @@ const shownStateId = computed(() => (creating.value ? draft.value.stateId : issu
 const shownPriority = computed(() =>
   creating.value ? draft.value.priority : (issue.value?.priority ?? 'Normal')
 );
-function historyValue(field: string, value: string | null): { text: string; nick: string | null } {
-  if (!value) return { text: '—', nick: null };
-  if (field === 'assignee') {
-    const name = nameOf(value);
-    return { text: name, nick: name !== value ? value : null };
-  }
-  if (field === 'due date') return { text: dueLabel(value)?.text ?? value, nick: null };
-  return { text: value, nick: null };
+function historyValue(field: string, value: string | null): { text: string; login: string | null } {
+  if (!value) return { text: '—', login: null };
+  if (field === 'assignee') return { text: value, login: value };
+  if (field === 'due date') return { text: dueLabel(value)?.text ?? value, login: null };
+  return { text: value, login: null };
 }
 
 const history = computed(() =>
@@ -1867,16 +1865,25 @@ async function removeIssue(): Promise<void> {
             <div v-else-if="issue" class="hist">
               <div v-for="h in history" :key="h.id" class="hi">
                 <time>{{ stampAt(h.at) }}</time>
-                <span class="hi__who" :style="{ color: ink(colorOf(h.by)) }">{{ nameOf(h.by) }}</span>
+                <span class="hi__who"><PersonName v-if="h.by" :login="h.by" /></span>
                 <span class="hi__what">
                   <span v-if="h.viaToken" class="api">API</span>
                   <span class="hi__f">{{ h.field }}</span>
                   <template v-if="h.was">
-                    <span class="hi__f">{{ h.was.text }}<span v-if="h.was.nick" class="nick">{{ h.was.nick }}</span></span>
+                    <span class="hi__f">
+                      <PersonName v-if="h.was.login" :login="h.was.login" />
+                      <template v-else>{{ h.was.text }}</template>
+                    </span>
                     <span class="hi__arrow">→</span>
-                    <span class="hi__t">{{ h.now.text }}<span v-if="h.now.nick" class="nick">{{ h.now.nick }}</span></span>
+                    <span class="hi__t">
+                      <PersonName v-if="h.now.login" :login="h.now.login" />
+                      <template v-else>{{ h.now.text }}</template>
+                    </span>
                   </template>
-                  <span v-else-if="h.to" class="hi__t">{{ h.now.text }}<span v-if="h.now.nick" class="nick">{{ h.now.nick }}</span></span>
+                  <span v-else-if="h.to" class="hi__t">
+                    <PersonName v-if="h.now.login" :login="h.now.login" />
+                    <template v-else>{{ h.now.text }}</template>
+                  </span>
                 </span>
               </div>
               <div v-if="!issue.history.length" class="empty empty--sm">
@@ -2216,7 +2223,11 @@ async function removeIssue(): Promise<void> {
   margin-bottom: 0;
 }
 .hi {
-  grid-template-columns: 152px 96px minmax(0, 1fr);
+  grid-template-columns: 152px 180px minmax(0, 1fr);
+}
+.hi__who {
+  min-width: 0;
+  overflow: hidden;
 }
 .cm--lead {
   order: -1;
