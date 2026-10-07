@@ -16,11 +16,12 @@ const { errors, fail, clear } = usePanelErrors();
 
 const ABILITIES: [string, string | null][] = [
   ['Post, edit, delete and pin comments, attach files to them', 'React to comments'],
-  ['Create issues, change status, priority, assignee, due date, tags, board', 'Ping people or mark notices as read'],
+  ['Create issues, change status, priority, assignee, due date, tags, board', 'Ping people'],
   ['Manage projects, boards, statuses, tags and marked days', 'Manage roles, people and invite links'],
   ['Delete, if your role can', 'Change your account, sessions or the token itself'],
-  ['Read projects, boards, issues, the calendar and analytics', null],
+  ['Read projects, boards, issues, notices, the calendar and analytics', null],
   ['Link issues, attach files, star issues', null],
+  ['Mark notices as read', null],
 ];
 
 const tokenCreated = computed(() => stamp(me.value?.token?.createdAt ?? null));
@@ -70,15 +71,82 @@ async function copyToken(): Promise<void> {
 const BASE = `${window.location.origin}/api`;
 const HEADER = '-H "Authorization: Bearer trk_…"';
 
-const CALLS: { verb: string; path: string; what: string }[] = [
-  { verb: 'GET', path: '/projects', what: 'Every project open to you, with its boards' },
-  { verb: 'GET', path: '/boards/:boardId', what: 'One board with its statuses and their uuids' },
-  { verb: 'GET', path: '/boards/:boardId/issues', what: 'The tasks on one board' },
-  { verb: 'GET', path: '/issues/:key', what: 'One issue whole, not its uuid' },
-  { verb: 'GET', path: '/issues/search?q=text', what: 'Issues whose summary carries the text' },
-  { verb: 'POST', path: '/boards/:boardId/issues', what: 'Write a new issue onto that board' },
-  { verb: 'PATCH', path: '/issues/:id', what: 'Change status, priority, assignee, due date, tags' },
-  { verb: 'GET', path: '/my-issues', what: 'Everything open on your own hands' },
+type Call = { verb: string; path: string; what: string };
+
+const CALLS: { group: string; calls: Call[] }[] = [
+  {
+    group: 'Reading',
+    calls: [
+      { verb: 'GET', path: '/me', what: 'Your own account' },
+      { verb: 'GET', path: '/projects', what: 'Every project open to you, with its boards' },
+      { verb: 'GET', path: '/boards/:boardId', what: 'One board with its statuses and their uuids' },
+      { verb: 'GET', path: '/boards/:boardId/issues', what: 'The issues on one board' },
+      { verb: 'GET', path: '/issues?q=&tags=&from=&to=', what: 'Issues across every project open to you' },
+      { verb: 'GET', path: '/issues/:key', what: 'One issue whole: comments, history, files, links, commits' },
+      { verb: 'GET', path: '/issues/search?q=text', what: 'Issues whose summary carries the text' },
+      { verb: 'GET', path: '/my-issues', what: 'Everything open on your own hands' },
+      { verb: 'GET', path: '/my-favourites', what: 'Your starred issues' },
+      { verb: 'GET', path: '/people', what: 'Everyone on the tracker' },
+      { verb: 'GET', path: '/tags', what: 'Every tag' },
+      { verb: 'GET', path: '/analytics?from=&to=', what: 'The numbers behind Analytics' },
+      { verb: 'GET', path: '/events', what: 'Live stream of every change you may see' },
+    ],
+  },
+  {
+    group: 'Issues',
+    calls: [
+      { verb: 'POST', path: '/boards/:boardId/issues', what: 'Write a new issue onto that board' },
+      { verb: 'PATCH', path: '/issues/:issueId', what: 'Change summary, description, status, priority, assignee, due date, tags, board' },
+      { verb: 'DELETE', path: '/issues/:issueId', what: 'Delete an issue, if your role can' },
+      { verb: 'POST', path: '/issues/:issueId/links', what: 'Link it to another issue' },
+      { verb: 'DELETE', path: '/issues/:issueId/links/:otherId', what: 'Unlink the two' },
+      { verb: 'PUT', path: '/issues/:issueId/favourite', what: 'Star or unstar it' },
+    ],
+  },
+  {
+    group: 'Comments and files',
+    calls: [
+      { verb: 'POST', path: '/issues/:issueId/comments', what: 'Post a comment' },
+      { verb: 'PATCH', path: '/comments/:commentId', what: 'Edit your comment' },
+      { verb: 'DELETE', path: '/comments/:commentId', what: 'Delete a comment' },
+      { verb: 'PUT', path: '/comments/:commentId/pin', what: 'Pin or unpin it' },
+      { verb: 'POST', path: '/issues/:issueId/attachments', what: 'Attach a file; add ?comment=:commentId to put it on your comment' },
+      { verb: 'GET', path: '/attachments/:fileId', what: 'Download a file' },
+      { verb: 'DELETE', path: '/attachments/:fileId', what: 'Remove a file' },
+    ],
+  },
+  {
+    group: 'Notices',
+    calls: [
+      { verb: 'GET', path: '/notices', what: 'Your notices, newest first' },
+      { verb: 'GET', path: '/notices/unread', what: 'How many are unread, by kind' },
+      { verb: 'POST', path: '/notices/read', what: 'Mark one read with its id, or all of them without one' },
+    ],
+  },
+  {
+    group: 'Calendar',
+    calls: [
+      { verb: 'GET', path: '/calendar?from=&to=', what: 'Marked days, due dates and activity in the range' },
+      { verb: 'POST', path: '/key-dates', what: 'Mark a day' },
+      { verb: 'PATCH', path: '/key-dates/:dateId', what: 'Change a marked day' },
+      { verb: 'DELETE', path: '/key-dates/:dateId', what: 'Remove it, if your role can' },
+    ],
+  },
+  {
+    group: 'Settings',
+    calls: [
+      { verb: 'POST', path: '/projects', what: 'Make a project' },
+      { verb: 'PATCH', path: '/projects/:key', what: 'Change a project' },
+      { verb: 'POST', path: '/projects/:key/boards', what: 'Make a board' },
+      { verb: 'PATCH', path: '/boards/:boardId', what: 'Change a board' },
+      { verb: 'POST', path: '/boards/:boardId/states', what: 'Make a status' },
+      { verb: 'PATCH', path: '/states/:statusId', what: 'Change a status' },
+      { verb: 'POST', path: '/tags', what: 'Make a tag' },
+      { verb: 'PATCH', path: '/tags/:tagId', what: 'Change a tag' },
+      { verb: 'PUT', path: '/tags/:tagId/boards/:boardId', what: 'Show the tag on a board' },
+      { verb: 'DELETE', path: '/tags/:tagId/boards/:boardId', what: 'Hide it there' },
+    ],
+  },
 ];
 </script>
 
@@ -149,10 +217,13 @@ const CALLS: { verb: string; path: string; what: string }[] = [
         <div class="field">
           <span class="label">What answers</span>
           <div class="api__table">
-            <template v-for="c in CALLS" :key="c.verb + c.path">
-              <span class="api__verb">{{ c.verb }}</span>
-              <code class="api__path">{{ c.path }}</code>
-              <span class="api__what">{{ c.what }}</span>
+            <template v-for="g in CALLS" :key="g.group">
+              <span class="api__group">{{ g.group }}</span>
+              <template v-for="c in g.calls" :key="c.verb + c.path">
+                <span class="api__verb">{{ c.verb }}</span>
+                <code class="api__path">{{ c.path }}</code>
+                <span class="api__what">{{ c.what }}</span>
+              </template>
             </template>
           </div>
         </div>
@@ -249,6 +320,15 @@ const CALLS: { verb: string; path: string; what: string }[] = [
   gap: 6px 12px;
   align-items: baseline;
   font-size: 12.5px;
+}
+.api__group {
+  grid-column: 1 / -1;
+  padding-top: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.api__group:first-child {
+  padding-top: 0;
 }
 .api__verb {
   color: var(--accent);

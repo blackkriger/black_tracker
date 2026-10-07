@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { DAY_RE, pool, ZONE } from './db.js';
-import { requireAuth, requireSession } from './auth.js';
+import { requireAuth } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 
 const NAME = /(?:^|\s)@([a-zA-Z0-9_.-]{2,32})/g;
@@ -147,14 +147,14 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
   });
 
   app.post('/notices/read', async (req, reply) => {
-    const session = await requireSession(req, reply);
-    if (!session) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const parsed = z.object({ id: z.string().uuid().optional() }).safeParse(req.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: 'Bad notice.' });
     await pool.query(
       `update notices set read_at = now()
         where user_id = $1 and read_at is null and ($2::uuid is null or id = $2)`,
-      [session.userId, parsed.data.id ?? null]
+      [auth.userId, parsed.data.id ?? null]
     );
     return reply.send({ data: { ok: true } });
   });
