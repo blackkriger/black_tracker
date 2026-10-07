@@ -1688,8 +1688,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
   });
 
   app.patch('/comments/:id', async (req, reply) => {
-    const session = await requireSession(req, reply);
-    if (!session) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = z.object({ text: z.string().trim().min(1).max(20000) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'A comment needs some text.' });
@@ -1698,10 +1698,10 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id]
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
-    if (!(await mayReachIssue(session, owner.rows[0].issue_id))) {
+    if (!(await mayReachIssue(auth, owner.rows[0].issue_id))) {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
-    if (owner.rows[0].author_id !== session.userId) {
+    if (owner.rows[0].author_id !== auth.userId) {
       return reply.code(403).send({ error: 'Only the author can edit a comment.' });
     }
     const res = await inTransaction(async (client) => {
@@ -1709,11 +1709,11 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         'update issue_comments set text = $2, edited_at = now() where id = $1 returning edited_at',
         [id, parsed.data.text]
       );
-      await syncMentions(client, id, parsed.data.text, session.userId);
+      await syncMentions(client, id, parsed.data.text, auth.userId);
       return updated;
     });
     const host = await issueById(owner.rows[0].issue_id);
-    await writeHistory(pool, owner.rows[0].issue_id, session, 'comment edited', null, null);
+    await writeHistory(pool, owner.rows[0].issue_id, auth, 'comment edited', null, null);
     void publish({
       type: 'comment.edited',
       boardId: host?.board_id,
@@ -1721,7 +1721,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueId: owner.rows[0].issue_id,
       issueKey: host?.readable_id,
       commentId: id,
-      by: session.login,
+      by: auth.login,
       origin: tabOf(req),
     });
     return reply.send({
@@ -1730,7 +1730,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
   });
 
   app.delete('/comments/:id', async (req, reply) => {
-    const auth = await requireSession(req, reply);
+    const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { id } = req.params as { id: string };
     const owner = await pool.query<{ author_id: string; issue_id: string }>(
@@ -1968,9 +1968,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'This file is not open to you.' });
     }
     if (row.comment_id) {
-      if (auth.kind !== 'session') {
-        return reply.code(403).send({ error: 'An API token cannot do this — sign in instead.' });
-      }
       const owner = await pool.query<{ author_id: string }>(
         'select author_id from issue_comments where id = $1',
         [row.comment_id]
