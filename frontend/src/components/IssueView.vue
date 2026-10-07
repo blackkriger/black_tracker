@@ -2570,6 +2570,9 @@ async function removeIssue(): Promise<void> {
   height: 26px;
   color: var(--text-dim);
 }
+.prop__pair .btn {
+  flex: none;
+}
 .prop__pair > :first-child {
   flex: 1 1 auto;
   min-width: 0;
