@@ -223,6 +223,23 @@ async function openNotice(n: Notice): Promise<void> {
 
     <template v-else>
       <div class="field">
+        <span class="label">Icon</span>
+        <div class="icons" role="radiogroup" aria-label="Icon">
+          <button
+            v-for="m in MARK_ICONS"
+            :key="m.name"
+            class="btn btn--sm btn--icon btn--ghost icons__i"
+            :class="{ 'is-on': icon === m.name }"
+            type="button"
+            role="radio"
+            :aria-checked="icon === m.name"
+            :aria-label="m.label"
+            :title="m.label"
+            @click="icon = m.name"
+          ><component :is="m.icon" class="ic" /></button>
+        </div>
+      </div>
+      <div class="field">
         <label class="label" for="mark-title">Title</label>
         <input
           id="mark-title"
@@ -245,23 +262,6 @@ async function openNotice(n: Notice): Promise<void> {
           maxlength="500"
           placeholder="https://"
         />
-      </div>
-      <div class="field">
-        <span class="label">Icon</span>
-        <div class="icons" role="radiogroup" aria-label="Icon">
-          <button
-            v-for="m in MARK_ICONS"
-            :key="m.name"
-            class="btn btn--sm btn--icon btn--ghost icons__i"
-            :class="{ 'is-on': icon === m.name }"
-            type="button"
-            role="radio"
-            :aria-checked="icon === m.name"
-            :aria-label="m.label"
-            :title="m.label"
-            @click="icon = m.name"
-          ><component :is="m.icon" class="ic" /></button>
-        </div>
       </div>
       <div class="addrow">
         <Select v-model="scope" :options="projectChoices" />
