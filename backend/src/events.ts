@@ -1,7 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { credentialOf, requireAuth, type Auth } from './auth.js';
+import { z } from 'zod';
+import { credentialOf, requireAuth, requireSession, type Auth } from './auth.js';
 import { pool } from './db.js';
 import { DENIES_NOTHING, deniedFor, type Denials } from './board-service.js';
+
+export interface BoardPresence {
+  board: string[];
+  issues: Record<string, string[]>;
+}
 
 export interface LiveEvent {
   type: string;
@@ -14,6 +20,7 @@ export interface LiveEvent {
   by?: string;
   origin?: string;
   only?: string;
+  presence?: BoardPresence;
 }
 
 export const tabOf = (req: { headers: Record<string, unknown> }): string =>
@@ -23,8 +30,17 @@ interface Client {
   reply: FastifyReply;
   auth: Auth;
   credential: string;
+  tab: string;
   denied: Denials;
   deniedAt: number;
+}
+
+interface Seat {
+  login: string;
+  boardId: string | null;
+  issueId: string | null;
+  issueBoardId: string | null;
+  since: number;
 }
 
 async function stillAllowed(client: Client): Promise<Denials | null> {
@@ -52,6 +68,58 @@ const HEARTBEAT_MS = 25_000;
 
 const clients = new Map<number, Client>();
 let nextId = 1;
+
+const seats = new Map<string, Seat>();
+const projectOfBoard = new Map<string, string>();
+const seatOf = (userId: string, tab: string): string => `${userId}:${tab}`;
+
+async function projectOf(boardId: string): Promise<string | null> {
+  const known = projectOfBoard.get(boardId);
+  if (known) return known;
+  const res = await pool.query<{ project_id: string }>('select project_id from boards where id = $1', [boardId]);
+  const id = res.rows[0]?.project_id ?? null;
+  if (id) projectOfBoard.set(boardId, id);
+  return id;
+}
+
+function presenceOf(boardId: string): BoardPresence {
+  const board = new Set<string>();
+  const issues = new Map<string, Set<string>>();
+  for (const seat of seats.values()) {
+    if (seat.boardId === boardId) board.add(seat.login);
+    if (seat.issueId && seat.issueBoardId === boardId) {
+      issues.set(seat.issueId, (issues.get(seat.issueId) ?? new Set()).add(seat.login));
+    }
+  }
+  return { board: [...board], issues: Object.fromEntries([...issues].map(([id, who]) => [id, [...who]])) };
+}
+
+async function tellPresence(boardIds: (string | null | undefined)[]): Promise<void> {
+  for (const boardId of new Set(boardIds.filter((id): id is string => !!id))) {
+    void publish({ type: 'presence.changed', boardId, projectId: await projectOf(boardId), presence: presenceOf(boardId) });
+  }
+}
+
+function leave(key: string): void {
+  const seat = seats.get(key);
+  if (!seat) return;
+  seats.delete(key);
+  void tellPresence([seat.boardId, seat.issueBoardId]);
+}
+
+function leaveIfGone(userId: string, tab: string): void {
+  const open = [...clients.values()].some((c) => c.auth.userId === userId && c.tab === tab);
+  if (!open) leave(seatOf(userId, tab));
+}
+
+const SEAT_GRACE_MS = 60_000;
+setInterval(() => {
+  for (const [key, seat] of seats) {
+    const [userId, tab] = key.split(':');
+    const open = [...clients.values()].some((c) => c.auth.userId === userId && c.tab === tab);
+    if (!open && Date.now() - seat.since > SEAT_GRACE_MS) leave(key);
+  }
+}, SEAT_GRACE_MS).unref();
 
 async function denialsFresh(client: Client): Promise<Denials | null> {
   if (Date.now() - client.deniedAt <= DENIALS_TTL) return client.denied;
@@ -147,31 +215,71 @@ export function registerEventRoutes(app: FastifyInstance): void {
     reply.raw.write(': open\n\n');
 
     const id = nextId++;
+    const tab = String((req.query as { tab?: string }).tab ?? '').slice(0, 64);
     clients.set(id, {
       reply,
       auth,
       credential,
+      tab,
       denied: auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId),
       deniedAt: Date.now(),
     });
 
+    const gone = (): void => {
+      clearInterval(beat);
+      clients.delete(id);
+      if (tab) leaveIfGone(auth.userId, tab);
+    };
     const beat = setInterval(() => {
       if (reply.raw.destroyed || reply.raw.writableEnded) {
-        clearInterval(beat);
-        clients.delete(id);
+        gone();
         return;
       }
       try {
         reply.raw.write(': ping\n\n');
       } catch {
-        clearInterval(beat);
-        clients.delete(id);
+        gone();
       }
     }, HEARTBEAT_MS);
 
-    req.raw.on('close', () => {
-      clearInterval(beat);
-      clients.delete(id);
-    });
+    req.raw.on('close', gone);
+  });
+
+  app.post('/presence', async (req, reply) => {
+    const auth = await requireSession(req, reply);
+    if (!auth) return;
+    const tab = tabOf(req).slice(0, 64);
+    const parsed = z
+      .object({ boardId: z.string().uuid().nullable(), issueId: z.string().uuid().nullable() })
+      .safeParse(req.body);
+    if (!tab || !parsed.success) return reply.code(400).send({ error: 'Bad presence.' });
+    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    const open = (boardId: string, projectId: string | null): boolean =>
+      !!projectId && !denied.everything && !denied.boards.has(boardId) && !denied.projects.has(projectId);
+
+    let boardId = parsed.data.boardId;
+    if (boardId && !open(boardId, await projectOf(boardId))) boardId = null;
+    let issueId = parsed.data.issueId;
+    let issueBoardId: string | null = null;
+    if (issueId) {
+      const res = await pool.query<{ board_id: string; project_id: string }>(
+        'select board_id, project_id from issues where id = $1',
+        [issueId]
+      );
+      const row = res.rows[0];
+      if (row && open(row.board_id, row.project_id)) issueBoardId = row.board_id;
+      else issueId = null;
+    }
+
+    const key = seatOf(auth.userId, tab);
+    const before = seats.get(key);
+    if (boardId || issueId) {
+      seats.set(key, { login: auth.login, boardId, issueId, issueBoardId, since: Date.now() });
+    } else {
+      seats.delete(key);
+    }
+    void tellPresence([before?.boardId, before?.issueBoardId, boardId, issueBoardId]);
+    const shown = [...new Set([boardId, issueBoardId].filter((id): id is string => !!id))];
+    return reply.send({ data: Object.fromEntries(shown.map((id) => [id, presenceOf(id)])) });
   });
 }

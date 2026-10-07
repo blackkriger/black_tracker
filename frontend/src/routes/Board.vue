@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import Viewers from '../components/Viewers.vue';
+import { boardViewers, here } from '../lib/presence';
 import { useRoute, useRouter } from 'vue-router';
 import IssueView from '../components/IssueView.vue';
 import Select from '../components/Select.vue';
@@ -418,6 +420,14 @@ onMounted(() => {
   window.addEventListener('keydown', onKeydown);
 });
 onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+
+const onBoard = boardViewers(() => current.value?.id);
+watch(
+  () => current.value?.id,
+  (id) => (here.boardId = id ?? null),
+  { immediate: true }
+);
+onUnmounted(() => (here.boardId = null));
 watch(
   () => route.params.short,
   (short) => {
@@ -508,6 +518,7 @@ watch(
       >
         Clear filters
       </button>
+      <Viewers :logins="onBoard" class="board__who" />
     </div>
 
     <div
@@ -667,6 +678,9 @@ watch(
 }
 .filter:hover {
   color: var(--text);
+}
+.board__who {
+  margin-left: auto;
 }
 .tagbar__sep {
   flex: none;

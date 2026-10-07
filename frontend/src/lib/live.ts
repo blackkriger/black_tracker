@@ -11,6 +11,7 @@ export interface LiveEvent {
   fields?: string[];
   by?: string;
   origin?: string;
+  presence?: { board: string[]; issues: Record<string, string[]> };
   at: string;
 }
 
@@ -25,7 +26,7 @@ let delay = 1000;
 
 function open(): void {
   if (source || retry) return;
-  const stream = new EventSource('/api/events', { withCredentials: true });
+  const stream = new EventSource(`/api/events?tab=${encodeURIComponent(TAB_ID)}`, { withCredentials: true });
   source = stream;
   stream.onopen = () => {
     delay = 1000;
@@ -72,10 +73,14 @@ export function settled(run: () => void, ms = 300): () => void {
   };
 }
 
-export function useLive(handler: Handler, resync?: () => void): void {
+export function listen(handler: Handler, resync?: () => void): void {
   handlers.add(handler);
   if (resync) resyncs.add(resync);
   open();
+}
+
+export function useLive(handler: Handler, resync?: () => void): void {
+  listen(handler, resync);
   onUnmounted(() => {
     handlers.delete(handler);
     if (resync) resyncs.delete(resync);

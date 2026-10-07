@@ -14,6 +14,8 @@ import FileWall from './FileWall.vue';
 import Select from './Select.vue';
 import { canRead, isPicture } from '../lib/files';
 import { usePeople } from '../lib/people';
+import { here, issueViewers } from '../lib/presence';
+import Viewers from './Viewers.vue';
 import { useProjects } from '../lib/projects';
 import { useFocus } from '../lib/focus';
 import { useNotices } from '../lib/notices';
@@ -649,7 +651,16 @@ onMounted(() => {
   window.addEventListener('mousemove', onMouseMove);
   void loadPeople();
 });
+const watching = issueViewers(
+  () => issue.value?.boardId,
+  () => issue.value?.id
+);
+watch(
+  () => issue.value?.id,
+  (id) => (here.issueId = id ?? null)
+);
 onUnmounted(() => {
+  if (here.issueId === issue.value?.id) here.issueId = null;
   for (const url of previewUrls.values()) URL.revokeObjectURL(url);
   previewUrls.clear();
   window.removeEventListener('keydown', onKeydown);
@@ -1310,6 +1321,7 @@ async function removeIssue(): Promise<void> {
             <span class="key iv__key">{{ issueKey ?? nextKey ?? 'NEW ISSUE' }}</span>
           </span>
           <div class="sp"></div>
+          <Viewers v-if="!creating" :logins="watching" class="iv__who" />
           <template v-if="creating">
             <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
             <button
@@ -2476,6 +2488,9 @@ async function removeIssue(): Promise<void> {
 }
 .props__all {
   display: contents;
+}
+.iv__who {
+  margin-right: 8px;
 }
 .via {
   margin-left: 8px;
