@@ -269,14 +269,8 @@ function onEnter(ev: PointerEvent, c: Cell): void {
 .cal--range .cal__day {
   touch-action: none;
 }
-.cal--range .cal__day:not(.is-picked, .is-today, .has-due, .is-late) {
-  color: var(--text-muted);
-}
 .cal__day.is-picked {
   font-weight: 700;
-}
-.cal__day.is-picked:not(.has-due, .is-late) {
-  color: var(--text);
 }
 .cal__pop::before,
 .cal__pop::after {
