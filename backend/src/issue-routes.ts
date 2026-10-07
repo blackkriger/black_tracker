@@ -266,6 +266,7 @@ interface HistoryRow {
   new_value: string | null;
   created_at: Date;
   user_login: string | null;
+  via_token: boolean;
 }
 
 async function visibleHistory(auth: Auth, projectId: string, rows: HistoryRow[]): Promise<HistoryRow[]> {
@@ -398,20 +399,23 @@ async function noteStarred(
   }
 }
 
+type Actor = { userId: string; kind?: Auth['kind'] };
+
 async function writeHistory(
   client: { query: typeof pool.query },
   issueId: string,
-  userId: string,
+  actor: Actor,
   field: string,
   oldValue: string | null,
   newValue: string | null
 ): Promise<void> {
   await client.query(
-    'insert into issue_history (issue_id, user_id, field, old_value, new_value) values ($1, $2, $3, $4, $5)',
-    [issueId, userId, field, oldValue, newValue]
+    `insert into issue_history (issue_id, user_id, field, old_value, new_value, via_token)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [issueId, actor.userId, field, oldValue, newValue, actor.kind === 'token']
   );
   if (STARRED_FIELDS.has(field)) {
-    await noteStarred(client, issueId, userId, { field, from: oldValue, to: newValue });
+    await noteStarred(client, issueId, actor.userId, { field, from: oldValue, to: newValue });
   }
 }
 
@@ -462,7 +466,7 @@ async function tellWatchers(issue: Placed, actorId: string): Promise<void> {
 async function changeState(
   client: { query: typeof pool.query },
   issueId: string,
-  userId: string,
+  actor: Actor,
   boardId: string,
   fromStateId: string,
   toStateId: string
@@ -475,7 +479,7 @@ async function changeState(
   await writeHistory(
     client,
     issueId,
-    userId,
+    actor,
     'status',
     byId(fromStateId)?.name ?? null,
     byId(toStateId)?.name ?? null
@@ -566,7 +570,7 @@ export async function boardDefaults(boardId: string): Promise<BoardDefaults | nu
 export type IssueDraft = z.infer<typeof issueCreate>;
 
 export async function createIssue(
-  by: { userId: string; login: string },
+  by: Actor & { login: string },
   boardId: string,
   board: BoardDefaults,
   p: IssueDraft,
@@ -625,7 +629,7 @@ export async function createIssue(
         [row.rows[0].id, p.tagIds]
       );
     }
-    await writeHistory(client, row.rows[0].id, by.userId, 'created', null, null);
+    await writeHistory(client, row.rows[0].id, by, 'created', null, null);
     if (assigneeId && assigneeId !== by.userId) {
       await client.query(
         `insert into notices (user_id, kind, issue_id, by_id) values ($1, 'assigned', $2, $3)`,
@@ -677,7 +681,7 @@ export async function storeFile(issueId: string, source: NodeJS.ReadableStream, 
 export async function recordFile(
   issue: Pick<IssueRow, 'id' | 'board_id' | 'project_id' | 'readable_id'>,
   file: { stored: string; filename: string; mime: string; commentId: string | null },
-  by: { userId: string; login: string },
+  by: Actor & { login: string },
   origin?: string
 ): Promise<{ id: string; filename: string; size: number; createdAt: Date }> {
   const { size } = await stat(onDisk(file.stored));
@@ -697,7 +701,7 @@ export async function recordFile(
   if (file.commentId) {
     await pool.query('update issue_comments set edited_at = now() where id = $1', [file.commentId]);
   }
-  await writeHistory(pool, issue.id, by.userId, 'file added', null, filename);
+  await writeHistory(pool, issue.id, by, 'file added', null, filename);
   void publish({
     type: 'attachment.added',
     boardId: issue.board_id,
@@ -806,7 +810,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         await writeHistory(
           client,
           issueId,
-          auth.userId,
+          auth,
           'status',
           was.rows[0]?.name ?? null,
           state.rows[0].name
@@ -852,7 +856,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const [tags, comments, history, attachments, links, stars, commits] = await Promise.all([
       tagsFor([issue.id]),
       pool.query(
-        `select c.id, c.text, c.created_at, c.edited_at, c.author_id, c.pinned_at,
+        `select c.id, c.text, c.created_at, c.edited_at, c.author_id, c.pinned_at, c.via_token,
                 u.login as author_login, p.login as pinned_by_login,
                 coalesce(
                   (select json_agg(json_build_object('emoji', r.emoji, 'by', ru.login)
@@ -871,7 +875,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       ),
       pool
         .query<HistoryRow>(
-          `select h.id, h.field, h.old_value, h.new_value, h.created_at, u.login as user_login
+          `select h.id, h.field, h.old_value, h.new_value, h.created_at, h.via_token, u.login as user_login
              from issue_history h left join users u on u.id = h.user_id
             where h.issue_id = $1 order by h.created_at desc`,
           [issue.id]
@@ -908,6 +912,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           editedAt: c.edited_at?.toISOString() ?? null,
           pinnedAt: c.pinned_at?.toISOString() ?? null,
           pinnedBy: c.pinned_by_login,
+          viaToken: c.via_token,
           reactions: c.reactions as { emoji: string; by: string }[],
         })),
         history: history.map((h) => ({
@@ -916,6 +921,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           from: h.old_value,
           to: h.new_value,
           by: h.user_login,
+          viaToken: h.via_token,
           at: h.created_at.toISOString(),
         })),
         links: links.map(publicLink),
@@ -994,16 +1000,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
 
     await inTransaction(async (client) => {
       if (p.summary !== undefined && p.summary !== issue.summary) {
-        await writeHistory(client, id, auth.userId, 'summary', issue.summary, p.summary);
+        await writeHistory(client, id, auth, 'summary', issue.summary, p.summary);
       }
       if (p.description !== undefined && p.description !== issue.description) {
-        await writeHistory(client, id, auth.userId, 'description edited', null, null);
+        await writeHistory(client, id, auth, 'description edited', null, null);
       }
       if (p.priority !== undefined && p.priority !== issue.priority) {
-        await writeHistory(client, id, auth.userId, 'priority', issue.priority, p.priority);
+        await writeHistory(client, id, auth, 'priority', issue.priority, p.priority);
       }
       if (p.dueDate !== undefined && (p.dueDate ?? null) !== issue.due_date) {
-        await writeHistory(client, id, auth.userId, 'due date', issue.due_date, p.dueDate ?? null);
+        await writeHistory(client, id, auth, 'due date', issue.due_date, p.dueDate ?? null);
       }
       if (p.assigneeId !== undefined && (p.assigneeId ?? null) !== issue.assignee_id) {
         const names = await client.query<{ id: string; login: string }>(
@@ -1015,7 +1021,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         await writeHistory(
           client,
           id,
-          auth.userId,
+          auth,
           'assignee',
           login(issue.assignee_id),
           login(p.assigneeId ?? null)
@@ -1037,7 +1043,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         await writeHistory(
           client,
           id,
-          auth.userId,
+          auth,
           'board',
           was.rows[0]?.name ?? null,
           landing.name
@@ -1045,7 +1051,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         await client.query('update issues set board_id = $2 where id = $1', [id, landing.boardId]);
       }
       if (nextState !== undefined && nextState !== issue.state_id) {
-        await changeState(client, id, auth.userId, home, issue.state_id, nextState);
+        await changeState(client, id, auth, home, issue.state_id, nextState);
       }
 
       await client.query(
@@ -1093,10 +1099,10 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           );
         }
         for (const row of after.rows.filter((r) => !had.has(r.id))) {
-          await writeHistory(client, id, auth.userId, 'tag added', null, row.name);
+          await writeHistory(client, id, auth, 'tag added', null, row.name);
         }
         for (const row of before.rows.filter((r) => !has.has(r.tag_id))) {
-          await writeHistory(client, id, auth.userId, 'tag removed', null, row.name);
+          await writeHistory(client, id, auth, 'tag removed', null, row.name);
         }
       }
     });
@@ -1435,17 +1441,17 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         await changeState(
           client,
           from.id,
-          found.auth.userId,
+          found.auth,
           from.board_id,
           from.state_id,
           duplicateState
         );
       }
-      await writeHistory(client, id, found.auth.userId, 'link added', null, target.readable_id);
+      await writeHistory(client, id, found.auth, 'link added', null, target.readable_id);
       await writeHistory(
         client,
         target.id,
-        found.auth.userId,
+        found.auth,
         'link added',
         null,
         found.issue.readable_id
@@ -1486,11 +1492,11 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [found.issue.id, other?.id ?? otherId]
       );
       if (!gone.rowCount || !other) return gone;
-      await writeHistory(client, id, found.auth.userId, 'link removed', null, other.readable_id);
+      await writeHistory(client, id, found.auth, 'link removed', null, other.readable_id);
       await writeHistory(
         client,
         other.id,
-        found.auth.userId,
+        found.auth,
         'link removed',
         null,
         found.issue.readable_id
@@ -1518,8 +1524,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
 
   app.post('/issues/:id/comments', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const session = await requireSession(req, reply);
-    if (!session) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const found = await loadIssueFor(req, reply, id);
     if (!found) return;
     const parsed = z.object({ text: z.string().trim().min(1).max(20000) }).safeParse(req.body);
@@ -1527,11 +1533,11 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     let starredNow = false;
     const row = await inTransaction(async (client) => {
       const res = await client.query(
-        `insert into issue_comments (issue_id, author_id, text) values ($1, $2, $3)
+        `insert into issue_comments (issue_id, author_id, text, via_token) values ($1, $2, $3, $4)
          returning id, text, created_at, edited_at`,
-        [id, session.userId, parsed.data.text]
+        [id, auth.userId, parsed.data.text, auth.kind === 'token']
       );
-      await syncMentions(client, res.rows[0].id, parsed.data.text, session.userId);
+      await syncMentions(client, res.rows[0].id, parsed.data.text, auth.userId);
       await client.query(
         `insert into notices (user_id, kind, issue_id, comment_id, by_id)
          select f.user_id, 'starred', $1, $2, $3
@@ -1541,13 +1547,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
               select 1 from notices n
                where n.comment_id = $2 and n.user_id = f.user_id and n.kind = 'mention'
             )`,
-        [id, res.rows[0].id, session.userId]
+        [id, res.rows[0].id, auth.userId]
       );
-      starredNow = await autoStar(client, session.userId, id, 'star_commented');
+      starredNow = await autoStar(client, auth.userId, id, 'star_commented');
       return res.rows[0];
     });
-    if (starredNow) tellStarred(session.userId, found.issue);
-    await writeHistory(pool, id, session.userId, 'comment added', null, null);
+    if (starredNow) tellStarred(auth.userId, found.issue);
+    await writeHistory(pool, id, auth, 'comment added', null, null);
     void publish({
       type: 'comment.added',
       boardId: found.issue.board_id,
@@ -1555,18 +1561,19 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueId: id,
       issueKey: found.issue.readable_id,
       commentId: row.id,
-      by: session.login,
+      by: auth.login,
       origin: tabOf(req),
     });
     return reply.code(201).send({
       data: {
         id: row.id,
         text: row.text,
-        author: { id: session.userId, login: session.login },
+        author: { id: auth.userId, login: auth.login },
         createdAt: row.created_at.toISOString(),
         editedAt: null,
         pinnedAt: null,
         pinnedBy: null,
+        viaToken: auth.kind === 'token',
       },
     });
   });
@@ -1631,8 +1638,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
   });
 
   app.put('/comments/:id/pin', async (req, reply) => {
-    const session = await requireSession(req, reply);
-    if (!session) return;
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
     const { id } = req.params as { id: string };
     const parsed = z.object({ pinned: z.boolean() }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Say pinned true or false.' });
@@ -1642,7 +1649,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
     const host = await issueById(owner.rows[0].issue_id);
-    if (!host || !(await mayOpenBoard(session, host.board_id, host.project_id))) {
+    if (!host || !(await mayOpenBoard(auth, host.board_id, host.project_id))) {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
     }
     const res = await pool.query<{ pinned_at: Date | null }>(
@@ -1651,12 +1658,12 @@ export function registerIssueRoutes(app: FastifyInstance): void {
               pinned_by = case when $2 then $3::uuid else null end
         where id = $1
         returning pinned_at`,
-      [id, parsed.data.pinned, session.userId]
+      [id, parsed.data.pinned, auth.userId]
     );
     await writeHistory(
       pool,
       host.id,
-      session.userId,
+      auth,
       parsed.data.pinned ? 'comment pinned' : 'comment unpinned',
       null,
       null
@@ -1668,14 +1675,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       issueId: host.id,
       issueKey: host.readable_id,
       commentId: id,
-      by: session.login,
+      by: auth.login,
       origin: tabOf(req),
     });
     return reply.send({
       data: {
         id,
         pinnedAt: res.rows[0].pinned_at?.toISOString() ?? null,
-        pinnedBy: parsed.data.pinned ? session.login : null,
+        pinnedBy: parsed.data.pinned ? auth.login : null,
       },
     });
   });
@@ -1706,7 +1713,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return updated;
     });
     const host = await issueById(owner.rows[0].issue_id);
-    await writeHistory(pool, owner.rows[0].issue_id, session.userId, 'comment edited', null, null);
+    await writeHistory(pool, owner.rows[0].issue_id, session, 'comment edited', null, null);
     void publish({
       type: 'comment.edited',
       boardId: host?.board_id,
@@ -1743,7 +1750,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     await pool.query('delete from issue_comments where id = $1', [id]);
     await Promise.all(files.rows.map((f) => unlink(onDisk(f.storage_path)).catch(() => {})));
     const host = await issueById(owner.rows[0].issue_id);
-    await writeHistory(pool, owner.rows[0].issue_id, auth.userId, 'comment deleted', null, null);
+    await writeHistory(pool, owner.rows[0].issue_id, auth, 'comment deleted', null, null);
     void publish({
       type: 'comment.deleted',
       boardId: host?.board_id,
@@ -1786,9 +1793,6 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         [comment, id]
       );
       if (!owns.rowCount) return reply.code(400).send({ error: 'That comment is on another issue.' });
-      if (found.auth.kind !== 'session') {
-        return reply.code(403).send({ error: 'An API token cannot do this — sign in instead.' });
-      }
       if (owns.rows[0].author_id !== found.auth.userId) {
         return reply.code(403).send({ error: 'Only the author can edit a comment.' });
       }
@@ -1986,7 +1990,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     }
     await unlink(onDisk(row.storage_path)).catch(() => {});
     const host = await issueById(row.issue_id);
-    await writeHistory(pool, row.issue_id, auth.userId, 'file removed', null, row.filename);
+    await writeHistory(pool, row.issue_id, auth, 'file removed', null, row.filename);
     void publish({
       type: 'attachment.deleted',
       boardId: host?.board_id,

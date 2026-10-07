@@ -64,6 +64,7 @@ export interface Comment {
   editedAt: string | null;
   pinnedAt: string | null;
   pinnedBy: string | null;
+  viaToken?: boolean;
 }
 
 export interface HistoryEntry {
@@ -72,6 +73,7 @@ export interface HistoryEntry {
   from: string | null;
   to: string | null;
   by: string | null;
+  viaToken?: boolean;
   at: string;
 }
 

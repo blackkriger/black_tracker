@@ -1657,6 +1657,7 @@ async function removeIssue(): Promise<void> {
                       <span class="cm__who" :style="{ color: ink(colorOf(c.author.login)) }">
                         {{ nameOf(c.author.login) }}
                       </span>
+                      <span v-if="c.viaToken" class="api">API</span>
                       <time class="stamp">{{ stampAt(c.createdAt) }}</time>
                       <span v-if="c.editedAt" class="cm__edited">
                         edited
@@ -1850,6 +1851,7 @@ async function removeIssue(): Promise<void> {
                 <time>{{ stampAt(h.at) }}</time>
                 <span class="hi__who" :style="{ color: ink(colorOf(h.by)) }">{{ nameOf(h.by) }}</span>
                 <span class="hi__what">
+                  <span v-if="h.viaToken" class="api">API</span>
                   <span class="hi__f">{{ h.field }}</span>
                   <template v-if="h.from">
                     <span class="hi__f">{{ h.from }}</span>
