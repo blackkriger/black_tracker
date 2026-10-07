@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import pg from 'pg';
 import { z } from 'zod';
 import { credentialOf, requireAuth, requireSession, type Auth } from './auth.js';
 import { pool } from './db.js';
+import { env } from './env.js';
 import { DENIES_NOTHING, deniedFor, type Denials } from './board-service.js';
 
 export interface BoardPresence {
@@ -135,6 +137,63 @@ function mayHear(denied: Denials, event: LiveEvent): boolean {
   if (event.boardId && denied.boards.has(event.boardId)) return false;
   if (event.projectId && denied.projects.has(event.projectId)) return false;
   return true;
+}
+
+const historyOf = new Map<string, string | null>();
+let historyFlush: ReturnType<typeof setTimeout> | null = null;
+
+async function announceHistory(): Promise<void> {
+  historyFlush = null;
+  const changed = [...historyOf];
+  historyOf.clear();
+  const res = await pool.query<{ id: string; readable_id: string; board_id: string; project_id: string }>(
+    'select id, readable_id, board_id, project_id from issues where id = any($1::uuid[])',
+    [changed.map(([id]) => id)]
+  );
+  const people = await pool.query<{ id: string; login: string }>('select id, login from users where id = any($1::uuid[])', [
+    changed.map(([, by]) => by).filter((by): by is string => !!by),
+  ]);
+  const loginOf = new Map(people.rows.map((u) => [u.id, u.login]));
+  const actorOf = new Map(changed);
+  for (const row of res.rows) {
+    const by = actorOf.get(row.id);
+    void publish({
+      type: 'history.added',
+      issueId: row.id,
+      issueKey: row.readable_id,
+      boardId: row.board_id,
+      projectId: row.project_id,
+      by: by ? loginOf.get(by) : undefined,
+    });
+  }
+}
+
+export async function listenForHistory(): Promise<void> {
+  const client = new pg.Client({ connectionString: env.databaseUrl });
+  const again = (err?: Error): void => {
+    if (err) console.error('[events] history listener lost', err.message);
+    client.removeAllListeners();
+    void client.end().catch(() => {});
+    setTimeout(() => void listenForHistory(), 5000).unref();
+  };
+  client.on('notification', (msg) => {
+    try {
+      const { issue, by } = JSON.parse(msg.payload ?? '{}') as { issue?: string; by?: string | null };
+      if (issue) historyOf.set(issue, by ?? null);
+    } catch {
+      return;
+    }
+    historyFlush ??= setTimeout(() => {
+      void announceHistory().catch((err) => console.error('[events] history announce failed', (err as Error).message));
+    }, 50);
+  });
+  client.on('error', again);
+  try {
+    await client.connect();
+    await client.query('listen issue_history');
+  } catch (err) {
+    again(err as Error);
+  }
 }
 
 export async function publish(event: LiveEvent): Promise<void> {

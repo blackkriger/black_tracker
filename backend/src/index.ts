@@ -17,7 +17,7 @@ import { registerIssueRoutes } from './issue-routes.js';
 import { registerCalendarRoutes } from './calendar-routes.js';
 import { registerAnalyticsRoutes } from './analytics-routes.js';
 import { registerNoticeRoutes } from './notice-routes.js';
-import { registerChangeFeed, registerEventRoutes } from './events.js';
+import { listenForHistory, registerChangeFeed, registerEventRoutes } from './events.js';
 import { registerGitRoutes } from './git-routes.js';
 import { registerTelegramRoutes, startTelegram } from './telegram.js';
 
@@ -91,5 +91,6 @@ await mkdir(env.uploadDir, { recursive: true });
 await pruneSessions();
 setInterval(pruneSessions, 24 * 60 * 60 * 1000).unref();
 await startTelegram();
+await listenForHistory();
 
 await app.listen({ port: env.port, host: '127.0.0.1' });
