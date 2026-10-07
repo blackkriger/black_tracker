@@ -583,6 +583,24 @@ const shownStateId = computed(() => (creating.value ? draft.value.stateId : issu
 const shownPriority = computed(() =>
   creating.value ? draft.value.priority : (issue.value?.priority ?? 'Normal')
 );
+function historyValue(field: string, value: string | null): { text: string; nick: string | null } {
+  if (!value) return { text: '—', nick: null };
+  if (field === 'assignee') {
+    const name = nameOf(value);
+    return { text: name, nick: name !== value ? value : null };
+  }
+  if (field === 'due date') return { text: dueLabel(value)?.text ?? value, nick: null };
+  return { text: value, nick: null };
+}
+
+const history = computed(() =>
+  (issue.value?.history ?? []).map((h) => ({
+    ...h,
+    was: h.from ? historyValue(h.field, h.from) : null,
+    now: h.to ? historyValue(h.field, h.to) : historyValue(h.field, null),
+  }))
+);
+
 const pingable = computed(
   () => !creating.value && !!issue.value?.assignee && issue.value.assignee.id !== session.me.value?.id
 );
@@ -1847,18 +1865,18 @@ async function removeIssue(): Promise<void> {
             </div>
 
             <div v-else-if="issue" class="hist">
-              <div v-for="h in issue.history" :key="h.id" class="hi">
+              <div v-for="h in history" :key="h.id" class="hi">
                 <time>{{ stampAt(h.at) }}</time>
                 <span class="hi__who" :style="{ color: ink(colorOf(h.by)) }">{{ nameOf(h.by) }}</span>
                 <span class="hi__what">
                   <span v-if="h.viaToken" class="api">API</span>
                   <span class="hi__f">{{ h.field }}</span>
-                  <template v-if="h.from">
-                    <span class="hi__f">{{ h.from }}</span>
+                  <template v-if="h.was">
+                    <span class="hi__f">{{ h.was.text }}<span v-if="h.was.nick" class="nick">{{ h.was.nick }}</span></span>
                     <span class="hi__arrow">→</span>
-                    <span class="hi__t">{{ h.to ?? '—' }}</span>
+                    <span class="hi__t">{{ h.now.text }}<span v-if="h.now.nick" class="nick">{{ h.now.nick }}</span></span>
                   </template>
-                  <span v-else-if="h.to" class="hi__t">{{ h.to }}</span>
+                  <span v-else-if="h.to" class="hi__t">{{ h.now.text }}<span v-if="h.now.nick" class="nick">{{ h.now.nick }}</span></span>
                 </span>
               </div>
               <div v-if="!issue.history.length" class="empty empty--sm">
