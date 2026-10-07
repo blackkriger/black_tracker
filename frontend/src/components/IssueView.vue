@@ -14,6 +14,7 @@ import FileWall from './FileWall.vue';
 import Select from './Select.vue';
 import { canRead, isPicture } from '../lib/files';
 import { usePeople } from '../lib/people';
+import { features } from '../lib/features';
 import { here, issueViewers } from '../lib/presence';
 import PersonName from './PersonName.vue';
 import Viewers from './Viewers.vue';
@@ -600,7 +601,11 @@ const history = computed(() =>
 );
 
 const pingable = computed(
-  () => !creating.value && !!issue.value?.assignee && issue.value.assignee.id !== session.me.value?.id
+  () =>
+    features.pings &&
+    !creating.value &&
+    !!issue.value?.assignee &&
+    issue.value.assignee.id !== session.me.value?.id
 );
 const rang = ref(false);
 let pinging = false;
@@ -695,7 +700,9 @@ const watching = issueViewers(
 );
 watch(
   () => issue.value?.id,
-  (id) => (here.issueId = id ?? null)
+  (id) => {
+    if (features.presence) here.issueId = id ?? null;
+  }
 );
 onUnmounted(() => {
   if (here.issueId === issue.value?.id) here.issueId = null;
@@ -1359,7 +1366,7 @@ async function removeIssue(): Promise<void> {
             <span class="key iv__key">{{ issueKey ?? nextKey ?? 'NEW ISSUE' }}</span>
           </span>
           <div class="sp"></div>
-          <Viewers v-if="!creating" :logins="watching" class="iv__who" />
+          <Viewers v-if="features.presence && !creating" :logins="watching" class="iv__who" />
           <template v-if="creating">
             <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
             <button

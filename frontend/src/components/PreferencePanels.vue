@@ -6,6 +6,7 @@ import { commentOrder, type CommentOrder } from '../lib/issues';
 import { setWrapLines, wrapLines } from '../lib/files';
 import { layout, setLayout, type Layout } from '../lib/layout';
 import { setTheme, theme, type Theme } from '../lib/theme';
+import { features } from '../lib/features';
 import { useNotices, type NoticeKind } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useSession, type Me } from '../lib/session';
@@ -37,7 +38,7 @@ const KINDS: { kind: NoticeKind; label: string }[] = [
   { kind: 'assigned', label: 'Assigned to you' },
   { kind: 'reaction', label: 'Reactions' },
   { kind: 'starred', label: 'Starred issues' },
-  { kind: 'ping', label: 'Pings' },
+  ...(features.pings ? [{ kind: 'ping' as const, label: 'Pings' }] : []),
 ];
 
 const STARS: { key: keyof Me['autoStar']; body: string; label: string }[] = [

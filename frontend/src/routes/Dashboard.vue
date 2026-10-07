@@ -34,6 +34,7 @@ import type { IssueTag } from '../lib/issues';
 import { priorityColor, stampAt, type Priority } from '../lib/issues';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
+import { features } from '../lib/features';
 import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
@@ -553,7 +554,7 @@ function closeIssue(): void {
                 ><Star class="ic" /></button>
                 <span class="selbar kind__what">Starred issues</span>
               </span>
-              <span class="kind__hold">
+              <span v-if="features.pings" class="kind__hold">
                 <button
                   class="btn btn--sm btn--icon btn--ghost kind"
                   :class="{ 'is-off': off.includes('ping') }"

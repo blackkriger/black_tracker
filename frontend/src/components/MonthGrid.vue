@@ -11,6 +11,7 @@ import {
   type Cell,
   type DayInfo,
 } from '../lib/calendar';
+import { features } from '../lib/features';
 import { markIconOf } from '../lib/markIcons';
 import { ink } from '../lib/theme';
 
@@ -44,7 +45,7 @@ function heat(key?: string): number {
   return Math.min(5, Math.ceil((worked / props.peak) * 5));
 }
 
-const WAITING = ['mention', 'assigned', 'reaction', 'ping'];
+const WAITING = ['mention', 'assigned', 'reaction', ...(features.pings ? ['ping'] : [])];
 
 function markOf(key?: string): string | null {
   const day = info(key);

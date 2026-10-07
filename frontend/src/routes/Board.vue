@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import Viewers from '../components/Viewers.vue';
+import { features } from '../lib/features';
 import { boardViewers, here } from '../lib/presence';
 import { useRoute, useRouter } from 'vue-router';
 import IssueView from '../components/IssueView.vue';
@@ -424,7 +425,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 const onBoard = boardViewers(() => current.value?.id);
 watch(
   () => current.value?.id,
-  (id) => (here.boardId = id ?? null),
+  (id) => {
+    if (features.presence) here.boardId = id ?? null;
+  },
   { immediate: true }
 );
 onUnmounted(() => (here.boardId = null));
@@ -518,7 +521,7 @@ watch(
       >
         Clear filters
       </button>
-      <Viewers :logins="onBoard" class="board__who" />
+      <Viewers v-if="features.presence" :logins="onBoard" class="board__who" />
     </div>
 
     <div
