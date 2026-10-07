@@ -113,7 +113,7 @@ const CALLS: { verb: string; path: string; what: string }[] = [
               <li><Check class="ic token__yes" />Create issues, change status, priority, assignee, due date, tags, board</li>
               <li><Check class="ic token__yes" />Link issues, attach files, star issues</li>
               <li><Check class="ic token__yes" />Manage projects, boards, statuses, tags and marked days</li>
-              <li><Check class="ic token__yes" />Delete, if your role can delete</li>
+              <li><Check class="ic token__yes" />Delete, if your role can</li>
               <li><Check class="ic token__yes" />Post, edit, delete and pin comments, attach files to them</li>
             </ul>
             <ul class="token__list">
