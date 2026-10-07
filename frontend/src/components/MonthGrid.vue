@@ -31,9 +31,6 @@ const emit = defineEmits<{
 function picked(key?: string): boolean {
   return !!key && !!props.range && key >= props.range.from && key <= props.range.to;
 }
-function edge(key?: string): boolean {
-  return !!key && !!props.range && (key === props.range.from || key === props.range.to);
-}
 
 const session = useSession();
 const mine = computed(() => session.me.value?.role?.color ?? undefined);
@@ -109,7 +106,6 @@ function onEnter(ev: PointerEvent, c: Cell): void {
           'is-today': c.today,
           [`heat-${heat(c.key)}`]: heat(c.key) > 0,
           'is-picked': picked(c.key),
-          'is-edge': edge(c.key),
         },
       ]"
       type="button"
@@ -273,11 +269,14 @@ function onEnter(ev: PointerEvent, c: Cell): void {
 .cal--range .cal__day {
   touch-action: none;
 }
-.cal__day.is-picked {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 55%, transparent);
+.cal--range .cal__day:not(.is-picked, .is-today, .has-due, .is-late) {
+  color: var(--text-muted);
 }
-.cal__day.is-edge {
-  box-shadow: inset 0 0 0 1px var(--text);
+.cal__day.is-picked {
+  font-weight: 700;
+}
+.cal__day.is-picked:not(.has-due, .is-late) {
+  color: var(--text);
 }
 .cal__pop::before,
 .cal__pop::after {
