@@ -336,6 +336,34 @@ async function openIssue(w: Where): Promise<void> {
         <div class="stack">
           <section class="panel">
             <header class="panel__h">
+              Time to close
+              <span
+                v-if="data?.cycle.median != null"
+                class="panel__end"
+                :title="exact(data.cycle.median)"
+              >{{ days(data.cycle.median) }}</span>
+            </header>
+            <div class="panel__b">
+              <div v-if="loading" class="skel">
+                <div v-for="n in 2" :key="n" class="skel__ridge">
+                  <span class="sk sk--line" style="width: 64px"></span>
+                  <span class="sk sk--line skel__hill"></span>
+                  <span class="sk sk--line" style="width: 20px"></span>
+                </div>
+              </div>
+              <div v-else-if="!data?.cycle.closed" class="hint faint">
+                Nothing was closed in this period.
+              </div>
+              <RidgeRows v-else :rows="closeRows" :full="closeTallest">
+                <template #axis>
+                  <span v-for="b in CLOSE_AXIS" :key="b">{{ b }}</span>
+                </template>
+              </RidgeRows>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header class="panel__h">
               Deadlines
               <span v-if="data?.due.overdue.length" class="panel__end is-late">
                 {{ data.due.overdue.length }} late
@@ -367,34 +395,6 @@ async function openIssue(w: Where): Promise<void> {
                 v-if="!loading && !data?.due.overdue.length && !data?.due.soon.length"
                 class="hint faint"
               >Nothing is due in this period.</div>
-            </div>
-          </section>
-
-          <section class="panel">
-            <header class="panel__h">
-              Time to close
-              <span
-                v-if="data?.cycle.median != null"
-                class="panel__end"
-                :title="exact(data.cycle.median)"
-              >{{ days(data.cycle.median) }}</span>
-            </header>
-            <div class="panel__b">
-              <div v-if="loading" class="skel">
-                <div v-for="n in 2" :key="n" class="skel__ridge">
-                  <span class="sk sk--line" style="width: 64px"></span>
-                  <span class="sk sk--line skel__hill"></span>
-                  <span class="sk sk--line" style="width: 20px"></span>
-                </div>
-              </div>
-              <div v-else-if="!data?.cycle.closed" class="hint faint">
-                Nothing was closed in this period.
-              </div>
-              <RidgeRows v-else :rows="closeRows" :full="closeTallest">
-                <template #axis>
-                  <span v-for="b in CLOSE_AXIS" :key="b">{{ b }}</span>
-                </template>
-              </RidgeRows>
             </div>
           </section>
         </div>
