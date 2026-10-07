@@ -19,7 +19,9 @@ import { registerAnalyticsRoutes } from './analytics-routes.js';
 import { registerNoticeRoutes } from './notice-routes.js';
 import { listenForHistory, registerChangeFeed, registerEventRoutes } from './events.js';
 import { registerGitRoutes } from './git-routes.js';
+import { registerMessengerRoutes, startMessengers } from './messenger.js';
 import { registerTelegramRoutes, startTelegram } from './telegram.js';
+import { registerVkRoutes, startVk } from './vk.js';
 
 const app = Fastify({
   logger: {
@@ -70,7 +72,9 @@ registerCalendarRoutes(app);
 registerAnalyticsRoutes(app);
 registerNoticeRoutes(app);
 registerGitRoutes(app);
+registerMessengerRoutes(app);
 registerTelegramRoutes(app);
+registerVkRoutes(app);
 registerEventRoutes(app);
 registerChangeFeed(app);
 
@@ -92,5 +96,7 @@ await pruneSessions();
 setInterval(pruneSessions, 24 * 60 * 60 * 1000).unref();
 await startTelegram();
 await listenForHistory();
+startMessengers();
 
 await app.listen({ port: env.port, host: '127.0.0.1' });
+await startVk();

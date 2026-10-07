@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
-import { env, telegramReady } from './env.js';
+import { env, telegramReady, vkReady } from './env.js';
 import { publish, tabOf } from './events.js';
 
 export const SESSION_COOKIE = 'tracker_session';
@@ -84,14 +84,15 @@ interface UserRow {
   star_assigned: boolean;
   star_commented: boolean;
   github_login: string | null;
-  telegram_chat_id: number | null;
-  telegram_name: string | null;
+  messengers: Record<string, string> | null;
   notices_off: string[];
 }
 
 export const USER_SELECT = `
   select u.*, r.name as role_name, r.color as role_color, r.can_delete as role_can_delete,
-         r.can_manage_roles as role_can_manage_roles
+         r.can_manage_roles as role_can_manage_roles,
+         (select json_object_agg(l.channel, coalesce(l.name, ''))
+            from messenger_links l where l.user_id = u.id) as messengers
     from users u
     left join roles r on r.id = u.role_id`;
 
@@ -129,8 +130,10 @@ const publicMe = (row: UserRow) => ({
   ...publicUser(row),
   autoStar: { created: row.star_created, assigned: row.star_assigned, commented: row.star_commented },
   githubLogin: row.github_login,
-  telegram: row.telegram_chat_id ? (row.telegram_name ?? '') : null,
-  telegramReady: telegramReady(),
+  messengers: {
+    telegram: { ready: telegramReady(), name: row.messengers?.telegram ?? null },
+    vk: { ready: vkReady(), name: row.messengers?.vk ?? null },
+  },
   noticesOff: row.notices_off,
 });
 

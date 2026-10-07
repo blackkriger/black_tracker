@@ -7,7 +7,7 @@ import { stamp } from '../lib/issues';
 import { ink } from '../lib/theme';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
-import { useSession, type Me } from '../lib/session';
+import { useSession, type Me, type Messenger } from '../lib/session';
 import { describeAgent } from '../lib/userAgent';
 
 interface Session {
@@ -51,7 +51,12 @@ const others = computed(() => sessions.value?.some((s) => !s.current) ?? false);
 const github = ref(me.value?.githubLogin ?? '');
 const githubBusy = ref(false);
 const githubSaved = ref(false);
-const telegramBusy = ref(false);
+const messengerBusy = ref(false);
+const MESSENGERS: { key: Messenger; title: string }[] = [
+  { key: 'telegram', title: 'Telegram' },
+  { key: 'vk', title: 'VK' },
+];
+const messengers = computed(() => MESSENGERS.filter((m) => me.value?.messengers[m.key].ready));
 
 const since = computed(() => stamp(me.value?.createdAt ?? null));
 const role = computed(() => me.value?.role ?? null);
@@ -113,13 +118,13 @@ async function saveGithub(): Promise<void> {
   }
 }
 
-async function linkTelegram(): Promise<void> {
-  if (telegramBusy.value) return;
-  telegramBusy.value = true;
+async function linkMessenger(channel: Messenger): Promise<void> {
+  if (messengerBusy.value) return;
+  messengerBusy.value = true;
   clear('integrations');
   const tab = window.open('', '_blank');
   try {
-    const { url } = await api<{ url: string }>('/me/telegram/link', { method: 'POST' });
+    const { url } = await api<{ url: string }>(`/me/${channel}/link`, { method: 'POST' });
     if (tab) {
       tab.opener = null;
       tab.location.href = url;
@@ -130,21 +135,22 @@ async function linkTelegram(): Promise<void> {
     tab?.close();
     fail('integrations', err);
   } finally {
-    telegramBusy.value = false;
+    messengerBusy.value = false;
   }
 }
 
-async function unlinkTelegram(): Promise<void> {
-  if (telegramBusy.value) return;
-  telegramBusy.value = true;
+async function unlinkMessenger(channel: Messenger): Promise<void> {
+  if (messengerBusy.value) return;
+  messengerBusy.value = true;
   clear('integrations');
   try {
-    await api('/me/telegram', { method: 'DELETE' });
-    me.value = { ...(me.value as Me), telegram: null };
+    await api(`/me/${channel}`, { method: 'DELETE' });
+    const now = me.value as Me;
+    me.value = { ...now, messengers: { ...now.messengers, [channel]: { ...now.messengers[channel], name: null } } };
   } catch (err) {
     fail('integrations', err);
   } finally {
-    telegramBusy.value = false;
+    messengerBusy.value = false;
   }
 }
 
@@ -280,29 +286,35 @@ async function changePassword(): Promise<void> {
             <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
           </div>
         </form>
-        <template v-if="me?.telegramReady">
+        <template v-for="m in messengers" :key="m.key">
           <div class="hr"></div>
           <div class="field">
-            <label class="label" for="telegram">Telegram</label>
-            <div class="addrow tg">
+            <label class="label" :for="m.key">{{ m.title }}</label>
+            <div class="addrow messenger">
               <input
-                id="telegram"
+                :id="m.key"
                 class="input"
-                :value="me.telegram ?? ''"
+                :value="me?.messengers[m.key].name ?? ''"
                 placeholder="Not linked"
                 tabindex="-1"
                 readonly
               />
               <button
-                v-if="me.telegram !== null"
+                v-if="me?.messengers[m.key].name !== null"
                 class="btn btn--danger"
                 type="button"
-                :disabled="telegramBusy"
-                @click="unlinkTelegram"
+                :disabled="messengerBusy"
+                @click="unlinkMessenger(m.key)"
               >
                 Unlink
               </button>
-              <button v-else class="btn btn--primary" type="button" :disabled="telegramBusy" @click="linkTelegram">
+              <button
+                v-else
+                class="btn btn--primary"
+                type="button"
+                :disabled="messengerBusy"
+                @click="linkMessenger(m.key)"
+              >
                 Link
               </button>
             </div>
@@ -360,7 +372,7 @@ async function changePassword(): Promise<void> {
   flex-direction: column;
   gap: var(--space-4);
 }
-.tg {
+.messenger {
   margin-top: 0;
 }
 .who {

@@ -22,7 +22,11 @@ export const env = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
   telegramBotName: process.env.TELEGRAM_BOT_NAME ?? '',
   telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? '',
+  vkGroupToken: process.env.VK_GROUP_TOKEN ?? '',
+  vkSecret: process.env.VK_SECRET ?? '',
 };
 
 export const telegramReady = (): boolean =>
   !!(env.telegramBotToken && env.telegramBotName && env.telegramWebhookSecret);
+
+export const vkReady = (): boolean => !!(env.vkGroupToken && env.vkSecret);
