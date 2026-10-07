@@ -160,12 +160,12 @@ function onEnter(ev: PointerEvent, c: Cell): void {
         <span class="key" :style="{ color: ink(d.color) }">{{ d.key }}</span>
         {{ d.summary }}
       </span>
-      <span v-if="hovered.said" class="cal__pop-at" :style="{ color: ink(mine) }">
-        {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
-      </span>
       <span v-if="hovered.worked || hovered.created || hovered.resolved" class="cal__pop-work">
         {{ hovered.worked }} worked, {{ hovered.created }} opened,
         {{ hovered.resolved }} closed
+      </span>
+      <span v-if="hovered.said" class="cal__pop-at" :style="{ color: ink(mine) }">
+        {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
       </span>
       <span
         v-if="!hovered.marks.length && !hovered.dues.length && !hovered.worked && !hovered.created && !hovered.resolved && !hovered.said"
