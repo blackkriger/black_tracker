@@ -195,7 +195,8 @@ const bInput = computed({ get: () => b.value, set: (v: number) => setRgb(r.value
 const EDGE = 8;
 const GAP = 8;
 const popupStyle = ref<Record<string, string>>({ visibility: 'hidden' });
-const side = ref<'below' | 'above' | null>(null);
+const TIP_ROOM = 12;
+const leftOf = ref(false);
 
 function placePopup(): void {
   const el = popupEl.value;
@@ -206,27 +207,19 @@ function placePopup(): void {
   const vh = window.innerHeight;
   const a = props.anchor?.getBoundingClientRect();
   if (!a) {
-    side.value = null;
+    leftOf.value = false;
     popupStyle.value = { left: `${Math.max(EDGE, (vw - w) / 2)}px`, top: `${Math.max(EDGE, (vh - h) / 2)}px` };
     return;
   }
-  const middle = (a.left + a.right) / 2;
-  const left = clamp(middle - w / 2, EDGE, Math.max(EDGE, vw - EDGE - w));
-  const roomBelow = vh - EDGE - a.bottom - GAP;
-  const roomAbove = a.top - GAP - EDGE;
-  let top: number;
-  if (h <= roomBelow || roomBelow >= roomAbove) {
-    top = a.bottom + GAP;
-    side.value = 'below';
-  } else {
-    top = a.top - GAP - h;
-    side.value = 'above';
-  }
-  if (top < EDGE || top + h > vh - EDGE) {
-    top = clamp(top, EDGE, Math.max(EDGE, vh - EDGE - h));
-    side.value = null;
-  }
-  popupStyle.value = { left: `${left}px`, top: `${top}px`, '--tip': `${middle - left}px` };
+  const middle = (a.top + a.bottom) / 2;
+  const top = clamp(middle - h / 2, EDGE, Math.max(EDGE, vh - EDGE - h));
+  const left = Math.max(EDGE, a.left - GAP - w);
+  leftOf.value = left + w <= a.left;
+  popupStyle.value = {
+    left: `${left}px`,
+    top: `${top}px`,
+    '--tip': `${clamp(middle - top, TIP_ROOM, h - TIP_ROOM)}px`,
+  };
 }
 
 function onOutside(ev: PointerEvent): void {
@@ -266,7 +259,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div ref="popupEl" class="cp" :class="side && `is-${side}`" :style="popupStyle">
+    <div ref="popupEl" class="cp" :class="{ 'is-left': leftOf }" :style="popupStyle">
       <div class="cp__top">
         <div class="cp__left">
           <div class="cp__group">
@@ -373,37 +366,21 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-md);
   user-select: none;
 }
-.cp.is-below::before,
-.cp.is-below::after,
-.cp.is-above::before,
-.cp.is-above::after {
+.cp.is-left::before,
+.cp.is-left::after {
   content: "";
   position: absolute;
-  left: var(--tip, 50%);
-  margin-left: -6px;
+  top: var(--tip, 50%);
+  left: 100%;
+  margin-top: -6px;
   border: 6px solid transparent;
 }
-.cp.is-below::before,
-.cp.is-below::after {
-  bottom: 100%;
+.cp.is-left::before {
+  border-left-color: var(--line-2);
 }
-.cp.is-below::before {
-  border-bottom-color: var(--line-2);
-}
-.cp.is-below::after {
-  margin-bottom: -1px;
-  border-bottom-color: var(--card);
-}
-.cp.is-above::before,
-.cp.is-above::after {
-  top: 100%;
-}
-.cp.is-above::before {
-  border-top-color: var(--line-2);
-}
-.cp.is-above::after {
-  margin-top: -1px;
-  border-top-color: var(--card);
+.cp.is-left::after {
+  margin-left: -1px;
+  border-left-color: var(--card);
 }
 .cp__top {
   display: flex;
