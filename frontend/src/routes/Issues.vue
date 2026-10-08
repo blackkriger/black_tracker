@@ -191,7 +191,10 @@ useLive(
   (ev) => {
     if (ev.type === 'tag.changed') void loadTags(true);
     if (['board.changed', 'state.changed'].includes(ev.type)) forget();
-    if (ev.type.startsWith('issue.') || ['board.changed', 'state.changed', 'project.changed'].includes(ev.type)) {
+    if (
+      ev.type.startsWith('issue.') ||
+      ['board.changed', 'state.changed', 'project.changed', 'tag.changed', 'history.added'].includes(ev.type)
+    ) {
       reload();
     }
   },
@@ -356,6 +359,7 @@ onMounted(() => {
       :project="open.project"
       @close="closeIssue"
       @changed="reload"
+      @linked="reload"
       @moved="reload(); showIssue(open.key)"
       @deleted="closeIssue(); reload()"
     />

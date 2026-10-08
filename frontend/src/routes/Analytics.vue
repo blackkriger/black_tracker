@@ -138,7 +138,7 @@ const reload = settled(() => void load());
 useLive((ev) => {
   if (
     ev.type.startsWith('issue.') ||
-    ['state.changed', 'board.changed', 'project.changed', 'role.changed', 'user.changed'].includes(
+    ['history.added', 'state.changed', 'board.changed', 'project.changed', 'role.changed', 'user.changed'].includes(
       ev.type
     )
   ) {
@@ -572,6 +572,7 @@ async function openIssue(w: Where): Promise<void> {
       :project="open.project"
       @close="open = null"
       @changed="load"
+      @linked="load"
       @deleted="open = null; load()"
       @moved="open = null; load()"
     />
