@@ -37,6 +37,11 @@ const stateCreate = z.object({
 
 const statePatch = z.object({
   name: z.string().trim().min(1).max(60).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .transform((c) => c.toLowerCase())
+    .optional(),
   isOpen: z.boolean().optional(),
   isResolved: z.boolean().optional(),
   position: z.number().int().min(0).optional(),
@@ -307,10 +312,11 @@ export function registerBoardRoutes(app: FastifyInstance): void {
               set name = coalesce($2, name),
                   is_open = $3,
                   is_resolved = $4,
-                  position = coalesce($5, position)
+                  position = coalesce($5, position),
+                  color = coalesce($6, color)
             where id = $1
             returning *`,
-          [id, p.name ?? null, flags.isOpen, flags.isResolved, p.position ?? null]
+          [id, p.name ?? null, flags.isOpen, flags.isResolved, p.position ?? null, p.color ?? null]
         );
         if (flags.isResolved !== before.rows[0].is_resolved) {
           await client.query(

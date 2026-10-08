@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Select from '../../components/Select.vue';
 import Dialog from '../../components/Dialog.vue';
+import ColorPicker from '../../components/ColorPicker.vue';
 import { api } from '../../lib/api';
 import { useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
@@ -211,6 +212,19 @@ async function deleteStatus(b: Board, s: State): Promise<void> {
   }
 }
 
+const picking = ref<{ board: Board; state: State; anchor: HTMLElement } | null>(null);
+
+function pickColor(b: Board, s: State, ev: MouseEvent): void {
+  const anchor = ev.currentTarget as HTMLElement;
+  picking.value = picking.value?.state.id === s.id ? null : { board: b, state: s, anchor };
+}
+
+function applyColor(color: string): void {
+  const p = picking.value;
+  picking.value = null;
+  if (p && color !== p.state.color) void patchStatus(p.board, p.state, { color });
+}
+
 const dragging = ref<{ boardId: string; stateId: string } | null>(null);
 
 async function onDrop(b: Board, target: State): Promise<void> {
@@ -286,7 +300,12 @@ async function onDrop(b: Board, target: State): Promise<void> {
             <tbody>
               <tr v-for="w in [110, 86, 74, 64]" :key="w">
                 <td class="c-grip grip"><GripVertical class="ic" /></td>
-                <td><span class="sk sk--ctl" :style="{ width: `${w}px` }"></span></td>
+                <td>
+                  <span class="status-cell">
+                    <span class="sk status-swatch"></span>
+                    <span class="sk sk--ctl" :style="{ width: `${w}px` }"></span>
+                  </span>
+                </td>
                 <td><span class="sk sk--box"></span></td>
                 <td><span class="sk sk--box"></span></td>
                 <td class="c-del"><span class="sk sk--ctl sk--right" style="width: 26px"></span></td>
@@ -410,13 +429,22 @@ async function onDrop(b: Board, target: State): Promise<void> {
               >
                 <td class="c-grip grip"><GripVertical class="ic" /></td>
                 <td>
-                  <input
-                    class="input input--sm status-name"
-                    :value="s.name"
-                    :style="{ color: ink(s.color) }"
-                    maxlength="60"
-                    @change="patchStatus(b, s, { name: ($event.target as HTMLInputElement).value })"
-                  />
+                  <span class="status-cell">
+                    <button
+                      class="status-swatch"
+                      type="button"
+                      :style="{ background: s.color }"
+                      :aria-label="`Color of ${s.name}`"
+                      @click="pickColor(b, s, $event)"
+                    ></button>
+                    <input
+                      class="input input--sm status-name"
+                      :value="s.name"
+                      :style="{ color: ink(s.color) }"
+                      maxlength="60"
+                      @change="patchStatus(b, s, { name: ($event.target as HTMLInputElement).value })"
+                    />
+                  </span>
                 </td>
                 <td>
                   <label class="check">
@@ -477,6 +505,15 @@ async function onDrop(b: Board, target: State): Promise<void> {
       </section>
       <div v-if="errors.newBoard" class="err sheet__wide panel__err">{{ errors.newBoard }}</div>
     </template>
+
+    <ColorPicker
+      v-if="picking"
+      :key="picking.state.id"
+      :initial="picking.state.color"
+      :anchor="picking.anchor"
+      @pick="applyColor"
+      @close="picking = null"
+    />
 
     <Dialog
       v-if="deletingBoard"
@@ -582,6 +619,23 @@ async function onDrop(b: Board, target: State): Promise<void> {
 .grip {
   color: var(--text-dim);
   cursor: grab;
+}
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.status-swatch {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+button.status-swatch:hover {
+  outline: 1px solid var(--text-dim);
+  outline-offset: 2px;
 }
 .status-name {
   font-weight: 500;
