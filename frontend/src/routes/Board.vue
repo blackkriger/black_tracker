@@ -354,10 +354,12 @@ function closeIssue(): void {
 }
 
 function issueChanged(updated: Issue): void {
+  const before = issues.value.find((i) => i.id === updated.id);
   issues.value = issues.value.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
+  if (!before || before.stateId !== updated.stateId) reloadCards();
 }
 
-function linksChanged(): void {
+function reloadCards(): void {
   if (current.value) void loadIssues(current.value.id, true);
 }
 
@@ -370,6 +372,7 @@ function issueMoved(boardId: string): void {
 
 function issueGone(id: string): void {
   issues.value = issues.value.filter((i) => i.id !== id);
+  reloadCards();
   closeIssue();
 }
 
@@ -638,7 +641,7 @@ watch(
       @tag-created="tagCreated"
       @moved="issueMoved"
       @changed="issueChanged"
-      @linked="linksChanged"
+      @linked="reloadCards"
       @created="issueCreated"
       @deleted="issueGone"
     />
