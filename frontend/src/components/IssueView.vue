@@ -758,7 +758,11 @@ watch(
 useLive((ev) => {
   refreshKey(ev.issueKey);
   const current = issue.value;
-  if (!current || ev.issueId !== current.id) return;
+  if (!current) return;
+  if (ev.issueId !== current.id) {
+    if (ev.type.startsWith('issue.') && current.links.some((l) => l.id === ev.issueId)) void reload();
+    return;
+  }
   if (ev.type === 'issue.deleted') {
     emit('close');
     return;
