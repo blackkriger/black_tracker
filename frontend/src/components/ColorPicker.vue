@@ -117,8 +117,8 @@ const BASIC_PALETTE: string[] = TONES.flatMap(([s, l]) =>
 const popupEl = ref<HTMLDivElement | null>(null);
 const canvasEl = ref<HTMLCanvasElement | null>(null);
 const sliderEl = ref<HTMLDivElement | null>(null);
-const CANVAS_W = 190;
-const CANVAS_H = 190;
+const CANVAS_W = 170;
+const CANVAS_H = 110;
 
 function paintCanvas(): void {
   const ctx = canvasEl.value?.getContext('2d');
@@ -255,94 +255,84 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div ref="popupEl" class="cp" :style="popupStyle">
-      <div class="cp__body">
-        <div class="cp__left">
-          <div class="cp__label">Basic colors:</div>
-          <div class="cp__grid">
-            <button
-              v-for="c in BASIC_PALETTE"
-              :key="c"
-              type="button"
-              class="cp__swatch"
-              :class="{ 'is-active': c === hex }"
-              :style="{ background: c }"
-              :title="c"
-              @click="setHex(c)"
-            ></button>
-          </div>
-          <div class="cp__label">Default colors:</div>
-          <div class="cp__grid">
-            <button
-              v-for="d in DEFAULT_COLORS"
-              :key="d.name"
-              type="button"
-              class="cp__swatch"
-              :class="{ 'is-active': d.color === hex }"
-              :style="{ background: d.color }"
-              :title="d.name"
-              @click="setHex(d.color)"
-            ></button>
-          </div>
-        </div>
+      <div class="cp__label">Basic colors:</div>
+      <div class="cp__grid">
+        <button
+          v-for="c in BASIC_PALETTE"
+          :key="c"
+          type="button"
+          class="cp__swatch"
+          :class="{ 'is-active': c === hex }"
+          :style="{ background: c }"
+          :title="c"
+          @click="setHex(c)"
+        ></button>
+      </div>
+      <div class="cp__label">Default colors:</div>
+      <div class="cp__grid">
+        <button
+          v-for="d in DEFAULT_COLORS"
+          :key="d.name"
+          type="button"
+          class="cp__swatch"
+          :class="{ 'is-active': d.color === hex }"
+          :style="{ background: d.color }"
+          :title="d.name"
+          @click="setHex(d.color)"
+        ></button>
+      </div>
 
-        <div class="cp__right">
-          <div class="cp__canvas-row">
-            <div class="cp__canvas-wrap">
-              <canvas
-                ref="canvasEl"
-                :width="CANVAS_W"
-                :height="CANVAS_H"
-                class="cp__canvas"
-                @pointerdown="startDrag($event, applyCanvasPos)"
-              ></canvas>
-              <div class="cp__canvas-marker" :style="canvasMarkerStyle"></div>
-            </div>
-            <div
-              ref="sliderEl"
-              class="cp__slider"
-              :style="{ background: sliderGradient }"
-              @pointerdown="startDrag($event, applySliderPos)"
-            >
-              <ChevronLeft class="ic ic--sm cp__slider-marker" :style="sliderMarkerStyle" />
-            </div>
-          </div>
-          <div class="cp__preview-row">
-            <div class="cp__preview" :style="{ background: hex }"></div>
-            <div class="cp__inputs">
-              <label class="cp__input-row">
-                <span>Hue:</span>
-                <input v-model.number.lazy="hInput" class="input" type="number" min="0" max="240" />
-              </label>
-              <label class="cp__input-row">
-                <span>Sat:</span>
-                <input v-model.number.lazy="sInput" class="input" type="number" min="0" max="240" />
-              </label>
-              <label class="cp__input-row">
-                <span>Lum:</span>
-                <input v-model.number.lazy="lInput" class="input" type="number" min="0" max="240" />
-              </label>
-            </div>
-            <div class="cp__inputs">
-              <label class="cp__input-row">
-                <span>Red:</span>
-                <input v-model.number.lazy="rInput" class="input" type="number" min="0" max="255" />
-              </label>
-              <label class="cp__input-row">
-                <span>Green:</span>
-                <input v-model.number.lazy="gInput" class="input" type="number" min="0" max="255" />
-              </label>
-              <label class="cp__input-row">
-                <span>Blue:</span>
-                <input v-model.number.lazy="bInput" class="input" type="number" min="0" max="255" />
-              </label>
-            </div>
-          </div>
+      <div class="cp__canvas-row">
+        <div class="cp__canvas-wrap">
+          <canvas
+            ref="canvasEl"
+            :width="CANVAS_W"
+            :height="CANVAS_H"
+            class="cp__canvas"
+            @pointerdown="startDrag($event, applyCanvasPos)"
+          ></canvas>
+          <div class="cp__canvas-marker" :style="canvasMarkerStyle"></div>
         </div>
+        <div
+          ref="sliderEl"
+          class="cp__slider"
+          :style="{ background: sliderGradient }"
+          @pointerdown="startDrag($event, applySliderPos)"
+        >
+          <ChevronLeft class="ic ic--sm cp__slider-marker" :style="sliderMarkerStyle" />
+        </div>
+      </div>
+      <div class="cp__preview" :style="{ background: hex }"></div>
+      <div class="cp__inputs">
+        <label class="cp__input-row">
+          <span>Hue:</span>
+          <input v-model.number.lazy="hInput" class="input" type="number" min="0" max="240" />
+        </label>
+        <label class="cp__input-row">
+          <span>Red:</span>
+          <input v-model.number.lazy="rInput" class="input" type="number" min="0" max="255" />
+        </label>
+        <label class="cp__input-row">
+          <span>Sat:</span>
+          <input v-model.number.lazy="sInput" class="input" type="number" min="0" max="240" />
+        </label>
+        <label class="cp__input-row">
+          <span>Green:</span>
+          <input v-model.number.lazy="gInput" class="input" type="number" min="0" max="255" />
+        </label>
+        <label class="cp__input-row">
+          <span>Lum:</span>
+          <input v-model.number.lazy="lInput" class="input" type="number" min="0" max="240" />
+        </label>
+        <label class="cp__input-row">
+          <span>Blue:</span>
+          <input v-model.number.lazy="bInput" class="input" type="number" min="0" max="255" />
+        </label>
       </div>
 
       <div class="cp__footer">
-        <button class="btn" type="button" @click="emit('close')">Cancel</button>
-        <button class="btn btn--primary" type="button" @click="emit('pick', hex)">OK</button>
+        <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
+        <button class="btn btn--sm btn--primary" type="button" @click="emit('pick', hex)">OK</button>
       </div>
     </div>
   </Teleport>
@@ -352,26 +342,14 @@ onBeforeUnmount(() => {
 .cp {
   position: fixed;
   z-index: 60;
-  max-width: calc(100vw - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
   background: var(--card);
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow-md);
   user-select: none;
-}
-.cp__body {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 16px 16px 12px;
-}
-.cp__left,
-.cp__right {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.cp__right {
-  gap: 12px;
 }
 .cp__label {
   color: var(--text-muted);
@@ -383,7 +361,8 @@ onBeforeUnmount(() => {
   grid-auto-rows: 18px;
   gap: 4px;
 }
-.cp__grid + .cp__label {
+.cp__grid + .cp__label,
+.cp__grid + .cp__canvas-row {
   margin-top: 4px;
 }
 .cp__swatch {
@@ -403,21 +382,21 @@ onBeforeUnmount(() => {
 }
 .cp__canvas-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: flex-start;
 }
 .cp__canvas-wrap {
   position: relative;
   flex: none;
-  width: 190px;
-  height: 190px;
+  width: 170px;
+  height: 110px;
   border: 1px solid var(--line-2);
   box-sizing: content-box;
 }
 .cp__canvas {
   display: block;
-  width: 190px;
-  height: 190px;
+  width: 170px;
+  height: 110px;
   cursor: crosshair;
   touch-action: none;
 }
@@ -434,7 +413,7 @@ onBeforeUnmount(() => {
   position: relative;
   flex: none;
   width: 12px;
-  height: 190px;
+  height: 110px;
   border: 1px solid var(--line-2);
   box-sizing: content-box;
   cursor: ns-resize;
@@ -442,32 +421,26 @@ onBeforeUnmount(() => {
 }
 .cp__slider-marker {
   position: absolute;
-  left: 14px;
+  left: 13px;
   margin-top: -6px;
   color: var(--text);
   pointer-events: none;
 }
-.cp__preview-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
 .cp__preview {
-  flex: none;
-  width: 58px;
-  height: 58px;
+  height: 20px;
   border: 1px solid var(--line-2);
 }
 .cp__inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  justify-content: space-between;
+  gap: 4px 8px;
 }
 .cp__input-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 4px;
   color: var(--text-dim);
   font-size: 12px;
 }
@@ -476,8 +449,8 @@ onBeforeUnmount(() => {
   text-align: right;
 }
 .cp__input-row .input {
-  width: 56px;
-  height: 26px;
+  width: 48px;
+  height: 24px;
   padding: 0 6px;
   font: 12px var(--font-num);
   text-align: right;
@@ -492,6 +465,6 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 0 16px 16px;
+  margin-top: 4px;
 }
 </style>
