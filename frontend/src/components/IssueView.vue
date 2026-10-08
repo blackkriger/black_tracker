@@ -507,18 +507,21 @@ const gallery = computed(() => [
 ]);
 
 const hostStates = ref<State[] | null>(null);
+
+async function readHostStates(id: string | undefined, always = false): Promise<void> {
+  if (!id || (!always && id === props.board.id)) {
+    hostStates.value = null;
+    return;
+  }
+  try {
+    const host = await api<{ states: State[] }>(`/boards/${id}`);
+    if (issue.value?.boardId === id) hostStates.value = host.states;
+  } catch {}
+}
+
 watch(
   () => issue.value?.boardId,
-  async (id) => {
-    if (!id || id === props.board.id) {
-      hostStates.value = null;
-      return;
-    }
-    try {
-      const host = await api<{ states: State[] }>(`/boards/${id}`);
-      if (issue.value?.boardId === id) hostStates.value = host.states;
-    } catch {}
-  }
+  (id) => void readHostStates(id)
 );
 
 const stateChoices = computed(() =>
@@ -759,6 +762,8 @@ useLive((ev) => {
   refreshKey(ev.issueKey);
   const current = issue.value;
   if (!current) return;
+  if (ev.type === 'state.changed' || ev.type === 'board.changed') void readHostStates(current.boardId, true);
+  if (ev.type === 'tag.changed') void reload();
   if (ev.issueId !== current.id) {
     if (ev.type.startsWith('issue.') && current.links.some((l) => l.id === ev.issueId)) void reload();
     return;

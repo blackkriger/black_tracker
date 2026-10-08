@@ -242,15 +242,19 @@ const reloadLists = settled(() => {
   void loadMine();
   void loadStarred();
 });
+const RELOAD_ON = ['history.added', 'state.changed', 'board.changed', 'project.changed'];
 useLive((ev) => {
   if (
     ev.type.startsWith('issue.') ||
     ev.type.startsWith('comment.') ||
-    ev.type === 'key-date.changed'
+    ev.type === 'key-date.changed' ||
+    RELOAD_ON.includes(ev.type)
   ) {
     reloadDays();
   }
-  if (ev.type.startsWith('issue.') || ev.type === 'favourite.changed') reloadLists();
+  if (ev.type.startsWith('issue.') || ev.type === 'favourite.changed' || RELOAD_ON.includes(ev.type)) {
+    reloadLists();
+  }
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadFeed();
 }, () => {
   reloadDays();
@@ -631,6 +635,7 @@ function closeIssue(): void {
       :focus-comment="open.comment"
       @close="open = null"
       @changed="refresh"
+      @linked="refresh"
       @deleted="closeIssue"
       @moved="closeIssue"
       @tag-created="openTags = [...openTags, $event]"
