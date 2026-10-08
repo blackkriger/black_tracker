@@ -10,6 +10,7 @@ import {
   startSession,
   userById,
 } from './auth.js';
+import { publish } from './events.js';
 import { accountCredentials } from './user-routes.js';
 
 const INVITE_DAYS = 7;
@@ -242,6 +243,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     });
 
     if (!outcome.ok) return reply.code(outcome.code).send({ error: outcome.error });
+    void publish({ type: 'user.changed' });
     const row = await userById(outcome.userId);
     await startSession(req, reply, outcome.userId);
     return reply.code(201).send({ data: publicUser(row as NonNullable<typeof row>) });
