@@ -151,6 +151,10 @@ function flash(issueId: string): void {
 useLive((ev) => {
   const board = current.value;
   if (!board) return;
+  if (ev.type === 'favourite.changed') {
+    void loadIssues(board.id, true);
+    return;
+  }
   if (['state.changed', 'board.changed', 'project.changed', 'tag.changed'].includes(ev.type)) {
     void load(String(route.params.short), true);
     if (ev.type !== 'project.changed') void loadIssues(board.id, true);
@@ -176,10 +180,16 @@ const failed = ref(false);
 const boards = computed(() =>
   [...(project.value?.boards ?? [])].sort((a, b) => a.position - b.position)
 );
+const shownId = ref<string | null>(null);
 const current = computed(() => {
   const wanted = String(route.params.slug ?? '').toLowerCase();
   if (wanted)
-    return boards.value.find((b) => b.slug.toLowerCase() === wanted) ?? boards.value[0] ?? null;
+    return (
+      boards.value.find((b) => b.slug.toLowerCase() === wanted) ??
+      boards.value.find((b) => b.id === shownId.value) ??
+      boards.value[0] ??
+      null
+    );
   const short = project.value?.shortName;
   const remembered = short ? boards.value.find((b) => b.slug === lastBoard.get(short)) : null;
   return remembered ?? boards.value[0] ?? null;
@@ -379,8 +389,18 @@ function issueGone(id: string): void {
 watch(current, (board) => {
   const short = project.value?.shortName;
   if (!board || !short) return;
+  shownId.value = board.id;
   lastBoard.set(short, board.slug);
-  if (!route.params.slug) void router.replace(`/${short}/${board.slug}`);
+  const slug = String(route.params.slug ?? '');
+  if (!slug) {
+    void router.replace(`/${short}/${board.slug}`);
+  } else if (
+    slug.toLowerCase() !== board.slug.toLowerCase() &&
+    String(route.params.short ?? '').toUpperCase() === short.toUpperCase()
+  ) {
+    const key = openKey.value ? `/${openKey.value}` : '';
+    void router.replace({ path: `/${short}/${board.slug}${key}`, query: route.query });
+  }
 });
 
 async function load(short: string, quiet = false): Promise<void> {
