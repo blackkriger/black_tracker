@@ -132,8 +132,10 @@ async function denialsFresh(client: Client): Promise<Denials | null> {
   return denied;
 }
 
+const ACCOUNT_EVENTS = new Set(['user.changed', 'role.changed', 'session.changed']);
+
 function mayHear(denied: Denials, event: LiveEvent): boolean {
-  if (denied.everything) return false;
+  if (denied.everything) return ACCOUNT_EVENTS.has(event.type);
   if (event.boardId && denied.boards.has(event.boardId)) return false;
   if (event.projectId && denied.projects.has(event.projectId)) return false;
   return true;
@@ -198,6 +200,9 @@ export async function listenForHistory(): Promise<void> {
 
 export async function publish(event: LiveEvent): Promise<void> {
   if (!clients.size) return;
+  if (event.type === 'user.changed' || event.type === 'role.changed') {
+    for (const client of clients.values()) client.deniedAt = 0;
+  }
   const { only, ...told } = event;
   const line = `data: ${JSON.stringify({ ...told, at: new Date().toISOString() })}\n\n`;
   for (const [id, client] of clients) {

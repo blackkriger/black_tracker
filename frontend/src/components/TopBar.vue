@@ -148,6 +148,8 @@ useLive((ev) => {
     void loadPeople(true);
     void loadRoles(true);
     void rereadMe();
+    void load(true);
+    void readNotices();
   }
   if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void readNotices();
   if (ev.type === 'session.changed') void api('/me').catch(() => {});
