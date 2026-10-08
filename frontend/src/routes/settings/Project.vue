@@ -11,7 +11,7 @@ import { usePanelErrors } from '../../lib/panelErrors';
 import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
 import { usePeople } from '../../lib/people';
-import { GripVertical, X } from 'lucide-vue-next';
+import { GripVertical, Palette, X } from 'lucide-vue-next';
 import { ink } from '../../lib/theme';
 
 interface State {
@@ -294,21 +294,21 @@ async function onDrop(b: Board, target: State): Promise<void> {
                 <th>Status</th>
                 <th class="c-flag">Open</th>
                 <th class="c-flag">Resolved</th>
-                <th class="c-del"><span class="sr">Delete</span></th>
+                <th class="c-act"><span class="sr">Actions</span></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="w in [110, 86, 74, 64]" :key="w">
                 <td class="c-grip grip"><GripVertical class="ic" /></td>
-                <td>
-                  <span class="status-cell">
-                    <span class="sk status-swatch"></span>
-                    <span class="sk sk--ctl" :style="{ width: `${w}px` }"></span>
+                <td><span class="sk sk--ctl" :style="{ width: `${w}px` }"></span></td>
+                <td><span class="sk sk--box"></span></td>
+                <td><span class="sk sk--box"></span></td>
+                <td class="c-act">
+                  <span class="row-acts">
+                    <span class="sk sk--ctl" style="width: 26px"></span>
+                    <span class="sk sk--ctl" style="width: 26px"></span>
                   </span>
                 </td>
-                <td><span class="sk sk--box"></span></td>
-                <td><span class="sk sk--box"></span></td>
-                <td class="c-del"><span class="sk sk--ctl sk--right" style="width: 26px"></span></td>
               </tr>
             </tbody>
           </table>
@@ -415,7 +415,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
                 <th>Status</th>
                 <th class="c-flag">Open</th>
                 <th class="c-flag">Resolved</th>
-                <th class="c-del"><span class="sr">Delete</span></th>
+                <th class="c-act"><span class="sr">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -429,22 +429,13 @@ async function onDrop(b: Board, target: State): Promise<void> {
               >
                 <td class="c-grip grip"><GripVertical class="ic" /></td>
                 <td>
-                  <span class="status-cell">
-                    <button
-                      class="status-swatch"
-                      type="button"
-                      :style="{ background: s.color }"
-                      :aria-label="`Color of ${s.name}`"
-                      @click="pickColor(b, s, $event)"
-                    ></button>
-                    <input
-                      class="input input--sm status-name"
-                      :value="s.name"
-                      :style="{ color: ink(s.color) }"
-                      maxlength="60"
-                      @change="patchStatus(b, s, { name: ($event.target as HTMLInputElement).value })"
-                    />
-                  </span>
+                  <input
+                    class="input input--sm status-name"
+                    :value="s.name"
+                    :style="{ color: ink(s.color) }"
+                    maxlength="60"
+                    @change="patchStatus(b, s, { name: ($event.target as HTMLInputElement).value })"
+                  />
                 </td>
                 <td>
                   <label class="check">
@@ -464,16 +455,26 @@ async function onDrop(b: Board, target: State): Promise<void> {
                     />
                   </label>
                 </td>
-                <td class="c-del">
-                  <button
-                    class="btn btn--sm btn--icon btn--ghost"
-                    type="button"
-                    aria-label="Delete status"
-                    :disabled="!canDelete"
-                    @click="deleteStatus(b, s)"
-                  >
-                    <X class="ic ic--sm" />
-                  </button>
+                <td class="c-act">
+                  <span class="row-acts">
+                    <button
+                      class="btn btn--sm btn--icon btn--ghost"
+                      type="button"
+                      :aria-label="`Color of ${s.name}`"
+                      @click="pickColor(b, s, $event)"
+                    >
+                      <Palette class="ic" />
+                    </button>
+                    <button
+                      class="btn btn--sm btn--icon btn--ghost"
+                      type="button"
+                      aria-label="Delete status"
+                      :disabled="!canDelete"
+                      @click="deleteStatus(b, s)"
+                    >
+                      <X class="ic ic--sm" />
+                    </button>
+                  </span>
                 </td>
               </tr>
             </tbody>
@@ -620,23 +621,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
   color: var(--text-dim);
   cursor: grab;
 }
-.status-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.status-swatch {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  padding: 0;
-  border: 0;
-  cursor: pointer;
-}
-button.status-swatch:hover {
-  outline: 1px solid var(--text-dim);
-  outline-offset: 2px;
-}
 .status-name {
   font-weight: 500;
 }
@@ -646,8 +630,13 @@ button.status-swatch:hover {
 .c-flag {
   width: 70px;
 }
-.c-del {
-  width: 44px;
+.c-act {
+  width: 78px;
+}
+.row-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
 }
 @media (max-width: 760px) {
   .board-prefs {
