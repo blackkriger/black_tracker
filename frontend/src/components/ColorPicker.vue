@@ -117,8 +117,8 @@ const BASIC_PALETTE: string[] = TONES.flatMap(([s, l]) =>
 const popupEl = ref<HTMLDivElement | null>(null);
 const canvasEl = ref<HTMLCanvasElement | null>(null);
 const sliderEl = ref<HTMLDivElement | null>(null);
-const CANVAS_W = 170;
-const CANVAS_H = 110;
+const CANVAS_W = 200;
+const CANVAS_H = 200;
 
 function paintCanvas(): void {
   const ctx = canvasEl.value?.getContext('2d');
@@ -192,29 +192,41 @@ const rInput = computed({ get: () => r.value, set: (v: number) => setRgb(v, g.va
 const gInput = computed({ get: () => g.value, set: (v: number) => setRgb(r.value, v, b.value) });
 const bInput = computed({ get: () => b.value, set: (v: number) => setRgb(r.value, g.value, v) });
 
+const EDGE = 8;
+const GAP = 8;
 const popupStyle = ref<Record<string, string>>({ visibility: 'hidden' });
+const side = ref<'below' | 'above' | null>(null);
 
 function placePopup(): void {
   const el = popupEl.value;
   if (!el) return;
-  const rect = el.getBoundingClientRect();
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const a = props.anchor?.getBoundingClientRect();
-  let left: number;
-  let top: number;
-  if (a) {
-    left = (a.left + a.right) / 2 - rect.width / 2;
-    top = a.bottom + 4;
-    if (top + rect.height > vh - 8) top = a.top - rect.height - 4;
-    if (left + rect.width > vw - 8) left = vw - rect.width - 8;
-    if (left < 8) left = 8;
-    if (top < 8) top = 8;
-  } else {
-    left = Math.max(8, (vw - rect.width) / 2);
-    top = Math.max(8, (vh - rect.height) / 2);
+  if (!a) {
+    side.value = null;
+    popupStyle.value = { left: `${Math.max(EDGE, (vw - w) / 2)}px`, top: `${Math.max(EDGE, (vh - h) / 2)}px` };
+    return;
   }
-  popupStyle.value = { left: `${left}px`, top: `${top}px` };
+  const middle = (a.left + a.right) / 2;
+  const left = clamp(middle - w / 2, EDGE, Math.max(EDGE, vw - EDGE - w));
+  const roomBelow = vh - EDGE - a.bottom - GAP;
+  const roomAbove = a.top - GAP - EDGE;
+  let top: number;
+  if (h <= roomBelow || roomBelow >= roomAbove) {
+    top = a.bottom + GAP;
+    side.value = 'below';
+  } else {
+    top = a.top - GAP - h;
+    side.value = 'above';
+  }
+  if (top < EDGE || top + h > vh - EDGE) {
+    top = clamp(top, EDGE, Math.max(EDGE, vh - EDGE - h));
+    side.value = null;
+  }
+  popupStyle.value = { left: `${left}px`, top: `${top}px`, '--tip': `${middle - left}px` };
 }
 
 function onOutside(ev: PointerEvent): void {
@@ -254,85 +266,94 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div ref="popupEl" class="cp" :style="popupStyle">
-      <div class="cp__label">Basic colors:</div>
-      <div class="cp__grid">
-        <button
-          v-for="c in BASIC_PALETTE"
-          :key="c"
-          type="button"
-          class="cp__swatch"
-          :class="{ 'is-active': c === hex }"
-          :style="{ background: c }"
-          :title="c"
-          @click="setHex(c)"
-        ></button>
-      </div>
-      <div class="cp__label">Default colors:</div>
-      <div class="cp__grid">
-        <button
-          v-for="d in DEFAULT_COLORS"
-          :key="d.name"
-          type="button"
-          class="cp__swatch"
-          :class="{ 'is-active': d.color === hex }"
-          :style="{ background: d.color }"
-          :title="d.name"
-          @click="setHex(d.color)"
-        ></button>
+    <div ref="popupEl" class="cp" :class="side && `is-${side}`" :style="popupStyle">
+      <div class="cp__top">
+        <div class="cp__left">
+          <div class="cp__group">
+            <div class="cp__label">Basic colors:</div>
+            <div class="cp__grid">
+              <button
+                v-for="c in BASIC_PALETTE"
+                :key="c"
+                type="button"
+                class="cp__swatch"
+                :class="{ 'is-active': c === hex }"
+                :style="{ background: c }"
+                :title="c"
+                @click="setHex(c)"
+              ></button>
+            </div>
+          </div>
+          <div class="cp__group">
+            <div class="cp__label">Default colors:</div>
+            <div class="cp__grid">
+              <button
+                v-for="d in DEFAULT_COLORS"
+                :key="d.name"
+                type="button"
+                class="cp__swatch"
+                :class="{ 'is-active': d.color === hex }"
+                :style="{ background: d.color }"
+                :title="d.name"
+                @click="setHex(d.color)"
+              ></button>
+            </div>
+          </div>
+        </div>
+        <div class="cp__field">
+          <div class="cp__canvas-wrap">
+            <canvas
+              ref="canvasEl"
+              :width="CANVAS_W"
+              :height="CANVAS_H"
+              class="cp__canvas"
+              @pointerdown="startDrag($event, applyCanvasPos)"
+            ></canvas>
+            <div class="cp__canvas-marker" :style="canvasMarkerStyle"></div>
+          </div>
+          <div
+            ref="sliderEl"
+            class="cp__slider"
+            :style="{ background: sliderGradient }"
+            @pointerdown="startDrag($event, applySliderPos)"
+          >
+            <ChevronLeft class="ic ic--sm cp__slider-marker" :style="sliderMarkerStyle" />
+          </div>
+        </div>
       </div>
 
-      <div class="cp__canvas-row">
-        <div class="cp__canvas-wrap">
-          <canvas
-            ref="canvasEl"
-            :width="CANVAS_W"
-            :height="CANVAS_H"
-            class="cp__canvas"
-            @pointerdown="startDrag($event, applyCanvasPos)"
-          ></canvas>
-          <div class="cp__canvas-marker" :style="canvasMarkerStyle"></div>
+      <div class="cp__bottom">
+        <div class="cp__preview" :style="{ background: hex }"></div>
+        <div class="cp__inputs">
+          <label class="cp__input-row">
+            <span>Hue:</span>
+            <input v-model.number.lazy="hInput" class="input" type="number" min="0" max="240" />
+          </label>
+          <label class="cp__input-row">
+            <span>Sat:</span>
+            <input v-model.number.lazy="sInput" class="input" type="number" min="0" max="240" />
+          </label>
+          <label class="cp__input-row">
+            <span>Lum:</span>
+            <input v-model.number.lazy="lInput" class="input" type="number" min="0" max="240" />
+          </label>
+          <label class="cp__input-row">
+            <span>Red:</span>
+            <input v-model.number.lazy="rInput" class="input" type="number" min="0" max="255" />
+          </label>
+          <label class="cp__input-row">
+            <span>Green:</span>
+            <input v-model.number.lazy="gInput" class="input" type="number" min="0" max="255" />
+          </label>
+          <label class="cp__input-row">
+            <span>Blue:</span>
+            <input v-model.number.lazy="bInput" class="input" type="number" min="0" max="255" />
+          </label>
         </div>
-        <div
-          ref="sliderEl"
-          class="cp__slider"
-          :style="{ background: sliderGradient }"
-          @pointerdown="startDrag($event, applySliderPos)"
-        >
-          <ChevronLeft class="ic ic--sm cp__slider-marker" :style="sliderMarkerStyle" />
+        <div class="cp__actions">
+          <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
+          <button class="btn btn--sm btn--primary" type="button" @click="emit('pick', hex)">OK</button>
         </div>
-      </div>
-      <div class="cp__preview" :style="{ background: hex }"></div>
-      <div class="cp__inputs">
-        <label class="cp__input-row">
-          <span>Hue:</span>
-          <input v-model.number.lazy="hInput" class="input" type="number" min="0" max="240" />
-        </label>
-        <label class="cp__input-row">
-          <span>Red:</span>
-          <input v-model.number.lazy="rInput" class="input" type="number" min="0" max="255" />
-        </label>
-        <label class="cp__input-row">
-          <span>Sat:</span>
-          <input v-model.number.lazy="sInput" class="input" type="number" min="0" max="240" />
-        </label>
-        <label class="cp__input-row">
-          <span>Green:</span>
-          <input v-model.number.lazy="gInput" class="input" type="number" min="0" max="255" />
-        </label>
-        <label class="cp__input-row">
-          <span>Lum:</span>
-          <input v-model.number.lazy="lInput" class="input" type="number" min="0" max="240" />
-        </label>
-        <label class="cp__input-row">
-          <span>Blue:</span>
-          <input v-model.number.lazy="bInput" class="input" type="number" min="0" max="255" />
-        </label>
-      </div>
-
-      <div class="cp__footer">
-        <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
-        <button class="btn btn--sm btn--primary" type="button" @click="emit('pick', hex)">OK</button>
       </div>
     </div>
   </Teleport>
@@ -344,26 +365,72 @@ onBeforeUnmount(() => {
   z-index: 60;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  max-width: calc(100vw - 16px);
   padding: 12px;
   background: var(--card);
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow-md);
   user-select: none;
 }
+.cp.is-below::before,
+.cp.is-below::after,
+.cp.is-above::before,
+.cp.is-above::after {
+  content: "";
+  position: absolute;
+  left: var(--tip, 50%);
+  margin-left: -6px;
+  border: 6px solid transparent;
+}
+.cp.is-below::before,
+.cp.is-below::after {
+  bottom: 100%;
+}
+.cp.is-below::before {
+  border-bottom-color: var(--line-2);
+}
+.cp.is-below::after {
+  margin-bottom: -1px;
+  border-bottom-color: var(--card);
+}
+.cp.is-above::before,
+.cp.is-above::after {
+  top: 100%;
+}
+.cp.is-above::before {
+  border-top-color: var(--line-2);
+}
+.cp.is-above::after {
+  margin-top: -1px;
+  border-top-color: var(--card);
+}
+.cp__top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.cp__left {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cp__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .cp__label {
   color: var(--text-muted);
   font-size: 12px;
+  line-height: 16px;
 }
 .cp__grid {
   display: grid;
   grid-template-columns: repeat(8, 22px);
   grid-auto-rows: 18px;
   gap: 4px;
-}
-.cp__grid + .cp__label,
-.cp__grid + .cp__canvas-row {
-  margin-top: 4px;
 }
 .cp__swatch {
   width: 22px;
@@ -380,23 +447,23 @@ onBeforeUnmount(() => {
   outline: 1px solid var(--text);
   outline-offset: 1px;
 }
-.cp__canvas-row {
+.cp__field {
   display: flex;
   gap: 6px;
-  align-items: flex-start;
+  padding-right: 11px;
 }
 .cp__canvas-wrap {
   position: relative;
   flex: none;
-  width: 170px;
-  height: 110px;
+  width: 200px;
+  height: 200px;
   border: 1px solid var(--line-2);
   box-sizing: content-box;
 }
 .cp__canvas {
   display: block;
-  width: 170px;
-  height: 110px;
+  width: 200px;
+  height: 200px;
   cursor: crosshair;
   touch-action: none;
 }
@@ -413,7 +480,7 @@ onBeforeUnmount(() => {
   position: relative;
   flex: none;
   width: 12px;
-  height: 110px;
+  height: 200px;
   border: 1px solid var(--line-2);
   box-sizing: content-box;
   cursor: ns-resize;
@@ -426,31 +493,36 @@ onBeforeUnmount(() => {
   color: var(--text);
   pointer-events: none;
 }
+.cp__bottom {
+  display: flex;
+  gap: 12px;
+}
 .cp__preview {
-  height: 20px;
+  flex: none;
+  width: 56px;
   border: 1px solid var(--line-2);
 }
 .cp__inputs {
+  flex: 1;
   display: grid;
-  grid-template-columns: repeat(2, auto);
+  grid-template-columns: repeat(3, auto);
   justify-content: space-between;
   gap: 4px 8px;
 }
 .cp__input-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 4px;
   color: var(--text-dim);
   font-size: 12px;
 }
 .cp__input-row span {
-  min-width: 38px;
+  min-width: 40px;
   text-align: right;
 }
 .cp__input-row .input {
-  width: 48px;
-  height: 24px;
+  width: 52px;
+  height: 26px;
   padding: 0 6px;
   font: 12px var(--font-num);
   text-align: right;
@@ -461,10 +533,16 @@ onBeforeUnmount(() => {
   margin: 0;
   appearance: none;
 }
-.cp__footer {
+.cp__actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 4px;
+  flex-direction: column;
+  gap: 4px;
+}
+@media (max-width: 520px) {
+  .cp__inputs {
+    grid-template-columns: none;
+    grid-template-rows: repeat(3, auto);
+    grid-auto-flow: column;
+  }
 }
 </style>
