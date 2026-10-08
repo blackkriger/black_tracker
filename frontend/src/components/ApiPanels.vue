@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { Check, X } from 'lucide-vue-next';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { features } from '../lib/features';
 import { stamp } from '../lib/issues';
 import { usePanelErrors } from '../lib/panelErrors';
@@ -9,6 +10,10 @@ import { useSession } from '../lib/session';
 
 const session = useSession();
 const me = session.me;
+
+useLive((ev) => {
+  if (ev.type === 'session.changed') void session.refresh();
+});
 
 const tokenBusy = ref(false);
 const freshToken = ref<string | null>(null);

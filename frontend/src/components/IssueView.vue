@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
-import { TAB_ID, api } from '../lib/api';
+import { ApiError, TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank, trimBlank } from '../lib/richtext';
 import { forgetKeys, keyInfo, refreshKey } from '../lib/issueKeys';
 import { buddyAvatarStyle } from '../lib/avatar';
@@ -763,6 +763,7 @@ useLive((ev) => {
   const current = issue.value;
   if (!current) return;
   if (ev.type === 'state.changed' || ev.type === 'board.changed') void readHostStates(current.boardId, true);
+  if (ev.type === 'board.changed' || ev.type === 'project.changed') void closeIfGone();
   if (ev.type === 'tag.changed') void reload();
   if (ev.issueId !== current.id) {
     if (ev.type.startsWith('issue.') && current.links.some((l) => l.id === ev.issueId)) void reload();
@@ -778,6 +779,15 @@ useLive((ev) => {
     else flash((ev.fields ?? []).map((f) => FIELD_OF[f] ?? f));
   });
 }, () => void reload());
+
+async function closeIfGone(): Promise<void> {
+  if (!props.issueKey) return;
+  try {
+    await api(`/issues/${encodeURIComponent(props.issueKey)}`);
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 403)) emit('close');
+  }
+}
 
 async function reload(): Promise<void> {
   if (!props.issueKey) return;

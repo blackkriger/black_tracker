@@ -142,7 +142,10 @@ function onKeydown(ev: KeyboardEvent): void {
 }
 
 useLive((ev) => {
-  if (['project.changed', 'board.changed'].includes(ev.type)) void load(true);
+  if (['project.changed', 'board.changed'].includes(ev.type)) {
+    void load(true);
+    void readNotices();
+  }
   if (ev.type === 'key-date.changed') void readNext();
   if (['role.changed', 'user.changed'].includes(ev.type)) {
     void loadPeople(true);

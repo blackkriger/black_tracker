@@ -447,6 +447,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
         where id = $3`,
       [hashToken(token), token.slice(-4), auth.userId]
     );
+    void publish({ type: 'session.changed', only: auth.userId, origin: tabOf(req) });
     return reply.send({ data: { token } });
   });
 
@@ -460,6 +461,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
         where id = $1`,
       [auth.userId]
     );
+    void publish({ type: 'session.changed', only: auth.userId, origin: tabOf(req) });
     return reply.send({ data: { ok: true } });
   });
 
