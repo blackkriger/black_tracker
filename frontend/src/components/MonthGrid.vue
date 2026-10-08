@@ -273,6 +273,9 @@ function onEnter(ev: PointerEvent, c: Cell): void {
 .cal__day.is-picked {
   font-weight: 700;
 }
+.cal__day.is-picked .ic {
+  stroke-width: 2.5;
+}
 .cal__pop::before,
 .cal__pop::after {
   left: var(--tip, 50%);
