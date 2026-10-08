@@ -16,7 +16,7 @@ import {
   type Mark,
 } from '../lib/calendar';
 import { useFocus } from '../lib/focus';
-import { useLive } from '../lib/live';
+import { settled, useLive } from '../lib/live';
 import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
@@ -110,9 +110,17 @@ onMounted(() => {
 onBeforeUnmount(() => window.removeEventListener('resize', fill));
 watch(() => route.fullPath, () => void readMonth());
 
+const rereadMonth = settled(() => void readMonth());
 useLive(
   (ev) => {
     if (ev.type === 'key-date.changed') void readMonth();
+    if (
+      ev.type.startsWith('issue.') ||
+      ev.type.startsWith('comment.') ||
+      ['history.added', 'state.changed', 'board.changed', 'project.changed'].includes(ev.type)
+    ) {
+      rereadMonth();
+    }
   },
   () => void readMonth()
 );
