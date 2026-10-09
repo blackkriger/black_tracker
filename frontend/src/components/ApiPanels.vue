@@ -218,6 +218,11 @@ const CALLS: { group: string; calls: Call[] }[] = [
         </div>
 
         <div class="field">
+          <span class="label">Authorization header</span>
+          <pre class="api__code">{{ HEADER }}</pre>
+        </div>
+
+        <div class="field">
           <span class="label">What answers</span>
           <div class="api__table">
             <template v-for="g in CALLS" :key="g.group">
@@ -229,11 +234,6 @@ const CALLS: { group: string; calls: Call[] }[] = [
               </template>
             </template>
           </div>
-        </div>
-
-        <div class="field">
-          <span class="label">Authorization header</span>
-          <pre class="api__code">{{ HEADER }}</pre>
         </div>
       </div>
     </section>
