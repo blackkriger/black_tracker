@@ -1,6 +1,4 @@
 export default {
-  today: 'today',
-  inDays: 'in {n} day | in {n} days',
   prevMonth: 'Previous month',
   nextMonth: 'Next month',
   full: 'Full calendar',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next';
@@ -23,7 +23,7 @@ import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
 
-const props = defineProps<{ soon: Mark | null; daysLeft?: number | null; withFull?: boolean; all?: boolean }>();
+defineProps<{ soon: Mark | null; withFull?: boolean; all?: boolean }>();
 const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>();
 
 const { t } = useI18n();
@@ -34,13 +34,6 @@ const { colorOf, nameOf, genderOf, load: loadPeople } = usePeople();
 void loadPeople();
 const { notices: everything, shown: notices, hasMore, loadMore, markRead } = useNotices();
 const list = ref<HTMLDivElement | null>(null);
-
-const soonIn = computed(() => {
-  const left = props.daysLeft;
-  if (left == null || left < 0) return '';
-  if (left === 0) return t('calendar.today');
-  return t('calendar.inDays', { n: left }, left);
-});
 
 async function fill(): Promise<void> {
   await nextTick();
@@ -177,7 +170,7 @@ defineExpose({ readMonth });
               rel="noopener noreferrer"
             >{{ soon.title }}</a>
             <span v-else class="soon__title">{{ soon.title }}</span>
-            <span class="stamp">{{ longDate(soon.day) }}<template v-if="soonIn">, {{ soonIn }}</template></span>
+            <span class="stamp">{{ longDate(soon.day) }}</span>
           </span>
           <span v-if="soon.project" class="key">{{ soon.project.shortName }}</span>
         </div>

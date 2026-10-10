@@ -313,7 +313,7 @@ async function signOut(): Promise<void> {
     </nav>
 
     <div class="rail__date">
-      <DatePanel ref="panel" :soon="soon" :days-left="daysOff" all @day="toDay" />
+      <DatePanel ref="panel" :soon="soon" all @day="toDay" />
     </div>
 
     <nav class="rail__account" :aria-label="t('nav.account')">

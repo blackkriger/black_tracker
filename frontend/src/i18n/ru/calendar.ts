@@ -2,8 +2,6 @@ import type en from '../en/calendar';
 import type { Shape } from '../shape';
 
 const calendar: Shape<typeof en> = {
-  today: 'сегодня',
-  inDays: 'через {n} день | через {n} дня | через {n} дней',
   prevMonth: 'Предыдущий месяц',
   nextMonth: 'Следующий месяц',
   full: 'Весь календарь',
