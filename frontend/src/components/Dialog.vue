@@ -5,8 +5,10 @@ const stack: symbol[] = [];
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { X } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 
 defineProps<{ title: string; width?: number }>();
+const { t } = useI18n();
 const emit = defineEmits<{ (e: 'close'): void }>();
 const pressedScrim = ref(false);
 
@@ -36,7 +38,7 @@ onUnmounted(() => {
       <section class="dlg dialog" role="dialog" aria-modal="true" :style="{ width: `${width ?? 360}px` }">
         <header class="dlg__h">
           <span>{{ title }}</span>
-          <button class="btn btn--sm btn--icon btn--ghost" type="button" aria-label="Close" @click="emit('close')">
+          <button class="btn btn--sm btn--icon btn--ghost" type="button" :aria-label="t('common.close')" @click="emit('close')">
             <X class="ic" />
           </button>
         </header>

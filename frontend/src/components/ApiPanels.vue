@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Check, X } from 'lucide-vue-next';
 import { api } from '../lib/api';
 import { useLive } from '../lib/live';
@@ -8,6 +9,7 @@ import { stamp } from '../lib/issues';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useSession } from '../lib/session';
 
+const { t } = useI18n();
 const session = useSession();
 const me = session.me;
 
@@ -20,12 +22,12 @@ const freshToken = ref<string | null>(null);
 const copied = ref(false);
 const { errors, fail, clear } = usePanelErrors();
 
-const ABILITIES: [string, string | null][] = [
-  ['Create issues, change status, priority, assignee, watcher, due date, tags, board', features.pings ? 'Ping people' : null],
-  ['Post, edit, delete and pin comments, attach files to them', 'React to comments'],
-  ['Manage projects, boards, statuses, tags and marked days', 'Manage roles, people and invite links'],
-  ['Delete, if your role can', 'Change your account, sessions or the token itself'],
-];
+const ABILITIES = computed<[string, string | null][]>(() => [
+  [t('api.canIssues'), features.pings ? t('api.cannotPing') : null],
+  [t('api.canComments'), t('api.cannotReact')],
+  [t('api.canManage'), t('api.cannotRoles')],
+  [t('api.canDelete'), t('api.cannotAccount')],
+]);
 
 const tokenCreated = computed(() => stamp(me.value?.token?.createdAt ?? null));
 const tokenUsed = computed(() => stamp(me.value?.token?.lastUsedAt ?? null));
@@ -40,7 +42,7 @@ async function regenerate(): Promise<void> {
     freshToken.value = res.token;
     await session.refresh();
   } catch (err) {
-    fail('token', err, 'Could not issue a token.');
+    fail('token', err, t('api.issueFailed'));
   } finally {
     tokenBusy.value = false;
   }
@@ -55,7 +57,7 @@ async function revoke(): Promise<void> {
     freshToken.value = null;
     await session.refresh();
   } catch (err) {
-    fail('token', err, 'Could not revoke the token.');
+    fail('token', err, t('api.revokeFailed'));
   } finally {
     tokenBusy.value = false;
   }
@@ -155,38 +157,38 @@ const CALLS: { group: string; calls: Call[] }[] = [
 
 <template>
     <section class="panel sheet__wide">
-      <header class="panel__h">API token</header>
+      <header class="panel__h">{{ t('api.token') }}</header>
       <div class="panel__b form">
-        <p class="token__lede">
-          Personal token for scripts and API use. Whatever it does is recorded as
-          <strong>your</strong> action, marked <span class="api">API</span> in history.
-        </p>
+        <i18n-t keypath="api.lede" tag="p" class="token__lede">
+          <template #your><strong>{{ t('api.your') }}</strong></template>
+          <template #api><span class="api">API</span></template>
+        </i18n-t>
 
         <div v-if="freshToken" class="field">
-          <span class="label">Your new token — copy it now</span>
+          <span class="label">{{ t('api.copyNow') }}</span>
           <div class="token__row">
             <code class="input token__value">{{ freshToken }}</code>
-            <button class="btn" type="button" @click="copyToken">{{ copied ? 'Copied' : 'Copy' }}</button>
+            <button class="btn" type="button" @click="copyToken">{{ copied ? t('users.copied') : t('users.copy') }}</button>
           </div>
-          <span class="hint">It is stored as a hash, so this is the only time it can be read.</span>
+          <span class="hint">{{ t('users.hashHint') }}</span>
         </div>
 
         <div v-else-if="me?.token" class="field">
-          <span class="label">Token</span>
+          <span class="label">{{ t('api.tokenLabel') }}</span>
           <code class="input token__value">••••••••••••{{ me.token.hint }}</code>
           <span class="stamp">
-            CREATED {{ tokenCreated }}<template v-if="tokenUsed">, LAST USED {{ tokenUsed }}</template>
-            <template v-else>, NEVER USED</template>
+            {{ t('api.created', { date: tokenCreated }) }}<template v-if="tokenUsed">, {{ t('api.lastUsed', { date: tokenUsed }) }}</template>
+            <template v-else>, {{ t('api.neverUsed') }}</template>
           </span>
         </div>
 
         <div v-else class="empty empty--sm">
           <span class="empty__g">◇</span>
-          No token yet.
+          {{ t('api.noToken') }}
         </div>
 
         <div class="token__can">
-          <span class="label token__can-h">What the token can do:</span>
+          <span class="label token__can-h">{{ t('api.canDo') }}</span>
           <ul class="token__list">
             <template v-for="[can, cannot] in ABILITIES" :key="can">
               <li><Check class="ic token__yes" />{{ can }}</li>
@@ -199,10 +201,10 @@ const CALLS: { group: string; calls: Call[] }[] = [
         <div class="token__foot">
           <div class="sp"></div>
           <button v-if="me?.token" class="btn btn--danger" type="button" :disabled="tokenBusy" @click="revoke">
-            Revoke
+            {{ t('users.revoke') }}
           </button>
           <button class="btn" type="button" :disabled="tokenBusy" @click="regenerate">
-            {{ me?.token ? 'Regenerate' : 'Create token' }}
+            {{ me?.token ? t('api.regenerate') : t('api.create') }}
           </button>
         </div>
       </div>

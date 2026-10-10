@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ExternalLink } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 import { api } from '../lib/api';
 import { stamp } from '../lib/issues';
 import { useLive } from '../lib/live';
 import { useProjects } from '../lib/projects';
 
+const { t } = useI18n();
 const { projects, loaded, load } = useProjects();
 
 const updated = ref<string | null>(null);
@@ -45,25 +47,25 @@ useLive(
   <div class="page">
 
     <div class="page__body">
-      <nav ref="nav" class="side settings__side" aria-label="Settings sections">
-        <div class="side__h">Profile</div>
-        <RouterLink to="/settings/profile">Profile</RouterLink>
-        <RouterLink to="/settings/preferences">Preferences</RouterLink>
+      <nav ref="nav" class="side settings__side" :aria-label="t('settings.sections')">
+        <div class="side__h">{{ t('settings.profile') }}</div>
+        <RouterLink to="/settings/profile">{{ t('settings.profile') }}</RouterLink>
+        <RouterLink to="/settings/preferences">{{ t('settings.preferences') }}</RouterLink>
         <RouterLink to="/settings/api">API</RouterLink>
 
-        <div class="side__h">Projects</div>
+        <div class="side__h">{{ t('fields.projects') }}</div>
         <span v-for="n in loaded ? 0 : 3" :key="n" class="sk sk--row side__sk"></span>
         <RouterLink v-for="p in live" :key="p.id" :to="`/settings/${p.shortName}`">
           <span><span class="proj__k">{{ p.shortName }}</span> {{ p.name }}</span>
         </RouterLink>
         <RouterLink v-for="p in archived" :key="p.id" :to="`/settings/${p.shortName}`">
-          <span><span class="proj__k">{{ p.shortName }}</span> {{ p.name }} (archived)</span>
+          <span><span class="proj__k">{{ p.shortName }}</span> {{ p.name }} {{ t('settings.archivedMark') }}</span>
         </RouterLink>
-        <RouterLink to="/settings/new">New project…</RouterLink>
+        <RouterLink to="/settings/new">{{ t('settings.newProjectLink') }}</RouterLink>
 
-        <div class="side__h">Workspace</div>
-        <RouterLink to="/settings/users">Users &amp; access</RouterLink>
-        <RouterLink to="/settings/tags">Tags</RouterLink>
+        <div class="side__h">{{ t('settings.workspace') }}</div>
+        <RouterLink to="/settings/users">{{ t('settings.usersAccess') }}</RouterLink>
+        <RouterLink to="/settings/tags">{{ t('fields.tags') }}</RouterLink>
 
         <a class="side__db" href="/db/" target="_blank" rel="noopener noreferrer">
           DB
@@ -71,7 +73,7 @@ useLive(
         </a>
 
         <span class="side__foot stamp">
-          <template v-if="updated">UPDATED {{ stamp(updated) }}</template>
+          <template v-if="updated">{{ t('settings.updated', { date: stamp(updated) }) }}</template>
         </span>
       </nav>
 

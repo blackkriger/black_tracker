@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Select from '../../components/Select.vue';
 import Dialog from '../../components/Dialog.vue';
@@ -39,6 +40,7 @@ interface Project {
   boards: Board[];
 }
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const projectsStore = useProjects();
@@ -76,7 +78,7 @@ async function load(quiet = false): Promise<void> {
   } catch (err) {
     if (mine !== projectReads) return;
     project.value = null;
-    loadError.value = err instanceof Error ? err.message : 'Could not load the project.';
+    loadError.value = err instanceof Error ? err.message : t('project.loadFailed');
   } finally {
     if (mine === projectReads) loading.value = false;
   }
@@ -254,14 +256,14 @@ async function onDrop(b: Board, target: State): Promise<void> {
   <SettingsLayout>
     <template v-if="loading">
       <section class="panel sheet__wide">
-        <header class="panel__h">Project</header>
+        <header class="panel__h">{{ t('fields.project') }}</header>
         <div class="panel__b p-row">
           <div class="field p-key">
-            <span class="label">Key</span>
+            <span class="label">{{ t('settings.key') }}</span>
             <span class="sk sk--field"></span>
           </div>
           <div class="field p-name">
-            <span class="label">Name</span>
+            <span class="label">{{ t('settings.name') }}</span>
             <span class="sk sk--field"></span>
           </div>
           <span class="sk sk--field p-btn" style="width: 132px"></span>
@@ -278,11 +280,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
         </header>
         <div class="board-prefs">
           <div class="field">
-            <span class="label">Default status</span>
+            <span class="label">{{ t('project.defaultStatus') }}</span>
             <span class="sk default-pick-sk"></span>
           </div>
           <div class="field">
-            <span class="label">Default assignee</span>
+            <span class="label">{{ t('project.defaultAssignee') }}</span>
             <span class="sk default-pick-sk"></span>
           </div>
         </div>
@@ -290,11 +292,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
           <table class="tbl">
             <thead>
               <tr>
-                <th class="c-grip"><span class="sr">Order</span></th>
-                <th>Status</th>
-                <th class="c-flag">Open</th>
-                <th class="c-flag">Resolved</th>
-                <th class="c-act"><span class="sr">Actions</span></th>
+                <th class="c-grip"><span class="sr">{{ t('project.order') }}</span></th>
+                <th>{{ t('fields.status') }}</th>
+                <th class="c-flag">{{ t('project.open') }}</th>
+                <th class="c-flag">{{ t('project.resolved') }}</th>
+                <th class="c-act"><span class="sr">{{ t('project.actions') }}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -321,7 +323,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
       </section>
 
       <section class="panel sheet__wide">
-        <header class="panel__h">New board</header>
+        <header class="panel__h">{{ t('project.newBoard') }}</header>
         <div class="panel__b">
           <div class="addrow">
             <span class="sk sk--field"></span>
@@ -337,20 +339,20 @@ async function onDrop(b: Board, target: State): Promise<void> {
     <template v-else>
       <section class="panel sheet__wide">
         <header class="panel__h">
-          Project
-          <span class="panel__end">{{ project.archived ? 'Archived' : '' }}</span>
+          {{ t('fields.project') }}
+          <span class="panel__end">{{ project.archived ? t('project.archived') : '' }}</span>
         </header>
         <div class="panel__b p-row">
           <div class="field p-key">
-            <label class="label" for="p-key">Key</label>
+            <label class="label" for="p-key">{{ t('settings.key') }}</label>
             <input id="p-key" class="input" :value="project.shortName" tabindex="-1" readonly />
           </div>
           <div class="field p-name">
-            <label class="label" for="p-name">Name</label>
+            <label class="label" for="p-name">{{ t('settings.name') }}</label>
             <input id="p-name" class="input" :value="project.name" tabindex="-1" readonly />
           </div>
           <button class="btn p-btn" type="button" @click="toggleArchived">
-            {{ project.archived ? 'Restore project' : 'Archive project' }}
+            {{ project.archived ? t('project.restore') : t('project.archive') }}
           </button>
           <button
             class="btn btn--danger p-btn"
@@ -358,7 +360,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
             :disabled="!canDelete"
             @click="deleting = true"
           >
-            Delete
+            {{ t('common.delete') }}
           </button>
         </div>
       </section>
@@ -380,14 +382,14 @@ async function onDrop(b: Board, target: State): Promise<void> {
               :disabled="!canDelete"
               @click="deletingBoard = b"
             >
-              Delete board
+              {{ t('project.deleteBoard') }}
             </button>
           </span>
         </header>
 
         <div class="board-prefs">
           <div class="field">
-            <label class="label" :for="`default-${b.id}`">Default status</label>
+            <label class="label" :for="`default-${b.id}`">{{ t('project.defaultStatus') }}</label>
             <Select
               :id="`default-${b.id}`"
               class="default-pick"
@@ -397,7 +399,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
             />
           </div>
           <div class="field">
-            <label class="label" :for="`assignee-${b.id}`">Default assignee</label>
+            <label class="label" :for="`assignee-${b.id}`">{{ t('project.defaultAssignee') }}</label>
             <Select
               :id="`assignee-${b.id}`"
               class="default-pick"
@@ -411,11 +413,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
           <table class="tbl">
             <thead>
               <tr>
-                <th class="c-grip"><span class="sr">Order</span></th>
-                <th>Status</th>
-                <th class="c-flag">Open</th>
-                <th class="c-flag">Resolved</th>
-                <th class="c-act"><span class="sr">Actions</span></th>
+                <th class="c-grip"><span class="sr">{{ t('project.order') }}</span></th>
+                <th>{{ t('fields.status') }}</th>
+                <th class="c-flag">{{ t('project.open') }}</th>
+                <th class="c-flag">{{ t('project.resolved') }}</th>
+                <th class="c-act"><span class="sr">{{ t('project.actions') }}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -460,7 +462,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
                     <button
                       class="btn btn--sm btn--icon btn--ghost"
                       type="button"
-                      :aria-label="`Color of ${s.name}`"
+                      :aria-label="t('project.colorOf', { name: s.name })"
                       @click="pickColor(b, s, $event)"
                     >
                       <Palette class="ic" />
@@ -468,7 +470,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
                     <button
                       class="btn btn--sm btn--icon btn--ghost"
                       type="button"
-                      aria-label="Delete status"
+                      :aria-label="t('project.deleteStatus')"
                       :disabled="!canDelete"
                       @click="deleteStatus(b, s)"
                     >
@@ -484,11 +486,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
             <input
               :value="newStatus[b.id] ?? ''"
               class="input"
-              placeholder="Add status…"
+              :placeholder="t('project.addStatus')"
               maxlength="60"
               @input="newStatus = { ...newStatus, [b.id]: ($event.target as HTMLInputElement).value }"
             />
-            <button class="btn" type="submit" :disabled="!(newStatus[b.id] ?? '').trim()">Add</button>
+            <button class="btn" type="submit" :disabled="!(newStatus[b.id] ?? '').trim()">{{ t('common.add') }}</button>
           </form>
         </div>
       </section>
@@ -496,11 +498,11 @@ async function onDrop(b: Board, target: State): Promise<void> {
       </template>
 
       <section class="panel sheet__wide">
-        <header class="panel__h">New board</header>
+        <header class="panel__h">{{ t('project.newBoard') }}</header>
         <div class="panel__b">
           <form class="addrow" @submit.prevent="addBoard">
-            <input v-model="newBoard" class="input" placeholder="Add board…" maxlength="60" />
-            <button class="btn" type="submit" :disabled="!newBoard.trim()">Add</button>
+            <input v-model="newBoard" class="input" :placeholder="t('project.addBoard')" maxlength="60" />
+            <button class="btn" type="submit" :disabled="!newBoard.trim()">{{ t('common.add') }}</button>
           </form>
         </div>
       </section>
@@ -518,41 +520,41 @@ async function onDrop(b: Board, target: State): Promise<void> {
 
     <Dialog
       v-if="deletingBoard"
-      :title="`Delete ${deletingBoard.name}`"
+      :title="t('common.deleteNamed', { name: deletingBoard.name })"
       @close="deletingBoard = null"
     >
       <p class="dialog__lede">
-        This takes the board's statuses and issues with it. This cannot be undone.
+        {{ t('project.deleteBoardText') }}
       </p>
       <div v-if="errors.deleteBoard" class="err">{{ errors.deleteBoard }}</div>
       <template #footer>
-        <button class="btn" type="button" @click="deletingBoard = null">Cancel</button>
-        <button class="btn btn--danger" type="button" @click="deleteBoard">Delete board</button>
+        <button class="btn" type="button" @click="deletingBoard = null">{{ t('common.cancel') }}</button>
+        <button class="btn btn--danger" type="button" @click="deleteBoard">{{ t('project.deleteBoard') }}</button>
       </template>
     </Dialog>
 
     <Dialog
       v-if="deleting && project"
-      :title="`Delete ${project.name}`"
+      :title="t('common.deleteNamed', { name: project.name })"
       @close="deleting = false; confirmKey = ''"
     >
       <p class="dialog__lede">
-        This takes the project's boards, statuses, issues and its own tags with it. This cannot be undone.
+        {{ t('project.deleteProjectText') }}
       </p>
       <div class="field">
-        <label class="label" for="p-confirm">Type name of the project to confirm</label>
+        <label class="label" for="p-confirm">{{ t('project.typeName') }}</label>
         <input id="p-confirm" v-model="confirmKey" class="input" autofocus @keydown.enter.prevent="deleteProject" />
       </div>
       <div v-if="errors.deleteProject" class="err">{{ errors.deleteProject }}</div>
       <template #footer>
-        <button class="btn" type="button" @click="deleting = false; confirmKey = ''">Cancel</button>
+        <button class="btn" type="button" @click="deleting = false; confirmKey = ''">{{ t('common.cancel') }}</button>
         <button
           class="btn btn--danger"
           type="button"
           :disabled="confirmKey.trim().toLowerCase() !== project.name.trim().toLowerCase()"
           @click="deleteProject"
         >
-          Delete project
+          {{ t('project.deleteProject') }}
         </button>
       </template>
     </Dialog>

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue';
 import { ChevronLeft, ChevronRight, FileDown, Scan, WrapText, X, ZoomIn, ZoomOut } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 import DOMPurify from '../lib/purify';
 import { api } from '../lib/api';
 import { langOf, setWrapLines, wrapLines as wrapped } from '../lib/files';
 import { shownTheme } from '../lib/theme';
 
+const { t } = useI18n();
 const props = defineProps<{ file: { id: string; name: string } | null }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
 
@@ -149,7 +151,7 @@ async function read(): Promise<void> {
     truncated.value = got.truncated;
     await paint();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not read this file.';
+    error.value = err instanceof Error ? err.message : t('files.readFailed');
   } finally {
     loading.value = false;
   }
@@ -193,7 +195,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <div v-if="file" class="iviewer" @click.self="onPage">
       <div class="fv__page" @click.self="onPage">
-        <div v-if="loading" class="fv__said">Reading…</div>
+        <div v-if="loading" class="fv__said">{{ t('files.reading') }}</div>
         <div v-else-if="error" class="err fv__said">{{ error }}</div>
         <div v-else-if="isMd" class="md fv__md" v-html="marked_"></div>
         <iframe
@@ -204,7 +206,7 @@ onUnmounted(() => {
           :class="{ 'is-sized': frameSize }"
           src="/drawio/viewer.html"
           sandbox="allow-scripts"
-          title="Diagram"
+          :title="t('files.diagram')"
         ></iframe>
         <div v-else class="fv__code" :class="{ 'is-folded': wrapped }">
           <template v-for="(line, i) in lines" :key="i">
@@ -213,7 +215,7 @@ onUnmounted(() => {
           </template>
         </div>
         <div v-if="truncated && !loading && !error" class="fv__cut">
-          Only the first 512 KB are shown. Download the file to read the rest.
+          {{ t('files.truncated') }}
         </div>
       </div>
 
@@ -225,26 +227,26 @@ onUnmounted(() => {
             class="btn btn--sm"
             type="button"
             :aria-pressed="wrapped"
-            title="Fold long lines (Alt+Z)"
+            :title="t('files.foldTitle')"
             @click="setWrapLines(!wrapped)"
           >
             <WrapText class="ic" />
-            Wrap
+            {{ t('files.wrap') }}
           </button>
           <template v-if="isDrawio && frameSize">
-            <button v-if="pages.count > 1" class="btn btn--sm" type="button" aria-label="Previous" @click="drawio('prev')"><ChevronLeft class="ic" /></button>
+            <button v-if="pages.count > 1" class="btn btn--sm" type="button" :aria-label="t('files.previous')" @click="drawio('prev')"><ChevronLeft class="ic" /></button>
             <span v-if="pages.count > 1" class="iviewer__n">{{ pages.page + 1 }} / {{ pages.count }}</span>
-            <button v-if="pages.count > 1" class="btn btn--sm" type="button" aria-label="Next" @click="drawio('next')"><ChevronRight class="ic" /></button>
-            <button class="btn btn--sm" type="button" aria-label="Zoom out" @click="drawio('zoomOut')"><ZoomOut class="ic" /></button>
-            <button class="btn btn--sm" type="button" aria-label="Zoom in" @click="drawio('zoomIn')"><ZoomIn class="ic" /></button>
-            <button class="btn btn--sm" type="button" aria-label="Fit" @click="drawio('fit')"><Scan class="ic" /></button>
+            <button v-if="pages.count > 1" class="btn btn--sm" type="button" :aria-label="t('files.next')" @click="drawio('next')"><ChevronRight class="ic" /></button>
+            <button class="btn btn--sm" type="button" :aria-label="t('files.zoomOut')" @click="drawio('zoomOut')"><ZoomOut class="ic" /></button>
+            <button class="btn btn--sm" type="button" :aria-label="t('files.zoomIn')" @click="drawio('zoomIn')"><ZoomIn class="ic" /></button>
+            <button class="btn btn--sm" type="button" :aria-label="t('files.fit')" @click="drawio('fit')"><Scan class="ic" /></button>
           </template>
           <a class="btn btn--sm" :href="`/api/attachments/${file.id}`" download>
             <FileDown class="ic" />
-            Download
+            {{ t('files.download') }}
           </a>
         </div>
-        <button class="btn btn--sm iviewer__close" type="button" aria-label="Close" @click="emit('close')">
+        <button class="btn btn--sm iviewer__close" type="button" :aria-label="t('common.close')" @click="emit('close')">
           <X class="ic" />
         </button>
       </div>

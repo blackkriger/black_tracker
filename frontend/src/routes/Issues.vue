@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-vue-next';
 import FilterBar from '../components/FilterBar.vue';
 import IssueView from '../components/IssueView.vue';
@@ -26,6 +27,7 @@ interface Row extends Omit<Issue, 'description'> {
 }
 type Column = 'key' | 'priority' | 'board' | 'status' | 'due' | 'assignee';
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const { projects, load: loadProjects } = useProjects();
@@ -230,7 +232,7 @@ onMounted(() => {
       <div class="sheet">
         <section class="panel sheet__wide">
           <header class="panel__h">
-            Issues
+            {{ t('nav.issues') }}
             <span v-if="!loading" class="panel__end">{{ sorted.length }}</span>
           </header>
 
@@ -241,19 +243,19 @@ onMounted(() => {
                 <input
                   v-model="typed"
                   class="input input--sm search__f"
-                  :placeholder="tiny ? 'Search…' : small ? 'Summary or key…' : 'Search by summary or key…'"
+                  :placeholder="tiny ? t('issues.searchTiny') : small ? t('issues.searchSmall') : t('issues.search')"
                   maxlength="100"
-                  aria-label="Search the issues"
+                  :aria-label="t('issues.searchLabel')"
                 />
               </span>
-              <div class="seg" role="radiogroup" aria-label="Issues shown">
+              <div class="seg" role="radiogroup" :aria-label="t('issues.shown')">
                 <label class="seg__i" :class="{ 'is-on': !closed }">
                   <input v-model="closed" class="sr" type="radio" name="issues-shown" :value="false" />
-                  Open
+                  {{ t('issues.open') }}
                 </label>
                 <label class="seg__i" :class="{ 'is-on': closed }">
                   <input v-model="closed" class="sr" type="radio" name="issues-shown" :value="true" />
-                  All
+                  {{ t('issues.all') }}
                 </label>
               </div>
             </div>
@@ -266,33 +268,33 @@ onMounted(() => {
                 <tr>
                   <th class="list__key">
                     <button type="button" :class="{ sorted: sortCol === 'key' }" @click="sortBy('key')">
-                      Key <component :is="arrowOf('key')" class="ic ic--sm" />
+                      {{ t('issues.key') }} <component :is="arrowOf('key')" class="ic ic--sm" />
                     </button>
                   </th>
                   <th class="list__prio">
                     <button type="button" :class="{ sorted: sortCol === 'priority' }" @click="sortBy('priority')">
-                      Priority <component :is="arrowOf('priority')" class="ic ic--sm" />
+                      {{ t('fields.priority') }} <component :is="arrowOf('priority')" class="ic ic--sm" />
                     </button>
                   </th>
-                  <th class="list__summary">Summary</th>
+                  <th class="list__summary">{{ t('issues.summary') }}</th>
                   <th class="list__board">
                     <button type="button" :class="{ sorted: sortCol === 'board' }" @click="sortBy('board')">
-                      Board <component :is="arrowOf('board')" class="ic ic--sm" />
+                      {{ t('fields.board') }} <component :is="arrowOf('board')" class="ic ic--sm" />
                     </button>
                   </th>
                   <th class="list__state">
                     <button type="button" :class="{ sorted: sortCol === 'status' }" @click="sortBy('status')">
-                      Status <component :is="arrowOf('status')" class="ic ic--sm" />
+                      {{ t('fields.status') }} <component :is="arrowOf('status')" class="ic ic--sm" />
                     </button>
                   </th>
                   <th class="list__when">
                     <button type="button" :class="{ sorted: sortCol === 'due' }" @click="sortBy('due')">
-                      Due <component :is="arrowOf('due')" class="ic ic--sm" />
+                      {{ t('fields.due') }} <component :is="arrowOf('due')" class="ic ic--sm" />
                     </button>
                   </th>
                   <th class="list__who">
                     <button type="button" :class="{ sorted: sortCol === 'assignee' }" @click="sortBy('assignee')">
-                      Assignee <component :is="arrowOf('assignee')" class="ic ic--sm" />
+                      {{ t('fields.assignee') }} <component :is="arrowOf('assignee')" class="ic ic--sm" />
                     </button>
                   </th>
                 </tr>
@@ -318,18 +320,18 @@ onMounted(() => {
                 >
                   <td class="key list__key" :style="{ color: ink(r.stateColor) }">{{ r.key }}</td>
                   <td class="list__prio">
-                    <span class="prio" :class="priorityClass(r.priority)" :aria-label="r.priority">
+                    <span class="prio" :class="priorityClass(r.priority)" :aria-label="t(`priority.${r.priority}`)">
                       <i></i><i></i><i></i><i></i>
                     </span>
                   </td>
                   <td class="list__what">
                     <span class="list__text">{{ r.summary }}</span>
                     <span
-                      v-for="t in r.tags"
-                      :key="t.id"
+                      v-for="tag in r.tags"
+                      :key="tag.id"
                       class="taglabel taglabel--plain taglabel--sm list__tag"
-                      :style="{ '--c': t.color }"
-                    >{{ t.name }}</span>
+                      :style="{ '--c': tag.color }"
+                    >{{ tag.name }}</span>
                   </td>
                   <td class="list__dim list__board">{{ r.boardName }}</td>
                   <td class="list__state" :style="{ color: ink(r.stateColor) }">{{ r.stateName }}</td>
@@ -342,7 +344,7 @@ onMounted(() => {
                 </tr>
               </tbody>
             </table>
-            <div v-if="!loading && !sorted.length" class="hint faint list__none">Nothing found.</div>
+            <div v-if="!loading && !sorted.length" class="hint faint list__none">{{ t('issues.nothingFound') }}</div>
           </div>
         </section>
         <div v-if="errors.list" class="err sheet__wide">{{ errors.list }}</div>

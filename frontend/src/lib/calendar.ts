@@ -1,3 +1,5 @@
+import { locale } from '../i18n';
+
 export interface Cell {
   day: number | null;
   key?: string;
@@ -52,7 +54,42 @@ export interface DayInfo {
   unreadOf: Record<string, number>;
 }
 
-export const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const WEEKDAYS = {
+  en: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+  ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+};
+const RU_MONTHS = [
+  'Январь',
+  'Февраль',
+  'Март',
+  'Апрель',
+  'Май',
+  'Июнь',
+  'Июль',
+  'Август',
+  'Сентябрь',
+  'Октябрь',
+  'Ноябрь',
+  'Декабрь',
+];
+const RU_MONTHS_OF = [
+  'января',
+  'февраля',
+  'марта',
+  'апреля',
+  'мая',
+  'июня',
+  'июля',
+  'августа',
+  'сентября',
+  'октября',
+  'ноября',
+  'декабря',
+];
+export const RU_MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const RU_WEEKDAYS_LONG = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+
+export const weekdayNames = (): string[] => WEEKDAYS[locale.value];
 
 export const pad2 = (n: number): string => String(n).padStart(2, '0');
 
@@ -73,15 +110,21 @@ export function firstWeekday(year: number, month: number): number {
 }
 
 export function monthName(year: number, month: number): string {
+  if (locale.value === 'ru') return `${RU_MONTHS[month]} ${year}`;
   return new Date(year, month, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 }
 
 export function dayAndMonth(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
+  if (locale.value === 'ru') return `${d} ${RU_MONTHS_OF[m - 1]}`;
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
 }
 
 export function shortDate(key: string, withYear = true): string {
+  if (locale.value === 'ru') {
+    const [y, m, d] = key.split('-').map(Number);
+    return `${d} ${RU_MONTHS_SHORT[m - 1]}${withYear ? ` ${String(y).slice(2)}` : ''}`;
+  }
   return new Date(`${key}T00:00:00Z`).toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
@@ -98,6 +141,7 @@ export function spanLabel(from: string, to: string, withYear = true): string {
 
 export function longDate(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
+  if (locale.value === 'ru') return `${RU_WEEKDAYS_LONG[new Date(y, m - 1, d).getDay()]}, ${dayAndMonth(key)}`;
   const weekday = new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long' });
   return `${weekday}, ${dayAndMonth(key)}`;
 }

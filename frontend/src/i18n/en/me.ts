@@ -1,0 +1,17 @@
+export default {
+  starredFailed: 'Could not read your starred issues.',
+  mineFailed: 'Could not read your issues.',
+  monthFailed: 'Could not read the month.',
+  openFailed: 'Could not open the issue.',
+  yourIssues: 'Your issues',
+  nothingOnYou: 'Nothing is on you.',
+  prevYear: 'Previous year',
+  nextYear: 'Next year',
+  threeMonths: 'Show three months',
+  wholeYear: 'Show the whole year',
+  markedDays: 'Marked days',
+  nothingMarked: 'Nothing marked this year.',
+  starred: 'Starred',
+  nothingStarred: 'Nothing starred.',
+  nothingForYou: 'Nothing for you yet.',
+};

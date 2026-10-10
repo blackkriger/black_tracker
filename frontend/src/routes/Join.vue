@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { ApiError, api } from '../lib/api';
 import banner from '../assets/banner.png';
 
+const { t } = useI18n();
 const route = useRoute();
 
 const token = String(route.params.token ?? '');
@@ -34,11 +36,11 @@ onMounted(async () => {
       kind: 'invite' | 'reset';
       role: { name: string; color: string } | null;
     }>(`/invites/${encodeURIComponent(token)}/check`);
-    if (invite.kind !== 'invite') throw new Error('This invite link is no longer valid.');
+    if (invite.kind !== 'invite') throw new Error(t('auth.inviteGone'));
     role.value = invite.role;
     valid.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'This invite link is no longer valid.';
+    error.value = err instanceof Error ? err.message : t('auth.inviteGone');
   } finally {
     checking.value = false;
   }
@@ -56,7 +58,7 @@ async function onSubmit(): Promise<void> {
     });
     window.location.assign('/');
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Could not create the account.';
+    const message = err instanceof Error ? err.message : t('auth.createFailed');
     if (err instanceof ApiError && (err.status === 409 || /login/i.test(message))) {
       loginError.value = message;
     } else {
@@ -74,7 +76,7 @@ async function onSubmit(): Promise<void> {
 
     <section class="panel signin__panel" aria-labelledby="join-title">
       <header id="join-title" class="panel__h">
-        Create account
+        {{ t('auth.createAccount') }}
         <span v-if="checking || role" class="panel__end">
           <span v-if="checking" class="sk sk--line join__role-sk"></span>
           <span v-else-if="role" class="taglabel taglabel--plain" :style="{ '--c': role.color }">
@@ -90,13 +92,13 @@ async function onSubmit(): Promise<void> {
 
       <div v-else-if="!valid" class="panel__b signin__form">
         <div class="signin__err" role="alert">{{ error }}</div>
-        <RouterLink class="btn signin__submit" to="/login">Sign in</RouterLink>
+        <RouterLink class="btn signin__submit" to="/login">{{ t('auth.signIn') }}</RouterLink>
       </div>
 
       <form v-else class="panel__b signin__form" @submit.prevent="onSubmit">
         <div v-if="error" class="signin__err" role="alert">{{ error }}</div>
         <div class="field">
-          <label class="label" for="join-login">Login</label>
+          <label class="label" for="join-login">{{ t('auth.login') }}</label>
           <input
             id="join-login"
             v-model="login"
@@ -108,7 +110,7 @@ async function onSubmit(): Promise<void> {
           <span v-if="loginError" class="err">{{ loginError }}</span>
         </div>
         <div class="field">
-          <label class="label" for="join-password">Password</label>
+          <label class="label" for="join-password">{{ t('auth.password') }}</label>
           <input
             id="join-password"
             v-model="password"
@@ -116,10 +118,10 @@ async function onSubmit(): Promise<void> {
             type="password"
             autocomplete="new-password"
           />
-          <span class="hint">At least 8 characters.</span>
+          <span class="hint">{{ t('auth.atLeast8') }}</span>
         </div>
         <div class="field">
-          <label class="label" for="join-repeat">Repeat password</label>
+          <label class="label" for="join-repeat">{{ t('auth.repeatPassword') }}</label>
           <input
             id="join-repeat"
             v-model="repeat"
@@ -127,10 +129,10 @@ async function onSubmit(): Promise<void> {
             type="password"
             autocomplete="new-password"
           />
-          <span v-if="mismatch" class="err">The two do not match.</span>
+          <span v-if="mismatch" class="err">{{ t('auth.mismatch') }}</span>
         </div>
         <button class="btn btn--primary signin__submit" type="submit" :disabled="!canSubmit">
-          {{ busy ? 'Creating…' : 'Create account' }}
+          {{ busy ? t('auth.creating') : t('auth.createAccount') }}
         </button>
       </form>
     </section>

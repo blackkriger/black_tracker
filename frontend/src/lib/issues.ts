@@ -1,4 +1,5 @@
-import { todayKey } from './calendar';
+import { locale } from '../i18n';
+import { RU_MONTHS_SHORT, todayKey } from './calendar';
 
 export interface Person {
   id: string;
@@ -173,8 +174,12 @@ export const priorityColor = (p: Priority): string =>
 export const priorityClass = (p: Priority): string =>
   ({ Critical: 'p4', Major: 'p3', Normal: 'p2', Minor: 'p1' })[p];
 
+const ruShort = (d: Date, withYear: boolean): string =>
+  `${String(d.getDate()).padStart(2, '0')} ${RU_MONTHS_SHORT[d.getMonth()].toUpperCase()}${withYear ? ` ${d.getFullYear()}` : ''}`;
+
 export function stamp(iso: string | null): string {
   if (!iso) return '';
+  if (locale.value === 'ru') return ruShort(new Date(iso), true);
   return new Date(iso)
     .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     .toUpperCase();
@@ -183,16 +188,19 @@ export function stamp(iso: string | null): string {
 export function dueLabel(date: string | null): { text: string; late: boolean } | null {
   if (!date) return null;
   const today = todayKey();
+  const day = new Date(`${date}T00:00:00`);
   return {
-    text: new Date(`${date}T00:00:00`)
-      .toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
-      .toUpperCase(),
+    text:
+      locale.value === 'ru'
+        ? ruShort(day, false)
+        : day.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
     late: date < today,
   };
 }
 
 export function stampAt(iso: string): string {
   const d = new Date(iso);
+  if (locale.value === 'ru') return `${ruShort(d, true)} ${d.toLocaleTimeString('en-GB', { hour12: false })}`;
   const day = d
     .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     .toUpperCase();
@@ -203,7 +211,8 @@ export function stampAt(iso: string): string {
 export const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
 export function fileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const ru = locale.value === 'ru';
+  if (bytes < 1024) return `${bytes} ${ru ? 'Б' : 'B'}`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ${ru ? 'КБ' : 'KB'}`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} ${ru ? 'МБ' : 'MB'}`;
 }

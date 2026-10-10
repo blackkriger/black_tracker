@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import LayoutSketch from './LayoutSketch.vue';
 import { api } from '../lib/api';
 import { commentOrder, type CommentOrder } from '../lib/issues';
@@ -10,22 +11,36 @@ import { features } from '../lib/features';
 import { useNotices, type NoticeKind } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useSession, type Me } from '../lib/session';
+import { setLanguage } from '../lib/locale';
+import type { LangChoice } from '../i18n';
 
+const { t } = useI18n();
 const session = useSession();
 const { errors, fail, clear } = usePanelErrors();
 const me = session.me;
 const { off, toggleKind } = useNotices();
 
-const LAYOUTS: { value: Layout; label: string }[] = [
-  { value: 'top', label: 'Top bar' },
-  { value: 'side', label: 'Sidebar' },
-];
+const LAYOUTS = computed<{ value: Layout; label: string }[]>(() => [
+  { value: 'top', label: t('prefs.topBar') },
+  { value: 'side', label: t('prefs.sidebar') },
+]);
 
-const THEMES: { value: Theme; label: string }[] = [
-  { value: 'dark', label: 'Dark' },
-  { value: 'light', label: 'Light' },
-  { value: 'system', label: 'System' },
-];
+const THEMES = computed<{ value: Theme; label: string }[]>(() => [
+  { value: 'dark', label: t('prefs.dark') },
+  { value: 'light', label: t('prefs.light') },
+  { value: 'system', label: t('prefs.system') },
+]);
+
+const LANGS = computed<{ value: LangChoice; label: string }[]>(() => [
+  { value: 'en', label: 'English' },
+  { value: 'ru', label: 'Русский' },
+  { value: 'system', label: t('prefs.system') },
+]);
+
+function pickLanguage(next: LangChoice): void {
+  clear('lang');
+  setLanguage(next).catch((err) => fail('lang', err));
+}
 
 const order = ref<CommentOrder>(commentOrder.get());
 function setOrder(next: CommentOrder): void {
@@ -33,19 +48,17 @@ function setOrder(next: CommentOrder): void {
   commentOrder.set(next);
 }
 
-const KINDS: { kind: NoticeKind; label: string }[] = [
-  { kind: 'mention', label: 'Mentions' },
-  { kind: 'assigned', label: 'Assigned to you' },
-  { kind: 'reaction', label: 'Reactions' },
-  { kind: 'starred', label: 'Starred issues' },
-  ...(features.pings ? [{ kind: 'ping' as const, label: 'Pings' }] : []),
-];
+const KINDS = computed<{ kind: NoticeKind; label: string }[]>(() =>
+  (['mention', 'assigned', 'reaction', 'starred', ...(features.pings ? ['ping' as const] : [])] as NoticeKind[]).map(
+    (kind) => ({ kind, label: t(`notices.kinds.${kind}`) })
+  )
+);
 
-const STARS: { key: keyof Me['autoStar']; body: string; label: string }[] = [
-  { key: 'created', body: 'starCreated', label: 'Created by me' },
-  { key: 'assigned', body: 'starAssigned', label: 'Assigned to me' },
-  { key: 'commented', body: 'starCommented', label: 'Commented on (by me)' },
-];
+const STARS = computed<{ key: keyof Me['autoStar']; body: string; label: string }[]>(() => [
+  { key: 'created', body: 'starCreated', label: t('prefs.starCreated') },
+  { key: 'assigned', body: 'starAssigned', label: t('prefs.starAssigned') },
+  { key: 'commented', body: 'starCommented', label: t('prefs.starCommented') },
+]);
 
 async function setAutoStar(body: string, on: boolean): Promise<void> {
   clear('prefs');
@@ -61,7 +74,7 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
 <template>
   <div class="sheet__wide prefs">
     <section class="panel prefs__layout">
-      <header class="panel__h">Layout</header>
+      <header class="panel__h">{{ t('prefs.layout') }}</header>
       <div class="panel__b layouts">
         <label
           v-for="l in LAYOUTS"
@@ -83,18 +96,18 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
     </section>
     <div class="stack prefs__main">
       <section class="panel">
-        <header class="panel__h">Preferences</header>
+        <header class="panel__h">{{ t('settings.preferences') }}</header>
         <div class="panel__b form">
           <div class="pairs">
             <div class="field">
-              <span class="label">Theme</span>
+              <span class="label">{{ t('prefs.theme') }}</span>
               <label v-for="t in THEMES" :key="t.value" class="flag">
                 <input type="radio" name="theme" :checked="theme === t.value" @change="setTheme(t.value)" />
                 {{ t.label }}
               </label>
             </div>
             <div class="field">
-              <span class="label">Comments read</span>
+              <span class="label">{{ t('prefs.commentsRead') }}</span>
               <label class="flag">
                 <input
                   type="radio"
@@ -102,7 +115,7 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
                   :checked="order === 'oldest'"
                   @change="setOrder('oldest')"
                 />
-                Oldest first
+                {{ t('prefs.oldestFirst') }}
               </label>
               <label class="flag">
                 <input
@@ -111,13 +124,13 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
                   :checked="order === 'newest'"
                   @change="setOrder('newest')"
                 />
-                Newest first
+                {{ t('prefs.newestFirst') }}
               </label>
             </div>
           </div>
           <div class="pairs">
             <div class="field">
-              <span class="label">Notices shown</span>
+              <span class="label">{{ t('prefs.noticesShown') }}</span>
               <label v-for="k in KINDS" :key="k.kind" class="flag">
                 <input
                   type="checkbox"
@@ -128,20 +141,20 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
               </label>
             </div>
             <div class="field">
-              <span class="label">Files</span>
+              <span class="label">{{ t('prefs.files') }}</span>
               <label class="flag">
                 <input
                   type="checkbox"
                   :checked="wrapLines"
                   @change="setWrapLines(($event.target as HTMLInputElement).checked)"
                 />
-                Wrap long lines
+                {{ t('prefs.wrapLines') }}
               </label>
             </div>
           </div>
           <div class="pairs">
             <div class="field">
-              <span class="label">Star automatically</span>
+              <span class="label">{{ t('prefs.starAuto') }}</span>
               <label v-for="s in STARS" :key="s.key" class="flag">
                 <input
                   type="checkbox"
@@ -155,6 +168,18 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
         </div>
       </section>
       <div v-if="errors.prefs" class="err panel__err">{{ errors.prefs }}</div>
+      <section class="panel">
+        <header class="panel__h">{{ t('prefs.language') }}</header>
+        <div class="panel__b form">
+          <div class="field">
+            <label v-for="l in LANGS" :key="l.value" class="flag">
+              <input type="radio" name="lang" :checked="me?.lang === l.value" @change="pickLanguage(l.value)" />
+              {{ l.label }}
+            </label>
+          </div>
+        </div>
+      </section>
+      <div v-if="errors.lang" class="err panel__err">{{ errors.lang }}</div>
     </div>
   </div>
 </template>

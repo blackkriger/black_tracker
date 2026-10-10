@@ -219,6 +219,11 @@ export async function startTelegram(): Promise<void> {
     if (!reply.ok) console.error('[telegram] setWebhook failed', reply.description);
     const commands = await bot('setMyCommands', { commands: [{ command: 'issue', description: 'Create an issue' }] });
     if (!commands.ok) console.error('[telegram] setMyCommands failed', commands.description);
+    const russian = await bot('setMyCommands', {
+      commands: [{ command: 'issue', description: 'Создать задачу' }],
+      language_code: 'ru',
+    });
+    if (!russian.ok) console.error('[telegram] setMyCommands failed', russian.description);
   } catch (err) {
     console.error('[telegram] setWebhook failed', (err as Error).message);
   }

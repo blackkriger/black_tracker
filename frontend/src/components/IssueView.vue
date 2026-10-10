@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
@@ -95,6 +96,7 @@ const emit = defineEmits<{
   (e: 'linked'): void;
 }>();
 
+const { t, te } = useI18n();
 const session = useSession();
 const pressedScrim = ref(false);
 const { projects } = useProjects();
@@ -118,7 +120,7 @@ const issue = ref<IssueFull | null>(null);
 let issueReads = 0;
 const loading = ref(true);
 const error = ref<string | null>(null);
-const { people, colorOf, colorOfId, nameOf, load: loadPeople } = usePeople();
+const { people, colorOf, colorOfId, nameOf, genderOf, load: loadPeople } = usePeople();
 const { load: readNotices } = useNotices();
 const { wanted, pending: askedFor } = useFocus();
 
@@ -196,25 +198,20 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let searches = 0;
 
 type LinkPick = 'related' | 'parentOf' | 'subtaskOf' | 'duplicateOf' | 'duplicatedBy';
-const LINK_PICKS: { value: LinkPick; label: string; kind: LinkKind }[] = [
-  { value: 'related', label: 'Related to', kind: 'related' },
-  { value: 'parentOf', label: 'Parent of', kind: 'child' },
-  { value: 'subtaskOf', label: 'Subtask of', kind: 'parent' },
-  { value: 'duplicateOf', label: 'Duplicate of', kind: 'duplicateOf' },
-  { value: 'duplicatedBy', label: 'Duplicated by', kind: 'duplicatedBy' },
+const LINK_KINDS: { value: LinkPick; kind: LinkKind }[] = [
+  { value: 'related', kind: 'related' },
+  { value: 'parentOf', kind: 'child' },
+  { value: 'subtaskOf', kind: 'parent' },
+  { value: 'duplicateOf', kind: 'duplicateOf' },
+  { value: 'duplicatedBy', kind: 'duplicatedBy' },
 ];
-const LINK_GROUPS: { kind: LinkKind; label: string }[] = [
-  { kind: 'parent', label: 'Parent' },
-  { kind: 'child', label: 'Subtasks' },
-  { kind: 'duplicateOf', label: 'Duplicate of' },
-  { kind: 'duplicatedBy', label: 'Duplicated by' },
-  { kind: 'related', label: 'Related' },
-];
+const LINK_PICKS = computed(() => LINK_KINDS.map((p) => ({ ...p, label: t(`issue.picks.${p.value}`) })));
+const LINK_GROUPS: LinkKind[] = ['parent', 'child', 'duplicateOf', 'duplicatedBy', 'related'];
 const linkPick = ref<LinkPick>('related');
 
 const shownLinks = computed(() => (creating.value ? pendingLinks.value : (issue.value?.links ?? [])));
 const linkGroups = computed(() =>
-  LINK_GROUPS.map((g) => ({ ...g, links: shownLinks.value.filter((l) => l.kind === g.kind) })).filter(
+  LINK_GROUPS.map((kind) => ({ kind, label: t(`issue.groups.${kind}`), links: shownLinks.value.filter((l) => l.kind === kind) })).filter(
     (g) => g.links.length
   )
 );
@@ -529,7 +526,9 @@ watch(
 const stateChoices = computed(() =>
   (hostStates.value ?? props.board.states).map((s) => ({ value: s.id, label: s.name, color: s.color }))
 );
-const priorityChoices = PRIORITIES.map((p) => ({ value: p, label: p, color: priorityColor(p) }));
+const priorityChoices = computed(() =>
+  PRIORITIES.map((p) => ({ value: p, label: t(`priority.${p}`), color: priorityColor(p) }))
+);
 const assigneeChoices = computed(() => [
   { value: '', label: '—' },
   ...people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor })),
@@ -537,7 +536,7 @@ const assigneeChoices = computed(() => [
 const boardChoices = computed(() => props.boards.map((b) => ({ value: b.id, label: b.name })));
 const tagChoices = computed(() => [
   ...freeTags.value.map((t) => ({ value: t.id, label: t.name, color: t.color })),
-  { value: 'new', label: 'New tag…' },
+  { value: 'new', label: t('issue.newTagChoice') },
 ]);
 
 const shotOfFile = (f: File): Shot => ({
@@ -594,7 +593,13 @@ function historyValue(field: string, value: string | null): { text: string; logi
   if (!value) return { text: '—', login: null };
   if (field === 'assignee' || field === 'watcher' || field === 'pinged') return { text: value, login: value };
   if (field === 'due date') return { text: dueLabel(value)?.text ?? value, login: null };
+  if (field === 'priority' && te(`priority.${value}`)) return { text: t(`priority.${value}`), login: null };
   return { text: value, login: null };
+}
+
+function historyField(field: string): string {
+  const key = field.replace(/ (\w)/g, (_, c: string) => c.toUpperCase());
+  return te(`issue.history.${key}`) ? t(`issue.history.${key}`) : field;
 }
 
 const history = computed(() =>
@@ -623,7 +628,7 @@ async function ping(): Promise<void> {
     await api(`/issues/${issue.value.id}/ping`, { method: 'POST' });
     rang.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Something went wrong.';
+    error.value = err instanceof Error ? err.message : t('common.wentWrong');
   } finally {
     pinging = false;
   }
@@ -644,7 +649,7 @@ const propsSummary = computed(() => {
   const due = dueLabel(shownDue.value);
   return [
     ...(state ? [{ text: state.label, color: state.color }] : []),
-    { text: shownPriority.value, color: priorityColor(shownPriority.value) },
+    { text: t(`priority.${shownPriority.value}`), color: priorityColor(shownPriority.value) },
     ...(person ? [{ text: person.fullName || person.login, color: person.roleColor }] : []),
     ...(due ? [{ text: due.text, date: true, late: due.late }] : []),
   ];
@@ -834,7 +839,7 @@ async function load(): Promise<void> {
     void lookAtComment(askedFor() ?? props.focusComment);
   } catch (err) {
     issue.value = null;
-    error.value = err instanceof Error ? err.message : 'Could not load the issue.';
+    error.value = err instanceof Error ? err.message : t('issue.loadFailed');
   } finally {
     loading.value = false;
   }
@@ -852,7 +857,7 @@ async function patch(body: Record<string, unknown>): Promise<boolean> {
     await reload();
     return true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not save the change.';
+    error.value = err instanceof Error ? err.message : t('issue.saveFailed');
     return false;
   }
 }
@@ -897,10 +902,10 @@ async function create(): Promise<void> {
         try {
           await api(`/issues/${made.id}/links`, {
             method: 'POST',
-            body: { key: link.key, kind: LINK_PICKS.find((p) => p.kind === link.kind)?.value },
+            body: { key: link.key, kind: LINK_KINDS.find((p) => p.kind === link.kind)?.value },
           });
         } catch (err) {
-          problem = err instanceof Error ? err.message : 'The issue was created without a link.';
+          problem = err instanceof Error ? err.message : t('issue.createdNoLink');
         }
       }
       pendingLinks.value = [];
@@ -910,13 +915,13 @@ async function create(): Promise<void> {
       try {
         await sendFiles(made.id, pending.value);
       } catch (err) {
-        problem = err instanceof Error ? err.message : 'The issue was created without the files.';
+        problem = err instanceof Error ? err.message : t('issue.createdNoFiles');
       }
       pending.value = [];
     }
     emit('created', made, problem);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not create the issue.';
+    error.value = err instanceof Error ? err.message : t('issue.createFailed');
   } finally {
     saving.value = false;
   }
@@ -932,7 +937,7 @@ async function toggleFavourite(): Promise<void> {
     emit('changed', { ...current, favourite: next });
   } catch (err) {
     issue.value = { ...(issue.value as IssueFull), favourite: current.favourite };
-    error.value = err instanceof Error ? err.message : 'Could not change the star.';
+    error.value = err instanceof Error ? err.message : t('issue.starFailed');
   }
 }
 
@@ -949,7 +954,7 @@ async function saveText(): Promise<void> {
   if (!current || saving.value) return;
   const summary = titleDraft.value.trim();
   if (!summary) {
-    error.value = 'An issue needs a title.';
+    error.value = t('issue.needsTitle');
     return;
   }
   const body: Record<string, unknown> = {};
@@ -994,7 +999,7 @@ async function createTag(): Promise<void> {
     makingTag.value = false;
     toggleTag(created.id, true);
   } catch (err) {
-    tagError.value = err instanceof Error ? err.message : 'Could not create the tag.';
+    tagError.value = err instanceof Error ? err.message : t('issue.tagFailed');
   } finally {
     tagBusy.value = false;
   }
@@ -1022,7 +1027,7 @@ async function postComment(): Promise<void> {
       try {
         await sendFiles(current.id, commentFiles.value, created.id);
       } catch (err) {
-        error.value = err instanceof Error ? err.message : 'The comment was posted without the files.';
+        error.value = err instanceof Error ? err.message : t('issue.postedNoFiles');
       }
       commentFiles.value = [];
     }
@@ -1036,7 +1041,7 @@ async function postComment(): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not post the comment.';
+    error.value = err instanceof Error ? err.message : t('issue.postFailed');
   } finally {
     posting.value = false;
   }
@@ -1066,7 +1071,7 @@ async function saveComment(c: Comment): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not save the comment.';
+    error.value = err instanceof Error ? err.message : t('issue.commentSaveFailed');
   }
 }
 
@@ -1074,7 +1079,7 @@ async function addLink(key: string): Promise<void> {
   if (!key || linking.value) return;
   if (creating.value) {
     const found = linkResults.value.find((r) => r.key === key);
-    const kind = LINK_PICKS.find((p) => p.value === linkPick.value)?.kind ?? 'related';
+    const kind = LINK_KINDS.find((p) => p.value === linkPick.value)?.kind ?? 'related';
     if (found) pendingLinks.value = [...pendingLinks.value, { ...found, kind }];
     picking.value = false;
     return;
@@ -1097,7 +1102,7 @@ async function addLink(key: string): Promise<void> {
     }
     emit('linked');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not link them.';
+    error.value = err instanceof Error ? err.message : t('issue.linkFailed');
   } finally {
     linking.value = false;
   }
@@ -1117,7 +1122,7 @@ async function removeLink(link: IssueLink): Promise<void> {
     issue.value = { ...now, links: now.links.filter((l) => l.id !== link.id) };
     emit('linked');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not unlink them.';
+    error.value = err instanceof Error ? err.message : t('issue.unlinkFailed');
   }
 }
 
@@ -1167,7 +1172,7 @@ async function react(c: Comment, emoji: string): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not react.';
+    error.value = err instanceof Error ? err.message : t('issue.reactFailed');
   }
 }
 
@@ -1189,7 +1194,7 @@ async function togglePin(c: Comment): Promise<void> {
     };
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not pin the comment.';
+    error.value = err instanceof Error ? err.message : t('issue.pinFailed');
   }
 }
 
@@ -1211,7 +1216,7 @@ async function removeComment(c: Comment): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not delete the comment.';
+    error.value = err instanceof Error ? err.message : t('issue.commentDeleteFailed');
   }
 }
 
@@ -1229,7 +1234,7 @@ async function sendFiles(issueId: string, list: File[], commentId?: string): Pro
     const payload = (await res.json().catch(() => null)) as
       | { data?: Attachment; error?: string }
       | null;
-    if (!res.ok || !payload?.data) throw new Error(payload?.error ?? 'Could not upload the file.');
+    if (!res.ok || !payload?.data) throw new Error(payload?.error ?? t('issue.uploadFailed'));
     if (issue.value) {
       issue.value = { ...issue.value, attachments: [...issue.value.attachments, payload.data] };
     }
@@ -1265,7 +1270,7 @@ async function upload(list: FileList | File[] | null): Promise<void> {
     await sendFiles(issue.value.id, chosen);
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not upload the file.';
+    error.value = err instanceof Error ? err.message : t('issue.uploadFailed');
   } finally {
     uploading.value = false;
   }
@@ -1323,7 +1328,7 @@ async function addToComment(commentId: string, list: FileList | File[] | null): 
     await sendFiles(issue.value.id, chosen, commentId);
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not upload the file.';
+    error.value = err instanceof Error ? err.message : t('issue.uploadFailed');
   } finally {
     uploading.value = false;
   }
@@ -1338,7 +1343,7 @@ async function removeAttachment(a: Attachment): Promise<void> {
     issue.value = { ...now, attachments: now.attachments.filter((row) => row.id !== a.id) };
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not delete the file.';
+    error.value = err instanceof Error ? err.message : t('issue.fileDeleteFailed');
   }
 }
 
@@ -1350,7 +1355,7 @@ async function removeIssue(): Promise<void> {
     emit('deleted', current.id);
   } catch (err) {
     deleting.value = false;
-    error.value = err instanceof Error ? err.message : 'Could not delete the issue.';
+    error.value = err instanceof Error ? err.message : t('issue.deleteFailed');
   }
 }
 </script>
@@ -1367,7 +1372,7 @@ async function removeIssue(): Promise<void> {
           <button
             class="btn btn--sm btn--icon btn--ghost"
             type="button"
-            aria-label="Close"
+            :aria-label="t('common.close')"
             @click="emit('close')"
           >
             <X class="ic" />
@@ -1376,7 +1381,7 @@ async function removeIssue(): Promise<void> {
             class="btn btn--sm btn--icon btn--ghost iv__top"
             :class="{ 'is-off': !scrolled }"
             type="button"
-            aria-label="Back to top"
+            :aria-label="t('issue.toTop')"
             :aria-hidden="!scrolled"
             :tabindex="scrolled ? 0 : -1"
             @click="toTop"
@@ -1389,25 +1394,25 @@ async function removeIssue(): Promise<void> {
             <span class="iv__sep">/</span>
             <span class="iv__where">{{ board.name }}</span>
             <span class="iv__sep">/</span>
-            <span class="key iv__key">{{ issueKey ?? nextKey ?? 'NEW ISSUE' }}</span>
+            <span class="key iv__key">{{ issueKey ?? nextKey ?? t('issue.newIssue') }}</span>
           </span>
           <div class="sp"></div>
           <Viewers v-if="features.presence && !creating" :logins="watching" class="iv__who" />
           <template v-if="creating">
-            <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
+            <button class="btn btn--sm" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
             <button
               class="btn btn--sm btn--primary"
               type="button"
               :disabled="saving || !titleDraft.trim()"
               @click="create"
             >
-              Create
+              {{ t('issue.create') }}
             </button>
           </template>
           <template v-else-if="editing">
-            <button class="btn btn--sm" type="button" @click="editing = false">Cancel</button>
+            <button class="btn btn--sm" type="button" @click="editing = false">{{ t('common.cancel') }}</button>
             <button class="btn btn--sm btn--primary" type="button" :disabled="saving" @click="saveText">
-              Save
+              {{ t('common.save') }}
             </button>
           </template>
           <template v-else>
@@ -1415,7 +1420,7 @@ async function removeIssue(): Promise<void> {
               class="btn btn--sm btn--icon btn--ghost iv__star"
               :class="{ 'is-on': issue?.favourite }"
               type="button"
-              :title="issue?.favourite ? 'In favourites' : 'Add to favourites'"
+              :title="issue?.favourite ? t('issue.inFavourites') : t('issue.addFavourite')"
               :aria-pressed="issue?.favourite === true"
               :disabled="!issue"
               @click="toggleFavourite"
@@ -1425,7 +1430,7 @@ async function removeIssue(): Promise<void> {
             <button
               class="btn btn--sm btn--icon btn--ghost"
               type="button"
-              aria-label="Edit"
+              :aria-label="t('issue.edit')"
               :disabled="!issue"
               @click="startEditing"
             >
@@ -1434,8 +1439,8 @@ async function removeIssue(): Promise<void> {
             <button
               class="btn btn--sm btn--icon btn--ghost iv__trash"
               type="button"
-              title="Delete"
-              aria-label="Delete"
+              :title="t('common.delete')"
+              :aria-label="t('common.delete')"
               :disabled="!session.canDelete.value"
               @click="deleting = true"
             >
@@ -1489,7 +1494,7 @@ async function removeIssue(): Promise<void> {
               v-model="titleDraft"
               class="input iv__title-edit"
               maxlength="300"
-              placeholder="What needs doing?"
+              :placeholder="t('issue.titlePlaceholder')"
               autofocus
               @blur="keepNew"
               @keydown.enter.prevent="creating ? create() : saveText()"
@@ -1504,7 +1509,7 @@ async function removeIssue(): Promise<void> {
               <RichText
                 v-if="editing"
                 v-model="bodyDraft"
-                placeholder="What is this about?"
+                :placeholder="t('issue.bodyPlaceholder')"
                 @files="upload"
                 @blur="keepNew"
               />
@@ -1515,16 +1520,16 @@ async function removeIssue(): Promise<void> {
                 @click="followKey"
                 v-html="asHtml(issue.description)"
               ></div>
-              <div v-else class="iv__body hint faint">Nothing written yet.</div>
+              <div v-else class="iv__body hint faint">{{ t('issue.nothingWritten') }}</div>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
               <div v-if="!shownLinks.length" class="sec-h links">
                 <Link2 class="ic links__icon" aria-hidden="true" />
-                <span class="hint faint">No links yet.</span>
+                <span class="hint faint">{{ t('issue.noLinks') }}</span>
                 <div class="sp"></div>
                 <button class="btn btn--sm btn--ghost" type="button" @click="openPicker">
-                  Add link…
+                  {{ t('issue.addLink') }}
                 </button>
               </div>
               <div v-else class="lgroups">
@@ -1551,7 +1556,7 @@ async function removeIssue(): Promise<void> {
                       type="button"
                       @click="openPicker"
                     >
-                      Edit links…
+                      {{ t('issue.editLinks') }}
                     </button>
                   </div>
                 </template>
@@ -1561,14 +1566,14 @@ async function removeIssue(): Promise<void> {
             <div :class="{ 'is-fresh': fresh.has('files') }">
               <div v-if="own.length" class="sec-h">
                 <Paperclip class="ic" aria-hidden="true" />
-                <span>{{ own.length }} {{ own.length === 1 ? 'file' : 'files' }}, {{ fileSize(ownBytes) }}</span>
+                <span>{{ t('issue.files', { n: own.length }, own.length) }}, {{ fileSize(ownBytes) }}</span>
                 <div class="sp"></div>
                 <a
                   v-if="own.length > 1 && issue"
                   class="btn btn--sm btn--ghost"
                   :href="`/api/issues/${issue.id}/files.zip`"
                   download
-                >Download all</a>
+                >{{ t('issue.downloadAll') }}</a>
               </div>
               <div v-for="a in files" :key="a.id" class="att__cap att__row">
                 <a
@@ -1581,12 +1586,12 @@ async function removeIssue(): Promise<void> {
                   class="btn btn--sm btn--icon btn--ghost"
                   :href="`/api/attachments/${a.id}`"
                   download
-                  :aria-label="`Download ${a.filename}`"
+                  :aria-label="t('issue.downloadNamed', { name: a.filename })"
                 ><FileDown class="ic ic--sm" /></a>
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
-                  :aria-label="`Delete ${a.filename}`"
+                  :aria-label="t('common.deleteNamed', { name: a.filename })"
                   @click="removeAttachment(a)"
                 ><X class="ic ic--sm" /></button>
               </div>
@@ -1607,7 +1612,7 @@ async function removeIssue(): Promise<void> {
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
-                  :aria-label="`Remove ${f.name}`"
+                  :aria-label="t('files.remove', { name: f.name })"
                   @click="dropPending(f, 'issue')"
                 ><X class="ic ic--sm" /></button>
               </div>
@@ -1632,18 +1637,18 @@ async function removeIssue(): Promise<void> {
                   :disabled="uploading"
                   @change="upload(picked($event))"
                 />
-                {{ uploading ? 'Uploading…' : 'Drop files here, or click to choose' }}
+                {{ uploading ? t('issue.uploading') : t('issue.dropFiles') }}
               </label>
             </div>
 
-            <nav v-if="issue" class="itabs" aria-label="Issue detail">
+            <nav v-if="issue" class="itabs" :aria-label="t('issue.detail')">
               <button
                 class="itab"
                 type="button"
                 :aria-selected="tab === 'comments'"
                 @click="tab = 'comments'"
               >
-                Comments<span class="n">{{ issue.comments.length }}</span>
+                {{ t('issue.comments') }}<span class="n">{{ issue.comments.length }}</span>
               </button>
               <button
                 class="itab"
@@ -1651,14 +1656,14 @@ async function removeIssue(): Promise<void> {
                 :aria-selected="tab === 'history'"
                 @click="tab = 'history'"
               >
-                History<span class="n">{{ issue.history.length }}</span>
+                {{ t('issue.historyTab') }}<span class="n">{{ issue.history.length }}</span>
               </button>
               <div class="sp"></div>
               <button
                 v-if="tab === 'comments'"
                 class="itab itab--order"
                 type="button"
-                :title="order === 'oldest' ? 'Oldest first' : 'Newest first'"
+                :title="order === 'oldest' ? t('prefs.oldestFirst') : t('prefs.newestFirst')"
                 @click="flipOrder"
               >
                 <component :is="order === 'oldest' ? ArrowUpNarrowWide : ArrowDownWideNarrow" class="ic" />
@@ -1677,13 +1682,14 @@ async function removeIssue(): Promise<void> {
                     <div class="ev__head">
                       <span class="cm__who" :style="{ color: ink(colorOf(e.by)) }">{{ e.by ? nameOf(e.by) : e.author }}</span>
                       <span v-if="e.by && nameOf(e.by) !== e.by" class="nick">{{ e.by }}</span>
-                      <span v-if="e.kind === 'merge'">
-                        merged <span class="ev__ref">{{ e.from }}</span> into <span class="ev__ref">{{ e.branch }}</span>
-                      </span>
-                      <span v-else>
-                        pushed {{ e.commits.length }} {{ e.commits.length === 1 ? 'commit' : 'commits' }} to
-                        <span class="ev__ref">{{ e.branch }}</span>
-                      </span>
+                      <i18n-t v-if="e.kind === 'merge'" :keypath="`issue.merged.${genderOf(e.by) ?? 'x'}`" tag="span">
+                        <template #from><span class="ev__ref">{{ e.from }}</span></template>
+                        <template #branch><span class="ev__ref">{{ e.branch }}</span></template>
+                      </i18n-t>
+                      <i18n-t v-else :keypath="`issue.pushed.${genderOf(e.by) ?? 'x'}`" tag="span" :plural="e.commits.length">
+                        <template #n>{{ e.commits.length }}</template>
+                        <template #branch><span class="ev__ref">{{ e.branch }}</span></template>
+                      </i18n-t>
                     </div>
                     <a
                       v-for="k in e.commits"
@@ -1712,13 +1718,13 @@ async function removeIssue(): Promise<void> {
                       <span v-if="c.viaToken" class="api">API</span>
                       <time class="stamp">{{ stampAt(c.createdAt) }}</time>
                       <span v-if="c.editedAt" class="cm__edited">
-                        edited
+                        {{ t('issue.edited') }}
                         <span class="selbar cm__when">{{ stampAt(c.editedAt) }}</span>
                       </span>
                       <Pin
                         v-if="c.pinnedAt"
                         class="ic ic--sm cm__pin"
-                        :aria-label="c.pinnedBy ? `Pinned by ${c.pinnedBy}` : 'Pinned'"
+                        :aria-label="c.pinnedBy ? t(`issue.pinnedBy.${genderOf(c.pinnedBy) ?? 'x'}`, { name: nameOf(c.pinnedBy) }) : t('issue.pinned')"
                       />
                       <span class="cm__acts">
                         <span class="cm__react">
@@ -1734,25 +1740,25 @@ async function removeIssue(): Promise<void> {
                           <button
                             class="btn btn--sm btn--icon btn--ghost react__hold"
                             type="button"
-                            aria-label="React"
+                            :aria-label="t('issue.react')"
                             @click="openReactions(c, $event)"
                           ><SmilePlus class="ic ic--sm" /></button>
                         </span>
                         <button class="btn btn--sm btn--ghost" type="button" @click="togglePin(c)">
-                          {{ c.pinnedAt ? 'Unpin' : 'Pin' }}
+                          {{ c.pinnedAt ? t('issue.unpin') : t('issue.pin') }}
                         </button>
                         <button
                           v-if="c.author.id === session.me.value?.id"
                           class="btn btn--sm btn--ghost"
                           type="button"
                           @click="editingComment = c.id; commentEdit = c.text"
-                        >Edit</button>
+                        >{{ t('issue.edit') }}</button>
                         <button
                           v-if="c.author.id === session.me.value?.id || session.canDelete.value"
                           class="btn btn--sm btn--ghost"
                           type="button"
                           @click="deletingComment = c"
-                        >Delete</button>
+                        >{{ t('common.delete') }}</button>
                       </span>
                     </div>
                     <template v-if="editingComment === c.id">
@@ -1763,7 +1769,7 @@ async function removeIssue(): Promise<void> {
                         @files="(list) => addToComment(c.id, list)"
                       >
                         <template #tools>
-                          <label class="rt__clip" title="Attach files">
+                          <label class="rt__clip" :title="t('issue.attach')">
                             <input
                               type="file"
                               multiple
@@ -1777,8 +1783,8 @@ async function removeIssue(): Promise<void> {
                       </RichText>
                       <div class="composer__row">
                         <div class="sp"></div>
-                        <button class="btn btn--sm" type="button" @click="editingComment = null">Cancel</button>
-                        <button class="btn btn--sm btn--primary" type="button" @click="saveComment(c)">Save</button>
+                        <button class="btn btn--sm" type="button" @click="editingComment = null">{{ t('common.cancel') }}</button>
+                        <button class="btn btn--sm btn--primary" type="button" @click="saveComment(c)">{{ t('common.save') }}</button>
                       </div>
                     </template>
                     <div v-else class="md cm__body" @click="followKey" v-html="asHtml(c.text)"></div>
@@ -1787,7 +1793,7 @@ async function removeIssue(): Promise<void> {
                       <div v-if="filesOf(c.id).length > 1" class="att__cap att__row att__all">
                         <div></div>
                         <div class="att__all__what">
-                          {{ filesOf(c.id).length }} files
+                          {{ t('issue.filesCount', { n: filesOf(c.id).length }, filesOf(c.id).length) }}
                           <span class="stamp">{{ fileSize(bytesOf(c.id)) }}</span>
                         </div>
                         <div class="att__all__go">
@@ -1795,9 +1801,9 @@ async function removeIssue(): Promise<void> {
                             class="btn btn--sm btn--icon btn--ghost"
                             :href="`/api/comments/${c.id}/files.zip`"
                             download
-                            aria-label="Download all"
+                            :aria-label="t('issue.downloadAll')"
                           ><FileArchive class="ic ic--sm" /></a>
-                          <div class="selbar att__all__tip">Download all</div>
+                          <div class="selbar att__all__tip">{{ t('issue.downloadAll') }}</div>
                         </div>
                       </div>
                       <span
@@ -1815,13 +1821,13 @@ async function removeIssue(): Promise<void> {
                           class="btn btn--sm btn--icon btn--ghost"
                           :href="`/api/attachments/${a.id}`"
                           download
-                          :aria-label="`Download ${a.filename}`"
+                          :aria-label="t('issue.downloadNamed', { name: a.filename })"
                         ><FileDown class="ic ic--sm" /></a>
                         <button
                           v-if="editingComment === c.id"
                           class="btn btn--sm btn--icon btn--ghost"
                           type="button"
-                          :aria-label="`Delete ${a.filename}`"
+                          :aria-label="t('common.deleteNamed', { name: a.filename })"
                           @click="removeAttachment(a)"
                         ><X class="ic ic--sm" /></button>
                       </span>
@@ -1843,13 +1849,13 @@ async function removeIssue(): Promise<void> {
                     ref="composer"
                     v-model="commentDraft"
                     min-height="90px"
-                    placeholder="Write a comment…"
+                    :placeholder="t('issue.commentPlaceholder')"
                     :disabled="posting"
                     @files="pickCommentFiles"
                     @blur="keepDraft"
                   >
                     <template #tools>
-                      <label class="rt__clip" title="Attach files">
+                      <label class="rt__clip" :title="t('issue.attach')">
                         <input
                           type="file"
                           multiple
@@ -1870,7 +1876,7 @@ async function removeIssue(): Promise<void> {
                     <button
                       class="btn btn--sm btn--icon btn--ghost"
                       type="button"
-                      :aria-label="`Remove ${f.name}`"
+                      :aria-label="t('files.remove', { name: f.name })"
                       :disabled="posting"
                       @click="dropPending(f, 'comment')"
                     ><X class="ic ic--sm" /></button>
@@ -1883,7 +1889,7 @@ async function removeIssue(): Promise<void> {
                     @remove="dropPendingKey($event, 'comment')"
                   />
                   <div class="composer__row">
-                    <span v-if="draftSaved" class="composer__kept">Draft saved</span>
+                    <span v-if="draftSaved" class="composer__kept">{{ t('issue.draftSaved') }}</span>
                     <div class="sp"></div>
                     <button
                       class="btn btn--sm btn--primary"
@@ -1891,7 +1897,7 @@ async function removeIssue(): Promise<void> {
                       type="submit"
                       :disabled="isBlank(commentDraft) || posting"
                     >
-                      Post
+                      {{ t('issue.post') }}
                     </button>
                   </div>
                 </div>
@@ -1904,7 +1910,7 @@ async function removeIssue(): Promise<void> {
                 <span class="hi__who"><PersonName v-if="h.by" :login="h.by" /></span>
                 <span class="hi__what">
                   <span v-if="h.viaToken" class="api">API</span>
-                  <span class="hi__f">{{ h.field }}</span>
+                  <span class="hi__f">{{ historyField(h.field) }}</span>
                   <template v-if="h.was">
                     <span class="hi__f">
                       <PersonName v-if="h.was.login" :login="h.was.login" />
@@ -1923,7 +1929,7 @@ async function removeIssue(): Promise<void> {
                 </span>
               </div>
               <div v-if="!issue.history.length" class="empty empty--sm">
-                <span class="empty__g">◇</span>Nothing yet.
+                <span class="empty__g">◇</span>{{ t('calendar.nothingYet') }}
               </div>
             </div>
           </div>
@@ -1942,7 +1948,7 @@ async function removeIssue(): Promise<void> {
             <div class="props__all" :class="{ 'is-open': propsOpen }">
               <template v-if="issue && boards.length > 1">
                 <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('board') }">
-                  <span class="prop__k">Board</span>
+                  <span class="prop__k">{{ t('fields.board') }}</span>
                   <div class="prop__stack">
                     <Select
                       :model-value="issue.boardId"
@@ -1950,13 +1956,13 @@ async function removeIssue(): Promise<void> {
                       small
                       @update:model-value="moveBoard"
                     />
-                    <span class="hint">Moving it resets the status.</span>
+                    <span class="hint">{{ t('issue.moveHint') }}</span>
                   </div>
                 </div>
                 <div class="hr"></div>
               </template>
               <div class="prop" :class="{ 'is-fresh': fresh.has('status') }">
-                <span class="prop__k">Status</span>
+                <span class="prop__k">{{ t('fields.status') }}</span>
                 <Select
                   :model-value="shownStateId ?? ''"
                   :options="stateChoices"
@@ -1965,7 +1971,7 @@ async function removeIssue(): Promise<void> {
                 />
               </div>
               <div class="prop" :class="{ 'is-fresh': fresh.has('priority') }">
-                <span class="prop__k">Priority</span>
+                <span class="prop__k">{{ t('fields.priority') }}</span>
                 <Select
                   :model-value="shownPriority"
                   :options="priorityChoices"
@@ -1974,7 +1980,7 @@ async function removeIssue(): Promise<void> {
                 />
               </div>
               <div class="prop" :class="{ 'is-fresh': fresh.has('assignee') }">
-                <span class="prop__k">Assignee</span>
+                <span class="prop__k">{{ t('fields.assignee') }}</span>
                 <div class="prop__pair">
                   <Select
                     :model-value="shownAssignee ?? ''"
@@ -1988,15 +1994,15 @@ async function removeIssue(): Promise<void> {
                       v-else
                       class="btn btn--sm btn--icon btn--ghost"
                       type="button"
-                      :title="`Ping ${nameOf(issue?.assignee?.login)}`"
-                      :aria-label="`Ping ${nameOf(issue?.assignee?.login)}`"
+                      :title="t('issue.ping', { name: nameOf(issue?.assignee?.login) })"
+                      :aria-label="t('issue.ping', { name: nameOf(issue?.assignee?.login) })"
                       @click="ping"
                     ><Bell class="ic" /></button>
                   </template>
                 </div>
               </div>
               <div class="prop" :class="{ 'is-fresh': fresh.has('watcher') }">
-                <span class="prop__k">Watcher</span>
+                <span class="prop__k">{{ t('fields.watcher') }}</span>
                 <Select
                   :model-value="shownWatcher ?? ''"
                   :options="assigneeChoices"
@@ -2005,7 +2011,7 @@ async function removeIssue(): Promise<void> {
                 />
               </div>
               <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
-                <span class="prop__k">Due</span>
+                <span class="prop__k">{{ t('fields.due') }}</span>
                 <input
                   class="input input--sm"
                   :class="{ 'is-late': dueLabel(shownDue)?.late }"
@@ -2018,26 +2024,26 @@ async function removeIssue(): Promise<void> {
               <div class="hr"></div>
 
               <div class="prop prop--tall" :class="{ 'is-fresh': fresh.has('tags') }">
-                <span class="prop__k">Tags</span>
+                <span class="prop__k">{{ t('fields.tags') }}</span>
                 <div class="prop__tags">
                   <span
-                    v-for="t in wornTags"
-                    :key="t.id"
+                    v-for="tag in wornTags"
+                    :key="tag.id"
                     class="taglabel"
-                    :style="{ '--c': t.color }"
+                    :style="{ '--c': tag.color }"
                   >
-                    {{ t.name }}
+                    {{ tag.name }}
                     <button
                       class="taglabel__x"
                       type="button"
-                      :aria-label="`Remove ${t.name}`"
-                      @click="toggleTag(t.id, false)"
+                      :aria-label="t('files.remove', { name: tag.name })"
+                      @click="toggleTag(tag.id, false)"
                     ><X class="ic ic--sm" /></button>
                   </span>
                   <Select
                     model-value=""
                     :options="tagChoices"
-                    placeholder="Add tag…"
+                    :placeholder="t('tags.addPlaceholder')"
                     small
                     @update:model-value="pickTag"
                   />
@@ -2048,7 +2054,7 @@ async function removeIssue(): Promise<void> {
                 <div class="hr"></div>
 
                 <div class="prop">
-                  <span class="prop__k">Author</span>
+                  <span class="prop__k">{{ t('fields.author') }}</span>
                   <span class="pv pv--ro">
                     <span>
                       <span :style="{ color: ink(colorOfId(issue.author?.id)) }">{{
@@ -2058,12 +2064,12 @@ async function removeIssue(): Promise<void> {
                         v-if="issue.author && nameOf(issue.author.login) !== issue.author.login"
                         class="nick"
                       >{{ issue.author.login }}</span>
-                      <span v-if="issue.viaBot" class="via" title="Created via bot"><Bot class="ic ic--sm" /></span>
+                      <span v-if="issue.viaBot" class="via" :title="t('issue.viaBot')"><Bot class="ic ic--sm" /></span>
                     </span>
                   </span>
                 </div>
                 <div class="prop">
-                  <span class="prop__k">Created</span>
+                  <span class="prop__k">{{ t('fields.created') }}</span>
                   <span class="pv pv--ro stamp">{{ stampAt(issue.createdAt) }}</span>
                 </div>
               </template>
@@ -2074,25 +2080,25 @@ async function removeIssue(): Promise<void> {
         <div v-if="error" class="err iv__err">{{ error }}</div>
       </section>
 
-      <Dialog v-if="picking" title="Link an issue" :width="460" @close="picking = false">
+      <Dialog v-if="picking" :title="t('issue.linkTitle')" :width="460" @close="picking = false">
         <div v-if="shownLinks.length" class="pick">
           <template v-for="g in linkGroups" :key="g.kind">
             <div class="sec-h pick__group">{{ g.label }}</div>
             <div v-for="l in g.links" :key="l.id" class="pick__line">
               <span class="key">{{ l.key }}</span>
               <span class="pick__sum">{{ l.summary }}</span>
-              <button class="btn btn--sm btn--ghost" type="button" @click="removeLink(l)">Unlink</button>
+              <button class="btn btn--sm btn--ghost" type="button" @click="removeLink(l)">{{ t('issue.unlink') }}</button>
             </div>
           </template>
         </div>
         <div v-if="shownLinks.length" class="hr"></div>
 
         <div class="pick__find">
-          <Select v-model="linkPick" class="pick__kind" :options="LINK_PICKS" label="Kind of link" />
+          <Select v-model="linkPick" class="pick__kind" :options="LINK_PICKS" :label="t('issue.linkKind')" />
           <input
             v-model="linkQuery"
             class="input"
-            placeholder="Key or title…"
+            :placeholder="t('issue.keyOrTitle')"
             autofocus
             @keydown.enter.prevent="pickable[0] && addLink(pickable[0].key)"
           />
@@ -2110,14 +2116,14 @@ async function removeIssue(): Promise<void> {
             <span class="pick__sum">{{ r.summary }}</span>
             <span class="pick__state" :style="{ color: ink(r.stateColor) }">{{ r.stateName }}</span>
           </button>
-          <p v-if="searching" class="hint">Searching…</p>
-          <p v-else-if="linkQuery.trim() && !pickable.length" class="hint">Nothing found.</p>
+          <p v-if="searching" class="hint">{{ t('issue.searching') }}</p>
+          <p v-else-if="linkQuery.trim() && !pickable.length" class="hint">{{ t('issues.nothingFound') }}</p>
         </div>
       </Dialog>
 
-      <Dialog v-if="makingTag" title="New tag" :width="420" @close="makingTag = false">
+      <Dialog v-if="makingTag" :title="t('issue.newTag')" :width="420" @close="makingTag = false">
         <div class="field">
-          <label class="label" for="tag-name">Name</label>
+          <label class="label" for="tag-name">{{ t('settings.name') }}</label>
           <input
             id="tag-name"
             v-model="newTagName"
@@ -2130,14 +2136,14 @@ async function removeIssue(): Promise<void> {
         <div v-if="tagError" class="err">{{ tagError }}</div>
         <template #footer>
           <div class="sp"></div>
-          <button class="btn" type="button" @click="makingTag = false">Cancel</button>
+          <button class="btn" type="button" @click="makingTag = false">{{ t('common.cancel') }}</button>
           <button
             class="btn btn--primary"
             type="button"
             :disabled="tagBusy || !newTagName.trim()"
             @click="createTag"
           >
-            Create
+            {{ t('issue.create') }}
           </button>
         </template>
       </Dialog>
@@ -2165,25 +2171,25 @@ async function removeIssue(): Promise<void> {
         :class="{ 'is-far': !popupNear, 'is-below': !popup.above }"
         :style="{ left: `${popup.x}px`, top: `${popup.y}px` }"
       >
-        <button type="button" @click="copySelection">Copy</button>
-        <button type="button" @click="replyToSelection">Reply</button>
+        <button type="button" @click="copySelection">{{ t('users.copy') }}</button>
+        <button type="button" @click="replyToSelection">{{ t('issue.reply') }}</button>
       </div>
 
       <ImageViewer v-model:index="shown" :images="gallery" />
       <FileViewer :file="reading" @close="reading = null" />
 
-      <Dialog v-if="deleting" :title="`Delete ${issueKey}`" @close="deleting = false">
-        <p class="iv__lede">This takes its comments, files and history with it. This cannot be undone.</p>
+      <Dialog v-if="deleting" :title="t('common.deleteNamed', { name: issueKey })" @close="deleting = false">
+        <p class="iv__lede">{{ t('issue.deleteText') }}</p>
         <template #footer>
-          <button class="btn" type="button" @click="deleting = false">Cancel</button>
-          <button class="btn btn--danger" type="button" @click="removeIssue">Delete issue</button>
+          <button class="btn" type="button" @click="deleting = false">{{ t('common.cancel') }}</button>
+          <button class="btn btn--danger" type="button" @click="removeIssue">{{ t('issue.deleteIssue') }}</button>
         </template>
       </Dialog>
-      <Dialog v-if="deletingComment" title="Delete comment" @close="deletingComment = null">
-        <p class="iv__lede">This takes its files and reactions with it. This cannot be undone.</p>
+      <Dialog v-if="deletingComment" :title="t('issue.deleteComment')" @close="deletingComment = null">
+        <p class="iv__lede">{{ t('issue.deleteCommentText') }}</p>
         <template #footer>
-          <button class="btn" type="button" @click="deletingComment = null">Cancel</button>
-          <button class="btn btn--danger" type="button" @click="confirmRemoveComment">Delete comment</button>
+          <button class="btn" type="button" @click="deletingComment = null">{{ t('common.cancel') }}</button>
+          <button class="btn btn--danger" type="button" @click="confirmRemoveComment">{{ t('issue.deleteComment') }}</button>
         </template>
       </Dialog>
     </div>

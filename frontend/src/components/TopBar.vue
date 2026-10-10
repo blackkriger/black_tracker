@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
@@ -32,6 +33,7 @@ import {
 } from 'lucide-vue-next';
 import { ink, setTheme, shownTheme } from '../lib/theme';
 
+const { t } = useI18n();
 const session = useSession();
 const router = useRouter();
 const route = useRoute();
@@ -57,12 +59,7 @@ const at = (name: string): 'page' | undefined => (section.value === name ? 'page
 
 const drawer = ref(false);
 watch([() => route.fullPath, narrow], () => (drawer.value = false));
-const SECTION_NAMES: Record<string, string> = {
-  issues: 'Issues',
-  analytics: 'Analytics',
-  feedback: 'Feedback',
-  settings: 'Settings',
-};
+const SECTIONS = ['issues', 'analytics', 'feedback', 'settings'];
 const place = computed(() => {
   if (here.value) {
     const p = live.value.find((x) => x.shortName === currentShort.value);
@@ -71,11 +68,10 @@ const place = computed(() => {
   }
   const login = session.me.value?.login ?? '';
   if (section.value === 'me') return { key: null, name: login, avatar: login };
-  const name = SECTION_NAMES[section.value];
-  return name ? { key: null, name, avatar: null } : null;
+  return SECTIONS.includes(section.value) ? { key: null, name: t(`nav.${section.value}`), avatar: null } : null;
 });
 
-const today = stamp(new Date().toISOString());
+const today = computed(() => stamp(new Date().toISOString()));
 const dateOpen = ref(false);
 const panel = ref<InstanceType<typeof DatePanel> | null>(null);
 
@@ -90,22 +86,23 @@ const countdown = computed(() => {
   const left = daysOff.value;
   const what = soon.value?.title ?? '';
   if (left === null || left < 0) return '';
-  if (left === 0) return `${what} is today`;
-  if (left === 1) return `1 day till ${what}`;
-  return `${left} days till ${what}`;
+  if (left === 0) return t('nav.today', { what });
+  return t('nav.till', { n: left, what }, left);
 });
 
 const { unreadOf, load: readNotices } = useNotices();
 
-const KINDS: { kind: NoticeKind; icon: typeof AtSign; label: string }[] = [
-  { kind: 'mention', icon: AtSign, label: 'Mentions' },
-  { kind: 'assigned', icon: ContactRound, label: 'Assigned to you' },
-  { kind: 'reaction', icon: Smile, label: 'Reactions' },
-  { kind: 'starred', icon: Star, label: 'Starred issues' },
-  ...(features.pings ? [{ kind: 'ping' as const, icon: Bell, label: 'Pings' }] : []),
+const KINDS: { kind: NoticeKind; icon: typeof AtSign }[] = [
+  { kind: 'mention', icon: AtSign },
+  { kind: 'assigned', icon: ContactRound },
+  { kind: 'reaction', icon: Smile },
+  { kind: 'starred', icon: Star },
+  ...(features.pings ? [{ kind: 'ping' as const, icon: Bell }] : []),
 ];
 const unreadKinds = computed(() =>
-  KINDS.map((k) => ({ ...k, count: unreadOf.value(k.kind) })).filter((k) => k.count)
+  KINDS.map((k) => ({ ...k, label: t(`notices.kinds.${k.kind}`), count: unreadOf.value(k.kind) })).filter(
+    (k) => k.count
+  )
 );
 const { ask } = useFocus();
 
@@ -200,7 +197,7 @@ async function signOut(): Promise<void> {
     <button
       class="topitem"
       type="button"
-      aria-label="Menu"
+      :aria-label="t('nav.menu')"
       :aria-expanded="drawer"
       @click="drawer = !drawer"
     ><Menu class="ic" /></button>
@@ -210,7 +207,7 @@ async function signOut(): Promise<void> {
       <span class="topitem__name">{{ place.name }}</span>
     </span>
     <div class="sp"></div>
-    <button v-if="unreadKinds.length" class="topitem" type="button" aria-label="Notices" @click="drawer = true">
+    <button v-if="unreadKinds.length" class="topitem" type="button" :aria-label="t('nav.notices')" @click="drawer = true">
       <span
         v-for="k in unreadKinds"
         :key="k.kind"
@@ -222,7 +219,7 @@ async function signOut(): Promise<void> {
   </header>
 
   <header v-else-if="layout === 'top'" class="top">
-    <nav v-if="live.length" class="topitems" aria-label="Projects">
+    <nav v-if="live.length" class="topitems" :aria-label="t('nav.projects')">
       <span v-for="p in live" :key="p.id" class="topproj">
         <RouterLink
           class="topitem topitem--project"
@@ -247,13 +244,13 @@ async function signOut(): Promise<void> {
 
     <div class="sp"></div>
 
-    <nav class="topitems" aria-label="Account">
+    <nav class="topitems" :aria-label="t('nav.account')">
       <span class="datepick" @click.stop>
         <button
           class="topitem topitem--caret datechip"
           type="button"
           :aria-expanded="dateOpen"
-          aria-label="Calendar"
+          :aria-label="t('nav.calendar')"
           @click="toggleDate"
         >
           <span v-if="countdown" class="stamp topcount">{{ countdown }}</span>
@@ -276,26 +273,26 @@ async function signOut(): Promise<void> {
         <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
         {{ session.me.value?.login }}
       </RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" :to="issuesTo" :aria-current="at('issues')">Issues</RouterLink>
+      <RouterLink v-if="hasRole" class="topitem" :to="issuesTo" :aria-current="at('issues')">{{ t('nav.issues') }}</RouterLink>
       <span v-if="hasRole" class="topboards">
-        <RouterLink class="topitem topitem__board" :to="analyticsTo" :aria-current="at('analytics')">Analytics</RouterLink>
-        <RouterLink class="topitem topitem__board" :to="{ name: 'feedback' }" :aria-current="at('feedback')">Feedback</RouterLink>
+        <RouterLink class="topitem topitem__board" :to="analyticsTo" :aria-current="at('analytics')">{{ t('nav.analytics') }}</RouterLink>
+        <RouterLink class="topitem topitem__board" :to="{ name: 'feedback' }" :aria-current="at('feedback')">{{ t('nav.feedback') }}</RouterLink>
       </span>
-      <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
-      <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
+      <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">{{ t('nav.settings') }}</RouterLink>
+      <button class="topitem topitem--danger" type="button" @click="signOut">{{ t('nav.signOut') }}</button>
     </nav>
   </header>
 
   <div v-if="narrow && drawer" class="rail__scrim" @click="drawer = false"></div>
   <aside v-if="narrow ? drawer : layout === 'side'" class="rail" :class="{ 'rail--drawer': narrow }">
-    <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
-      <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />Issues</RouterLink>
-      <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
-      <RouterLink class="topitem" :to="{ name: 'feedback' }" :aria-current="at('feedback')"><MessageSquareText class="ic" />Feedback</RouterLink>
+    <nav v-if="hasRole" class="rail__sections" :aria-label="t('nav.sections')">
+      <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />{{ t('nav.issues') }}</RouterLink>
+      <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />{{ t('nav.analytics') }}</RouterLink>
+      <RouterLink class="topitem" :to="{ name: 'feedback' }" :aria-current="at('feedback')"><MessageSquareText class="ic" />{{ t('nav.feedback') }}</RouterLink>
     </nav>
 
-    <nav v-if="live.length" class="rail__projects" aria-label="Projects">
-      <div class="side__h">Projects</div>
+    <nav v-if="live.length" class="rail__projects" :aria-label="t('nav.projects')">
+      <div class="side__h">{{ t('nav.projects') }}</div>
       <div v-for="p in live" :key="p.id" class="rail__proj">
         <RouterLink
           class="topitem topitem--project"
@@ -319,23 +316,23 @@ async function signOut(): Promise<void> {
       <DatePanel ref="panel" :soon="soon" :days-left="daysOff" all @day="toDay" />
     </div>
 
-    <nav class="rail__account" aria-label="Account">
+    <nav class="rail__account" :aria-label="t('nav.account')">
       <div class="rail__row">
         <RouterLink class="topitem" :to="{ name: 'me' }" :aria-current="at('me')">
           <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
           {{ session.me.value?.login }}
         </RouterLink>
         <div class="sp"></div>
-        <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
+        <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">{{ t('nav.settings') }}</RouterLink>
       </div>
       <div class="rail__row">
-        <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
+        <button class="topitem topitem--danger" type="button" @click="signOut">{{ t('nav.signOut') }}</button>
         <div class="sp"></div>
         <button
           class="topitem rail__theme"
           :class="{ 'is-on': shownTheme === 'light' }"
           type="button"
-          aria-label="Light"
+          :aria-label="t('nav.light')"
           :aria-pressed="shownTheme === 'light'"
           @click="setTheme('light')"
         ><Sun class="ic" /></button>
@@ -343,7 +340,7 @@ async function signOut(): Promise<void> {
           class="topitem rail__theme"
           :class="{ 'is-on': shownTheme === 'dark' }"
           type="button"
-          aria-label="Dark"
+          :aria-label="t('nav.dark')"
           :aria-pressed="shownTheme === 'dark'"
           @click="setTheme('dark')"
         ><Moon class="ic" /></button>

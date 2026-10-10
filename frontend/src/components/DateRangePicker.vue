@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { CalendarDays } from 'lucide-vue-next';
-import { shortDate as fmt, spanLabel } from '../lib/calendar';
+import { useI18n } from 'vue-i18n';
+import { monthName, shortDate as fmt, spanLabel, weekdayNames } from '../lib/calendar';
 
 const props = withDefaults(defineProps<{ from?: string; to?: string }>(), { from: '', to: '' });
 const emit = defineEmits<{
   (e: 'change', value: { from: string; to: string }): void;
 }>();
 
-const DOW = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+const { t } = useI18n();
 const MONTHS_BACK = 23;
 const MONTHS_AHEAD = 12;
 
@@ -41,9 +38,9 @@ const hasRange = computed(() => !!props.from || !!props.to);
 
 const triggerLabel = computed(() => {
   if (props.from && props.to) return spanLabel(props.from, props.to);
-  if (props.from) return `From ${fmt(props.from)}`;
-  if (props.to) return `Until ${fmt(props.to)}`;
-  return 'Any time';
+  if (props.from) return t('filters.from', { date: fmt(props.from) });
+  if (props.to) return t('filters.until', { date: fmt(props.to) });
+  return t('filters.anyTime');
 });
 
 const activeRange = computed<{ lo: string | null; hi: string | null }>(() => {
@@ -59,7 +56,7 @@ function sorted(a: string, b: string): { lo: string; hi: string } {
 
 const rangeSummary = computed(() => {
   if (hasRange.value) return triggerLabel.value;
-  return 'Click a day, or drag across days';
+  return t('filters.pickHint');
 });
 
 const months = computed(() => {
@@ -103,7 +100,7 @@ const months = computed(() => {
     const cells: ({ day: number; ymd: string } | null)[] = [];
     for (let i = 0; i < lead; i++) cells.push(null);
     for (let d = 1; d <= daysIn; d++) cells.push({ day: d, ymd: ymdOf(y, m, d) });
-    out.push({ key: `${y}-${pad(m + 1)}`, label: `${MONTH_NAMES[m]} ${y}`, cells });
+    out.push({ key: `${y}-${pad(m + 1)}`, label: monthName(y, m), cells });
     m += 1;
     if (m > 11) {
       m = 0;
@@ -229,12 +226,12 @@ onBeforeUnmount(() => {
       <div class="drp__pop-head">
         <span class="drp__summary">{{ rangeSummary }}</span>
         <button v-if="hasRange" type="button" class="btn btn--sm btn--ghost" @click="clearRange">
-          Clear
+          {{ t('filters.clear') }}
         </button>
       </div>
       <div ref="scrollRef" class="drp__months">
         <div class="drp__dow-head">
-          <span v-for="d in DOW" :key="d">{{ d }}</span>
+          <span v-for="d in weekdayNames()" :key="d">{{ d }}</span>
         </div>
         <div v-for="mo in months" :key="mo.key" class="drp__month" :data-month-key="mo.key">
           <div class="drp__month-label">{{ mo.label }}</div>

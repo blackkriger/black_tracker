@@ -53,8 +53,9 @@ export function registerUserRoutes(app: FastifyInstance): void {
       login: string;
       full_name: string;
       role_color: string | null;
+      gender: 'm' | 'f' | null;
     }>(
-      `select u.id, u.login, u.full_name, r.color as role_color
+      `select u.id, u.login, u.full_name, r.color as role_color, u.gender
          from users u
          left join roles r on r.id = u.role_id
         where u.active
@@ -66,6 +67,7 @@ export function registerUserRoutes(app: FastifyInstance): void {
         login: r.login,
         fullName: r.full_name,
         roleColor: r.role_color,
+        gender: r.gender,
       })),
     });
   });

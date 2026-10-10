@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue';
 import { X } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 
 export interface TagItem {
   id: string;
@@ -9,6 +10,7 @@ export interface TagItem {
 }
 
 withDefaults(defineProps<{ tags: TagItem[]; canRemove?: boolean }>(), { canRemove: true });
+const { t } = useI18n();
 const emit = defineEmits<{
   (e: 'add', name: string): void;
   (e: 'rename', tag: TagItem, name: string): void;
@@ -42,31 +44,31 @@ function add(): void {
 
 <template>
   <div class="taglabels">
-    <span v-for="t in tags" :key="t.id" class="taglabel" :style="{ '--c': t.color }">
+    <span v-for="tag in tags" :key="tag.id" class="taglabel" :style="{ '--c': tag.color }">
       <input
-        v-if="editingId === t.id"
-        :id="`tag-edit-${t.id}`"
+        v-if="editingId === tag.id"
+        :id="`tag-edit-${tag.id}`"
         v-model="draft"
         class="taglabel__input"
         maxlength="40"
-        @keydown.enter.prevent="commitEdit(t)"
+        @keydown.enter.prevent="commitEdit(tag)"
         @keydown.esc.prevent="editingId = null"
-        @blur="commitEdit(t)"
+        @blur="commitEdit(tag)"
       />
-      <button v-else class="taglabel__name" type="button" @click="startEdit(t)">{{ t.name }}</button>
+      <button v-else class="taglabel__name" type="button" @click="startEdit(tag)">{{ tag.name }}</button>
       <button
         class="taglabel__x"
         type="button"
-        :aria-label="`Delete ${t.name}`"
+        :aria-label="t('common.deleteNamed', { name: tag.name })"
         :disabled="!canRemove"
-        @click="emit('remove', t)"
+        @click="emit('remove', tag)"
       ><X class="ic ic--sm" /></button>
     </span>
   </div>
 
   <form class="addrow" @submit.prevent="add">
-    <input v-model="fresh" class="input" placeholder="Add tag…" maxlength="40" />
-    <button class="btn" type="submit" :disabled="!fresh.trim()">Add</button>
+    <input v-model="fresh" class="input" :placeholder="t('tags.addPlaceholder')" maxlength="40" />
+    <button class="btn" type="submit" :disabled="!fresh.trim()">{{ t('common.add') }}</button>
   </form>
 </template>
 

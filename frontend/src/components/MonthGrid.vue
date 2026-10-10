@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
 import { AtSign, Bell, ContactRound, Smile } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 import { useSession } from '../lib/session';
 import {
-  WEEKDAYS,
+  weekdayNames,
   emptyDay,
   longDate,
   monthGrid,
@@ -15,6 +16,7 @@ import { features } from '../lib/features';
 import { markIconOf } from '../lib/markIcons';
 import { ink } from '../lib/theme';
 
+const { t } = useI18n();
 const props = defineProps<{
   year: number;
   month: number;
@@ -94,7 +96,7 @@ function onEnter(ev: PointerEvent, c: Cell): void {
 
 <template>
   <div class="cal" :class="{ 'cal--compact': compact, 'cal--range': range }">
-    <span v-for="w in WEEKDAYS" :key="w" class="cal__wd">{{ w }}</span>
+    <span v-for="w in weekdayNames()" :key="w" class="cal__wd">{{ w }}</span>
     <button
       v-for="(c, i) in cells"
       :key="i"
@@ -161,7 +163,11 @@ function onEnter(ev: PointerEvent, c: Cell): void {
       <span class="cal__pop-head">
         <span class="cal__pop-day">{{ longDate(hover.key) }}</span>
         <span v-if="hovered.said" class="cal__pop-at" :style="{ color: ink(mine) }">
-          {{ hovered.unread ? `${hovered.unread} unread of ` : '' }}{{ hovered.said }} for you
+          {{
+            hovered.unread
+              ? t('calendar.unreadOf', { unread: hovered.unread, said: hovered.said }, hovered.unread)
+              : t('calendar.forYou', { said: hovered.said })
+          }}
         </span>
       </span>
       <span v-for="m in hovered.marks" :key="m.id" class="cal__pop-mark">
@@ -173,13 +179,12 @@ function onEnter(ev: PointerEvent, c: Cell): void {
         {{ d.summary }}
       </span>
       <span v-if="hovered.worked || hovered.created || hovered.resolved" class="cal__pop-work">
-        {{ hovered.worked }} worked, {{ hovered.created }} opened,
-        {{ hovered.resolved }} closed
+        {{ t('calendar.work', { worked: hovered.worked, created: hovered.created, resolved: hovered.resolved }) }}
       </span>
       <span
         v-if="!hovered.marks.length && !hovered.dues.length && !hovered.worked && !hovered.created && !hovered.resolved && !hovered.said"
         class="cal__pop-work"
-      >Nothing yet.</span>
+      >{{ t('calendar.nothingYet') }}</span>
     </div>
   </div>
 </template>

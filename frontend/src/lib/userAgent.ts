@@ -1,3 +1,5 @@
+import { i18n } from '../i18n';
+
 const BROWSERS: [RegExp, string][] = [
   [/YaBrowser\//, 'Yandex Browser'],
   [/Edg(A|iOS)?\//, 'Edge'],
@@ -19,7 +21,7 @@ const SYSTEMS: [RegExp, string][] = [
 
 export function describeAgent(agent: string | null): string {
   const browser = agent ? BROWSERS.find(([pattern]) => pattern.test(agent))?.[1] : undefined;
-  if (!browser) return 'Unknown browser';
+  if (!browser) return i18n.global.t('profile.unknownBrowser');
   const system = SYSTEMS.find(([pattern]) => pattern.test(agent as string))?.[1];
   return system ? `${browser}, ${system}` : browser;
 }

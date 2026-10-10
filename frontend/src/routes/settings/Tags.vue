@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
@@ -12,6 +13,7 @@ interface Tag extends TagItem {
   boardIds: string[];
 }
 
+const { t } = useI18n();
 const { canDelete } = useSession();
 const { projects, load: loadProjects } = useProjects();
 
@@ -42,7 +44,7 @@ onMounted(async () => {
   try {
     await Promise.all([reload(), loadProjects()]);
   } catch (err) {
-    fail('tags', err, 'Could not load tags.');
+    fail('tags', err, t('tags.loadFailed'));
   } finally {
     loading.value = false;
   }
@@ -102,7 +104,7 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
 <template>
   <SettingsLayout>
     <section v-if="loading" class="panel sheet__wide">
-      <header class="panel__h">Tags</header>
+      <header class="panel__h">{{ t('fields.tags') }}</header>
       <div class="panel__b">
         <div class="taglabels">
           <span v-for="w in [64, 92, 48, 76]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
@@ -115,7 +117,7 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
     </section>
     <section v-if="loading" class="panel sheet__wide">
       <header class="panel__h">
-        Boards
+        {{ t('tags.boards') }}
         <span class="panel__end tagmap__head" style="--boards: 2">
           <span v-for="w in [96, 72]" :key="w" class="sk sk--line" :style="{ width: `${w}px` }"></span>
         </span>
@@ -128,9 +130,9 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
     </section>
 
     <section v-else class="panel sheet__wide">
-      <header class="panel__h">Tags</header>
+      <header class="panel__h">{{ t('fields.tags') }}</header>
       <div class="panel__b">
-        <div v-if="!tags.length" class="empty empty--sm"><span class="empty__g">◇</span>None yet.</div>
+        <div v-if="!tags.length" class="empty empty--sm"><span class="empty__g">◇</span>{{ t('tags.none') }}</div>
         <TagLabels
           :tags="tags"
           :can-remove="canDelete"
@@ -144,23 +146,23 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
 
     <section v-if="!loading && boards.length && tags.length" class="panel sheet__wide">
       <header class="panel__h">
-        Boards
+        {{ t('tags.boards') }}
         <span class="panel__end tagmap__head" :style="{ '--boards': boards.length }">
           <span v-for="b in boards" :key="b.id" class="stamp" :title="b.label">{{ b.label }}</span>
         </span>
       </header>
       <div class="panel__b">
-        <div v-for="t in tags" :key="t.id" class="tagmap__row" :style="{ '--boards': boards.length }">
+        <div v-for="tag in tags" :key="tag.id" class="tagmap__row" :style="{ '--boards': boards.length }">
           <button
             v-for="b in boards"
             :key="b.id"
             class="taglabel taglabel--plain taglabel--pick"
-            :class="{ 'is-off': !t.boardIds.includes(b.id) }"
+            :class="{ 'is-off': !tag.boardIds.includes(b.id) }"
             type="button"
-            :aria-pressed="t.boardIds.includes(b.id)"
-            :style="{ '--c': t.color }"
-            @click="toggleOnBoard(t, b.id)"
-          >{{ t.name }}</button>
+            :aria-pressed="tag.boardIds.includes(b.id)"
+            :style="{ '--c': tag.color }"
+            @click="toggleOnBoard(tag, b.id)"
+          >{{ tag.name }}</button>
         </div>
       </div>
     </section>

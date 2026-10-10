@@ -86,6 +86,9 @@ interface UserRow {
   github_login: string | null;
   messengers: Record<string, string> | null;
   notices_off: string[];
+  lang: 'system' | 'en' | 'ru';
+  lang_seen: 'en' | 'ru' | null;
+  gender: 'm' | 'f' | null;
 }
 
 export const USER_SELECT = `
@@ -135,6 +138,9 @@ const publicMe = (row: UserRow) => ({
     vk: { ready: vkReady(), name: row.messengers?.vk ?? null },
   },
   noticesOff: row.notices_off,
+  lang: row.lang,
+  langSeen: row.lang_seen,
+  gender: row.gender,
 });
 
 const NOTICE_KINDS = ['mention', 'assigned', 'reaction', 'starred', 'ping'] as const;
@@ -476,6 +482,9 @@ export function registerAuthRoutes(app: FastifyInstance): void {
         starCommented: z.boolean().optional(),
         githubLogin: z.string().max(200).optional(),
         noticesOff: z.array(z.enum(NOTICE_KINDS)).optional(),
+        lang: z.enum(['system', 'en', 'ru']).optional(),
+        langSeen: z.enum(['en', 'ru']).optional(),
+        gender: z.enum(['m', 'f']).nullable().optional(),
       })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Name is too long.' });
@@ -492,7 +501,10 @@ export function registerAuthRoutes(app: FastifyInstance): void {
                 star_assigned = coalesce($4, star_assigned),
                 star_commented = coalesce($5, star_commented),
                 github_login = case when $6 then $7 else github_login end,
-                notices_off = coalesce($8, notices_off)
+                notices_off = coalesce($8, notices_off),
+                lang = coalesce($9, lang),
+                lang_seen = coalesce($10, lang_seen),
+                gender = case when $11 then $12 else gender end
           where id = $1`,
         [
           auth.userId,
@@ -503,6 +515,10 @@ export function registerAuthRoutes(app: FastifyInstance): void {
           github !== undefined,
           github || null,
           p.noticesOff ? [...new Set(p.noticesOff)] : null,
+          p.lang ?? null,
+          p.langSeen ?? null,
+          p.gender !== undefined,
+          p.gender ?? null,
         ]
       );
     } catch (err) {

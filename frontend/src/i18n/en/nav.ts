@@ -1,0 +1,17 @@
+export default {
+  issues: 'Issues',
+  analytics: 'Analytics',
+  feedback: 'Feedback',
+  settings: 'Settings',
+  signOut: 'Sign out',
+  projects: 'Projects',
+  menu: 'Menu',
+  notices: 'Notices',
+  calendar: 'Calendar',
+  account: 'Account',
+  sections: 'Sections',
+  light: 'Light',
+  dark: 'Dark',
+  today: '{what} is today',
+  till: '{n} day till {what} | {n} days till {what}',
+};

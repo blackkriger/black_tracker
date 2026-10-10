@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue';
 import { api } from './api';
+import { i18n } from '../i18n';
 import { shortDate } from './calendar';
 import { useSession, type Me } from './session';
 
@@ -38,21 +39,45 @@ export function showsAuthor(n: Notice, me: string | null | undefined): boolean {
   return n.by !== me;
 }
 
+const FIELD_KEYS: Record<string, string> = {
+  status: 'status',
+  assignee: 'assignee',
+  watcher: 'watcher',
+  priority: 'priority',
+  'due date': 'due',
+};
+
 export function describeChanges(changes: NoticeChange[], name: (login: string) => string): string {
+  const { t, te } = i18n.global;
   const show = (c: NoticeChange, value: string | null): string => {
     if (!value) return '—';
     if (c.field === 'assignee' || c.field === 'watcher') return name(value);
     if (c.field === 'due date') return shortDate(value, false);
+    if (c.field === 'priority' && te(`priority.${value}`)) return t(`priority.${value}`);
     return value;
   };
   return changes
     .map((c) => {
-      if (c.field === 'link added') return `linked ${c.to}`;
-      if (c.field === 'link removed') return `unlinked ${c.to}`;
-      const label = c.field === 'due date' ? 'due' : c.field;
+      if (c.field === 'link added') return t('notices.linked', { key: c.to });
+      if (c.field === 'link removed') return t('notices.unlinked', { key: c.to });
+      const label = FIELD_KEYS[c.field] ? t(`notices.fields.${FIELD_KEYS[c.field]}`) : c.field;
       return `${label} ${show(c, c.from)} → ${show(c, c.to)}`;
     })
     .join(', ');
+}
+
+export function noticeLine(
+  n: Notice,
+  name: (login: string) => string,
+  genderOf: (login: string | null) => 'm' | 'f' | null
+): string {
+  const { t } = i18n.global;
+  const g = genderOf(n.by) ?? 'x';
+  if (n.kind === 'reaction') return t(`notices.reacted.${g}`);
+  if (n.kind === 'assigned') return t(`notices.${n.review ? 'review' : 'assigned'}.${g}`);
+  if (n.kind === 'ping') return t(`notices.pinged.${g}`);
+  if (n.kind === 'starred' && !n.commentId) return describeChanges(n.changes, name);
+  return n.said;
 }
 
 const PAGE = 10;

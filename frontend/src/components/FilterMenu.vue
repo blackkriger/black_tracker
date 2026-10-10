@@ -2,7 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ChevronDown } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const props = defineProps<{
   label: string;
   options: { value: string; label: string; key?: string; color?: string | null }[];
@@ -15,7 +17,7 @@ const single = computed(() =>
   props.modelValue.length === 1 ? props.options.find((o) => o.value === props.modelValue[0]) : undefined
 );
 const summary = computed(() => {
-  if (!props.modelValue.length) return 'all';
+  if (!props.modelValue.length) return t('common.all');
   if (props.modelValue.length > 1) return String(props.modelValue.length);
   return props.modelValue[0];
 });

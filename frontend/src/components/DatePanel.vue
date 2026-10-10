@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import MonthGrid from './MonthGrid.vue';
 import { api } from '../lib/api';
@@ -17,7 +18,7 @@ import {
 } from '../lib/calendar';
 import { useFocus } from '../lib/focus';
 import { settled, useLive } from '../lib/live';
-import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
+import { noticeLine, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
@@ -25,10 +26,11 @@ import { ink } from '../lib/theme';
 const props = defineProps<{ soon: Mark | null; daysLeft?: number | null; withFull?: boolean; all?: boolean }>();
 const emit = defineEmits<{ (e: 'day', key: string): void; (e: 'leave'): void }>();
 
+const { t } = useI18n();
 const session = useSession();
 const router = useRouter();
 const route = useRoute();
-const { colorOf, nameOf, load: loadPeople } = usePeople();
+const { colorOf, nameOf, genderOf, load: loadPeople } = usePeople();
 void loadPeople();
 const { notices: everything, shown: notices, hasMore, loadMore, markRead } = useNotices();
 const list = ref<HTMLDivElement | null>(null);
@@ -36,9 +38,8 @@ const list = ref<HTMLDivElement | null>(null);
 const soonIn = computed(() => {
   const left = props.daysLeft;
   if (left == null || left < 0) return '';
-  if (left === 0) return 'today';
-  if (left === 1) return 'in 1 day';
-  return `in ${left} days`;
+  if (left === 0) return t('calendar.today');
+  return t('calendar.inDays', { n: left }, left);
 });
 
 async function fill(): Promise<void> {
@@ -136,13 +137,13 @@ defineExpose({ readMonth });
       <button
         class="btn btn--sm btn--icon btn--ghost"
         type="button"
-        aria-label="Previous month"
+        :aria-label="t('calendar.prevMonth')"
         @click="stepMonth(-1)"
       ><ChevronLeft class="ic ic--sm" /></button>
       <button
         class="btn btn--sm btn--icon btn--ghost"
         type="button"
-        aria-label="Next month"
+        :aria-label="t('calendar.nextMonth')"
         @click="stepMonth(1)"
       ><ChevronRight class="ic ic--sm" /></button>
     </div>
@@ -201,13 +202,7 @@ defineExpose({ readMonth });
             :style="{ color: ink(colorOf(n.by)) }"
           >{{ nameOf(n.by) }}</span>
           <span class="men__said">
-            <template v-if="n.kind === 'reaction'">reacted</template>
-            <template v-else-if="n.kind === 'assigned'">{{ n.review ? 'asked you to review' : 'assigned you' }}</template>
-            <template v-else-if="n.kind === 'ping'">pinged you</template>
-            <template v-else-if="n.kind === 'starred' && !n.commentId">
-              {{ describeChanges(n.changes, nameOf) }}
-            </template>
-            <template v-else>{{ n.said }}</template>
+            {{ noticeLine(n, nameOf, genderOf) }}
           </span>
         </button>
       </div>
@@ -215,7 +210,7 @@ defineExpose({ readMonth });
     <template v-if="withFull">
       <hr />
       <button class="menu__i" type="button" @click="toCalendar">
-        Full calendar
+        {{ t('calendar.full') }}
         <ArrowRight class="ic ic--sm" />
       </button>
     </template>

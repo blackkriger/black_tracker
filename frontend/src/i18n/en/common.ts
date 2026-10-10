@@ -1,0 +1,17 @@
+export default {
+  loading: 'Loading…',
+  noSuchPage: 'No such page.',
+  noProjects: 'No projects yet.',
+  projectsFailed: 'Could not load projects.',
+  wentWrong: 'Something went wrong.',
+  close: 'Close',
+  all: 'all',
+  add: 'Add',
+  deleteNamed: 'Delete {name}',
+  cancel: 'Cancel',
+  save: 'Save',
+  saved: 'Saved.',
+  delete: 'Delete',
+  remove: 'Remove',
+  rename: 'Rename',
+};

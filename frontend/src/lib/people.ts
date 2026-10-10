@@ -6,6 +6,7 @@ export interface Person {
   login: string;
   fullName: string;
   roleColor: string | null;
+  gender: 'm' | 'f' | null;
 }
 
 const people = ref<Person[]>([]);
@@ -27,6 +28,9 @@ export function usePeople() {
     },
     colorOfId(id: string | null | undefined): string | undefined {
       return (id && byId.value.get(id)?.roleColor) || undefined;
+    },
+    genderOf(login: string | null | undefined): 'm' | 'f' | null {
+      return (login && byLogin.value.get(login)?.gender) || null;
     },
     nameOf(login: string | null | undefined): string {
       if (!login) return '';

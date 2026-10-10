@@ -1,0 +1,15 @@
+export default {
+  remove: 'Remove {name}',
+  previous: 'Previous',
+  next: 'Next',
+  reading: 'Reading…',
+  readFailed: 'Could not read this file.',
+  diagram: 'Diagram',
+  truncated: 'Only the first 512 KB are shown. Download the file to read the rest.',
+  foldTitle: 'Fold long lines (Alt+Z)',
+  wrap: 'Wrap',
+  zoomOut: 'Zoom out',
+  zoomIn: 'Zoom in',
+  fit: 'Fit',
+  download: 'Download',
+};

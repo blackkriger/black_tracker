@@ -1,0 +1,18 @@
+export default {
+  signIn: 'Sign in',
+  signingIn: 'Signing in…',
+  signInFailed: 'Could not sign in.',
+  login: 'Login',
+  password: 'Password',
+  newPassword: 'New password',
+  repeatPassword: 'Repeat password',
+  repeatNewPassword: 'Repeat new password',
+  atLeast8: 'At least 8 characters.',
+  mismatch: 'The two do not match.',
+  createAccount: 'Create account',
+  creating: 'Creating…',
+  createFailed: 'Could not create the account.',
+  inviteGone: 'This invite link is no longer valid.',
+  linkGone: 'This link is no longer valid.',
+  setPassword: 'Set password',
+};

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import DateRangePicker from './DateRangePicker.vue';
 import FilterMenu from './FilterMenu.vue';
 import { useBoards } from '../lib/boards';
@@ -9,6 +10,7 @@ import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
 import { useTags } from '../lib/tags';
 
+const { t } = useI18n();
 const props = defineProps<{ modelValue: Filters; base?: Filters; dirty?: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: Filters): void; (e: 'clear'): void }>();
 
@@ -46,7 +48,7 @@ const stateChoices = computed(() => {
 const personChoices = computed(() =>
   people.value.map((p) => ({ value: p.login, label: p.fullName || p.login, color: p.roleColor }))
 );
-const assigneeChoices = computed(() => [{ value: '-', label: 'Nobody' }, ...personChoices.value]);
+const assigneeChoices = computed(() => [{ value: '-', label: t('fields.nobody') }, ...personChoices.value]);
 const tagChoices = computed(() => {
   const onBoards = new Set(scope.value.flatMap((p) => p.boards.map((b) => b.id)));
   return tags.value.filter((t) => t.boardIds.some((id) => onBoards.has(id)));
@@ -89,31 +91,31 @@ onMounted(() => {
   <div class="fbar">
     <FilterMenu
       :model-value="modelValue.projects"
-      label="Projects"
+      :label="t('fields.projects')"
       :options="projectChoices"
       @update:model-value="set({ projects: $event })"
     />
     <FilterMenu
       :model-value="modelValue.states"
-      label="Status"
+      :label="t('fields.status')"
       :options="stateChoices"
       @update:model-value="set({ states: $event })"
     />
     <FilterMenu
       :model-value="modelValue.assignees"
-      label="Assignee"
+      :label="t('fields.assignee')"
       :options="assigneeChoices"
       @update:model-value="set({ assignees: $event })"
     />
     <FilterMenu
       :model-value="modelValue.watchers"
-      label="Watcher"
+      :label="t('fields.watcher')"
       :options="personChoices"
       @update:model-value="set({ watchers: $event })"
     />
     <FilterMenu
       :model-value="modelValue.authors"
-      label="Author"
+      :label="t('fields.author')"
       :options="personChoices"
       @update:model-value="set({ authors: $event })"
     />
@@ -139,7 +141,7 @@ onMounted(() => {
       <span v-for="w in [40, 62]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
     </template>
     <button v-if="changed" class="btn btn--sm btn--ghost" type="button" @click="clearAll">
-      Clear all
+      {{ t('filters.clearAll') }}
     </button>
   </div>
 </template>

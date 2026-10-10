@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import {
   AtSign,
   Bell,
@@ -35,17 +36,18 @@ import { priorityColor, stampAt, type Priority } from '../lib/issues';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
 import { features } from '../lib/features';
-import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
+import { noticeLine, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { useSession } from '../lib/session';
 import { settled, useLive } from '../lib/live';
 import { ink } from '../lib/theme';
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const session = useSession();
-const { nameOf, colorOf, load: loadPeople } = usePeople();
+const { nameOf, colorOf, genderOf, load: loadPeople } = usePeople();
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 const { ask } = useFocus();
@@ -91,7 +93,7 @@ async function loadStarred(): Promise<void> {
   try {
     starred.value = await api<Starred[]>('/my-favourites');
   } catch (err) {
-    fail('starred', err, 'Could not read your starred issues.');
+    fail('starred', err, t('me.starredFailed'));
   } finally {
     starredLoading.value = false;
   }
@@ -152,7 +154,7 @@ async function loadMine(): Promise<void> {
   try {
     mine.value = await api<Mine[]>('/my-issues');
   } catch (err) {
-    fail('mine', err, 'Could not read your issues.');
+    fail('mine', err, t('me.mineFailed'));
   } finally {
     mineLoading.value = false;
   }
@@ -212,7 +214,7 @@ async function load(): Promise<void> {
     activity.value = got.activity;
     mentions.value = got.mentions;
   } catch (err) {
-    fail('month', err, 'Could not read the month.');
+    fail('month', err, t('me.monthFailed'));
   } finally {
     loading.value = false;
   }
@@ -348,7 +350,7 @@ async function openIssue(d: Due): Promise<void> {
     lookAt.value = undefined;
     picked.value = null;
   } catch (err) {
-    fail('day', err, 'Could not open the issue.');
+    fail('day', err, t('me.openFailed'));
   }
 }
 
@@ -364,7 +366,7 @@ function closeIssue(): void {
       <div class="sheet sheet--cal">
           <section class="panel sheet__wide">
             <header class="panel__h">
-              Your issues
+              {{ t('me.yourIssues') }}
               <span class="panel__end">{{ mine.length }}</span>
             </header>
             <div class="panel__b mine">
@@ -387,7 +389,7 @@ function closeIssue(): void {
               >
                 <span class="key mine__key" :style="{ color: ink(i.color) }">{{ i.key }}</span>
                 <span class="mine__pri" :style="{ color: priorityColor(i.priority as Priority) }">
-                  {{ i.priority }}
+                  {{ t(`priority.${i.priority}`) }}
                 </span>
                 <span class="mine__what">{{ i.summary }}</span>
                 <span class="mine__board">{{ i.boardName }}</span>
@@ -397,7 +399,7 @@ function closeIssue(): void {
                   :class="{ 'is-late': i.due && i.due < today }"
                 >{{ i.due ? dayAndMonth(i.due) : '—' }}</span>
               </button>
-              <div v-if="!mineLoading && !mine.length" class="hint faint">Nothing is on you.</div>
+              <div v-if="!mineLoading && !mine.length" class="hint faint">{{ t('me.nothingOnYou') }}</div>
             </div>
           </section>
           <div v-if="errors.mine" class="err panel__err sheet__wide">{{ errors.mine }}</div>
@@ -411,13 +413,13 @@ function closeIssue(): void {
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
-                  aria-label="Previous year"
+                  :aria-label="t('me.prevYear')"
                   @click="step(-1)"
                 ><ChevronLeft class="ic" /></button>
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
-                  aria-label="Next year"
+                  :aria-label="t('me.nextYear')"
                   @click="step(1)"
                 ><ChevronRight class="ic" /></button>
               </template>
@@ -425,7 +427,7 @@ function closeIssue(): void {
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
-                  :aria-label="wide ? 'Show three months' : 'Show the whole year'"
+                  :aria-label="wide ? t('me.threeMonths') : t('me.wholeYear')"
                   @click="unfold"
                 >
                   <ChevronsDownUp v-if="wide" class="ic" />
@@ -457,7 +459,7 @@ function closeIssue(): void {
           <div v-if="errors.month" class="err panel__err">{{ errors.month }}</div>
 
           <section class="panel">
-            <header class="panel__h">Marked days</header>
+            <header class="panel__h">{{ t('me.markedDays') }}</header>
             <div class="panel__b days">
               <template v-if="loading">
                 <span v-for="n in 2" :key="n" class="sk sk--line"></span>
@@ -477,7 +479,7 @@ function closeIssue(): void {
                   </span>
                 </button>
                 <div v-if="!yearMarks.length" class="empty empty--sm">
-                  <span class="empty__g">◇</span>Nothing marked this year.
+                  <span class="empty__g">◇</span>{{ t('me.nothingMarked') }}
                 </div>
               </template>
             </div>
@@ -487,7 +489,7 @@ function closeIssue(): void {
         <div class="stack">
           <section class="panel">
             <header class="panel__h">
-              <Star class="ic star" fill="currentColor" aria-label="Starred" />
+              <Star class="ic star" fill="currentColor" :aria-label="t('me.starred')" />
               <span class="panel__end">{{ starredLoading ? '' : starred.length }}</span>
             </header>
             <div class="panel__b days days--starred">
@@ -511,7 +513,7 @@ function closeIssue(): void {
                   <span class="note__said">{{ f.summary }}</span>
                 </span>
               </button>
-              <div v-if="!starredLoading && !starred.length" class="hint faint">Nothing starred.</div>
+              <div v-if="!starredLoading && !starred.length" class="hint faint">{{ t('me.nothingStarred') }}</div>
             </div>
           </section>
           <div v-if="errors.starred" class="err panel__err">{{ errors.starred }}</div>
@@ -523,50 +525,50 @@ function closeIssue(): void {
                   class="btn btn--sm btn--icon btn--ghost kind"
                   :class="{ 'is-off': off.includes('mention') }"
                   type="button"
-                  aria-label="Mentions"
+                  :aria-label="t('notices.kinds.mention')"
                   @click="toggleKind('mention').catch(() => {})"
                 ><AtSign class="ic" /></button>
-                <span class="selbar kind__what">Mentions</span>
+                <span class="selbar kind__what">{{ t('notices.kinds.mention') }}</span>
               </span>
               <span class="kind__hold">
                 <button
                   class="btn btn--sm btn--icon btn--ghost kind"
                   :class="{ 'is-off': off.includes('reaction') }"
                   type="button"
-                  aria-label="Reactions"
+                  :aria-label="t('notices.kinds.reaction')"
                   @click="toggleKind('reaction').catch(() => {})"
                 ><Smile class="ic" /></button>
-                <span class="selbar kind__what">Reactions</span>
+                <span class="selbar kind__what">{{ t('notices.kinds.reaction') }}</span>
               </span>
               <span class="kind__hold">
                 <button
                   class="btn btn--sm btn--icon btn--ghost kind"
                   :class="{ 'is-off': off.includes('assigned') }"
                   type="button"
-                  aria-label="Assigned to you"
+                  :aria-label="t('notices.kinds.assigned')"
                   @click="toggleKind('assigned').catch(() => {})"
                 ><ContactRound class="ic" /></button>
-                <span class="selbar kind__what">Assigned to you</span>
+                <span class="selbar kind__what">{{ t('notices.kinds.assigned') }}</span>
               </span>
               <span class="kind__hold">
                 <button
                   class="btn btn--sm btn--icon btn--ghost kind"
                   :class="{ 'is-off': off.includes('starred') }"
                   type="button"
-                  aria-label="Starred issues"
+                  :aria-label="t('notices.kinds.starred')"
                   @click="toggleKind('starred').catch(() => {})"
                 ><Star class="ic" /></button>
-                <span class="selbar kind__what">Starred issues</span>
+                <span class="selbar kind__what">{{ t('notices.kinds.starred') }}</span>
               </span>
               <span v-if="features.pings" class="kind__hold">
                 <button
                   class="btn btn--sm btn--icon btn--ghost kind"
                   :class="{ 'is-off': off.includes('ping') }"
                   type="button"
-                  aria-label="Pings"
+                  :aria-label="t('notices.kinds.ping')"
                   @click="toggleKind('ping').catch(() => {})"
                 ><Bell class="ic" /></button>
-                <span class="selbar kind__what">Pings</span>
+                <span class="selbar kind__what">{{ t('notices.kinds.ping') }}</span>
               </span>
               <span class="panel__end">{{ spanLabel(pickedDays.from, pickedDays.to, false) }}</span>
             </header>
@@ -595,18 +597,12 @@ function closeIssue(): void {
                     :style="{ color: ink(colorOf(n.by)) }"
                   >{{ nameOf(n.by) }}</span>
                   <span class="note__said">
-                    <template v-if="n.kind === 'reaction'">reacted</template>
-                    <template v-else-if="n.kind === 'assigned'">{{ n.review ? 'asked you to review' : 'assigned you' }}</template>
-                    <template v-else-if="n.kind === 'ping'">pinged you</template>
-                    <template v-else-if="n.kind === 'starred' && !n.commentId">
-                      {{ describeChanges(n.changes, nameOf) }}
-                    </template>
-                    <template v-else>{{ n.said }}</template>
+                    {{ noticeLine(n, nameOf, genderOf) }}
                   </span>
                 </span>
               </button>
               <div v-if="feedLoaded && !shownFeed.length" class="empty empty--sm">
-                <span class="empty__g">◇</span>Nothing for you yet.
+                <span class="empty__g">◇</span>{{ t('me.nothingForYou') }}
               </div>
             </div>
           </section>

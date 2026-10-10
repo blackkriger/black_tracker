@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { ChevronDown, ChevronRight, Download } from 'lucide-vue-next';
 import DateRangePicker from '../components/DateRangePicker.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import Select from '../components/Select.vue';
 import { api } from '../lib/api';
-import { FEEDBACK_FORMS, type FeedbackItem } from '../lib/feedback';
+import { feedbackForm, type FeedbackItem } from '../lib/feedback';
+import { locale } from '../i18n';
 import { stampAt } from '../lib/issues';
 import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
@@ -36,19 +38,12 @@ interface Report {
   responses: Answer[];
 }
 
-const DIMS: { key: Dim; title: string }[] = [
-  { key: 'country', title: 'Country' },
-  { key: 'device', title: 'Device' },
-  { key: 'os', title: 'System' },
-  { key: 'browser', title: 'Browser' },
-  { key: 'browserLang', title: 'Browser language' },
-  { key: 'lang', title: 'Page language' },
-  { key: 'theme', title: 'Theme' },
-];
+const DIMS: Dim[] = ['country', 'device', 'os', 'browser', 'browserLang', 'lang', 'theme'];
 const SHOWN_PER_DIM = 6;
 const SCORES = ['1', '2', '3', '4', '5'];
 
 const route = useRoute();
+const { t, te } = useI18n();
 const router = useRouter();
 const { errors, fail, clear } = usePanelErrors();
 
@@ -78,7 +73,7 @@ async function load(): Promise<void> {
     const got = await api<Report | null>(`/feedback/report${query ? `?${query}` : ''}`);
     if (mine === reads) report.value = got;
   } catch (err) {
-    if (mine === reads) fail('report', err, 'Could not read the feedback.');
+    if (mine === reads) fail('report', err, t('report.readFailed'));
   } finally {
     if (mine === reads) loading.value = false;
   }
@@ -96,8 +91,13 @@ useLive(
   () => reload()
 );
 
-const formChoices = computed(() => (report.value?.forms ?? []).map((f) => ({ value: f.id, label: f.name })));
-const sections = computed(() => FEEDBACK_FORMS[report.value?.form ?? ''] ?? []);
+const formChoices = computed(() =>
+  (report.value?.forms ?? []).map((f) => ({
+    value: f.id,
+    label: te(`report.formNames.${f.id}`) ? t(`report.formNames.${f.id}`) : f.name,
+  }))
+);
+const sections = computed(() => feedbackForm(report.value?.form ?? '', locale.value));
 const items = computed<FeedbackItem[]>(() => sections.value.flatMap((s) => s.items));
 const responses = computed(() => report.value?.responses ?? []);
 
@@ -106,10 +106,11 @@ const share = (n: number, of: number): string => (of ? `${Math.round((n / of) * 
 function took(ms: number | null | undefined): string {
   if (ms == null) return '—';
   const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
+  const u = locale.value === 'ru' ? { s: 'с', m: 'мин', h: 'ч' } : { s: 's', m: 'm', h: 'h' };
+  if (s < 60) return `${s}${u.s}`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${s % 60}s`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
+  if (m < 60) return `${m}${u.m} ${s % 60}${u.s}`;
+  return `${Math.floor(m / 60)}${u.h} ${m % 60}${u.m}`;
 }
 
 const funnel = computed(() => {
@@ -122,7 +123,7 @@ const funnel = computed(() => {
       const n = reachedFrom(i);
       return { key: s.id, label: `${i + 1}. ${s.title}`, n, share: share(n, r.sessions), time: took(r.sectionMs[s.id]) };
     }),
-    { key: 'sent', label: 'Sent', n: r.sent, share: share(r.sent, r.sessions), time: took(r.totalMs) },
+    { key: 'sent', label: t('report.sentRow'), n: r.sent, share: share(r.sent, r.sessions), time: took(r.totalMs) },
   ];
 });
 
@@ -233,8 +234,8 @@ const shownSection = computed(
     textSections.value[0]
 );
 
-const regions = new Intl.DisplayNames(['en'], { type: 'region' });
-const languages = new Intl.DisplayNames(['en'], { type: 'language' });
+const regions = computed(() => new Intl.DisplayNames([locale.value], { type: 'region' }));
+const languages = computed(() => new Intl.DisplayNames([locale.value], { type: 'language' }));
 
 function named(names: Intl.DisplayNames, code: string): string {
   try {
@@ -245,23 +246,28 @@ function named(names: Intl.DisplayNames, code: string): string {
 }
 
 function valueLabel(dim: Dim, value: string | null): string {
-  if (value == null) return 'Unknown';
-  if (dim === 'country') return named(regions, value);
-  if (dim === 'browserLang' || dim === 'lang') return named(languages, value);
-  if (dim === 'device' || dim === 'theme') return value.charAt(0).toUpperCase() + value.slice(1);
+  if (value == null) return t('report.unknown');
+  if (dim === 'country') return named(regions.value, value);
+  if (dim === 'browserLang' || dim === 'lang') {
+    const name = named(languages.value, value);
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  if (dim === 'device') return t(`report.devices.${value}`);
+  if (dim === 'theme') return t(`prefs.${value}`);
   return value;
 }
 
 const audience = computed(() =>
-  DIMS.map((d) => {
-    const all = report.value?.audience[d.key] ?? [];
+  DIMS.map((key) => {
+    const all = report.value?.audience[key] ?? [];
     const total = all.reduce((sum, r) => sum + r.n, 0);
     const rest = all.slice(SHOWN_PER_DIM).reduce((sum, r) => sum + r.n, 0);
     return {
-      ...d,
+      key,
+      title: t(`report.dims.${key}`),
       rows: [
-        ...all.slice(0, SHOWN_PER_DIM).map((r) => ({ label: valueLabel(d.key, r.value), n: r.n, share: share(r.n, total) })),
-        ...(rest ? [{ label: 'Other', n: rest, share: share(rest, total) }] : []),
+        ...all.slice(0, SHOWN_PER_DIM).map((r) => ({ label: valueLabel(key, r.value), n: r.n, share: share(r.n, total) })),
+        ...(rest ? [{ label: t('report.other'), n: rest, share: share(rest, total) }] : []),
       ],
     };
   })
@@ -298,10 +304,10 @@ function exportCsv(): void {
   const r = report.value;
   if (!r) return;
   const columns: { title: string; read: (a: Answer) => string }[] = [
-    { title: 'Date', read: (a) => a.at },
-    { title: 'Language', read: (a) => a.lang },
-    { title: 'Name', read: (a) => a.name ?? '' },
-    { title: 'Email', read: (a) => a.email ?? '' },
+    { title: t('report.date'), read: (a) => a.at },
+    { title: t('report.language'), read: (a) => a.lang },
+    { title: t('report.name'), read: (a) => a.name ?? '' },
+    { title: t('report.email'), read: (a) => a.email ?? '' },
     ...items.value.flatMap((it) =>
       it.kind === 'ratings'
         ? Object.entries(it.aspects).map(([key, label]) => ({
@@ -334,7 +340,7 @@ function exportCsv(): void {
             :model-value="report?.form ?? ''"
             :options="formChoices"
             small
-            label="Form"
+            :label="t('report.form')"
             class="lead__form"
             @update:model-value="pick({ form: $event })"
           />
@@ -345,17 +351,17 @@ function exportCsv(): void {
 
         <section class="panel sheet__wide">
           <header class="panel__h">
-            Funnel
-            <span v-if="report" class="panel__end">{{ report.views }} views</span>
+            {{ t('report.funnel') }}
+            <span v-if="report" class="panel__end">{{ t('report.views', { n: report.views }, report.views) }}</span>
           </header>
           <div class="panel__table">
             <table class="tbl funnel">
               <thead>
                 <tr>
-                  <th>Section</th>
-                  <th class="n">Reached</th>
-                  <th class="n">Share</th>
-                  <th class="n">Median time</th>
+                  <th>{{ t('report.section') }}</th>
+                  <th class="n">{{ t('report.reached') }}</th>
+                  <th class="n">{{ t('report.share') }}</th>
+                  <th class="n">{{ t('report.medianTime') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -381,7 +387,7 @@ function exportCsv(): void {
 
         <section class="panel sheet__wide">
           <header class="panel__h">
-            Responses
+            {{ t('report.responses') }}
             <span class="panel__end">
               <button
                 v-if="responses.length"
@@ -395,10 +401,10 @@ function exportCsv(): void {
             <table class="tbl answers">
               <thead>
                 <tr>
-                  <th>Sent</th>
-                  <th>Language</th>
-                  <th>Name</th>
-                  <th>Email</th>
+                  <th>{{ t('report.sentAt') }}</th>
+                  <th>{{ t('report.language') }}</th>
+                  <th>{{ t('report.name') }}</th>
+                  <th>{{ t('report.email') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -435,7 +441,7 @@ function exportCsv(): void {
                   </tr>
                 </template>
                 <tr v-if="!loading && !responses.length">
-                  <td colspan="4" class="hint faint">No responses yet.</td>
+                  <td colspan="4" class="hint faint">{{ t('report.noResponses') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -443,14 +449,14 @@ function exportCsv(): void {
         </section>
 
         <section class="panel sheet__wide">
-          <header class="panel__h">Audience</header>
+          <header class="panel__h">{{ t('report.audience') }}</header>
           <div class="panel__b crowd">
             <div v-for="d in audience" :key="d.key" class="crowd__dim">
               <h3 class="crowd__h">{{ d.title }}</h3>
               <template v-if="loading">
                 <span v-for="w in [70, 52]" :key="w" class="sk sk--line" :style="{ width: `${w}%` }"></span>
               </template>
-              <div v-else-if="!d.rows.length" class="hint faint">No visits yet.</div>
+              <div v-else-if="!d.rows.length" class="hint faint">{{ t('report.noVisits') }}</div>
               <div v-for="row in d.rows" :key="row.label" class="crowd__row">
                 <span class="crowd__what">{{ row.label }}</span>
                 <span class="n">{{ row.n }}</span>
@@ -468,9 +474,9 @@ function exportCsv(): void {
         </section>
 
         <section v-if="textSections.length" class="panel sheet__wide">
-          <header class="panel__h">Comments</header>
+          <header class="panel__h">{{ t('report.comments') }}</header>
           <div class="said">
-            <nav class="said__nav" aria-label="Sections">
+            <nav class="said__nav" :aria-label="t('report.sections')">
               <button
                 v-for="s in textSections"
                 :key="s.id"
@@ -488,7 +494,7 @@ function exportCsv(): void {
             <div class="said__body">
               <div v-for="q in shownSection?.questions ?? []" :key="q.key" class="said__group">
                 <div class="said__title">{{ q.title }}</div>
-                <div v-if="!q.said.length" class="hint faint">No answers yet.</div>
+                <div v-if="!q.said.length" class="hint faint">{{ t('report.noAnswers') }}</div>
                 <div v-for="s in q.said" :key="s.id" class="said__row">
                   <span class="stamp">{{ stampAt(s.at) }}, {{ s.lang.toUpperCase() }}</span>
                   <p class="said__text">{{ s.text }}</p>
@@ -501,7 +507,7 @@ function exportCsv(): void {
         <div v-for="(column, i) in choiceColumns" :key="i" class="stack">
           <section v-if="i === 0" class="panel">
             <header class="panel__h">
-              Ratings
+              {{ t('report.ratings') }}
               <span v-if="report" class="panel__end">{{ responses.length }}</span>
             </header>
             <div class="panel__b">
@@ -512,7 +518,7 @@ function exportCsv(): void {
                   <span class="sk sk--line" style="width: 20px"></span>
                 </div>
               </div>
-              <div v-else-if="!responses.length" class="hint faint">No responses yet.</div>
+              <div v-else-if="!responses.length" class="hint faint">{{ t('report.noResponses') }}</div>
               <RidgeRows v-else :rows="ratingRows" :full="scoreTallest">
                 <template #axis>
                   <span v-for="s in SCORES" :key="s">{{ s }}</span>
@@ -521,7 +527,7 @@ function exportCsv(): void {
             </div>
           </section>
           <section v-else class="panel">
-            <header class="panel__h">Scales</header>
+            <header class="panel__h">{{ t('report.scales') }}</header>
             <div class="panel__b">
               <div v-if="loading" class="skel">
                 <div v-for="n in 6" :key="n" class="skel__ridge">
@@ -530,7 +536,7 @@ function exportCsv(): void {
                   <span class="sk sk--line" style="width: 20px"></span>
                 </div>
               </div>
-              <div v-else-if="!responses.length" class="hint faint">No responses yet.</div>
+              <div v-else-if="!responses.length" class="hint faint">{{ t('report.noResponses') }}</div>
               <RidgeRows v-else :rows="scaleRows" :full="scoreTallest">
                 <template #axis>
                   <span v-for="s in SCORES" :key="s">{{ s }}</span>

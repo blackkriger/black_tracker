@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { X } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 import Dialog from './Dialog.vue';
 import Select from './Select.vue';
 import { api } from '../lib/api';
 import { tellTab } from '../lib/live';
 import { longDate, type Activity, type Due, type Mark } from '../lib/calendar';
 import { MARK_ICONS, type MarkIconName } from '../lib/markIcons';
-import { describeChanges, showsAuthor, useNotices, type Notice } from '../lib/notices';
+import { noticeLine, showsAuthor, useNotices, type Notice } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useProjects } from '../lib/projects';
 import { usePeople } from '../lib/people';
 import { useSession } from '../lib/session';
 import { ink } from '../lib/theme';
 
+const { t } = useI18n();
 const props = defineProps<{ day: string }>();
+const iconLabel = (name: string): string => t(`calendar.icons.${name.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())}`);
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'changed'): void;
@@ -23,7 +26,7 @@ const emit = defineEmits<{
 
 const session = useSession();
 const { projects } = useProjects();
-const { nameOf, colorOf, load: loadPeople } = usePeople();
+const { nameOf, colorOf, genderOf, load: loadPeople } = usePeople();
 void loadPeople();
 const { off, markRead } = useNotices();
 const { errors, fail, clear } = usePanelErrors();
@@ -45,7 +48,7 @@ const heard = ref<Notice[]>([]);
 const said = computed(() => heard.value.filter((n) => !off.value.includes(n.kind)));
 
 const projectChoices = computed(() => [
-  { value: '', label: 'Everything' },
+  { value: '', label: t('calendar.everything') },
   ...projects.value.map((p) => ({ value: p.shortName, label: p.name })),
 ]);
 
@@ -63,7 +66,7 @@ async function read(): Promise<void> {
     dues.value = got.dues.flatMap((d) => d.issues);
     activity.value = got.activity;
   } catch (err) {
-    fail('day', err, 'Could not read the day.');
+    fail('day', err, t('calendar.dayFailed'));
   }
 }
 
@@ -143,7 +146,7 @@ async function openNotice(n: Notice): Promise<void> {
 <template>
   <Dialog :title="longDate(day)" :width="460" @close="emit('close')">
     <div v-if="sum.worked || sum.created || sum.resolved" class="day__sum">
-      {{ sum.worked }} worked, {{ sum.created }} opened, {{ sum.resolved }} closed
+      {{ t('calendar.work', { worked: sum.worked, created: sum.created, resolved: sum.resolved }) }}
     </div>
 
     <div v-if="said.length" class="marks">
@@ -162,13 +165,7 @@ async function openNotice(n: Notice): Promise<void> {
           :style="{ color: ink(colorOf(n.by)) }"
         >{{ nameOf(n.by) }}</span>
         <span class="mark__title">
-          <template v-if="n.kind === 'reaction'">reacted</template>
-          <template v-else-if="n.kind === 'assigned'">{{ n.review ? 'asked you to review' : 'assigned you' }}</template>
-          <template v-else-if="n.kind === 'ping'">pinged you</template>
-          <template v-else-if="n.kind === 'starred' && !n.commentId">
-            {{ describeChanges(n.changes, nameOf) }}
-          </template>
-          <template v-else>{{ n.said }}</template>
+          {{ noticeLine(n, nameOf, genderOf) }}
         </span>
       </button>
     </div>
@@ -196,7 +193,7 @@ async function openNotice(n: Notice): Promise<void> {
             class="btn btn--sm btn--icon btn--ghost"
             type="button"
             :disabled="!session.canDelete.value"
-            :aria-label="`Delete ${m.title}`"
+            :aria-label="t('common.deleteNamed', { name: m.title })"
             @click="removingMark = m"
           ><X class="ic ic--sm" /></button>
         </div>
@@ -217,14 +214,14 @@ async function openNotice(n: Notice): Promise<void> {
     </div>
 
     <div v-if="!adding" class="addrow">
-      <button class="btn" type="button" @click="adding = true">Add event…</button>
+      <button class="btn" type="button" @click="adding = true">{{ t('calendar.addEvent') }}</button>
       <div class="sp"></div>
     </div>
 
     <template v-else>
       <div class="field">
-        <span class="label">Icon</span>
-        <div class="icons" role="radiogroup" aria-label="Icon">
+        <span class="label">{{ t('calendar.icon') }}</span>
+        <div class="icons" role="radiogroup" :aria-label="t('calendar.icon')">
           <button
             v-for="m in MARK_ICONS"
             :key="m.name"
@@ -233,14 +230,14 @@ async function openNotice(n: Notice): Promise<void> {
             type="button"
             role="radio"
             :aria-checked="icon === m.name"
-            :aria-label="m.label"
-            :title="m.label"
+            :aria-label="iconLabel(m.name)"
+            :title="iconLabel(m.name)"
             @click="icon = m.name"
           ><component :is="m.icon" class="ic" /></button>
         </div>
       </div>
       <div class="field">
-        <label class="label" for="mark-title">Title</label>
+        <label class="label" for="mark-title">{{ t('calendar.title') }}</label>
         <input
           id="mark-title"
           v-model="title"
@@ -250,11 +247,11 @@ async function openNotice(n: Notice): Promise<void> {
         />
       </div>
       <div class="field">
-        <label class="label" for="mark-url">Link</label>
+        <label class="label" for="mark-url">{{ t('calendar.link') }}</label>
         <input id="mark-url" v-model="url" class="input" maxlength="500" placeholder="https://" />
       </div>
       <div class="field">
-        <label class="label" for="mark-banner">Banner</label>
+        <label class="label" for="mark-banner">{{ t('calendar.banner') }}</label>
         <input
           id="mark-banner"
           v-model="banner"
@@ -265,20 +262,20 @@ async function openNotice(n: Notice): Promise<void> {
       </div>
       <div class="addrow">
         <Select v-model="scope" :options="projectChoices" />
-        <button class="btn" type="button" @click="adding = false">Cancel</button>
+        <button class="btn" type="button" @click="adding = false">{{ t('common.cancel') }}</button>
         <button class="btn" type="button" :disabled="busy || !title.trim()" @click="addMark">
-          Add
+          {{ t('common.add') }}
         </button>
       </div>
     </template>
     <div v-if="errors.day" class="err">{{ errors.day }}</div>
 
-    <Dialog v-if="removingMark" :title="`Delete ${removingMark.title}`" @close="removingMark = null">
-      <p>It leaves the calendar for everyone. This cannot be undone.</p>
+    <Dialog v-if="removingMark" :title="t('common.deleteNamed', { name: removingMark.title })" @close="removingMark = null">
+      <p>{{ t('calendar.deleteMarkText') }}</p>
       <template #footer>
         <div class="sp"></div>
-        <button class="btn" type="button" @click="removingMark = null">Cancel</button>
-        <button class="btn btn--danger" type="button" @click="confirmRemoveMark">Delete marked day</button>
+        <button class="btn" type="button" @click="removingMark = null">{{ t('common.cancel') }}</button>
+        <button class="btn btn--danger" type="button" @click="confirmRemoveMark">{{ t('calendar.deleteMark') }}</button>
       </template>
     </Dialog>
   </Dialog>

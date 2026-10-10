@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { hashToken, newRawToken, requireSession } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
 import { inTransaction, pool } from './db.js';
+import { deed, langOf, shortDay, WORDS, type Deed, type Gender, type Lang } from './words.js';
 import { env } from './env.js';
 import { publish, tabOf } from './events.js';
 import { boardDefaults, createIssue, recordFile, storeFile } from './issue-routes.js';
@@ -75,6 +76,8 @@ interface Teller {
   login: string;
   is_admin: boolean;
   role_id: string | null;
+  lang: string;
+  lang_seen: string | null;
 }
 
 interface SendRow {
@@ -85,6 +88,9 @@ interface SendRow {
   files: string[];
   by_login: string | null;
   by_name: string | null;
+  by_gender: Gender;
+  lang: string;
+  lang_seen: string | null;
   readable_id: string;
   summary: string;
   due_date: string | null;
@@ -115,13 +121,13 @@ interface DraftRow extends Draft {
   boards: string[];
 }
 
-const whoIs = (login: string | null, name: string | null): string =>
-  !login ? 'Someone' : name && name !== login ? `${name} (${login})` : login;
+async function langOfUser(id: string): Promise<Lang> {
+  const res = await pool.query<{ lang: string; lang_seen: string | null }>('select lang, lang_seen from users where id = $1', [id]);
+  return langOf(res.rows[0]?.lang, res.rows[0]?.lang_seen);
+}
 
-const dayOf = (date: string): string =>
-  new Date(`${date}T00:00:00Z`)
-    .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' })
-    .toUpperCase();
+const whoIs = (lang: Lang, login: string | null, name: string | null): string =>
+  !login ? WORDS[lang].someone : name && name !== login ? `${name} (${login})` : login;
 
 function said(n: SendRow): string {
   const text = plain(n.comment_text ?? '');
@@ -129,44 +135,48 @@ function said(n: SendRow): string {
   return [cut ? `"${cut}"` : '', ...n.files.map((f) => `[${f}]`)].filter(Boolean).join(' ');
 }
 
-function changesOf(detail: string | null, names: Map<string, string>): string {
+function changesOf(lang: Lang, detail: string | null, names: Map<string, string>): string {
+  const words = WORDS[lang];
   const changes = JSON.parse(detail ?? '[]') as { field: string; from: string | null; to: string | null }[];
   const show = (field: string, value: string | null): string => {
     if (!value) return '—';
     if (field === 'assignee' || field === 'watcher') return names.get(value) ?? value;
-    if (field === 'due date') return dayOf(value);
+    if (field === 'due date') return shortDay(lang, value);
+    if (field === 'priority') return words.priority[value] ?? value;
     return value;
   };
   return changes
     .map((c) => {
-      if (c.field === 'link added') return `linked ${c.to}`;
-      if (c.field === 'link removed') return `unlinked ${c.to}`;
-      return `${c.field === 'due date' ? 'due' : c.field} ${show(c.field, c.from)} → ${show(c.field, c.to)}`;
+      if (c.field === 'link added') return words.linked(c.to);
+      if (c.field === 'link removed') return words.unlinked(c.to);
+      return `${words.fields[c.field] ?? c.field} ${show(c.field, c.from)} → ${show(c.field, c.to)}`;
     })
     .join(', ');
 }
 
 function noticeNote(n: SendRow, names: Map<string, string>): Note | null {
-  const who = whoIs(n.by_login, n.by_name);
+  const lang = langOf(n.lang, n.lang_seen);
+  const who = whoIs(lang, n.by_login, n.by_name);
+  const did = (what: Deed, extra = ''): string => `${who} ${deed(lang, what, n.by_gender, extra)}`;
   const url = `${env.publicUrl}/${n.short_name}/${n.slug}/${n.readable_id}${n.comment_id ? `?c=${n.comment_id}` : ''}`;
   const issue: Segment[] = [{ text: n.readable_id, url }, ` ${n.summary}`];
   switch (n.kind) {
     case 'mention':
-      return note([`${who} mentioned you`], issue, said(n));
+      return note([did('mentioned')], issue, said(n));
     case 'assigned':
       return note(
-        [`${who} ${n.detail === 'watcher' ? 'asked you to review' : 'assigned you'}`],
+        [did(n.detail === 'watcher' ? 'review' : 'assigned')],
         issue,
-        n.due_date ? `Due ${dayOf(n.due_date)}` : ''
+        n.due_date ? WORDS[lang].due(shortDay(lang, n.due_date)) : ''
       );
     case 'ping':
-      return note([`${who} pinged you`], issue);
+      return note([did('pinged')], issue);
     case 'reaction':
-      return note([`${who} reacted ${n.detail ?? ''} to your comment`], issue, said(n));
+      return note([did('reacted', n.detail ?? '')], issue, said(n));
     case 'starred':
       return n.comment_id
-        ? note([`${who} commented on a starred issue`], issue, said(n))
-        : note([`${who} changed a starred issue`], issue, changesOf(n.detail, names));
+        ? note([did('commentedStarred')], issue, said(n))
+        : note([did('changedStarred')], issue, changesOf(lang, n.detail, names));
     default:
       return null;
   }
@@ -176,7 +186,7 @@ const SEND_SELECT = `
   select n.kind, n.detail, n.comment_id, c.text as comment_text,
          coalesce((select array_agg(a.filename order by a.created_at)
                      from issue_attachments a where a.comment_id = n.comment_id), '{}') as files,
-         bu.login as by_login, bu.full_name as by_name,
+         bu.login as by_login, bu.full_name as by_name, bu.gender as by_gender, u.lang, u.lang_seen,
          i.readable_id, i.summary, i.due_date, i.board_id, i.project_id, p.short_name, b.slug,
          l.peer_id as peer, u.notices_off, u.active, u.is_admin, u.role_id,
          s.peer_id as sent_peer, s.message_id, s.attempts, s.version
@@ -321,25 +331,28 @@ export async function linkByCode(adapter: Adapter, peer: number, name: string | 
     };
   });
   if (!linked) {
-    await adapter.send(
-      peer,
-      note(['This link has expired'], ['Get a new one on your ', { text: 'profile', url: `${env.publicUrl}/profile` }, '.'])
+    const owner = await pool.query<{ lang: string; lang_seen: string | null }>(
+      `select u.lang, u.lang_seen from messenger_codes c join users u on u.id = c.user_id
+        where c.code_hash = $1 and c.channel = $2`,
+      [hashToken(code), adapter.channel]
     );
+    const words = WORDS[langOf(owner.rows[0]?.lang, owner.rows[0]?.lang_seen)];
+    const [before, link, after] = words.getNew;
+    await adapter.send(peer, note([words.expired], [before, { text: link, url: `${env.publicUrl}/profile` }, after]));
     return;
   }
   for (const id of [linked.userId, ...linked.displaced]) void publish({ type: 'session.changed', only: id });
+  const words = WORDS[await langOfUser(linked.userId)];
   if (linked.previous && linked.previous !== peer) {
-    await adapter
-      .send(linked.previous, note([`${linked.login} is now linked to another ${adapter.title} account`]))
-      .catch(() => {});
+    await adapter.send(linked.previous, note([words.linkedElsewhere(linked.login, adapter.title)])).catch(() => {});
   }
-  await adapter.send(peer, note([`${linked.login} is linked`], "I'll notify you here."));
+  await adapter.send(peer, note([words.isLinked(linked.login)], words.willNotify));
 }
 
 const tellerOf = async (channel: Channel, peer: number): Promise<Teller | null> =>
   (
     await pool.query<Teller>(
-      `select u.id, u.login, u.is_admin, u.role_id
+      `select u.id, u.login, u.is_admin, u.role_id, u.lang, u.lang_seen
          from messenger_links l join users u on u.id = l.user_id
         where l.channel = $1 and l.peer_id = $2 and u.active`,
       [channel, peer]
@@ -410,7 +423,11 @@ async function fileIssue(adapter: Adapter, user: Teller, boardId: string, draft:
   );
   const { short_name: short, slug } = place.rows[0];
   const key = made.issue.readable_id;
-  return note(null, ['Created ', { text: key, url: `${env.publicUrl}/${short}/${slug}/${key}` }, ` ${made.issue.summary}`]);
+  return note(null, [
+    WORDS[langOf(user.lang, user.lang_seen)].created,
+    { text: key, url: `${env.publicUrl}/${short}/${slug}/${key}` },
+    ` ${made.issue.summary}`,
+  ]);
 }
 
 export async function issueCommand(adapter: Adapter, args: string, m: Incoming): Promise<void> {
@@ -453,7 +470,7 @@ export async function issueCommand(adapter: Adapter, args: string, m: Incoming):
   });
   const sent = await adapter.send(m.chat, note([draft.summary]), {
     replyTo: m.messageId,
-    buttons: [...rows, [{ text: 'Cancel', data: `x:${id}` }]],
+    buttons: [...rows, [{ text: WORDS[langOf(user.lang, user.lang_seen)].cancel, data: `x:${id}` }]],
   });
   if (sent.ok && sent.value !== null) {
     await pool.query('update messenger_drafts set message_id = $2 where id = $1', [id, sent.value]);
@@ -516,9 +533,8 @@ export function registerMessengerRoutes(app: FastifyInstance): void {
     );
     const peer = res.rows[0]?.peer_id;
     if (peer && adapter.ready()) {
-      await adapter
-        .send(peer, note([`Unlinked from ${auth.login}`], "I won't notify you here anymore."))
-        .catch(() => {});
+      const words = WORDS[await langOfUser(auth.userId)];
+      await adapter.send(peer, note([words.unlinkedFrom(auth.login)], words.wontNotify)).catch(() => {});
     }
     void publish({ type: 'session.changed', only: auth.userId, origin: tabOf(req) });
     return reply.send({ data: { ok: true } });

@@ -25,7 +25,9 @@ import {
   Strikethrough,
 } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const body = defineModel<string>({ required: true });
 const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?: boolean }>();
 const emit = defineEmits<{ (e: 'files', list: FileList): void; (e: 'blur'): void }>();
@@ -435,7 +437,7 @@ function addLink(): void {
   if (!quill) return;
   const range = quill.getSelection(true);
   if (!range || range.length === 0) return;
-  const url = window.prompt('Link to');
+  const url = window.prompt(t('editor.linkTo'));
   if (url === null) return;
   quill.format('link', url.trim() || false, 'user');
   readMarks();
@@ -445,15 +447,15 @@ function addLink(): void {
 <template>
   <div ref="wrap" class="rt" :class="{ 'is-off': disabled }">
     <div class="mdbar">
-      <button type="button" :aria-pressed="marks.bold" title="Bold" @click="toggle('bold')"><Bold class="ic" /></button>
-      <button type="button" :aria-pressed="marks.italic" title="Italic" @click="toggle('italic')"><Italic class="ic" /></button>
-      <button type="button" :aria-pressed="marks.strike" title="Strikethrough" @click="toggle('strike')"><Strikethrough class="ic" /></button>
-      <button type="button" :aria-pressed="marks.code" title="Code" @click="toggle('code')"><Code class="ic" /></button>
-      <button type="button" :aria-pressed="marks.header" title="Heading" @click="toggle('header', 3)"><Heading3 class="ic" /></button>
-      <button type="button" :aria-pressed="marks.bullet" title="Bulleted list" @click="toggle('list', 'bullet')"><List class="ic" /></button>
-      <button type="button" :aria-pressed="marks.ordered" title="Numbered list" @click="toggle('list', 'ordered')"><ListOrdered class="ic" /></button>
-      <button type="button" :aria-pressed="marks.blockquote" title="Quote" @click="toggle('blockquote')"><Quote class="ic" /></button>
-      <button type="button" title="Link" @click="addLink"><Link class="ic" /></button>
+      <button type="button" :aria-pressed="marks.bold" :title="t('editor.bold')" @click="toggle('bold')"><Bold class="ic" /></button>
+      <button type="button" :aria-pressed="marks.italic" :title="t('editor.italic')" @click="toggle('italic')"><Italic class="ic" /></button>
+      <button type="button" :aria-pressed="marks.strike" :title="t('editor.strike')" @click="toggle('strike')"><Strikethrough class="ic" /></button>
+      <button type="button" :aria-pressed="marks.code" :title="t('editor.code')" @click="toggle('code')"><Code class="ic" /></button>
+      <button type="button" :aria-pressed="marks.header" :title="t('editor.heading')" @click="toggle('header', 3)"><Heading3 class="ic" /></button>
+      <button type="button" :aria-pressed="marks.bullet" :title="t('editor.bullets')" @click="toggle('list', 'bullet')"><List class="ic" /></button>
+      <button type="button" :aria-pressed="marks.ordered" :title="t('editor.numbers')" @click="toggle('list', 'ordered')"><ListOrdered class="ic" /></button>
+      <button type="button" :aria-pressed="marks.blockquote" :title="t('editor.quote')" @click="toggle('blockquote')"><Quote class="ic" /></button>
+      <button type="button" :title="t('editor.link')" @click="addLink"><Link class="ic" /></button>
       <span v-if="$slots.tools" class="mdbar__sep" aria-hidden="true"></span>
       <slot name="tools" />
     </div>

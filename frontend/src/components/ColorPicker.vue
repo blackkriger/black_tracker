@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ChevronLeft } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const props = defineProps<{
   initial: string;
   anchor: HTMLElement | null;
@@ -263,7 +265,7 @@ onBeforeUnmount(() => {
       <div class="cp__top">
         <div class="cp__left">
           <div class="cp__group">
-            <div class="cp__label">Basic colors:</div>
+            <div class="cp__label">{{ t('colors.basic') }}</div>
             <div class="cp__grid">
               <button
                 v-for="c in BASIC_PALETTE"
@@ -278,7 +280,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="cp__group">
-            <div class="cp__label">Default colors:</div>
+            <div class="cp__label">{{ t('colors.defaults') }}</div>
             <div class="cp__grid">
               <button
                 v-for="d in DEFAULT_COLORS"
@@ -319,33 +321,33 @@ onBeforeUnmount(() => {
         <div class="cp__preview" :style="{ background: hex }"></div>
         <div class="cp__inputs">
           <label class="cp__input-row">
-            <span>Hue:</span>
+            <span>{{ t('colors.hue') }}</span>
             <input v-model.number.lazy="hInput" class="input" type="number" min="0" max="240" />
           </label>
           <label class="cp__input-row">
-            <span>Sat:</span>
+            <span>{{ t('colors.sat') }}</span>
             <input v-model.number.lazy="sInput" class="input" type="number" min="0" max="240" />
           </label>
           <label class="cp__input-row">
-            <span>Lum:</span>
+            <span>{{ t('colors.lum') }}</span>
             <input v-model.number.lazy="lInput" class="input" type="number" min="0" max="240" />
           </label>
           <label class="cp__input-row">
-            <span>Red:</span>
+            <span>{{ t('colors.red') }}</span>
             <input v-model.number.lazy="rInput" class="input" type="number" min="0" max="255" />
           </label>
           <label class="cp__input-row">
-            <span>Green:</span>
+            <span>{{ t('colors.green') }}</span>
             <input v-model.number.lazy="gInput" class="input" type="number" min="0" max="255" />
           </label>
           <label class="cp__input-row">
-            <span>Blue:</span>
+            <span>{{ t('colors.blue') }}</span>
             <input v-model.number.lazy="bInput" class="input" type="number" min="0" max="255" />
           </label>
         </div>
         <div class="cp__actions">
-          <button class="btn btn--sm" type="button" @click="emit('close')">Cancel</button>
-          <button class="btn btn--sm btn--primary" type="button" @click="emit('pick', hex)">OK</button>
+          <button class="btn btn--sm" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
+          <button class="btn btn--sm btn--primary" type="button" @click="emit('pick', hex)">{{ t('colors.ok') }}</button>
         </div>
       </div>
     </div>

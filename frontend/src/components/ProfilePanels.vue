@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import Select from './Select.vue';
 import { api } from '../lib/api';
 import { useLive } from '../lib/live';
 import { buddyAvatarStyle } from '../lib/avatar';
@@ -18,12 +20,19 @@ interface Session {
   current: boolean;
 }
 
+const { t } = useI18n();
 const session = useSession();
 const { errors, fail, clear } = usePanelErrors();
 const { load: loadPeople } = usePeople();
 const me = session.me;
 
 const fullName = ref(me.value?.fullName ?? '');
+const gender = ref<string>(me.value?.gender ?? '');
+const GENDERS = computed(() => [
+  { value: '', label: t('profile.genderUnset') },
+  { value: 'm', label: t('profile.male') },
+  { value: 'f', label: t('profile.female') },
+]);
 const nameBusy = ref(false);
 const nameSaved = ref(false);
 
@@ -67,12 +76,12 @@ async function saveName(): Promise<void> {
   clear('name');
   nameSaved.value = false;
   try {
-    const updated = await api<Me>('/me', { method: 'PATCH', body: { fullName: fullName.value } });
+    const updated = await api<Me>('/me', { method: 'PATCH', body: { fullName: fullName.value, gender: gender.value || null } });
     me.value = { ...(me.value as Me), ...updated };
     nameSaved.value = true;
     void loadPeople(true);
   } catch (err) {
-    fail('name', err, 'Could not save the name.');
+    fail('name', err, t('profile.nameFailed'));
   } finally {
     nameBusy.value = false;
   }
@@ -83,7 +92,7 @@ async function readSessions(): Promise<void> {
     sessions.value = await api<Session[]>('/me/sessions');
   } catch (err) {
     sessions.value = [];
-    fail('sessions', err, 'Could not read the sessions.');
+    fail('sessions', err, t('profile.sessionsFailed'));
   }
 }
 
@@ -95,7 +104,7 @@ async function endSessions(body: { id: string } | { others: true }): Promise<voi
     await api('/me/sessions', { method: 'DELETE', body });
     await readSessions();
   } catch (err) {
-    fail('sessions', err, 'Could not sign the session out.');
+    fail('sessions', err, t('profile.signOutFailed'));
   } finally {
     sessionBusy.value = false;
   }
@@ -112,7 +121,7 @@ async function saveGithub(): Promise<void> {
     github.value = updated.githubLogin ?? '';
     githubSaved.value = true;
   } catch (err) {
-    fail('integrations', err, 'Could not save the GitHub login.');
+    fail('integrations', err, t('profile.githubFailed'));
   } finally {
     githubBusy.value = false;
   }
@@ -188,7 +197,7 @@ async function changePassword(): Promise<void> {
     repeatPassword.value = '';
     passwordDone.value = true;
   } catch (err) {
-    fail('password', err, 'Could not change the password.');
+    fail('password', err, t('profile.passwordFailed'));
   } finally {
     passwordBusy.value = false;
   }
@@ -198,17 +207,17 @@ async function changePassword(): Promise<void> {
 <template>
   <div class="stack">
     <section class="panel">
-      <header class="panel__h">Profile</header>
+      <header class="panel__h">{{ t('settings.profile') }}</header>
       <form class="panel__b form" @submit.prevent="saveName">
         <div class="who">
           <span class="av av--xl" :style="buddyAvatarStyle(me?.login ?? '')"></span>
           <div class="who__lines">
             <span v-if="role" class="who__role" :style="{ color: ink(role.color) }">{{ role.name }}</span>
-            <span class="stamp">SINCE {{ since }}</span>
+            <span class="stamp">{{ t('profile.since', { date: since }) }}</span>
           </div>
         </div>
         <div class="field">
-          <label class="label" for="fullname">Display name</label>
+          <label class="label" for="fullname">{{ t('profile.displayName') }}</label>
           <input
             id="fullname"
             v-model="fullName"
@@ -218,31 +227,35 @@ async function changePassword(): Promise<void> {
           />
         </div>
         <div class="field">
-          <label class="label" for="login">Login</label>
+          <label class="label" for="gender">{{ t('profile.gender') }}</label>
+          <Select id="gender" v-model="gender" :options="GENDERS" />
+        </div>
+        <div class="field">
+          <label class="label" for="login">{{ t('auth.login') }}</label>
           <input id="login" class="input" :value="me?.login" tabindex="-1" readonly />
         </div>
         <div class="row-end">
-          <span v-if="nameSaved" class="hint">Saved.</span>
-          <button class="btn btn--primary" type="submit" :disabled="nameBusy">Save</button>
+          <span v-if="nameSaved" class="hint">{{ t('common.saved') }}</span>
+          <button class="btn btn--primary" type="submit" :disabled="nameBusy">{{ t('common.save') }}</button>
         </div>
       </form>
     </section>
     <div v-if="errors.name" class="err panel__err">{{ errors.name }}</div>
 
     <section class="panel">
-      <header class="panel__h">Password</header>
+      <header class="panel__h">{{ t('auth.password') }}</header>
       <form class="panel__b form" @submit.prevent="changePassword">
         <div class="field">
-          <label class="label" for="pw0">Current password</label>
+          <label class="label" for="pw0">{{ t('profile.currentPassword') }}</label>
           <input id="pw0" v-model="currentPassword" class="input" type="password" autocomplete="current-password" />
         </div>
         <div class="field">
-          <label class="label" for="pw1">New password</label>
+          <label class="label" for="pw1">{{ t('auth.newPassword') }}</label>
           <input id="pw1" v-model="newPassword" class="input" type="password" autocomplete="new-password" />
-          <span class="hint">At least 8 characters.</span>
+          <span class="hint">{{ t('auth.atLeast8') }}</span>
         </div>
         <div class="field">
-          <label class="label" for="pw2">Repeat new password</label>
+          <label class="label" for="pw2">{{ t('auth.repeatNewPassword') }}</label>
           <input
             id="pw2"
             v-model="repeatPassword"
@@ -251,12 +264,12 @@ async function changePassword(): Promise<void> {
             type="password"
             autocomplete="new-password"
           />
-          <span v-if="mismatch" class="err">Doesn't match the new password.</span>
+          <span v-if="mismatch" class="err">{{ t('profile.mismatch') }}</span>
         </div>
         <div class="row-end">
-          <span v-if="passwordDone" class="hint">Password changed.</span>
+          <span v-if="passwordDone" class="hint">{{ t('profile.passwordChanged') }}</span>
           <button class="btn btn--primary" type="submit" :disabled="!canChangePassword">
-            Change password
+            {{ t('profile.changePassword') }}
           </button>
         </div>
       </form>
@@ -266,11 +279,11 @@ async function changePassword(): Promise<void> {
 
   <div class="stack">
     <section class="panel">
-      <header class="panel__h">Integrations</header>
+      <header class="panel__h">{{ t('profile.integrations') }}</header>
       <div class="panel__b form">
         <form class="form" @submit.prevent="saveGithub">
           <div class="field">
-            <label class="label" for="github">GitHub login</label>
+            <label class="label" for="github">{{ t('profile.githubLogin') }}</label>
             <input
               id="github"
               v-model="github"
@@ -279,11 +292,11 @@ async function changePassword(): Promise<void> {
               autocomplete="off"
               spellcheck="false"
             />
-            <span class="hint">The name in github.com/name, so your commits show up under your name.</span>
+            <span class="hint">{{ t('profile.githubHint') }}</span>
           </div>
           <div class="row-end">
-            <span v-if="githubSaved" class="hint">Saved.</span>
-            <button class="btn btn--primary" type="submit" :disabled="githubBusy">Save</button>
+            <span v-if="githubSaved" class="hint">{{ t('common.saved') }}</span>
+            <button class="btn btn--primary" type="submit" :disabled="githubBusy">{{ t('common.save') }}</button>
           </div>
         </form>
         <template v-for="m in messengers" :key="m.key">
@@ -295,7 +308,7 @@ async function changePassword(): Promise<void> {
                 :id="m.key"
                 class="input"
                 :value="me?.messengers[m.key].name ?? ''"
-                placeholder="Not linked"
+                :placeholder="t('profile.notLinked')"
                 tabindex="-1"
                 readonly
               />
@@ -306,7 +319,7 @@ async function changePassword(): Promise<void> {
                 :disabled="messengerBusy"
                 @click="unlinkMessenger(m.key)"
               >
-                Unlink
+                {{ t('profile.unlink') }}
               </button>
               <button
                 v-else
@@ -315,7 +328,7 @@ async function changePassword(): Promise<void> {
                 :disabled="messengerBusy"
                 @click="linkMessenger(m.key)"
               >
-                Link
+                {{ t('profile.link') }}
               </button>
             </div>
           </div>
@@ -325,7 +338,7 @@ async function changePassword(): Promise<void> {
     <div v-if="errors.integrations" class="err panel__err">{{ errors.integrations }}</div>
 
     <section class="panel">
-      <header class="panel__h">Sessions</header>
+      <header class="panel__h">{{ t('profile.sessions') }}</header>
       <div class="panel__b form">
         <ul class="sess">
           <template v-if="!sessions">
@@ -340,10 +353,10 @@ async function changePassword(): Promise<void> {
             <span class="sess__lines">
               <span class="sess__what">{{ describeAgent(s.userAgent) }}</span>
               <span class="stamp">
-                SIGNED IN {{ stamp(s.createdAt) }}<template v-if="s.lastSeenAt">, ACTIVE {{ stamp(s.lastSeenAt) }}</template>
+                {{ t('profile.signedIn', { date: stamp(s.createdAt) }) }}<template v-if="s.lastSeenAt">, {{ t('profile.active', { date: stamp(s.lastSeenAt) }) }}</template>
               </span>
             </span>
-            <span v-if="s.current" class="hint">This device</span>
+            <span v-if="s.current" class="hint">{{ t('profile.thisDevice') }}</span>
             <button
               v-else
               class="btn btn--sm btn--danger"
@@ -351,13 +364,13 @@ async function changePassword(): Promise<void> {
               :disabled="sessionBusy"
               @click="endSessions({ id: s.id })"
             >
-              Sign out
+              {{ t('profile.endSession') }}
             </button>
           </li>
         </ul>
         <div v-if="others" class="row-end">
           <button class="btn btn--danger" type="button" :disabled="sessionBusy" @click="endSessions({ others: true })">
-            Sign out other sessions
+            {{ t('profile.signOutOthers') }}
           </button>
         </div>
       </div>

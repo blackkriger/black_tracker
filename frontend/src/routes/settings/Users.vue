@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import Select from '../../components/Select.vue';
@@ -52,6 +53,7 @@ const { projects, load: loadProjects } = useProjects();
 
 const users = ref<User[]>([]);
 const invites = ref<Invite[]>([]);
+const { t } = useI18n();
 const roles = ref<Role[]>([]);
 const removingRole = ref<Role | null>(null);
 const loading = ref(true);
@@ -61,10 +63,10 @@ const { nameOf, load: loadPeople } = usePeople();
 const inviteRole = ref('');
 const linkKind = ref('invite');
 const resetUser = ref('');
-const KIND_CHOICES = [
-  { value: 'invite', label: 'Invite' },
-  { value: 'reset', label: 'Password reset' },
-];
+const KIND_CHOICES = computed(() => [
+  { value: 'invite', label: t('users.invite') },
+  { value: 'reset', label: t('users.reset') },
+]);
 const personChoices = computed(() =>
   users.value
     .filter((u) => u.active)
@@ -75,7 +77,7 @@ const roleChoices = computed(() => [
   ...roles.value.map((r) => ({ value: r.id, label: r.name, color: r.color })),
 ]);
 const inviteChoices = computed(() => [
-  { value: '', label: 'No role' },
+  { value: '', label: t('users.noRole') },
   ...roles.value.map((r) => ({ value: r.id, label: r.name, color: r.color })),
 ]);
 
@@ -104,15 +106,15 @@ onMounted(async () => {
   await Promise.all([
     api<User[]>('/users')
       .then((rows) => (users.value = rows))
-      .catch((err) => fail('users', err, 'Could not load the accounts.')),
+      .catch((err) => fail('users', err, t('users.accountsFailed'))),
     canManageRoles.value
       ? api<Invite[]>('/invites')
           .then((rows) => (invites.value = rows))
-          .catch((err) => fail('invites', err, 'Could not load the invite links.'))
+          .catch((err) => fail('invites', err, t('users.invitesFailed')))
       : Promise.resolve(),
     api<Role[]>('/roles')
       .then((rows) => (roles.value = rows))
-      .catch((err) => fail('roles', err, 'Could not load the roles.')),
+      .catch((err) => fail('roles', err, t('users.rolesFailed'))),
   ]);
   loading.value = false;
 });
@@ -263,7 +265,7 @@ async function openAccess(role: Role): Promise<void> {
     accessRead.value = true;
   } catch (err) {
     if (mine !== accessReads) return;
-    fail('access', err, 'Could not read what this role can open.');
+    fail('access', err, t('users.accessFailed'));
   }
 }
 
@@ -316,11 +318,11 @@ async function saveAccess(): Promise<void> {
         <table class="tbl tbl--head">
           <thead>
             <tr>
-              <th>Users</th>
-              <th class="c-role">role</th>
-              <th class="c-flag">active</th>
-              <th class="c-when">joined</th>
-              <th class="c-when">last seen</th>
+              <th>{{ t('users.users') }}</th>
+              <th class="c-role">{{ t('users.role') }}</th>
+              <th class="c-flag">{{ t('users.active') }}</th>
+              <th class="c-when">{{ t('users.joined') }}</th>
+              <th class="c-when">{{ t('users.lastSeen') }}</th>
             </tr>
           </thead>
           <tbody v-if="loading">
@@ -382,9 +384,9 @@ async function saveAccess(): Promise<void> {
         <table class="tbl tbl--head">
           <thead>
             <tr>
-              <th>Roles</th>
-              <th class="c-act2">access</th>
-              <th class="c-del"><span class="sr">Delete</span></th>
+              <th>{{ t('users.roles') }}</th>
+              <th class="c-act2">{{ t('users.access') }}</th>
+              <th class="c-del"><span class="sr">{{ t('common.delete') }}</span></th>
             </tr>
           </thead>
           <tbody v-if="loading">
@@ -409,14 +411,14 @@ async function saveAccess(): Promise<void> {
               </td>
               <td class="c-act2">
                 <button class="btn btn--sm" type="button" :disabled="!isAdmin" @click="openAccess(r)">
-                  Access…
+                  {{ t('users.accessButton') }}
                 </button>
               </td>
               <td class="c-del">
                 <button
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
-                  aria-label="Delete role"
+                  :aria-label="t('users.deleteRole')"
                   :disabled="!isAdmin"
                   @click="removingRole = r"
                 >
@@ -427,7 +429,7 @@ async function saveAccess(): Promise<void> {
           </tbody>
         </table>
         <div v-if="!loading && !roles.length" class="empty empty--sm">
-          <span class="empty__g">◇</span>None yet.
+          <span class="empty__g">◇</span>{{ t('tags.none') }}
         </div>
 
         <div v-if="loading" class="addrow">
@@ -438,11 +440,11 @@ async function saveAccess(): Promise<void> {
           <input
             v-model="newRole"
             class="input"
-            placeholder="Add role…"
+            :placeholder="t('users.addRole')"
             maxlength="40"
             :disabled="!isAdmin"
           />
-          <button class="btn" type="submit" :disabled="!isAdmin || !newRole.trim()">Add</button>
+          <button class="btn" type="submit" :disabled="!isAdmin || !newRole.trim()">{{ t('common.add') }}</button>
         </form>
       </div>
     </section>
@@ -453,12 +455,12 @@ async function saveAccess(): Promise<void> {
         <table class="tbl tbl--head">
           <thead>
             <tr>
-              <th>Links</th>
-              <th class="c-kind">kind</th>
-              <th class="c-role">for</th>
-              <th>status</th>
-              <th class="c-when">created</th>
-              <th class="c-act"><span class="sr">Revoke</span></th>
+              <th>{{ t('users.links') }}</th>
+              <th class="c-kind">{{ t('users.kind') }}</th>
+              <th class="c-role">{{ t('users.for') }}</th>
+              <th>{{ t('users.status') }}</th>
+              <th class="c-when">{{ t('users.created') }}</th>
+              <th class="c-act"><span class="sr">{{ t('users.revoke') }}</span></th>
             </tr>
           </thead>
           <tbody v-if="loading">
@@ -474,7 +476,7 @@ async function saveAccess(): Promise<void> {
           <tbody v-else>
             <tr v-for="i in invites" :key="i.id">
               <td class="key">…{{ i.hint }}</td>
-              <td class="c-kind">{{ i.kind === 'reset' ? 'Password reset' : 'Invite' }}</td>
+              <td class="c-kind">{{ i.kind === 'reset' ? t('users.reset') : t('users.invite') }}</td>
               <td class="c-role">
                 <span v-if="i.kind === 'reset'" class="who__lines">
                   {{ nameOf(i.forUser) }}
@@ -486,11 +488,11 @@ async function saveAccess(): Promise<void> {
               </td>
               <td>
                 <span v-if="i.status === 'used'" class="who__lines">
-                  Used by {{ nameOf(i.usedBy) }}
+                  {{ t('users.usedBy', { name: nameOf(i.usedBy) }) }}
                   <span v-if="i.usedBy && nameOf(i.usedBy) !== i.usedBy" class="who__login">{{ i.usedBy }}</span>
                 </span>
-                <template v-else-if="i.status === 'expired'">Expired</template>
-                <template v-else>Good until {{ stampAt(i.expiresAt) }}</template>
+                <template v-else-if="i.status === 'expired'">{{ t('users.expired') }}</template>
+                <template v-else>{{ t('users.goodUntil', { date: stampAt(i.expiresAt) }) }}</template>
               </td>
               <td class="stamp">
                 <span class="who__lines">
@@ -503,7 +505,7 @@ async function saveAccess(): Promise<void> {
                   v-if="i.status !== 'used'"
                   class="btn btn--sm btn--icon btn--ghost"
                   type="button"
-                  aria-label="Delete link"
+                  :aria-label="t('users.deleteLink')"
                   @click="i.kind === 'reset' ? revokeInvite(i) : (revokingInvite = i)"
                 >
                   <X class="ic ic--sm" />
@@ -514,20 +516,20 @@ async function saveAccess(): Promise<void> {
         </table>
 
         <div v-if="freshLink" class="field link__fresh">
-          <span class="label">The link — copy it now</span>
+          <span class="label">{{ t('users.copyNow') }}</span>
           <div class="link__row">
             <code class="input link__value">{{ freshLink }}</code>
-            <button class="btn" type="button" @click="copyLink">{{ copied ? 'Copied' : 'Copy' }}</button>
+            <button class="btn" type="button" @click="copyLink">{{ copied ? t('users.copied') : t('users.copy') }}</button>
             <button
               class="btn btn--icon btn--ghost"
               type="button"
-              aria-label="Hide the link"
+              :aria-label="t('users.hideLink')"
               @click="freshLink = null"
             >
               <X class="ic ic--sm" />
             </button>
           </div>
-          <span class="hint">It is stored as a hash, so this is the only time it can be read.</span>
+          <span class="hint">{{ t('users.hashHint') }}</span>
         </div>
 
         <div v-if="loading" class="addrow">
@@ -557,7 +559,7 @@ async function saveAccess(): Promise<void> {
             :disabled="inviteBusy || (linkKind === 'reset' && !resetUser)"
             @click="createInvite"
           >
-            Create link
+            {{ t('users.createLink') }}
           </button>
         </div>
       </div>
@@ -566,42 +568,42 @@ async function saveAccess(): Promise<void> {
       {{ errors.invites }}
     </div>
 
-    <Dialog v-if="revokingInvite" title="Delete invite link" @close="revokingInvite = null">
-      <p>Nobody can join with it any more. This cannot be undone.</p>
+    <Dialog v-if="revokingInvite" :title="t('users.deleteInvite')" @close="revokingInvite = null">
+      <p>{{ t('users.deleteInviteText') }}</p>
       <template #footer>
         <div class="sp"></div>
-        <button class="btn" type="button" @click="revokingInvite = null">Cancel</button>
-        <button class="btn btn--danger" type="button" @click="confirmRevokeInvite">Delete link</button>
+        <button class="btn" type="button" @click="revokingInvite = null">{{ t('common.cancel') }}</button>
+        <button class="btn btn--danger" type="button" @click="confirmRevokeInvite">{{ t('users.deleteLink') }}</button>
       </template>
     </Dialog>
 
     <Dialog
       v-if="removingRole"
-      :title="`Delete ${removingRole.name}?`"
+      :title="t('users.deleteRoleTitle', { name: removingRole.name })"
       @close="removingRole = null"
     >
-      <p>Whoever wears it stops wearing one. This cannot be undone.</p>
+      <p>{{ t('users.deleteRoleText') }}</p>
       <div v-if="errors.removeRole" class="err">{{ errors.removeRole }}</div>
       <template #footer>
         <div class="sp"></div>
-        <button class="btn" type="button" @click="removingRole = null">Cancel</button>
-        <button class="btn btn--danger" type="button" @click="removeRole">Delete</button>
+        <button class="btn" type="button" @click="removingRole = null">{{ t('common.cancel') }}</button>
+        <button class="btn btn--danger" type="button" @click="removeRole">{{ t('common.delete') }}</button>
       </template>
     </Dialog>
 
     <Dialog
       v-if="accessFor"
-      :title="`Access — ${accessFor.name}`"
+      :title="t('users.accessTitle', { name: accessFor.name })"
       :width="560"
       @close="accessFor = null"
     >
       <label class="check access__right">
         <input v-model="accessCanDelete" type="checkbox" />
-        May delete anything people made
+        {{ t('users.mayDelete') }}
       </label>
       <label class="check access__right">
         <input v-model="accessCanManageRoles" type="checkbox" />
-        May give people a role and invite new ones
+        {{ t('users.mayManage') }}
       </label>
       <div class="access__sep"></div>
 
@@ -627,20 +629,20 @@ async function saveAccess(): Promise<void> {
         </label>
       </div>
       <div v-if="!accessProjects.length" class="empty empty--sm">
-        <span class="empty__g">◇</span>No projects yet.
+        <span class="empty__g">◇</span>{{ t('common.noProjects') }}
       </div>
       <div v-if="errors.access" class="err access__err">{{ errors.access }}</div>
 
       <template #footer>
         <div class="sp"></div>
-        <button class="btn" type="button" @click="accessFor = null">Cancel</button>
+        <button class="btn" type="button" @click="accessFor = null">{{ t('common.cancel') }}</button>
         <button
           class="btn btn--primary"
           type="button"
           :disabled="accessBusy || !accessRead"
           @click="saveAccess"
         >
-          Save
+          {{ t('common.save') }}
         </button>
       </template>
     </Dialog>

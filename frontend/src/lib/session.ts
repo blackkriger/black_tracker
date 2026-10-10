@@ -21,6 +21,9 @@ export interface Me {
   githubLogin: string | null;
   messengers: Record<Messenger, { ready: boolean; name: string | null }>;
   noticesOff: NoticeKind[];
+  lang: 'system' | 'en' | 'ru';
+  langSeen: 'en' | 'ru' | null;
+  gender: 'm' | 'f' | null;
 }
 
 const me = ref<Me | null>(null);

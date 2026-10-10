@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import { api } from '../../lib/api';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
 
+const { t } = useI18n();
 const router = useRouter();
 const projects = useProjects();
 
@@ -29,7 +31,7 @@ async function create(): Promise<void> {
     await projects.load(true);
     await router.push(`/settings/${created.shortName}`);
   } catch (err) {
-    fail('create', err, 'Could not create the project.');
+    fail('create', err, t('settings.createProjectFailed'));
   } finally {
     busy.value = false;
   }
@@ -39,10 +41,10 @@ async function create(): Promise<void> {
 <template>
   <SettingsLayout>
     <section class="panel sheet__wide">
-      <header class="panel__h">New project</header>
+      <header class="panel__h">{{ t('settings.newProject') }}</header>
       <form class="panel__b form" @submit.prevent="create">
         <div class="field">
-          <label class="label" for="key">Key</label>
+          <label class="label" for="key">{{ t('settings.key') }}</label>
           <input
             id="key"
             v-model="shortName"
@@ -51,14 +53,14 @@ async function create(): Promise<void> {
             placeholder="PROJ"
             @input="shortName = shortName.toUpperCase()"
           />
-          <span class="hint">Upper-case letters and digits.</span>
+          <span class="hint">{{ t('settings.keyHint') }}</span>
         </div>
         <div class="field">
-          <label class="label" for="name">Name</label>
+          <label class="label" for="name">{{ t('settings.name') }}</label>
           <input id="name" v-model="name" class="input" maxlength="200" placeholder="Project" />
         </div>
         <div class="row-end">
-          <button class="btn btn--primary" type="submit" :disabled="!canCreate">Create project</button>
+          <button class="btn btn--primary" type="submit" :disabled="!canCreate">{{ t('settings.createProject') }}</button>
         </div>
       </form>
     </section>

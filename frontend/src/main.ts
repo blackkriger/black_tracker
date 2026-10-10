@@ -7,7 +7,9 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './styles/tracker.css';
 import './lib/theme';
 import './lib/layout';
+import { i18n } from './i18n';
+import './lib/locale';
 import App from './App.vue';
 import { router } from './router';
 
-createApp(App).use(router).mount('#app');
+createApp(App).use(i18n).use(router).mount('#app');

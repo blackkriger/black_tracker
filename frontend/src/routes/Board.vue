@@ -4,6 +4,7 @@ import Viewers from '../components/Viewers.vue';
 import { features } from '../lib/features';
 import { boardViewers, here } from '../lib/presence';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import IssueView from '../components/IssueView.vue';
 import Select from '../components/Select.vue';
 import { usePeople } from '../lib/people';
@@ -53,6 +54,7 @@ interface Project {
   boards: Board[];
 }
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const project = ref<Project | null>(null);
@@ -82,10 +84,12 @@ const personChoices = computed(() =>
   people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor }))
 );
 const assigneeChoices = computed(() => [
-  { value: 'none', label: 'Nobody' },
+  { value: 'none', label: t('fields.nobody') },
   ...personChoices.value,
 ]);
-const priorityChoices = PRIORITIES.map((p) => ({ value: p, label: p, color: priorityColor(p) }));
+const priorityChoices = computed(() =>
+  PRIORITIES.map((p) => ({ value: p, label: t(`priority.${p}`), color: priorityColor(p) }))
+);
 
 const filtering = computed(
   () =>
@@ -203,11 +207,11 @@ const boardTags = computed(() => tags.value.filter((t) => current.value?.tagIds.
 
 const openKey = computed(() => String(route.params.key ?? ''));
 
-const ORDER_CHOICES = [
-  { value: 'manual', label: 'Manual order' },
-  { value: 'priority', label: 'By priority' },
-  { value: 'due', label: 'By due date' },
-];
+const ORDER_CHOICES = computed(() => [
+  { value: 'manual', label: t('board.manualOrder') },
+  { value: 'priority', label: t('board.byPriority') },
+  { value: 'due', label: t('board.byDue') },
+]);
 const order = ref<CardOrder>('manual');
 watch(
   () => current.value?.id,
@@ -250,7 +254,7 @@ async function loadIssues(boardId: string, quiet = false): Promise<void> {
   } catch (err) {
     if (mine !== issuesRead) return;
     issues.value = [];
-    error.value = err instanceof Error ? err.message : 'Could not load the issues.';
+    error.value = err instanceof Error ? err.message : t('board.issuesFailed');
     failed.value = true;
   } finally {
     if (mine === issuesRead) issuesLoading.value = false;
@@ -338,7 +342,7 @@ async function onDrop(): Promise<void> {
       body: { issueId: moved.id, stateId: target.stateId, ids: column.map((i) => i.id) },
     });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not move the card.';
+    error.value = err instanceof Error ? err.message : t('board.moveFailed');
     await loadIssues(board.id);
   }
 }
@@ -429,7 +433,7 @@ async function load(short: string, quiet = false): Promise<void> {
     if (mine !== projectRead) return;
     project.value = null;
     tags.value = [];
-    error.value = err instanceof Error ? err.message : 'Could not load the project.';
+    error.value = err instanceof Error ? err.message : t('project.loadFailed');
   } finally {
     if (mine === projectRead) loading.value = false;
   }
@@ -475,7 +479,7 @@ watch(
         class="filter"
         :options="ORDER_CHOICES"
         small
-        label="Order the cards"
+        :label="t('board.orderLabel')"
         @update:model-value="setOrder"
       />
       <span class="tagbar__sep" aria-hidden="true"></span>
@@ -485,64 +489,64 @@ watch(
           ref="search"
           v-model="q"
           class="input input--sm filter search__f"
-          placeholder="Search by summary…"
+          :placeholder="t('board.searchPlaceholder')"
           maxlength="80"
-          aria-label="Search the board"
+          :aria-label="t('board.searchLabel')"
         />
       </span>
       <Select
         v-model="byPriority"
         class="filter"
         :options="priorityChoices"
-        placeholder="Priority"
+        :placeholder="t('fields.priority')"
         keep-placeholder
         small
-        label="Filter by priority"
+        :label="t('board.filterPriority')"
       />
       <Select
         v-model="byAssignee"
         class="filter"
         :options="assigneeChoices"
-        placeholder="Assignee"
+        :placeholder="t('fields.assignee')"
         keep-placeholder
         small
-        label="Filter by assignee"
+        :label="t('board.filterAssignee')"
       />
       <Select
         v-model="byWatcher"
         class="filter"
         :options="personChoices"
-        placeholder="Watcher"
+        :placeholder="t('fields.watcher')"
         keep-placeholder
         small
-        label="Filter by watcher"
+        :label="t('board.filterWatcher')"
       />
       <Select
         v-model="byAuthor"
         class="filter"
         :options="personChoices"
-        placeholder="Author"
+        :placeholder="t('fields.author')"
         keep-placeholder
         small
-        label="Filter by author"
+        :label="t('board.filterAuthor')"
       />
 
       <button
-        v-for="t in boardTags"
-        :key="t.id"
+        v-for="tag in boardTags"
+        :key="tag.id"
         class="taglabel taglabel--plain taglabel--pick"
-        :class="{ 'is-off': byTags.length && !byTags.includes(t.id) }"
+        :class="{ 'is-off': byTags.length && !byTags.includes(tag.id) }"
         type="button"
-        :aria-pressed="byTags.includes(t.id)"
-        :style="{ '--c': t.color }"
-        @click="toggleTag(t.id)"
-      >{{ t.name }}</button>
+        :aria-pressed="byTags.includes(tag.id)"
+        :style="{ '--c': tag.color }"
+        @click="toggleTag(tag.id)"
+      >{{ tag.name }}</button>
 
       <button
         class="btn btn--sm btn--icon btn--ghost star"
         :class="{ 'is-on': starred }"
         type="button"
-        title="Only my favourites"
+        :title="t('board.onlyFavourites')"
         :aria-pressed="starred"
         @click="starred = !starred"
       >
@@ -555,7 +559,7 @@ watch(
         type="button"
         @click="clearFilters"
       >
-        Clear filters
+        {{ t('board.clearFilters') }}
       </button>
       <Viewers v-if="features.presence" :logins="onBoard" class="board__who" />
     </div>
@@ -565,9 +569,9 @@ watch(
       class="page__body"
       :class="{ 'page__body--tags': current && !failed }"
     >
-      <p v-if="loading" class="hint">Loading…</p>
+      <p v-if="loading" class="hint">{{ t('common.loading') }}</p>
       <div v-else-if="error" class="empty"><span class="empty__g">✕</span>{{ error }}</div>
-      <div v-else-if="!current" class="empty"><span class="empty__g">◇</span>This project has no boards.</div>
+      <div v-else-if="!current" class="empty"><span class="empty__g">◇</span>{{ t('board.noBoards') }}</div>
     </div>
 
     <div v-if="current && !failed" class="board board--tags">
@@ -577,7 +581,7 @@ watch(
         class="col"
         :class="{ 'col--drop': dropAt?.stateId === s.id }"
         :style="{ '--c': s.color }"
-        :aria-label="`${s.name}, ${issuesOf(s.id).length} issues`"
+        :aria-label="t('board.column', { name: s.name, n: issuesOf(s.id).length }, issuesOf(s.id).length)"
         @dragover.prevent="onDragOver(s.id, $event)"
         @drop.prevent="onDrop"
       >
@@ -609,7 +613,7 @@ watch(
               >
                 <div class="card__top">
                   <span class="key">{{ i.key }}</span>
-                  <span class="prio" :class="priorityClass(i.priority)" :aria-label="i.priority">
+                  <span class="prio" :class="priorityClass(i.priority)" :aria-label="t(`priority.${i.priority}`)">
                     <i></i><i></i><i></i><i></i>
                   </span>
                 </div>
@@ -617,11 +621,11 @@ watch(
                   <span>{{ i.summary }}</span>
                   <span v-if="i.tags.length" class="card__tags">
                     <span
-                      v-for="t in i.tags"
-                      :key="t.id"
+                      v-for="tag in i.tags"
+                      :key="tag.id"
                       class="taglabel taglabel--plain taglabel--sm"
-                      :style="{ '--c': t.color }"
-                    >{{ t.name }}</span>
+                      :style="{ '--c': tag.color }"
+                    >{{ tag.name }}</span>
                   </span>
                 </div>
                 <div v-if="i.assignee || i.dueDate || i.subtasks" class="card__meta">
@@ -650,7 +654,7 @@ watch(
             <button
               class="add add--plus"
               type="button"
-              :aria-label="`Add an issue to ${s.name}`"
+              :aria-label="t('board.addTo', { name: s.name })"
               @click="creatingIn = s.id"
             ><Plus class="ic" /></button>
           </template>

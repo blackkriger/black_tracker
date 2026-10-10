@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -6,7 +9,7 @@
     <div class="page__body">
       <div class="empty">
         <span class="empty__g">404</span>
-        No such page.
+        {{ t('common.noSuchPage') }}
       </div>
     </div>
   </div>

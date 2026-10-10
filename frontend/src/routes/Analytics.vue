@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
 import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
@@ -10,6 +11,8 @@ import { filtersOf, filtersQuery, monthFilters, remember, sameQuery, type Filter
 import { dayAndMonth } from '../lib/calendar';
 import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/issues';
 import { ridgeShape } from '../lib/ridge';
+import { RU_MONTHS_SHORT } from '../lib/calendar';
+import { locale } from '../i18n';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
@@ -77,6 +80,7 @@ interface Numbers {
   };
 }
 
+const { t } = useI18n();
 const { projects, load: loadProjects } = useProjects();
 const { errors, fail, clear } = usePanelErrors();
 const { nameOf, load: loadPeople } = usePeople();
@@ -123,7 +127,7 @@ async function load(): Promise<void> {
     if (mine !== reads) return;
     data.value = got;
   } catch (err) {
-    fail('numbers', err, 'Could not count anything.');
+    fail('numbers', err, t('analytics.countFailed'));
   } finally {
     loading.value = false;
   }
@@ -181,7 +185,8 @@ const priorityRows = computed<RidgeRow[]>(() => {
     const p = found.get(name);
     return {
       key: name,
-      label: name,
+      label: t(`priority.${name}`),
+      hint: t(`priority.${name}`),
       profile: ridgeShape(axis.value.map((s) => p?.byState[s] ?? 0)),
       value: p?.count ?? 0,
       color: priorityColor(name as Priority),
@@ -189,7 +194,12 @@ const priorityRows = computed<RidgeRow[]>(() => {
   });
 });
 
-const CLOSE_AXIS = ['<1h', '<1d', '<3d', '<1w', '<1m', '1m+'];
+const CLOSE_AXIS = computed(() =>
+  locale.value === 'ru' ? ['<1ч', '<1д', '<3д', '<1н', '<1м', '1м+'] : ['<1h', '<1d', '<3d', '<1w', '<1m', '1m+']
+);
+const UNITS = computed(() =>
+  locale.value === 'ru' ? { s: 'с', m: 'мин', h: 'ч', d: 'д' } : { s: 's', m: 'm', h: 'h', d: 'd' }
+);
 const closeTallest = computed(() =>
   Math.max(1, ...(data.value?.cycle.months ?? []).flatMap((m) => m.buckets))
 );
@@ -197,10 +207,11 @@ const closeTallest = computed(() =>
 function days(n: number | null): string {
   if (n === null) return '—';
   const seconds = n * 86400;
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
-  return `${Math.round(n * 10) / 10}d`;
+  const u = UNITS.value;
+  if (seconds < 60) return `${Math.round(seconds)}${u.s}`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}${u.m}`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}${u.h}`;
+  return `${(Math.round(n * 10) / 10).toLocaleString(locale.value)}${u.d}`;
 }
 
 function exact(n: number | null): string | undefined {
@@ -210,12 +221,13 @@ function exact(n: number | null): string | undefined {
   for (const [unit, size] of [['d', 86400], ['h', 3600], ['m', 60], ['s', 1]] as const) {
     const whole = Math.floor(rest / size);
     rest -= whole * size;
-    if (whole || (unit === 's' && !parts.length)) parts.push(`${whole}${unit}`);
+    if (whole || (unit === 's' && !parts.length)) parts.push(`${whole}${UNITS.value[unit]}`);
   }
   return parts.join(' ');
 }
 const monthLabel = (month: string): string => {
   const [y, m] = month.split('-').map(Number);
+  if (locale.value === 'ru') return `${RU_MONTHS_SHORT[m - 1]} ${y}`;
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 };
 
@@ -281,7 +293,7 @@ async function openIssue(w: Where): Promise<void> {
     openTags.value = tags.filter((t) => full.tagIds.includes(t.id));
     open.value = { key: w.key, project: w.projectShort, board: full };
   } catch (err) {
-    fail('numbers', err, 'Could not open the issue.');
+    fail('numbers', err, t('me.openFailed'));
   }
 }
 </script>
@@ -292,7 +304,7 @@ async function openIssue(w: Where): Promise<void> {
       <div class="sheet">
         <FilterBar v-model="filters" class="sheet__wide" :base="base" />
         <section class="panel sheet__wide">
-          <header class="panel__h">Boards</header>
+          <header class="panel__h">{{ t('analytics.boards') }}</header>
           <div class="panel__b">
             <div v-if="loading" class="skel">
               <div v-for="n in 3" :key="n" class="skel__ridge">
@@ -301,7 +313,7 @@ async function openIssue(w: Where): Promise<void> {
                 <span class="sk sk--line" style="width: 20px"></span>
               </div>
             </div>
-            <div v-else-if="!boardRows.length" class="hint faint">No boards to count.</div>
+            <div v-else-if="!boardRows.length" class="hint faint">{{ t('analytics.noBoards') }}</div>
             <RidgeRows v-else :rows="boardRows" :full="tallest">
               <template #axis>
                 <span v-for="s in axis" :key="s">{{ s }}</span>
@@ -311,7 +323,7 @@ async function openIssue(w: Where): Promise<void> {
         </section>
 
         <section class="panel sheet__wide">
-          <header class="panel__h">Priorities</header>
+          <header class="panel__h">{{ t('analytics.priorities') }}</header>
           <div class="panel__b">
             <div v-if="loading" class="skel">
               <div v-for="n in 4" :key="n" class="skel__ridge">
@@ -331,7 +343,7 @@ async function openIssue(w: Where): Promise<void> {
         <div class="stack">
           <section class="panel">
             <header class="panel__h">
-              Time to close
+              {{ t('analytics.timeToClose') }}
               <span
                 v-if="data?.cycle.median != null"
                 class="panel__end"
@@ -347,7 +359,7 @@ async function openIssue(w: Where): Promise<void> {
                 </div>
               </div>
               <div v-else-if="!data?.cycle.closed" class="hint faint">
-                Nothing was closed in this period.
+                {{ t('analytics.nothingClosed') }}
               </div>
               <RidgeRows v-else :rows="closeRows" :full="closeTallest">
                 <template #axis>
@@ -359,9 +371,9 @@ async function openIssue(w: Where): Promise<void> {
 
           <section class="panel">
             <header class="panel__h">
-              Deadlines
+              {{ t('analytics.deadlines') }}
               <span v-if="data?.due.overdue.length" class="panel__end is-late">
-                {{ data.due.overdue.length }} late
+                {{ t('analytics.late', { n: data.due.overdue.length }) }}
               </span>
             </header>
             <div class="panel__b nums nums--table">
@@ -389,7 +401,7 @@ async function openIssue(w: Where): Promise<void> {
               <div
                 v-if="!loading && !data?.due.overdue.length && !data?.due.soon.length"
                 class="hint faint"
-              >Nothing is due in this period.</div>
+              >{{ t('analytics.nothingDue') }}</div>
             </div>
           </section>
         </div>
@@ -397,12 +409,12 @@ async function openIssue(w: Where): Promise<void> {
         <div class="stack">
           <section class="panel">
             <header class="panel__h">
-              Team
+              {{ t('analytics.team') }}
               <span class="panel__end who__head">
-                <span class="stamp">open</span>
-                <span class="stamp">late</span>
-                <span class="stamp">closed</span>
-                <span class="stamp">held</span>
+                <span class="stamp">{{ t('analytics.colOpen') }}</span>
+                <span class="stamp">{{ t('analytics.colLate') }}</span>
+                <span class="stamp">{{ t('analytics.colClosed') }}</span>
+                <span class="stamp">{{ t('analytics.colHeld') }}</span>
               </span>
             </header>
             <div class="panel__b nums nums--table">
@@ -429,7 +441,7 @@ async function openIssue(w: Where): Promise<void> {
                   <span class="n" :title="exact(p.held)">{{ days(p.held) }}</span>
                 </button>
                 <div v-if="openPeople.includes(p.login)" class="held">
-                  <div v-if="!p.issues.length" class="hint faint">Holding nothing.</div>
+                  <div v-if="!p.issues.length" class="hint faint">{{ t('analytics.holdingNothing') }}</div>
                   <template v-for="i in p.issues" :key="i.key">
                     <div class="held__row">
                       <button class="key held__key" type="button" @click="openIssue(i)">
@@ -450,9 +462,9 @@ async function openIssue(w: Where): Promise<void> {
                     <div v-if="handsOpen(i)" class="hands">
                       <template v-for="(h, n) in [...i.hands].reverse()" :key="n">
                         <div class="hands__row">
-                          <span :class="{ faint: !h.login }">{{ h.login ? nameOf(h.login) : 'Nobody' }}</span>
+                          <span :class="{ faint: !h.login }">{{ h.login ? nameOf(h.login) : t('fields.nobody') }}</span>
                           <span class="n" :title="exact(h.days)">{{ days(h.days) }}</span>
-                          <span class="stamp">{{ h.current ? 'still' : '' }}</span>
+                          <span class="stamp">{{ h.current ? t('analytics.still') : '' }}</span>
                         </div>
                         <div v-if="!h.current && h.states.length" class="hands__states">
                           <span
@@ -471,7 +483,7 @@ async function openIssue(w: Where): Promise<void> {
                 </div>
               </template>
               <div v-if="data?.unassigned" class="who who--loose">
-                <span class="faint">Nobody</span>
+                <span class="faint">{{ t('fields.nobody') }}</span>
                 <span class="n">{{ data.unassigned }}</span>
                 <span></span>
                 <span></span>
@@ -482,10 +494,10 @@ async function openIssue(w: Where): Promise<void> {
 
           <section class="panel">
             <header class="panel__h">
-              Worked on
+              {{ t('analytics.workedOn') }}
               <span class="panel__end who__head who__head--worked">
-                <span class="stamp">issues</span>
-                <span class="stamp">time</span>
+                <span class="stamp">{{ t('analytics.colIssues') }}</span>
+                <span class="stamp">{{ t('analytics.colTime') }}</span>
               </span>
             </header>
             <div class="panel__b nums nums--table">
@@ -547,7 +559,7 @@ async function openIssue(w: Where): Promise<void> {
                 </div>
               </template>
               <div v-if="!loading && !data?.worked.length" class="hint faint">
-                Nothing was worked on in this period.
+                {{ t('analytics.nothingWorked') }}
               </div>
             </div>
           </section>

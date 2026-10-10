@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { X } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 import { useWall } from '../lib/masonry';
 import { fileSize, type Shot } from '../lib/issues';
 
+const { t } = useI18n();
 const props = defineProps<{
   shots: Shot[];
   removable?: boolean;
@@ -32,7 +34,7 @@ const pack = useWall(wall, () => props.shots.length);
           v-if="removable"
           class="btn btn--sm btn--icon btn--ghost"
           type="button"
-          :aria-label="`Remove ${s.name}`"
+          :aria-label="t('files.remove', { name: s.name })"
           @click="emit('remove', s.key)"
         ><X class="ic ic--sm" /></button>
       </div>

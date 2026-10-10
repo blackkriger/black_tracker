@@ -1,0 +1,16 @@
+export default {
+  sections: 'Settings sections',
+  profile: 'Profile',
+  preferences: 'Preferences',
+  archivedMark: '(archived)',
+  newProjectLink: 'New project…',
+  workspace: 'Workspace',
+  usersAccess: 'Users & access',
+  updated: 'UPDATED {date}',
+  newProject: 'New project',
+  key: 'Key',
+  keyHint: 'Upper-case letters and digits.',
+  name: 'Name',
+  createProject: 'Create project',
+  createProjectFailed: 'Could not create the project.',
+};
