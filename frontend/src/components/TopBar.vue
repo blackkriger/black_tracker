@@ -17,7 +17,19 @@ import { buddyAvatarStyle } from '../lib/avatar';
 import { linkQuery, monthFilters, noFilters } from '../lib/filters';
 import { features } from '../lib/features';
 import { layout, narrow } from '../lib/layout';
-import { AtSign, Bell, ChartColumn, ContactRound, ListChecks, Menu, Moon, Smile, Star, Sun } from 'lucide-vue-next';
+import {
+  AtSign,
+  Bell,
+  ChartColumn,
+  ContactRound,
+  ListChecks,
+  Menu,
+  MessageSquareText,
+  Moon,
+  Smile,
+  Star,
+  Sun,
+} from 'lucide-vue-next';
 import { ink, setTheme, shownTheme } from '../lib/theme';
 
 const session = useSession();
@@ -39,13 +51,18 @@ const analyticsTo = computed(() => ({ name: 'analytics', query: linkQuery(monthF
 const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
 const section = computed(() => {
   const name = String(route.name ?? '');
-  return name.startsWith('settings') ? 'settings' : name.startsWith('analytics') ? 'analytics' : name;
+  return name.startsWith('settings') ? 'settings' : name;
 });
 const at = (name: string): 'page' | undefined => (section.value === name ? 'page' : undefined);
 
 const drawer = ref(false);
 watch([() => route.fullPath, narrow], () => (drawer.value = false));
-const SECTION_NAMES: Record<string, string> = { issues: 'Issues', analytics: 'Analytics', settings: 'Settings' };
+const SECTION_NAMES: Record<string, string> = {
+  issues: 'Issues',
+  analytics: 'Analytics',
+  feedback: 'Feedback',
+  settings: 'Settings',
+};
 const place = computed(() => {
   if (here.value) {
     const p = live.value.find((x) => x.shortName === currentShort.value);
@@ -260,20 +277,9 @@ async function signOut(): Promise<void> {
         {{ session.me.value?.login }}
       </RouterLink>
       <RouterLink v-if="hasRole" class="topitem" :to="issuesTo" :aria-current="at('issues')">Issues</RouterLink>
-      <span v-if="hasRole" class="topproj">
-        <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')">Analytics</RouterLink>
-        <span class="topboards">
-          <RouterLink
-            class="topitem topitem__board"
-            :class="{ 'is-here': route.name === 'analytics' }"
-            :to="analyticsTo"
-          >Issues</RouterLink>
-          <RouterLink
-            class="topitem topitem__board"
-            :class="{ 'is-here': route.name === 'analytics-feedback' }"
-            :to="{ name: 'analytics-feedback' }"
-          >Feedback</RouterLink>
-        </span>
+      <span v-if="hasRole" class="topboards">
+        <RouterLink class="topitem topitem__board" :to="analyticsTo" :aria-current="at('analytics')">Analytics</RouterLink>
+        <RouterLink class="topitem topitem__board" :to="{ name: 'feedback' }" :aria-current="at('feedback')">Feedback</RouterLink>
       </span>
       <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
@@ -284,19 +290,8 @@ async function signOut(): Promise<void> {
   <aside v-if="narrow ? drawer : layout === 'side'" class="rail" :class="{ 'rail--drawer': narrow }">
     <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
       <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />Issues</RouterLink>
-      <div class="rail__proj">
-        <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
-        <RouterLink
-          class="topitem topitem__board rail__board"
-          :class="{ 'is-here': route.name === 'analytics' }"
-          :to="analyticsTo"
-        >Issues</RouterLink>
-        <RouterLink
-          class="topitem topitem__board rail__board"
-          :class="{ 'is-here': route.name === 'analytics-feedback' }"
-          :to="{ name: 'analytics-feedback' }"
-        >Feedback</RouterLink>
-      </div>
+      <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
+      <RouterLink class="topitem" :to="{ name: 'feedback' }" :aria-current="at('feedback')"><MessageSquareText class="ic" />Feedback</RouterLink>
     </nav>
 
     <nav v-if="live.length" class="rail__projects" aria-label="Projects">
@@ -551,7 +546,6 @@ async function signOut(): Promise<void> {
 .rail__sections {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
 }
 .rail__date {
   display: flex;

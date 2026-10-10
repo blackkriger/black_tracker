@@ -62,7 +62,7 @@ const asked = computed(() => ({
 function pick(part: Partial<{ form: string; from: string; to: string }>): void {
   const next = { ...asked.value, ...part };
   void router.replace({
-    name: 'analytics-feedback',
+    name: 'feedback',
     query: Object.fromEntries(Object.entries(next).filter(([, v]) => v)),
   });
 }
@@ -87,7 +87,7 @@ async function load(): Promise<void> {
 
 onMounted(() => void load());
 watch(asked, () => {
-  if (route.name === 'analytics-feedback') void load();
+  if (route.name === 'feedback') void load();
 });
 const reload = settled(() => void load());
 useLive(
