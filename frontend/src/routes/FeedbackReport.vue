@@ -374,112 +374,6 @@ function exportCsv(): void {
         </section>
         <div v-if="errors.report" class="err panel__err sheet__wide">{{ errors.report }}</div>
 
-        <section class="panel">
-          <header class="panel__h">
-            Ratings
-            <span v-if="report" class="panel__end">{{ responses.length }}</span>
-          </header>
-          <div class="panel__b">
-            <div v-if="loading" class="skel">
-              <div v-for="n in 5" :key="n" class="skel__ridge">
-                <span class="sk sk--line" style="width: 64px"></span>
-                <span class="sk sk--line skel__hill"></span>
-                <span class="sk sk--line" style="width: 20px"></span>
-              </div>
-            </div>
-            <div v-else-if="!responses.length" class="hint faint">No responses yet.</div>
-            <RidgeRows v-else :rows="ratingRows" :full="scoreTallest">
-              <template #axis>
-                <span v-for="s in SCORES" :key="s">{{ s }}</span>
-              </template>
-            </RidgeRows>
-          </div>
-        </section>
-
-        <section class="panel">
-          <header class="panel__h">Scales</header>
-          <div class="panel__b">
-            <div v-if="loading" class="skel">
-              <div v-for="n in 6" :key="n" class="skel__ridge">
-                <span class="sk sk--line" style="width: 64px"></span>
-                <span class="sk sk--line skel__hill"></span>
-                <span class="sk sk--line" style="width: 20px"></span>
-              </div>
-            </div>
-            <div v-else-if="!responses.length" class="hint faint">No responses yet.</div>
-            <RidgeRows v-else :rows="scaleRows" :full="scoreTallest">
-              <template #axis>
-                <span v-for="s in SCORES" :key="s">{{ s }}</span>
-              </template>
-            </RidgeRows>
-          </div>
-        </section>
-
-        <div v-for="(column, i) in choiceColumns" :key="i" class="stack">
-          <section v-for="c in column" :key="c.key" class="panel">
-            <header class="panel__h">{{ c.title }}</header>
-            <div class="panel__table">
-              <table class="tbl tbl--plain">
-                <tbody>
-                  <tr v-for="row in c.rows" :key="row.value">
-                    <td class="wrap">{{ row.label }}</td>
-                    <td class="n">{{ row.n }}</td>
-                    <td class="n">{{ row.share }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
-        <section v-if="texts.length" class="panel sheet__wide">
-          <header class="panel__h">
-            Comments
-            <span class="panel__end">
-              <Select
-                :model-value="shownText?.key ?? ''"
-                :options="textChoices"
-                small
-                label="Question"
-                class="said__pick"
-                @update:model-value="textKey = $event"
-              />
-            </span>
-          </header>
-          <div class="panel__b said">
-            <div v-if="!shownText?.said.length" class="hint faint">No answers yet.</div>
-            <div v-for="s in shownText?.said ?? []" :key="s.id" class="said__row">
-              <span class="stamp">{{ stampAt(s.at) }}, {{ s.lang.toUpperCase() }}</span>
-              <p class="said__text">{{ s.text }}</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel sheet__wide">
-          <header class="panel__h">Audience</header>
-          <div class="panel__b crowd">
-            <div v-for="d in audience" :key="d.key" class="crowd__dim">
-              <h3 class="crowd__h">{{ d.title }}</h3>
-              <template v-if="loading">
-                <span v-for="w in [70, 52]" :key="w" class="sk sk--line" :style="{ width: `${w}%` }"></span>
-              </template>
-              <div v-else-if="!d.rows.length" class="hint faint">No visits yet.</div>
-              <div v-for="row in d.rows" :key="row.label" class="crowd__row">
-                <span class="crowd__what">{{ row.label }}</span>
-                <span class="n">{{ row.n }}</span>
-                <span class="n crowd__share">{{ row.share }}</span>
-              </div>
-              <a
-                v-if="d.key === 'country'"
-                class="crowd__credit"
-                href="https://db-ip.com"
-                target="_blank"
-                rel="noopener"
-              >IP geolocation by DB-IP</a>
-            </div>
-          </div>
-        </section>
-
         <section class="panel sheet__wide">
           <header class="panel__h">
             Responses
@@ -542,6 +436,112 @@ function exportCsv(): void {
             </table>
           </div>
         </section>
+
+        <section class="panel sheet__wide">
+          <header class="panel__h">Audience</header>
+          <div class="panel__b crowd">
+            <div v-for="d in audience" :key="d.key" class="crowd__dim">
+              <h3 class="crowd__h">{{ d.title }}</h3>
+              <template v-if="loading">
+                <span v-for="w in [70, 52]" :key="w" class="sk sk--line" :style="{ width: `${w}%` }"></span>
+              </template>
+              <div v-else-if="!d.rows.length" class="hint faint">No visits yet.</div>
+              <div v-for="row in d.rows" :key="row.label" class="crowd__row">
+                <span class="crowd__what">{{ row.label }}</span>
+                <span class="n">{{ row.n }}</span>
+                <span class="n crowd__share">{{ row.share }}</span>
+              </div>
+              <a
+                v-if="d.key === 'country'"
+                class="crowd__credit"
+                href="https://db-ip.com"
+                target="_blank"
+                rel="noopener"
+              >IP geolocation by DB-IP</a>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="texts.length" class="panel sheet__wide">
+          <header class="panel__h">
+            Comments
+            <span class="panel__end">
+              <Select
+                :model-value="shownText?.key ?? ''"
+                :options="textChoices"
+                small
+                label="Question"
+                class="said__pick"
+                @update:model-value="textKey = $event"
+              />
+            </span>
+          </header>
+          <div class="panel__b said">
+            <div v-if="!shownText?.said.length" class="hint faint">No answers yet.</div>
+            <div v-for="s in shownText?.said ?? []" :key="s.id" class="said__row">
+              <span class="stamp">{{ stampAt(s.at) }}, {{ s.lang.toUpperCase() }}</span>
+              <p class="said__text">{{ s.text }}</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__h">
+            Ratings
+            <span v-if="report" class="panel__end">{{ responses.length }}</span>
+          </header>
+          <div class="panel__b">
+            <div v-if="loading" class="skel">
+              <div v-for="n in 5" :key="n" class="skel__ridge">
+                <span class="sk sk--line" style="width: 64px"></span>
+                <span class="sk sk--line skel__hill"></span>
+                <span class="sk sk--line" style="width: 20px"></span>
+              </div>
+            </div>
+            <div v-else-if="!responses.length" class="hint faint">No responses yet.</div>
+            <RidgeRows v-else :rows="ratingRows" :full="scoreTallest">
+              <template #axis>
+                <span v-for="s in SCORES" :key="s">{{ s }}</span>
+              </template>
+            </RidgeRows>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__h">Scales</header>
+          <div class="panel__b">
+            <div v-if="loading" class="skel">
+              <div v-for="n in 6" :key="n" class="skel__ridge">
+                <span class="sk sk--line" style="width: 64px"></span>
+                <span class="sk sk--line skel__hill"></span>
+                <span class="sk sk--line" style="width: 20px"></span>
+              </div>
+            </div>
+            <div v-else-if="!responses.length" class="hint faint">No responses yet.</div>
+            <RidgeRows v-else :rows="scaleRows" :full="scoreTallest">
+              <template #axis>
+                <span v-for="s in SCORES" :key="s">{{ s }}</span>
+              </template>
+            </RidgeRows>
+          </div>
+        </section>
+
+        <div v-for="(column, i) in choiceColumns" :key="i" class="stack">
+          <section v-for="c in column" :key="c.key" class="panel">
+            <header class="panel__h">{{ c.title }}</header>
+            <div class="panel__table">
+              <table class="tbl tbl--plain">
+                <tbody>
+                  <tr v-for="row in c.rows" :key="row.value">
+                    <td class="wrap">{{ row.label }}</td>
+                    <td class="n">{{ row.n }}</td>
+                    <td class="n">{{ row.share }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   </div>
