@@ -4,6 +4,7 @@ export default {
   noProjects: 'No projects yet.',
   projectsFailed: 'Could not load projects.',
   wentWrong: 'Something went wrong.',
+  requestFailed: 'Request failed ({status}).',
   close: 'Close',
   all: 'all',
   add: 'Add',

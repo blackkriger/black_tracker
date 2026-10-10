@@ -1,3 +1,5 @@
+import { i18n } from '../i18n';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -38,7 +40,7 @@ export async function api<T>(
     | { data?: T; error?: string }
     | null;
   if (!res.ok || !payload || payload.error) {
-    const message = payload?.error ?? `Request failed (${res.status})`;
+    const message = payload?.error ?? i18n.global.t('common.requestFailed', { status: res.status });
     if (res.status === 401 && path !== '/login') unauthorized?.(message);
     throw new ApiError(message, res.status);
   }

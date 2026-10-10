@@ -78,81 +78,81 @@ const HEADER = '-H "Authorization: Bearer trk_…"';
 
 type Call = { verb: string; path: string; what: string };
 
-const CALLS: { group: string; calls: Call[] }[] = [
+const CALLS = computed<{ group: string; calls: Call[] }[]>(() => [
   {
-    group: 'Reading',
+    group: t('api.groups.reading'),
     calls: [
-      { verb: 'GET', path: '/me', what: 'Your own account' },
-      { verb: 'GET', path: '/projects', what: 'Every project open to you, with its boards' },
-      { verb: 'GET', path: '/boards/:boardId', what: 'One board with its statuses and their uuids' },
-      { verb: 'GET', path: '/boards/:boardId/issues', what: 'The issues on one board' },
-      { verb: 'GET', path: '/issues?q=&tags=&from=&to=', what: 'Issues across every project open to you' },
-      { verb: 'GET', path: '/issues/:key', what: 'One issue whole: comments, history, files, links, commits' },
-      { verb: 'GET', path: '/issues/search?q=text', what: 'Issues whose summary carries the text' },
-      { verb: 'GET', path: '/my-issues', what: 'Everything open on your own hands' },
-      { verb: 'GET', path: '/my-favourites', what: 'Your starred issues' },
-      { verb: 'GET', path: '/people', what: 'Everyone on the tracker' },
-      { verb: 'GET', path: '/tags', what: 'Every tag' },
-      { verb: 'GET', path: '/analytics?from=&to=', what: 'The numbers behind Analytics' },
-      { verb: 'GET', path: '/events', what: 'Live stream of every change you may see' },
+      { verb: 'GET', path: '/me', what: t('api.calls.me') },
+      { verb: 'GET', path: '/projects', what: t('api.calls.projects') },
+      { verb: 'GET', path: '/boards/:boardId', what: t('api.calls.board') },
+      { verb: 'GET', path: '/boards/:boardId/issues', what: t('api.calls.boardIssues') },
+      { verb: 'GET', path: '/issues?q=&tags=&from=&to=', what: t('api.calls.issues') },
+      { verb: 'GET', path: '/issues/:key', what: t('api.calls.issue') },
+      { verb: 'GET', path: '/issues/search?q=text', what: t('api.calls.search') },
+      { verb: 'GET', path: '/my-issues', what: t('api.calls.myIssues') },
+      { verb: 'GET', path: '/my-favourites', what: t('api.calls.favourites') },
+      { verb: 'GET', path: '/people', what: t('api.calls.people') },
+      { verb: 'GET', path: '/tags', what: t('api.calls.tags') },
+      { verb: 'GET', path: '/analytics?from=&to=', what: t('api.calls.analytics') },
+      { verb: 'GET', path: '/events', what: t('api.calls.events') },
     ],
   },
   {
-    group: 'Issues',
+    group: t('api.groups.issues'),
     calls: [
-      { verb: 'POST', path: '/boards/:boardId/issues', what: 'Write a new issue onto that board' },
-      { verb: 'PATCH', path: '/issues/:issueId', what: 'Change summary, description, status, priority, assignee, watcher, due date, tags, board' },
-      { verb: 'DELETE', path: '/issues/:issueId', what: 'Delete an issue, if your role can' },
-      { verb: 'POST', path: '/issues/:issueId/links', what: 'Link it to another issue' },
-      { verb: 'DELETE', path: '/issues/:issueId/links/:otherId', what: 'Unlink the two' },
-      { verb: 'PUT', path: '/issues/:issueId/favourite', what: 'Star or unstar it' },
+      { verb: 'POST', path: '/boards/:boardId/issues', what: t('api.calls.createIssue') },
+      { verb: 'PATCH', path: '/issues/:issueId', what: t('api.calls.patchIssue') },
+      { verb: 'DELETE', path: '/issues/:issueId', what: t('api.calls.deleteIssue') },
+      { verb: 'POST', path: '/issues/:issueId/links', what: t('api.calls.link') },
+      { verb: 'DELETE', path: '/issues/:issueId/links/:otherId', what: t('api.calls.unlink') },
+      { verb: 'PUT', path: '/issues/:issueId/favourite', what: t('api.calls.favourite') },
     ],
   },
   {
-    group: 'Comments and files',
+    group: t('api.groups.comments'),
     calls: [
-      { verb: 'POST', path: '/issues/:issueId/comments', what: 'Post a comment' },
-      { verb: 'PATCH', path: '/comments/:commentId', what: 'Edit your comment' },
-      { verb: 'DELETE', path: '/comments/:commentId', what: 'Delete a comment' },
-      { verb: 'PUT', path: '/comments/:commentId/pin', what: 'Pin or unpin it' },
-      { verb: 'POST', path: '/issues/:issueId/attachments', what: 'Attach a file; add ?comment=:commentId to put it on your comment' },
-      { verb: 'GET', path: '/attachments/:fileId', what: 'Download a file' },
-      { verb: 'DELETE', path: '/attachments/:fileId', what: 'Remove a file' },
+      { verb: 'POST', path: '/issues/:issueId/comments', what: t('api.calls.comment') },
+      { verb: 'PATCH', path: '/comments/:commentId', what: t('api.calls.editComment') },
+      { verb: 'DELETE', path: '/comments/:commentId', what: t('api.calls.deleteComment') },
+      { verb: 'PUT', path: '/comments/:commentId/pin', what: t('api.calls.pin') },
+      { verb: 'POST', path: '/issues/:issueId/attachments', what: t('api.calls.attach') },
+      { verb: 'GET', path: '/attachments/:fileId', what: t('api.calls.download') },
+      { verb: 'DELETE', path: '/attachments/:fileId', what: t('api.calls.removeFile') },
     ],
   },
   {
-    group: 'Notices',
+    group: t('api.groups.notices'),
     calls: [
-      { verb: 'GET', path: '/notices', what: 'Your notices, newest first' },
-      { verb: 'GET', path: '/notices/unread', what: 'How many are unread, by kind' },
-      { verb: 'POST', path: '/notices/read', what: 'Mark one read with its id, or all of them without one' },
+      { verb: 'GET', path: '/notices', what: t('api.calls.notices') },
+      { verb: 'GET', path: '/notices/unread', what: t('api.calls.unread') },
+      { verb: 'POST', path: '/notices/read', what: t('api.calls.read') },
     ],
   },
   {
-    group: 'Calendar',
+    group: t('api.groups.calendar'),
     calls: [
-      { verb: 'GET', path: '/calendar?from=&to=', what: 'Marked days, due dates and activity in the range' },
-      { verb: 'POST', path: '/key-dates', what: 'Mark a day' },
-      { verb: 'PATCH', path: '/key-dates/:dateId', what: 'Change a marked day' },
-      { verb: 'DELETE', path: '/key-dates/:dateId', what: 'Remove it, if your role can' },
+      { verb: 'GET', path: '/calendar?from=&to=', what: t('api.calls.calendar') },
+      { verb: 'POST', path: '/key-dates', what: t('api.calls.markDay') },
+      { verb: 'PATCH', path: '/key-dates/:dateId', what: t('api.calls.changeDay') },
+      { verb: 'DELETE', path: '/key-dates/:dateId', what: t('api.calls.removeDay') },
     ],
   },
   {
-    group: 'Settings',
+    group: t('api.groups.settings'),
     calls: [
-      { verb: 'POST', path: '/projects', what: 'Make a project' },
-      { verb: 'PATCH', path: '/projects/:key', what: 'Change a project' },
-      { verb: 'POST', path: '/projects/:key/boards', what: 'Make a board' },
-      { verb: 'PATCH', path: '/boards/:boardId', what: 'Change a board' },
-      { verb: 'POST', path: '/boards/:boardId/states', what: 'Make a status' },
-      { verb: 'PATCH', path: '/states/:statusId', what: 'Change a status' },
-      { verb: 'POST', path: '/tags', what: 'Make a tag' },
-      { verb: 'PATCH', path: '/tags/:tagId', what: 'Change a tag' },
-      { verb: 'PUT', path: '/tags/:tagId/boards/:boardId', what: 'Show the tag on a board' },
-      { verb: 'DELETE', path: '/tags/:tagId/boards/:boardId', what: 'Hide it there' },
+      { verb: 'POST', path: '/projects', what: t('api.calls.createProject') },
+      { verb: 'PATCH', path: '/projects/:key', what: t('api.calls.patchProject') },
+      { verb: 'POST', path: '/projects/:key/boards', what: t('api.calls.createBoard') },
+      { verb: 'PATCH', path: '/boards/:boardId', what: t('api.calls.patchBoard') },
+      { verb: 'POST', path: '/boards/:boardId/states', what: t('api.calls.createStatus') },
+      { verb: 'PATCH', path: '/states/:statusId', what: t('api.calls.patchStatus') },
+      { verb: 'POST', path: '/tags', what: t('api.calls.createTag') },
+      { verb: 'PATCH', path: '/tags/:tagId', what: t('api.calls.patchTag') },
+      { verb: 'PUT', path: '/tags/:tagId/boards/:boardId', what: t('api.calls.showTag') },
+      { verb: 'DELETE', path: '/tags/:tagId/boards/:boardId', what: t('api.calls.hideTag') },
     ],
   },
-];
+]);
 </script>
 
 <template>
@@ -212,20 +212,20 @@ const CALLS: { group: string; calls: Call[] }[] = [
     <div v-if="errors.token" class="err panel__err sheet__wide">{{ errors.token }}</div>
 
     <section class="panel sheet__wide">
-      <header class="panel__h">Using it</header>
+      <header class="panel__h">{{ t('api.using') }}</header>
       <div class="panel__b form">
         <div class="field">
-          <span class="label">Where to send it</span>
+          <span class="label">{{ t('api.whereTo') }}</span>
           <pre class="api__code">{{ BASE }}</pre>
         </div>
 
         <div class="field">
-          <span class="label">Authorization header</span>
+          <span class="label">{{ t('api.authHeader') }}</span>
           <pre class="api__code">{{ HEADER }}</pre>
         </div>
 
         <div class="field">
-          <span class="label">What answers</span>
+          <span class="label">{{ t('api.answers') }}</span>
           <div class="api__table">
             <template v-for="g in CALLS" :key="g.group">
               <span class="api__group">{{ g.group }}</span>

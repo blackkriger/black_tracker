@@ -7,6 +7,7 @@ const common: Shape<typeof en> = {
   noProjects: 'Проектов пока нет.',
   projectsFailed: 'Не получилось загрузить проекты.',
   wentWrong: 'Что-то пошло не так.',
+  requestFailed: 'Запрос не прошёл ({status}).',
   close: 'Закрыть',
   all: 'все',
   add: 'Добавить',
