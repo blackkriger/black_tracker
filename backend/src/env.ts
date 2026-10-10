@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import path from 'node:path';
 
 function required(key: string): string {
   const v = process.env[key];
@@ -16,6 +17,7 @@ export const env = {
     .map((s) => s.trim())
     .filter(Boolean),
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
+  geoipDir: process.env.GEOIP_DIR ?? path.resolve(process.env.UPLOAD_DIR ?? './uploads', '..', 'geoip'),
   secureCookies: process.env.SECURE_COOKIES === 'true',
   githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? '',
   publicUrl: (process.env.PUBLIC_URL ?? 'https://tracker.example.com').replace(/\/$/, ''),

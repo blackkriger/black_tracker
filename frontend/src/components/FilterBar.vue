@@ -87,6 +87,7 @@ onMounted(() => {
 
 <template>
   <div class="fbar">
+    <slot />
     <FilterMenu
       :model-value="modelValue.projects"
       label="Projects"
@@ -106,16 +107,16 @@ onMounted(() => {
       @update:model-value="set({ assignees: $event })"
     />
     <FilterMenu
-      :model-value="modelValue.authors"
-      label="Author"
-      :options="personChoices"
-      @update:model-value="set({ authors: $event })"
-    />
-    <FilterMenu
       :model-value="modelValue.watchers"
       label="Watcher"
       :options="personChoices"
       @update:model-value="set({ watchers: $event })"
+    />
+    <FilterMenu
+      :model-value="modelValue.authors"
+      label="Author"
+      :options="personChoices"
+      @update:model-value="set({ authors: $event })"
     />
     <span class="fbar__sep" aria-hidden="true"></span>
     <span class="fbar__period" :class="{ 'is-on': periodOn }">

@@ -39,7 +39,7 @@ const analyticsTo = computed(() => ({ name: 'analytics', query: linkQuery(monthF
 const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
 const section = computed(() => {
   const name = String(route.name ?? '');
-  return name.startsWith('settings') ? 'settings' : name;
+  return name.startsWith('settings') ? 'settings' : name.startsWith('analytics') ? 'analytics' : name;
 });
 const at = (name: string): 'page' | undefined => (section.value === name ? 'page' : undefined);
 

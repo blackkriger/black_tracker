@@ -8,6 +8,7 @@ export interface RidgeRow {
   value: string | number | null;
   highlight?: boolean;
   color?: string;
+  hint?: string;
 }
 
 withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
@@ -23,7 +24,7 @@ withDefaults(defineProps<{ rows: RidgeRow[]; full?: number }>(), { full: 4 });
         :class="{ 'is-busiest': row.highlight }"
         :style="{ zIndex: i + 1, ...(row.color ? { '--rg-row-color': row.color } : {}) }"
       >
-        <span class="rg-lab">{{ row.label }}</span>
+        <span class="rg-lab" :title="row.hint">{{ row.label }}</span>
         <svg class="rg-svg" :viewBox="`0 0 ${RIDGE_W} ${RIDGE_H}`" preserveAspectRatio="none">
           <path class="rg-area" :d="ridgePath(row.profile, full).area" />
           <path class="rg-line" :d="ridgePath(row.profile, full).line" />

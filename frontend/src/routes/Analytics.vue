@@ -4,12 +4,13 @@ import { useRoute, useRouter } from 'vue-router';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
 import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
+import AnalyticsTabs from '../components/AnalyticsTabs.vue';
 import FilterBar from '../components/FilterBar.vue';
 import { api } from '../lib/api';
 import { filtersOf, filtersQuery, monthFilters, remember, sameQuery, type Filters } from '../lib/filters';
 import { dayAndMonth } from '../lib/calendar';
 import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/issues';
-import { RIDGE_SMOOTH_KERNEL, smoothRidge } from '../lib/ridge';
+import { ridgeShape } from '../lib/ridge';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
@@ -150,11 +151,6 @@ useLive((ev) => {
 
 const axis = computed(() => (data.value?.statuses ?? []).map((s) => s.name));
 
-const WEIGHT = RIDGE_SMOOTH_KERNEL.reduce((all, k) => all + k, 0);
-function shape(counts: number[]): number[] {
-  return smoothRidge(counts.flatMap((n) => [n, n, n, n, n])).map((v) => v / WEIGHT);
-}
-
 const tallest = computed(() => {
   const all = [
     ...(data.value?.boards ?? []).flatMap((b) => b.states.map((s) => s.count)),
@@ -172,7 +168,7 @@ const boardRows = computed<RidgeRow[]>(() => {
     return {
       key: b.id,
       label: b.name,
-      profile: shape(axis.value.map((name) => byName.get(name) ?? 0)),
+      profile: ridgeShape(axis.value.map((name) => byName.get(name) ?? 0)),
       value: picked.length ? b.total : b.open,
       highlight: !picked.length && b.open === busiest && busiest > 0,
       color: tint,
@@ -187,7 +183,7 @@ const priorityRows = computed<RidgeRow[]>(() => {
     return {
       key: name,
       label: name,
-      profile: shape(axis.value.map((s) => p?.byState[s] ?? 0)),
+      profile: ridgeShape(axis.value.map((s) => p?.byState[s] ?? 0)),
       value: p?.count ?? 0,
       color: priorityColor(name as Priority),
     };
@@ -228,7 +224,7 @@ const closeRows = computed<RidgeRow[]>(() =>
   (data.value?.cycle.months ?? []).map((m) => ({
     key: m.month,
     label: monthLabel(m.month),
-    profile: shape(m.buckets),
+    profile: ridgeShape(m.buckets),
     value: days(m.median),
   }))
 );
@@ -295,7 +291,9 @@ async function openIssue(w: Where): Promise<void> {
   <div class="page">
     <div class="page__body">
       <div class="sheet">
-        <FilterBar v-model="filters" class="sheet__wide" :base="base" />
+        <FilterBar v-model="filters" class="sheet__wide" :base="base">
+          <AnalyticsTabs />
+        </FilterBar>
         <section class="panel sheet__wide">
           <header class="panel__h">Boards</header>
           <div class="panel__b">

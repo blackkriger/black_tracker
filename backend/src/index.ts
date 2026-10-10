@@ -20,6 +20,7 @@ import { registerNoticeRoutes } from './notice-routes.js';
 import { listenForHistory, registerChangeFeed, registerEventRoutes } from './events.js';
 import { registerGitRoutes } from './git-routes.js';
 import { registerFeedbackRoutes } from './feedback-routes.js';
+import { startGeoip } from './geoip.js';
 import { registerMessengerRoutes, startMessengers } from './messenger.js';
 import { registerTelegramRoutes, startTelegram } from './telegram.js';
 import { registerVkRoutes, startVk } from './vk.js';
@@ -102,3 +103,4 @@ startMessengers();
 
 await app.listen({ port: env.port, host: '127.0.0.1' });
 await startVk();
+startGeoip(app.log);

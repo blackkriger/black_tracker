@@ -509,15 +509,6 @@ watch(
         label="Filter by assignee"
       />
       <Select
-        v-model="byAuthor"
-        class="filter"
-        :options="personChoices"
-        placeholder="Author"
-        keep-placeholder
-        small
-        label="Filter by author"
-      />
-      <Select
         v-model="byWatcher"
         class="filter"
         :options="personChoices"
@@ -525,6 +516,15 @@ watch(
         keep-placeholder
         small
         label="Filter by watcher"
+      />
+      <Select
+        v-model="byAuthor"
+        class="filter"
+        :options="personChoices"
+        placeholder="Author"
+        keep-placeholder
+        small
+        label="Filter by author"
       />
 
       <button

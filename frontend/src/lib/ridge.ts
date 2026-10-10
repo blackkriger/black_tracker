@@ -4,6 +4,7 @@ const BASE = RIDGE_H - 3;
 const PEAK = 38;
 
 export const RIDGE_SMOOTH_KERNEL = [0.22, 0.55, 1, 0.55, 0.22];
+const WEIGHT = RIDGE_SMOOTH_KERNEL.reduce((all, k) => all + k, 0);
 
 export function smoothRidge(raw: number[]): number[] {
   return raw.map((_, i) => {
@@ -42,4 +43,8 @@ export function ridgePath(profile: number[], full = 4): { line: string; area: st
     line += ` C${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(p2.x)} ${f(p2.y)}`;
   }
   return { line, area: `${line} L${RIDGE_W} ${BASE} L0 ${BASE} Z` };
+}
+
+export function ridgeShape(counts: number[]): number[] {
+  return smoothRidge(counts.flatMap((n) => [n, n, n, n, n])).map((v) => v / WEIGHT);
 }
