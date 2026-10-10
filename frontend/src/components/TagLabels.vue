@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue';
-import { X } from 'lucide-vue-next';
+import { Palette, X } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 
 export interface TagItem {
@@ -15,6 +15,7 @@ const emit = defineEmits<{
   (e: 'add', name: string): void;
   (e: 'rename', tag: TagItem, name: string): void;
   (e: 'remove', tag: TagItem): void;
+  (e: 'color', tag: TagItem, anchor: HTMLElement): void;
 }>();
 
 const editingId = ref<string | null>(null);
@@ -56,6 +57,12 @@ function add(): void {
         @blur="commitEdit(tag)"
       />
       <button v-else class="taglabel__name" type="button" @click="startEdit(tag)">{{ tag.name }}</button>
+      <button
+        class="taglabel__x"
+        type="button"
+        :aria-label="t('tags.colorOf', { name: tag.name })"
+        @click="emit('color', tag, $event.currentTarget as HTMLElement)"
+      ><Palette class="ic ic--sm" /></button>
       <button
         class="taglabel__x"
         type="button"

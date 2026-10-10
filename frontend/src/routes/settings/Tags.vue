@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import ColorPicker from '../../components/ColorPicker.vue';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import TagLabels, { type TagItem } from '../../components/TagLabels.vue';
 import { api } from '../../lib/api';
@@ -65,6 +66,25 @@ async function rename(tag: TagItem, name: string): Promise<void> {
   try {
     const updated = await api<Tag>(`/tags/${tag.id}`, { method: 'PATCH', body: { name } });
     tags.value = tags.value.map((row) => (row.id === tag.id ? updated : row)).sort(byName);
+  } catch (err) {
+    fail('tags', err);
+  }
+}
+
+const picking = ref<{ tag: TagItem; anchor: HTMLElement } | null>(null);
+
+function pickColor(tag: TagItem, anchor: HTMLElement): void {
+  picking.value = picking.value?.tag.id === tag.id ? null : { tag, anchor };
+}
+
+async function applyColor(color: string): Promise<void> {
+  const p = picking.value;
+  picking.value = null;
+  if (!p || color === p.tag.color) return;
+  clear('tags');
+  try {
+    const updated = await api<Tag>(`/tags/${p.tag.id}`, { method: 'PATCH', body: { color } });
+    tags.value = tags.value.map((row) => (row.id === p.tag.id ? updated : row));
   } catch (err) {
     fail('tags', err);
   }
@@ -139,6 +159,7 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
           @add="add"
           @rename="rename"
           @remove="remove"
+          @color="pickColor"
         />
       </div>
     </section>
@@ -167,6 +188,15 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
       </div>
     </section>
     <div v-if="errors.boards" class="err sheet__wide panel__err">{{ errors.boards }}</div>
+
+    <ColorPicker
+      v-if="picking"
+      :key="picking.tag.id"
+      :initial="picking.tag.color"
+      :anchor="picking.anchor"
+      @pick="applyColor"
+      @close="picking = null"
+    />
   </SettingsLayout>
 </template>
 

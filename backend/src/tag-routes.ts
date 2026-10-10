@@ -26,7 +26,12 @@ const tagCreate = z.object({
 });
 
 const tagPatch = z.object({
-  name: z.string().trim().min(1).max(40),
+  name: z.string().trim().min(1).max(40).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .transform((c) => c.toLowerCase())
+    .optional(),
 });
 
 const TAG_COLUMNS = `id, name, color,
@@ -147,14 +152,16 @@ export function registerTagRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Bad patch.' });
     }
     if (!(await reachesTags(auth))) return reply.code(404).send({ error: 'No such tag.' });
-    const twin = await pool.query('select 1 from tags where lower(name) = lower($1) and id <> $2', [
-      parsed.data.name,
-      id,
-    ]);
-    if (twin.rowCount) return reply.code(409).send({ error: 'A tag with that name already exists.' });
+    if (parsed.data.name) {
+      const twin = await pool.query('select 1 from tags where lower(name) = lower($1) and id <> $2', [
+        parsed.data.name,
+        id,
+      ]);
+      if (twin.rowCount) return reply.code(409).send({ error: 'A tag with that name already exists.' });
+    }
     const res = await pool.query<TagRow>(
-      `update tags set name = $2 where id = $1 returning ${TAG_COLUMNS}`,
-      [id, parsed.data.name]
+      `update tags set name = coalesce($2, name), color = coalesce($3, color) where id = $1 returning ${TAG_COLUMNS}`,
+      [id, parsed.data.name ?? null, parsed.data.color ?? null]
     );
     if (!res.rowCount) return reply.code(404).send({ error: 'No such tag.' });
     const [data] = await withBoards(auth, res.rows);
