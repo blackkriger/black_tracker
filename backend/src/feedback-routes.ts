@@ -21,7 +21,8 @@ function allow(key: string, limit: number): boolean {
 }
 
 const lang = z.enum(['ru', 'en']);
-const scale = z.number().int().min(1).max(5).optional();
+const rating = z.number().int().min(1).max(5);
+const scale = rating.optional();
 const text = (max = 4000) =>
   z
     .string()
@@ -39,23 +40,21 @@ const answers = z
     stopped: z.enum(['finished', 'bored', 'stuck', 'hard', 'crash', 'other']),
     stoppedText: text(),
     ratings: z
-      .object({ exploration: scale, combat: scale, visuals: scale, narrative: scale, replay: scale })
-      .strict()
-      .optional(),
+      .object({ exploration: rating, combat: rating, visuals: rating, narrative: rating, progression: rating })
+      .strict(),
     ratingsText: text(),
     startClear: scale,
     startText: text(),
     readAttacks: scale,
     potions: z.enum(['enough', 'barely', 'short']).optional(),
     deathsFair: scale,
-    enemyText: text(),
+    combatText: text(),
     upgrades: scale,
     coins: z.enum(['enough', 'barely', 'short', 'unclear']).optional(),
     lost: scale,
     lostText: text(),
     interact: scale,
     bugsText: text(),
-    screen: text(200),
     addText: text(),
     removeText: text(),
   })
