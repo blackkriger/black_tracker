@@ -91,7 +91,6 @@ const visit = z.object({
   form: formId,
   lang,
   theme: z.enum(['light', 'dark']).optional(),
-  screen: z.string().regex(/^\d{2,5}x\d{2,5}$/).optional(),
   browserLang: z.string().regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8}){0,3}$/).optional(),
   touch: z.boolean().optional(),
   fresh: z.boolean().optional(),
@@ -101,7 +100,7 @@ const visit = z.object({
     .refine((t) => Object.keys(t).length <= 20),
 });
 
-const AUDIENCE = ['device', 'os', 'browser', 'screen', 'browserLang', 'theme', 'lang', 'country'] as const;
+const AUDIENCE = ['device', 'os', 'browser', 'browserLang', 'theme', 'lang', 'country'] as const;
 
 export function registerFeedbackRoutes(app: FastifyInstance): void {
   app.post('/public/feedback/send', { bodyLimit: 64 * 1024 }, async (req, reply) => {
@@ -136,19 +135,18 @@ export function registerFeedbackRoutes(app: FastifyInstance): void {
     const agent = readAgent(String(req.headers['user-agent'] ?? ''), p.touch ?? false);
     await pool.query(
       `insert into feedback_sessions
-         (id, form_id, day, lang, theme, device, os, browser, screen, browser_lang, country, reached, section_ms)
-       values ($1, $2, (now() at time zone '${ZONE}')::date, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         (id, form_id, day, lang, theme, device, os, browser, browser_lang, country, reached, section_ms)
+       values ($1, $2, (now() at time zone '${ZONE}')::date, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        on conflict (id) do update set
          lang = excluded.lang,
          theme = coalesce(excluded.theme, feedback_sessions.theme),
-         screen = coalesce(excluded.screen, feedback_sessions.screen),
          reached = greatest(feedback_sessions.reached, excluded.reached),
          section_ms = coalesce((
            select jsonb_object_agg(k, greatest(coalesce((feedback_sessions.section_ms ->> k)::bigint, 0),
                                                coalesce((excluded.section_ms ->> k)::bigint, 0)))
              from jsonb_object_keys(feedback_sessions.section_ms || excluded.section_ms) as k
          ), '{}'),
-         visits = feedback_sessions.visits + case when $13 then 1 else 0 end
+         visits = feedback_sessions.visits + case when $12 then 1 else 0 end
        where feedback_sessions.form_id = excluded.form_id`,
       [
         p.session,
@@ -158,7 +156,6 @@ export function registerFeedbackRoutes(app: FastifyInstance): void {
         agent.device,
         agent.os,
         agent.browser,
-        p.screen ?? null,
         p.browserLang ?? null,
         countryOf(req.ip),
         p.reached,
@@ -210,7 +207,7 @@ export function registerFeedbackRoutes(app: FastifyInstance): void {
       pool.query<{ dim: (typeof AUDIENCE)[number]; value: string | null; n: number }>(
         `select d.dim, d.value, count(*)::int as n
            from feedback_sessions,
-                lateral (values ('device', device), ('os', os), ('browser', browser), ('screen', screen),
+                lateral (values ('device', device), ('os', os), ('browser', browser),
                                 ('browserLang', browser_lang), ('theme', theme), ('lang', lang),
                                 ('country', country)) as d(dim, value)
           where ${within}

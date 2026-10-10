@@ -12,7 +12,7 @@ import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
 import { ridgeShape } from '../lib/ridge';
 
-type Dim = 'device' | 'os' | 'browser' | 'screen' | 'browserLang' | 'theme' | 'lang' | 'country';
+type Dim = 'device' | 'os' | 'browser' | 'browserLang' | 'theme' | 'lang' | 'country';
 
 interface Answer {
   id: string;
@@ -40,7 +40,6 @@ const DIMS: { key: Dim; title: string }[] = [
   { key: 'device', title: 'Device' },
   { key: 'os', title: 'System' },
   { key: 'browser', title: 'Browser' },
-  { key: 'screen', title: 'Screen' },
   { key: 'country', title: 'Country' },
   { key: 'browserLang', title: 'Browser language' },
   { key: 'lang', title: 'Page language' },
