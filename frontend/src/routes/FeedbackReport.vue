@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ChevronDown, ChevronRight, Download } from 'lucide-vue-next';
-import AnalyticsTabs from '../components/AnalyticsTabs.vue';
 import DateRangePicker from '../components/DateRangePicker.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import Select from '../components/Select.vue';
@@ -325,7 +324,6 @@ function exportCsv(): void {
     <div class="page__body">
       <div class="sheet">
         <div class="sheet__wide lead">
-          <AnalyticsTabs />
           <Select
             v-if="formChoices.length"
             :model-value="report?.form ?? ''"

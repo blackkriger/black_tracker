@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
 import IssueView from '../components/IssueView.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
-import AnalyticsTabs from '../components/AnalyticsTabs.vue';
 import FilterBar from '../components/FilterBar.vue';
 import { api } from '../lib/api';
 import { filtersOf, filtersQuery, monthFilters, remember, sameQuery, type Filters } from '../lib/filters';
@@ -291,9 +290,7 @@ async function openIssue(w: Where): Promise<void> {
   <div class="page">
     <div class="page__body">
       <div class="sheet">
-        <FilterBar v-model="filters" class="sheet__wide" :base="base">
-          <AnalyticsTabs />
-        </FilterBar>
+        <FilterBar v-model="filters" class="sheet__wide" :base="base" />
         <section class="panel sheet__wide">
           <header class="panel__h">Boards</header>
           <div class="panel__b">

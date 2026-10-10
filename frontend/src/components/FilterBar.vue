@@ -87,7 +87,6 @@ onMounted(() => {
 
 <template>
   <div class="fbar">
-    <slot />
     <FilterMenu
       :model-value="modelValue.projects"
       label="Projects"

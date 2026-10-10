@@ -260,7 +260,21 @@ async function signOut(): Promise<void> {
         {{ session.me.value?.login }}
       </RouterLink>
       <RouterLink v-if="hasRole" class="topitem" :to="issuesTo" :aria-current="at('issues')">Issues</RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" :to="analyticsTo" :aria-current="at('analytics')">Analytics</RouterLink>
+      <span v-if="hasRole" class="topproj">
+        <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')">Analytics</RouterLink>
+        <span class="topboards">
+          <RouterLink
+            class="topitem topitem__board"
+            :class="{ 'is-here': route.name === 'analytics' }"
+            :to="analyticsTo"
+          >Issues</RouterLink>
+          <RouterLink
+            class="topitem topitem__board"
+            :class="{ 'is-here': route.name === 'analytics-feedback' }"
+            :to="{ name: 'analytics-feedback' }"
+          >Feedback</RouterLink>
+        </span>
+      </span>
       <RouterLink v-if="hasRole" class="topitem" to="/settings" :aria-current="at('settings')">Settings</RouterLink>
       <button class="topitem topitem--danger" type="button" @click="signOut">Sign out</button>
     </nav>
@@ -270,7 +284,19 @@ async function signOut(): Promise<void> {
   <aside v-if="narrow ? drawer : layout === 'side'" class="rail" :class="{ 'rail--drawer': narrow }">
     <nav v-if="hasRole" class="rail__sections" aria-label="Sections">
       <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />Issues</RouterLink>
-      <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
+      <div class="rail__proj">
+        <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />Analytics</RouterLink>
+        <RouterLink
+          class="topitem topitem__board rail__board"
+          :class="{ 'is-here': route.name === 'analytics' }"
+          :to="analyticsTo"
+        >Issues</RouterLink>
+        <RouterLink
+          class="topitem topitem__board rail__board"
+          :class="{ 'is-here': route.name === 'analytics-feedback' }"
+          :to="{ name: 'analytics-feedback' }"
+        >Feedback</RouterLink>
+      </div>
     </nav>
 
     <nav v-if="live.length" class="rail__projects" aria-label="Projects">
@@ -525,6 +551,7 @@ async function signOut(): Promise<void> {
 .rail__sections {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
 .rail__date {
   display: flex;
