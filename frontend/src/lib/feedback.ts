@@ -2,7 +2,7 @@ export type FeedbackItem =
   | { kind: 'choice'; key: string; title: string; options: Record<string, string> }
   | { kind: 'scale'; key: string; title: string; short: string }
   | { kind: 'ratings'; key: string; title: string; aspects: Record<string, string>; shorts: Record<string, string> }
-  | { kind: 'text'; key: string; title: string };
+  | { kind: 'text'; key: string; title: string; short: string };
 
 export interface FeedbackSection {
   id: string;
@@ -33,7 +33,12 @@ const DEMO: FeedbackSection[] = [
         title: 'Have you played games like this before?',
         options: { mine: "yes, it's my genre", some: 'a couple of times', first: 'no, first time' },
       },
-      { kind: 'text', key: 'genreText', title: 'Tell us about those games: your favourites and what you love about them' },
+      {
+        kind: 'text',
+        key: 'genreText',
+        title: 'Tell us about those games: your favourites and what you love about them',
+        short: 'Similar games',
+      },
     ],
   },
   {
@@ -53,7 +58,7 @@ const DEMO: FeedbackSection[] = [
           other: 'something else',
         },
       },
-      { kind: 'text', key: 'stoppedText', title: 'Tell us what happened at that moment:' },
+      { kind: 'text', key: 'stoppedText', title: 'Tell us what happened at that moment:', short: 'Why they stopped' },
     ],
   },
   {
@@ -73,7 +78,12 @@ const DEMO: FeedbackSection[] = [
         },
         shorts: { progression: 'Upgrades' },
       },
-      { kind: 'text', key: 'ratingsText', title: 'Tell us more: what did you like, what got in the way?' },
+      {
+        kind: 'text',
+        key: 'ratingsText',
+        title: 'Tell us more: what did you like, what got in the way?',
+        short: 'About the ratings',
+      },
     ],
   },
   {
@@ -81,7 +91,7 @@ const DEMO: FeedbackSection[] = [
     title: 'The opening',
     items: [
       { kind: 'scale', key: 'startClear', title: 'Was it clear what to do in the first minutes?', short: 'Opening' },
-      { kind: 'text', key: 'startText', title: 'What was still unclear at the start?' },
+      { kind: 'text', key: 'startText', title: 'What was still unclear at the start?', short: 'Unclear at the start' },
     ],
   },
   {
@@ -89,7 +99,7 @@ const DEMO: FeedbackSection[] = [
     title: 'Combat in detail',
     items: [
       { kind: 'scale', key: 'readAttacks', title: 'Could you read enemy attacks and react in time?', short: 'Attacks' },
-      { kind: 'text', key: 'combatText', title: 'Tell us more about the fights:' },
+      { kind: 'text', key: 'combatText', title: 'Tell us more about the fights:', short: 'About the fights' },
       { kind: 'scale', key: 'deathsFair', title: 'Did deaths feel fair?', short: 'Deaths' },
       {
         kind: 'choice',
@@ -111,21 +121,23 @@ const DEMO: FeedbackSection[] = [
         options: { enough: 'enough', barely: 'just barely', short: 'not enough', unclear: "didn't get what they're for" },
       },
       { kind: 'scale', key: 'lost', title: 'Did you get lost on the map?', short: 'Map' },
-      { kind: 'text', key: 'lostText', title: 'Where exactly did you get lost?' },
+      { kind: 'text', key: 'lostText', title: 'Where exactly did you get lost?', short: 'Where they got lost' },
       { kind: 'scale', key: 'interact', title: 'Is it clear what you can pick up and interact with?', short: 'Interaction' },
     ],
   },
   {
     id: 'tech',
     title: 'Technical',
-    items: [{ kind: 'text', key: 'bugsText', title: 'Any frame drops, crashes or bugs? Describe the moment:' }],
+    items: [
+      { kind: 'text', key: 'bugsText', title: 'Any frame drops, crashes or bugs? Describe the moment:', short: 'Bugs' },
+    ],
   },
   {
     id: 'last',
     title: 'Last bits',
     items: [
-      { kind: 'text', key: 'addText', title: 'One thing worth adding:' },
-      { kind: 'text', key: 'removeText', title: 'One thing worth removing:' },
+      { kind: 'text', key: 'addText', title: 'One thing worth adding:', short: 'Worth adding' },
+      { kind: 'text', key: 'removeText', title: 'One thing worth removing:', short: 'Worth removing' },
     ],
   },
 ];

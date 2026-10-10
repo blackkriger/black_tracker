@@ -213,6 +213,7 @@ const texts = computed(() =>
           {
             key: it.key,
             title: it.title,
+            short: it.short,
             said: responses.value.flatMap((r) => {
               const v = r.answers[it.key];
               return typeof v === 'string' && v ? [{ id: r.id, at: r.at, lang: r.lang, text: v }] : [];
@@ -225,7 +226,6 @@ const textKey = ref('');
 const shownText = computed(
   () => texts.value.find((t) => t.key === textKey.value) ?? texts.value.find((t) => t.said.length) ?? texts.value[0]
 );
-const textChoices = computed(() => texts.value.map((t) => ({ value: t.key, label: `${t.title} (${t.said.length})` })));
 
 const regions = new Intl.DisplayNames(['en'], { type: 'region' });
 const languages = new Intl.DisplayNames(['en'], { type: 'language' });
@@ -462,24 +462,29 @@ function exportCsv(): void {
         </section>
 
         <section v-if="texts.length" class="panel sheet__wide">
-          <header class="panel__h">
-            Comments
-            <span class="panel__end">
-              <Select
-                :model-value="shownText?.key ?? ''"
-                :options="textChoices"
-                small
-                label="Question"
-                class="said__pick"
-                @update:model-value="textKey = $event"
-              />
-            </span>
-          </header>
-          <div class="panel__b said">
-            <div v-if="!shownText?.said.length" class="hint faint">No answers yet.</div>
-            <div v-for="s in shownText?.said ?? []" :key="s.id" class="said__row">
-              <span class="stamp">{{ stampAt(s.at) }}, {{ s.lang.toUpperCase() }}</span>
-              <p class="said__text">{{ s.text }}</p>
+          <header class="panel__h">Comments</header>
+          <div class="said">
+            <nav class="said__nav" aria-label="Questions">
+              <button
+                v-for="t in texts"
+                :key="t.key"
+                class="said__q"
+                :class="{ 'is-on': t.key === shownText?.key, 'is-empty': !t.said.length }"
+                type="button"
+                :aria-pressed="t.key === shownText?.key"
+                @click="textKey = t.key"
+              >
+                <span class="said__name">{{ t.short }}</span>
+                <span class="said__n">{{ t.said.length }}</span>
+              </button>
+            </nav>
+            <div class="said__body">
+              <div class="said__title">{{ shownText?.title }}</div>
+              <div v-if="!shownText?.said.length" class="hint faint">No answers yet.</div>
+              <div v-for="s in shownText?.said ?? []" :key="s.id" class="said__row">
+                <span class="stamp">{{ stampAt(s.at) }}, {{ s.lang.toUpperCase() }}</span>
+                <p class="said__text">{{ s.text }}</p>
+              </div>
             </div>
           </div>
         </section>
@@ -611,12 +616,60 @@ function exportCsv(): void {
   white-space: normal;
 }
 .said {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+.said__nav {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  border-right: 1px solid var(--line);
+}
+.said__q {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 16px 0 20px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 13px var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.said__q.is-empty {
+  color: var(--text-faint);
+}
+.said__q:hover,
+.said__q.is-on {
+  color: var(--text);
+}
+.said__q:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.said__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.said__n {
+  font: 11px var(--font-num);
+  color: var(--text-muted);
+}
+.said__body {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
+  padding: 20px;
 }
-.said__pick {
-  max-width: 420px;
+.said__title {
+  font-size: 12.5px;
+  color: var(--text-muted);
 }
 .said__row {
   display: flex;
@@ -711,6 +764,13 @@ function exportCsv(): void {
   overflow-wrap: anywhere;
 }
 @media (max-width: 760px) {
+  .said {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .said__nav {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
   .panel__h {
     flex-wrap: wrap;
     height: auto;
