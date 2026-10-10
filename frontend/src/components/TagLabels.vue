@@ -88,4 +88,7 @@ function add(): void {
   font: inherit;
   cursor: text;
 }
+.taglabel__x + .taglabel__x {
+  margin-left: -6px;
+}
 </style>
