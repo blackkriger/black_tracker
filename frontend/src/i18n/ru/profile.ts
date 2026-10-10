@@ -3,7 +3,6 @@ import type { Shape } from '../shape';
 
 const profile: Shape<typeof en> = {
   unknownBrowser: 'Неизвестный браузер',
-  genderUnset: 'Не указан',
   male: 'Мужской',
   female: 'Женский',
   gender: 'Пол',

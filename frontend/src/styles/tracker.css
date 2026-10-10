@@ -23,6 +23,8 @@
   --danger-text: #f2624a;
   --warn: #faa457;
   --ok: #8effa9;
+  --male: #6cb2ff;
+  --female: #ff86c2;
   --ink-shade: 0%;
   --code-keyword: #c98eff;
   --code-string: #8effa9;
@@ -70,6 +72,8 @@
   --danger-text: #b3171d;
   --warn: #b8621c;
   --ok: #2e8a4c;
+  --male: #2369c4;
+  --female: #c23a7e;
   --ink-shade: 40%;
   --code-keyword: #8a4fb0;
   --code-string: #2e8a4c;

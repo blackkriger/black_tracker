@@ -1,6 +1,5 @@
 export default {
   unknownBrowser: 'Unknown browser',
-  genderUnset: 'Not set',
   male: 'Male',
   female: 'Female',
   gender: 'Gender',

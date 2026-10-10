@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import Select from './Select.vue';
+import { Mars, Venus } from 'lucide-vue-next';
 import { api } from '../lib/api';
 import { useLive } from '../lib/live';
 import { buddyAvatarStyle } from '../lib/avatar';
@@ -29,9 +29,8 @@ const me = session.me;
 const fullName = ref(me.value?.fullName ?? '');
 const gender = ref<string>(me.value?.gender ?? '');
 const GENDERS = computed(() => [
-  { value: '', label: t('profile.genderUnset') },
-  { value: 'm', label: t('profile.male') },
-  { value: 'f', label: t('profile.female') },
+  { value: 'm', label: t('profile.male'), icon: Mars },
+  { value: 'f', label: t('profile.female'), icon: Venus },
 ]);
 const nameBusy = ref(false);
 const nameSaved = ref(false);
@@ -215,6 +214,21 @@ async function changePassword(): Promise<void> {
             <span v-if="role" class="who__role" :style="{ color: ink(role.color) }">{{ role.name }}</span>
             <span class="stamp">{{ t('profile.since', { date: since }) }}</span>
           </div>
+          <div class="who__gender" role="group" :aria-label="t('profile.gender')">
+            <button
+              v-for="g in GENDERS"
+              :key="g.value"
+              class="btn btn--sm btn--icon btn--ghost who__g"
+              :class="[`who__g--${g.value}`, { 'is-on': gender === g.value }]"
+              type="button"
+              :title="g.label"
+              :aria-label="g.label"
+              :aria-pressed="gender === g.value"
+              @click="gender = gender === g.value ? '' : g.value"
+            >
+              <component :is="g.icon" class="ic" />
+            </button>
+          </div>
         </div>
         <div class="field">
           <label class="label" for="fullname">{{ t('profile.displayName') }}</label>
@@ -225,10 +239,6 @@ async function changePassword(): Promise<void> {
             maxlength="120"
             :placeholder="me?.login"
           />
-        </div>
-        <div class="field">
-          <label class="label" for="gender">{{ t('profile.gender') }}</label>
-          <Select id="gender" v-model="gender" :options="GENDERS" />
         </div>
         <div class="field">
           <label class="label" for="login">{{ t('auth.login') }}</label>
@@ -406,6 +416,19 @@ async function changePassword(): Promise<void> {
 .who__role {
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+.who__gender {
+  display: flex;
+  margin-left: auto;
+}
+.who__g {
+  color: var(--text);
+}
+.who__g--m.is-on {
+  color: var(--male);
+}
+.who__g--f.is-on {
+  color: var(--female);
 }
 .row-end {
   display: flex;
