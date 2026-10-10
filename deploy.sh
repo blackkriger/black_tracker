@@ -5,6 +5,7 @@ set -euo pipefail
 SERVER="root@server.example"
 DEPLOY_DIR="/opt/issues_tracker"
 WEB_ROOT="/var/www/tracker"
+SITE_ROOT="/var/www/site"
 PM2_APP="tracker-api"
 
 SSH_KEEPALIVE=(-o ServerAliveInterval=15 -o ServerAliveCountMax=4)
@@ -23,6 +24,13 @@ tar -czf - -C frontend/dist . \
     rm -rf $WEB_ROOT.next && mkdir -p $WEB_ROOT.next && tar -xzf - -C $WEB_ROOT.next; \
     mv -T --exchange $WEB_ROOT.next $WEB_ROOT; \
     rm -rf $WEB_ROOT.next"
+
+echo ">> Shipping site to $SERVER:$SITE_ROOT"
+tar -czf - -C site . \
+  | ssh "${SSH_KEEPALIVE[@]}" "$SERVER" "set -e; \
+    rm -rf $SITE_ROOT.next && mkdir -p $SITE_ROOT.next && tar -xzf - -C $SITE_ROOT.next; \
+    if [ -d $SITE_ROOT ]; then mv -T --exchange $SITE_ROOT.next $SITE_ROOT; else mv $SITE_ROOT.next $SITE_ROOT; fi; \
+    rm -rf $SITE_ROOT.next"
 
 echo ">> Updating backend (git pull + npm install + migrate + pm2 restart)"
 ssh "${SSH_KEEPALIVE[@]}" "$SERVER" "set -e; \
