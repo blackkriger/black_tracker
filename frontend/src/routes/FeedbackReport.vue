@@ -456,7 +456,7 @@ function exportCsv(): void {
                 href="https://db-ip.com"
                 target="_blank"
                 rel="noopener"
-              >IP geolocation by DB-IP</a>
+              >IP geolocation done by DB-IP</a>
             </div>
           </div>
         </section>
