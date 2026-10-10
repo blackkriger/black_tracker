@@ -544,6 +544,9 @@ async function signOut(): Promise<void> {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+.rail__sections > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 .rail__date {
   display: flex;
   flex: 1 1 auto;

@@ -4,7 +4,7 @@ import type { Shape } from '../shape';
 const nav: Shape<typeof en> = {
   issues: 'Задачи',
   analytics: 'Аналитика',
-  feedback: 'Отчёты',
+  feedback: 'Обратная связь',
   settings: 'Настройки',
   signOut: 'Выйти',
   projects: 'Проекты',
