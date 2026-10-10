@@ -205,26 +205,32 @@ const choiceColumns = computed(() => [
   choicePanels.value.filter((_, i) => i % 2 === 1),
 ]);
 
-const texts = computed(() =>
-  items.value.flatMap((it) =>
-    it.kind !== 'text'
-      ? []
-      : [
-          {
-            key: it.key,
-            title: it.title,
-            short: it.short,
-            said: responses.value.flatMap((r) => {
-              const v = r.answers[it.key];
-              return typeof v === 'string' && v ? [{ id: r.id, at: r.at, lang: r.lang, text: v }] : [];
-            }),
-          },
-        ]
-  )
+const textSections = computed(() =>
+  sections.value.flatMap((section, i) => {
+    const questions = section.items.flatMap((it) =>
+      it.kind !== 'text'
+        ? []
+        : [
+            {
+              key: it.key,
+              title: it.title,
+              said: responses.value.flatMap((r) => {
+                const v = r.answers[it.key];
+                return typeof v === 'string' && v ? [{ id: r.id, at: r.at, lang: r.lang, text: v }] : [];
+              }),
+            },
+          ]
+    );
+    const count = questions.reduce((all, q) => all + q.said.length, 0);
+    return questions.length ? [{ id: section.id, number: i + 1, title: section.title, questions, count }] : [];
+  })
 );
-const textKey = ref('');
-const shownText = computed(
-  () => texts.value.find((t) => t.key === textKey.value) ?? texts.value.find((t) => t.said.length) ?? texts.value[0]
+const sectionKey = ref('');
+const shownSection = computed(
+  () =>
+    textSections.value.find((s) => s.id === sectionKey.value) ??
+    textSections.value.find((s) => s.count) ??
+    textSections.value[0]
 );
 
 const regions = new Intl.DisplayNames(['en'], { type: 'region' });
@@ -461,29 +467,32 @@ function exportCsv(): void {
           </div>
         </section>
 
-        <section v-if="texts.length" class="panel sheet__wide">
+        <section v-if="textSections.length" class="panel sheet__wide">
           <header class="panel__h">Comments</header>
           <div class="said">
-            <nav class="said__nav" aria-label="Questions">
+            <nav class="said__nav" aria-label="Sections">
               <button
-                v-for="t in texts"
-                :key="t.key"
+                v-for="s in textSections"
+                :key="s.id"
                 class="said__q"
-                :class="{ 'is-on': t.key === shownText?.key, 'is-empty': !t.said.length }"
+                :class="{ 'is-on': s.id === shownSection?.id, 'is-empty': !s.count }"
                 type="button"
-                :aria-pressed="t.key === shownText?.key"
-                @click="textKey = t.key"
+                :aria-pressed="s.id === shownSection?.id"
+                @click="sectionKey = s.id"
               >
-                <span class="said__name">{{ t.short }}</span>
-                <span class="said__n">{{ t.said.length }}</span>
+                <span class="said__num">{{ s.number }}</span>
+                <span class="said__name">{{ s.title }}</span>
+                <span class="said__n">{{ s.count }}</span>
               </button>
             </nav>
             <div class="said__body">
-              <div class="said__title">{{ shownText?.title }}</div>
-              <div v-if="!shownText?.said.length" class="hint faint">No answers yet.</div>
-              <div v-for="s in shownText?.said ?? []" :key="s.id" class="said__row">
-                <span class="stamp">{{ stampAt(s.at) }}, {{ s.lang.toUpperCase() }}</span>
-                <p class="said__text">{{ s.text }}</p>
+              <div v-for="q in shownSection?.questions ?? []" :key="q.key" class="said__group">
+                <div class="said__title">{{ q.title }}</div>
+                <div v-if="!q.said.length" class="hint faint">No answers yet.</div>
+                <div v-for="s in q.said" :key="s.id" class="said__row">
+                  <span class="stamp">{{ stampAt(s.at) }}, {{ s.lang.toUpperCase() }}</span>
+                  <p class="said__text">{{ s.text }}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -615,7 +624,7 @@ function exportCsv(): void {
 }
 .said {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
 }
 .said__nav {
   display: flex;
@@ -647,6 +656,12 @@ function exportCsv(): void {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+.said__num {
+  flex: none;
+  width: 14px;
+  font: 11px var(--font-num);
+  color: var(--text-muted);
+}
 .said__name {
   flex: 1;
   min-width: 0;
@@ -661,9 +676,14 @@ function exportCsv(): void {
 .said__body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 28px;
   min-width: 0;
   padding: 20px;
+}
+.said__group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 .said__title {
   font-size: 12.5px;
