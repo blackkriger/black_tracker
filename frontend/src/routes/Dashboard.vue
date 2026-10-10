@@ -68,8 +68,6 @@ interface Mine {
 }
 const mine = ref<Mine[]>([]);
 const mineLoading = ref(true);
-const watching = ref(false);
-let mineReads = 0;
 
 interface Starred {
   key: string;
@@ -150,22 +148,15 @@ function onPickUp(): void {
 watch(feedDays, () => void loadFeed());
 
 async function loadMine(): Promise<void> {
-  const read = ++mineReads;
   clear('mine');
   try {
-    const got = await api<Mine[]>(watching.value ? '/my-issues?watching=1' : '/my-issues');
-    if (read === mineReads) mine.value = got;
+    mine.value = await api<Mine[]>('/my-issues');
   } catch (err) {
-    if (read === mineReads) fail('mine', err, 'Could not read your issues.');
+    fail('mine', err, 'Could not read your issues.');
   } finally {
-    if (read === mineReads) mineLoading.value = false;
+    mineLoading.value = false;
   }
 }
-watch(watching, () => {
-  mine.value = [];
-  mineLoading.value = true;
-  void loadMine();
-});
 
 const wide = ref(route.query.calendar === 'full');
 
@@ -374,18 +365,7 @@ function closeIssue(): void {
           <section class="panel sheet__wide">
             <header class="panel__h">
               Your issues
-              <span class="panel__end">
-                <span class="seg" role="radiogroup" aria-label="Your part in them">
-                  <label class="seg__i" :class="{ 'is-on': !watching }">
-                    <input v-model="watching" class="sr" type="radio" name="mine-part" :value="false" />
-                    Assignee
-                  </label>
-                  <label class="seg__i" :class="{ 'is-on': watching }">
-                    <input v-model="watching" class="sr" type="radio" name="mine-part" :value="true" />
-                    Watcher
-                  </label>
-                </span>
-              </span>
+              <span class="panel__end">{{ mine.length }}</span>
             </header>
             <div class="panel__b mine">
               <template v-if="mineLoading">
@@ -417,9 +397,7 @@ function closeIssue(): void {
                   :class="{ 'is-late': i.due && i.due < today }"
                 >{{ i.due ? dayAndMonth(i.due) : '—' }}</span>
               </button>
-              <div v-if="!mineLoading && !mine.length" class="hint faint">
-                {{ watching ? 'Nothing to review.' : 'Nothing is on you.' }}
-              </div>
+              <div v-if="!mineLoading && !mine.length" class="hint faint">Nothing is on you.</div>
             </div>
           </section>
           <div v-if="errors.mine" class="err panel__err sheet__wide">{{ errors.mine }}</div>
@@ -776,31 +754,6 @@ function closeIssue(): void {
 }
 .note.is-new {
   color: var(--text);
-}
-.seg {
-  display: inline-flex;
-  height: 26px;
-  border: 1px solid var(--line-2);
-  background: var(--bg);
-}
-.seg__i {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 8px;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 400;
-  cursor: pointer;
-}
-.seg__i + .seg__i {
-  border-left: 1px solid var(--line-2);
-}
-.seg__i:hover,
-.seg__i.is-on {
-  color: var(--text);
-}
-.seg__i:has(input:focus-visible) {
-  box-shadow: var(--focus-ring);
 }
 .kind.is-off {
   opacity: 0.35;

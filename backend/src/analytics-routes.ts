@@ -112,7 +112,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
   app.get('/my-issues', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const watching = (req.query as { watching?: string }).watching === '1';
     const denied = await shutOut(auth);
     if (denied.all) return reply.send({ data: [] });
     const res = await pool.query<{
@@ -132,10 +131,10 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
          join projects p on p.id = i.project_id
          join boards b on b.id = i.board_id
          join states s on s.id = i.state_id
-        where (case when $4 then i.watcher_id else i.assignee_id end) = $3 and i.resolved_at is null
+        where (i.assignee_id = $3 or i.watcher_id = $3) and not s.is_resolved
           and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
         order by i.due_date nulls last, i.readable_id`,
-      [denied.boards, denied.projects, auth.userId, watching]
+      [denied.boards, denied.projects, auth.userId]
     );
     return reply.send({
       data: res.rows.map((r) => ({
