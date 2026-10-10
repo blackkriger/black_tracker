@@ -37,10 +37,10 @@ interface Report {
 }
 
 const DIMS: { key: Dim; title: string }[] = [
+  { key: 'country', title: 'Country' },
   { key: 'device', title: 'Device' },
   { key: 'os', title: 'System' },
   { key: 'browser', title: 'Browser' },
-  { key: 'country', title: 'Country' },
   { key: 'browserLang', title: 'Browser language' },
   { key: 'lang', title: 'Page language' },
   { key: 'theme', title: 'Theme' },
