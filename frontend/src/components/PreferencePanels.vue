@@ -12,7 +12,7 @@ import { useNotices, type NoticeKind } from '../lib/notices';
 import { usePanelErrors } from '../lib/panelErrors';
 import { useSession, type Me } from '../lib/session';
 import { setLanguage } from '../lib/locale';
-import type { LangChoice } from '../i18n';
+import { browserLocale, type LangChoice } from '../i18n';
 
 const { t } = useI18n();
 const session = useSession();
@@ -31,10 +31,12 @@ const THEMES = computed<{ value: Theme; label: string }[]>(() => [
   { value: 'system', label: t('prefs.system') },
 ]);
 
-const LANGS = computed<{ value: LangChoice; label: string }[]>(() => [
-  { value: 'en', label: 'English' },
-  { value: 'ru', label: 'Русский' },
-  { value: 'system', label: t('prefs.system') },
+const SPECIMENS = { en: 'Aa', ru: 'Яя' } as const;
+
+const LANGS = computed<{ value: LangChoice; label: string; specimen: string }[]>(() => [
+  { value: 'en', label: 'English', specimen: SPECIMENS.en },
+  { value: 'ru', label: 'Русский', specimen: SPECIMENS.ru },
+  { value: 'system', label: t('prefs.system'), specimen: SPECIMENS[browserLocale()] },
 ]);
 
 function pickLanguage(next: LangChoice): void {
@@ -95,6 +97,28 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
       </div>
     </section>
     <div class="stack prefs__main">
+      <section class="panel">
+        <header class="panel__h">{{ t('prefs.language') }}</header>
+        <div class="panel__b langs">
+          <label
+            v-for="l in LANGS"
+            :key="l.value"
+            class="layout"
+            :class="{ 'is-on': me?.lang === l.value }"
+          >
+            <input
+              class="sr"
+              type="radio"
+              name="lang"
+              :checked="me?.lang === l.value"
+              @change="pickLanguage(l.value)"
+            />
+            <span class="lang__specimen" aria-hidden="true">{{ l.specimen }}</span>
+            <span class="layout__name">{{ l.label }}</span>
+          </label>
+        </div>
+      </section>
+      <div v-if="errors.lang" class="err panel__err">{{ errors.lang }}</div>
       <section class="panel">
         <header class="panel__h">{{ t('settings.preferences') }}</header>
         <div class="panel__b form">
@@ -168,18 +192,6 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
         </div>
       </section>
       <div v-if="errors.prefs" class="err panel__err">{{ errors.prefs }}</div>
-      <section class="panel">
-        <header class="panel__h">{{ t('prefs.language') }}</header>
-        <div class="panel__b form">
-          <div class="field">
-            <label v-for="l in LANGS" :key="l.value" class="flag">
-              <input type="radio" name="lang" :checked="me?.lang === l.value" @change="pickLanguage(l.value)" />
-              {{ l.label }}
-            </label>
-          </div>
-        </div>
-      </section>
-      <div v-if="errors.lang" class="err panel__err">{{ errors.lang }}</div>
     </div>
   </div>
 </template>
@@ -219,11 +231,18 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
   flex-direction: column;
   gap: var(--space-4);
 }
+.layouts .layout {
+  width: 282px;
+}
+.langs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
 .layout {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: 282px;
   padding: 10px 10px 12px;
   border: 1px solid var(--line-2);
   color: var(--text-faint);
@@ -245,5 +264,13 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
 }
 .layout.is-on .layout__name {
   color: var(--text);
+}
+.lang__specimen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  background: var(--bg);
+  font: 500 34px/1 var(--font-ui);
 }
 </style>
