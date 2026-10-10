@@ -109,6 +109,7 @@ const draft = ref({
   stateId: '',
   priority: 'Normal' as Priority,
   assigneeId: null as string | null,
+  watcherId: null as string | null,
   dueDate: null as string | null,
   tagIds: [] as string[],
 });
@@ -475,6 +476,7 @@ const FIELD_OF: Record<string, string> = {
   board: 'board',
   priority: 'priority',
   assigneeId: 'assignee',
+  watcherId: 'watcher',
   dueDate: 'due',
   tagIds: 'tags',
 };
@@ -590,7 +592,7 @@ const shownPriority = computed(() =>
 );
 function historyValue(field: string, value: string | null): { text: string; login: string | null } {
   if (!value) return { text: '—', login: null };
-  if (field === 'assignee' || field === 'pinged') return { text: value, login: value };
+  if (field === 'assignee' || field === 'watcher' || field === 'pinged') return { text: value, login: value };
   if (field === 'due date') return { text: dueLabel(value)?.text ?? value, login: null };
   return { text: value, login: null };
 }
@@ -629,6 +631,9 @@ async function ping(): Promise<void> {
 
 const shownAssignee = computed(() =>
   creating.value ? draft.value.assigneeId : (issue.value?.assignee?.id ?? null)
+);
+const shownWatcher = computed(() =>
+  creating.value ? draft.value.watcherId : (issue.value?.watcher?.id ?? null)
 );
 const propsOpen = ref(false);
 const shownDue = computed(() => (creating.value ? draft.value.dueDate : (issue.value?.dueDate ?? null)));
@@ -806,6 +811,7 @@ async function load(): Promise<void> {
       stateId: props.createIn ?? props.board.states[0]?.id ?? '',
       priority: 'Normal',
       assigneeId: props.board.defaultAssigneeId ?? null,
+      watcherId: null,
       dueDate: null,
       tagIds: [],
     };
@@ -879,6 +885,7 @@ async function create(): Promise<void> {
         stateId: draft.value.stateId,
         priority: draft.value.priority,
         assigneeId: draft.value.assigneeId,
+        watcherId: draft.value.watcherId,
         dueDate: draft.value.dueDate,
         tagIds: draft.value.tagIds,
       },
@@ -1987,6 +1994,15 @@ async function removeIssue(): Promise<void> {
                     ><Bell class="ic" /></button>
                   </template>
                 </div>
+              </div>
+              <div class="prop" :class="{ 'is-fresh': fresh.has('watcher') }">
+                <span class="prop__k">Watcher</span>
+                <Select
+                  :model-value="shownWatcher ?? ''"
+                  :options="assigneeChoices"
+                  small
+                  @update:model-value="setProp({ watcherId: $event || null })"
+                />
               </div>
               <div class="prop" :class="{ 'is-fresh': fresh.has('due') }">
                 <span class="prop__k">Due</span>

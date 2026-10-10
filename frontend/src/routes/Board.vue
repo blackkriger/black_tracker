@@ -72,6 +72,7 @@ const q = ref('');
 const search = ref<HTMLInputElement | null>(null);
 const byAssignee = ref('');
 const byAuthor = ref('');
+const byWatcher = ref('');
 const byPriority = ref('');
 const { people, colorOf, nameOf, load: loadPeople } = usePeople();
 const byTags = ref<string[]>([]);
@@ -91,6 +92,7 @@ const filtering = computed(
     !!q.value.trim() ||
     !!byAssignee.value ||
     !!byAuthor.value ||
+    !!byWatcher.value ||
     !!byPriority.value ||
     byTags.value.length > 0 ||
     starred.value
@@ -100,6 +102,7 @@ function clearFilters(): void {
   q.value = '';
   byAssignee.value = '';
   byAuthor.value = '';
+  byWatcher.value = '';
   byPriority.value = '';
   byTags.value = [];
   starred.value = false;
@@ -121,6 +124,7 @@ const filtered = computed(() => {
       (!byAssignee.value ||
         (byAssignee.value === 'none' ? !i.assignee : i.assignee?.id === byAssignee.value)) &&
       (!byAuthor.value || i.author?.id === byAuthor.value) &&
+      (!byWatcher.value || i.watcher?.id === byWatcher.value) &&
       (!byPriority.value || i.priority === byPriority.value) &&
       byTags.value.every((id) => i.tags.some((t) => t.id === id)) &&
       (!starred.value || i.favourite)
@@ -512,6 +516,15 @@ watch(
         keep-placeholder
         small
         label="Filter by author"
+      />
+      <Select
+        v-model="byWatcher"
+        class="filter"
+        :options="personChoices"
+        placeholder="Watcher"
+        keep-placeholder
+        small
+        label="Filter by watcher"
       />
 
       <button

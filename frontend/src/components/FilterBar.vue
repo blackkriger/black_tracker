@@ -111,6 +111,12 @@ onMounted(() => {
       :options="personChoices"
       @update:model-value="set({ authors: $event })"
     />
+    <FilterMenu
+      :model-value="modelValue.watchers"
+      label="Watcher"
+      :options="personChoices"
+      @update:model-value="set({ watchers: $event })"
+    />
     <span class="fbar__sep" aria-hidden="true"></span>
     <span class="fbar__period" :class="{ 'is-on': periodOn }">
       <DateRangePicker

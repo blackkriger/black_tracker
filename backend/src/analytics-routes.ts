@@ -10,7 +10,8 @@ const ISSUE_PICKS = `
                 ) = cardinality($7))
             and ($8::text[] is null or i.assignee_id in (select id from users where login = any($8))
                  or ('-' = any($8) and i.assignee_id is null))
-            and ($9::text[] is null or i.author_id in (select id from users where login = any($9)))`;
+            and ($9::text[] is null or i.author_id in (select id from users where login = any($9)))
+            and ($10::text[] is null or i.watcher_id in (select id from users where login = any($10)))`;
 
 async function shutOut(auth: Auth): Promise<{ all: boolean; projects: string[]; boards: string[] }> {
   const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
@@ -111,6 +112,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
   app.get('/my-issues', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
+    const watching = (req.query as { watching?: string }).watching === '1';
     const denied = await shutOut(auth);
     if (denied.all) return reply.send({ data: [] });
     const res = await pool.query<{
@@ -130,10 +132,10 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
          join projects p on p.id = i.project_id
          join boards b on b.id = i.board_id
          join states s on s.id = i.state_id
-        where i.assignee_id = $3 and i.resolved_at is null
+        where (case when $4 then i.watcher_id else i.assignee_id end) = $3 and i.resolved_at is null
           and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
         order by i.due_date nulls last, i.readable_id`,
-      [denied.boards, denied.projects, auth.userId]
+      [denied.boards, denied.projects, auth.userId, watching]
     );
     return reply.send({
       data: res.rows.map((r) => ({
@@ -195,6 +197,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
     const tagged = listOf(q.tags)?.filter((t) => /^[0-9a-f-]{36}$/i.test(t)) ?? null;
     const holders = listOf(q.assignees);
     const writers = listOf(q.authors);
+    const watchers = listOf(q.watchers);
     const from = (q.from ?? '').trim() || null;
     const to = (q.to ?? '').trim() || null;
     if ((from && !DAY_RE.test(from)) || (to && !DAY_RE.test(to))) {
@@ -217,7 +220,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
     }
 
     const seen: [string[], string[], string[] | null] = [denied.boards, denied.projects, only];
-    const within = [...seen, inState, from, to, tagged, holders, writers];
+    const within = [...seen, inState, from, to, tagged, holders, writers, watchers];
     const people_ = holders?.filter((login) => login !== '-') ?? null;
 
     const [statuses, cells, dues, people, held, loose, priorities, cycle, months, worked, bounds] =
@@ -382,6 +385,7 @@ ${ISSUE_PICKS}
         states: inState,
         tags: tagged,
         authors: writers,
+        watchers,
         from,
         to,
       }),

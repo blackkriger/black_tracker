@@ -61,6 +61,7 @@ interface IssueRow {
   state_id: string;
   priority: string;
   assignee_id: string | null;
+  watcher_id: string | null;
   author_id: string | null;
   due_date: string | null;
   position: number;
@@ -69,6 +70,7 @@ interface IssueRow {
   resolved_at: Date | null;
   via_bot: boolean;
   assignee_login: string | null;
+  watcher_login: string | null;
   author_login: string | null;
 }
 
@@ -114,6 +116,7 @@ const publicIssue = (r: IssueRow, tags: TagRow[] = [], favourite = false) => ({
   stateId: r.state_id,
   priority: r.priority,
   assignee: person(r.assignee_id, r.assignee_login),
+  watcher: person(r.watcher_id, r.watcher_login),
   author: person(r.author_id, r.author_login),
   dueDate: r.due_date,
   position: r.position,
@@ -126,9 +129,10 @@ const publicIssue = (r: IssueRow, tags: TagRow[] = [], favourite = false) => ({
 });
 
 const ISSUE_SELECT = `
-  select i.*, a.login as assignee_login, w.login as author_login
+  select i.*, a.login as assignee_login, v.login as watcher_login, w.login as author_login
     from issues i
     left join users a on a.id = i.assignee_id
+    left join users v on v.id = i.watcher_id
     left join users w on w.id = i.author_id`;
 
 async function tagsFor(issueIds: string[]): Promise<Map<string, TagRow[]>> {
@@ -334,7 +338,7 @@ async function loadIssueFor(
   return { auth, issue };
 }
 
-const STARRED_FIELDS = new Set(['status', 'assignee', 'priority', 'due date', 'link added', 'link removed']);
+const STARRED_FIELDS = new Set(['status', 'assignee', 'watcher', 'priority', 'due date', 'link added', 'link removed']);
 
 interface StarChange {
   field: string;
@@ -371,7 +375,7 @@ async function noteStarred(
     [issueId, actorId]
   );
   for (const w of watchers.rows) {
-    if (change.field === 'assignee' && change.to === w.login) continue;
+    if ((change.field === 'assignee' || change.field === 'watcher') && change.to === w.login) continue;
     const open = await client.query<{ id: string; detail: string | null }>(
       `select id, detail from notices
         where user_id = $1 and issue_id = $2 and by_id = $3 and kind = 'starred'
@@ -505,6 +509,7 @@ const issueCreate = z.object({
   stateId: z.string().uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
+  watcherId: z.string().uuid().nullable().optional(),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
@@ -528,6 +533,7 @@ const issuePatch = z.object({
   stateId: z.string().uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
+  watcherId: z.string().uuid().nullable().optional(),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
@@ -578,6 +584,7 @@ export async function createIssue(
 ): Promise<{ issue: IssueRow; tags: TagRow[] } | { error: string }> {
   const projectId = board.project_id;
   const assigneeId = p.assigneeId !== undefined ? p.assigneeId : board.default_assignee_id;
+  const watcherId = p.watcherId ?? null;
   const stateId = p.stateId ?? board.default_state_id;
   if (!stateId) return { error: 'This board has no statuses yet.' };
   const state = await pool.query('select 1 from states where id = $1 and board_id = $2', [
@@ -603,8 +610,8 @@ export async function createIssue(
     const row = await client.query<{ id: string }>(
       `insert into issues
          (readable_id, project_id, board_id, number, summary, description, state_id,
-          priority, assignee_id, author_id, due_date, position, via_bot)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          priority, assignee_id, author_id, due_date, position, via_bot, watcher_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        returning id`,
       [
         `${short}-${number}`,
@@ -620,6 +627,7 @@ export async function createIssue(
         p.dueDate ?? null,
         top.rows[0].pos,
         options.viaBot ?? false,
+        watcherId,
       ]
     );
     if (p.tagIds?.length) {
@@ -636,6 +644,12 @@ export async function createIssue(
         [assigneeId, row.rows[0].id, by.userId]
       );
     }
+    if (watcherId && watcherId !== by.userId) {
+      await client.query(
+        `insert into notices (user_id, kind, issue_id, by_id, detail) values ($1, 'assigned', $2, $3, 'watcher')`,
+        [watcherId, row.rows[0].id, by.userId]
+      );
+    }
     if (await autoStar(client, by.userId, row.rows[0].id, 'star_created')) {
       autoStarred.push(by.userId);
     }
@@ -646,6 +660,9 @@ export async function createIssue(
   });
   if (assigneeId && assigneeId !== by.userId) {
     void publish({ type: 'notice.changed', only: assigneeId });
+  }
+  if (watcherId && watcherId !== by.userId && watcherId !== assigneeId) {
+    void publish({ type: 'notice.changed', only: watcherId });
   }
 
   const row = await issueById(created);
@@ -1036,6 +1053,28 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           autoStarred.push(p.assigneeId);
         }
       }
+      if (p.watcherId !== undefined && (p.watcherId ?? null) !== issue.watcher_id) {
+        const names = await client.query<{ id: string; login: string }>(
+          'select id, login from users where id = any($1::uuid[])',
+          [[issue.watcher_id, p.watcherId ?? null].filter(Boolean)]
+        );
+        const login = (uid: string | null) =>
+          uid ? (names.rows.find((r) => r.id === uid)?.login ?? null) : null;
+        await writeHistory(
+          client,
+          id,
+          auth,
+          'watcher',
+          login(issue.watcher_id),
+          login(p.watcherId ?? null)
+        );
+        if (p.watcherId && p.watcherId !== auth.userId) {
+          await client.query(
+            `insert into notices (user_id, kind, issue_id, by_id, detail) values ($1, 'assigned', $2, $3, 'watcher')`,
+            [p.watcherId, id, auth.userId]
+          );
+        }
+      }
       if (landing) {
         const was = await client.query<{ name: string }>('select name from boards where id = $1', [
           issue.board_id,
@@ -1062,6 +1101,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
                 priority = coalesce($5, priority),
                 assignee_id = case when $6 then $7::uuid else assignee_id end,
                 due_date = case when $8 then $9::date else due_date end,
+                watcher_id = case when $10 then $11::uuid else watcher_id end,
                 updated_at = now()
           where id = $1`,
         [
@@ -1074,6 +1114,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           p.assigneeId ?? null,
           p.dueDate !== undefined,
           p.dueDate ?? null,
+          p.watcherId !== undefined,
+          p.watcherId ?? null,
         ]
       );
 
@@ -1111,8 +1153,11 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (p.assigneeId && p.assigneeId !== issue.assignee_id && p.assigneeId !== auth.userId) {
       void publish({ type: 'notice.changed', only: p.assigneeId });
     }
+    if (p.watcherId && p.watcherId !== issue.watcher_id && p.watcherId !== auth.userId) {
+      void publish({ type: 'notice.changed', only: p.watcherId });
+    }
     for (const who of autoStarred) tellStarred(who, row as IssueRow);
-    if (['stateId', 'boardId', 'assigneeId', 'priority', 'dueDate'].some((k) => k in p)) {
+    if (['stateId', 'boardId', 'assigneeId', 'watcherId', 'priority', 'dueDate'].some((k) => k in p)) {
       void tellWatchers(row as IssueRow, auth.userId);
     }
     const [tags, stars] = await Promise.all([tagsFor([id]), starredBy(auth.userId, [id])]);
@@ -1202,7 +1247,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const tags = listOf(q.tags)?.filter((t) => /^[0-9a-f-]{36}$/i.test(t)) ?? null;
     const term = (q.q ?? '').trim().slice(0, 100) || null;
     const res = await pool.query<ListedRow>(
-      `select i.*, a.login as assignee_login, w.login as author_login,
+      `select i.*, a.login as assignee_login, v.login as watcher_login, w.login as author_login,
               s.name as state_name, s.color as state_color, s.is_resolved,
               b.name as board_name, b.slug, p.short_name
          from issues i
@@ -1210,6 +1255,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
          join boards b on b.id = i.board_id
          join states s on s.id = i.state_id
          left join users a on a.id = i.assignee_id
+         left join users v on v.id = i.watcher_id
          left join users w on w.id = i.author_id
         where not p.archived
           and b.id <> all($1::uuid[]) and p.id <> all($2::uuid[])
@@ -1225,6 +1271,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           and ($10::date is null or (i.created_at at time zone '${ZONE}')::date <= $10)
           and ($11::text is null or i.summary ilike '%' || $11 || '%' or i.readable_id ilike $11 || '%'
                or split_part(i.readable_id, '-', 2) = $11)
+          and ($12::text[] is null or v.login = any($12))
         order by i.updated_at desc, i.created_at desc
         limit 1000`,
       [
@@ -1239,6 +1286,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
         from,
         to,
         term,
+        listOf(q.watchers),
       ]
     );
     const tagged = await tagsFor(res.rows.map((r) => r.id));

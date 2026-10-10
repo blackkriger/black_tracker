@@ -165,11 +165,13 @@ type Change = { field: string; from: string | null; to: string | null };
 function publicNotice(r: NoticeRow, mine: string) {
   if (!r.comment_id) {
     const starred = r.kind === 'starred';
+    const review = r.kind === 'assigned' && r.detail === 'watcher';
     return {
       id: r.id,
       kind: r.kind,
+      review,
       commentId: null,
-      emoji: starred ? null : r.detail,
+      emoji: starred || review ? null : r.detail,
       changes: starred ? (JSON.parse(r.detail ?? '[]') as Change[]) : [],
       said: (r.summary ?? '').slice(0, 140),
       by: r.by_login,
@@ -188,6 +190,7 @@ function publicNotice(r: NoticeRow, mine: string) {
   return {
     id: r.id,
     kind: r.kind,
+    review: false,
     commentId: r.comment_id,
     emoji: r.detail,
     changes: [] as Change[],

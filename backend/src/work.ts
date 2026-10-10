@@ -57,6 +57,7 @@ export interface WorkFilter {
   states?: string[] | null;
   tags?: string[] | null;
   authors?: string[] | null;
+  watchers?: string[] | null;
   from: string | null;
   to: string | null;
   login?: string | null;
@@ -99,7 +100,8 @@ export async function workOf(f: WorkFilter): Promise<Worked[]> {
                  and (ah.old_value = $7 or ah.new_value = $7)
             ))
         and ($8::text[] is null or s.name = any($8))
-        and ($9::text[] is null or i.author_id in (select id from users where login = any($9)))`,
+        and ($9::text[] is null or i.author_id in (select id from users where login = any($9)))
+        and ($10::text[] is null or i.watcher_id in (select id from users where login = any($10)))`,
     [
       f.boards,
       f.projects,
@@ -110,6 +112,7 @@ export async function workOf(f: WorkFilter): Promise<Worked[]> {
       f.login ?? null,
       f.states ?? null,
       f.authors ?? null,
+      f.watchers ?? null,
     ]
   );
   if (!issues.rows.length) return [];

@@ -6,6 +6,7 @@ export interface Filters {
   states: string[];
   assignees: string[];
   authors: string[];
+  watchers: string[];
   tags: string[];
   from: string;
   to: string;
@@ -16,12 +17,13 @@ interface Remembered {
   states: string[];
   assignees: string[];
   authors: string[];
+  watchers: string[];
   tags: string[];
   period: { from: string; to: string } | null;
 }
 
 const KEPT = 'tracker:filters';
-const LISTS = ['projects', 'states', 'assignees', 'authors', 'tags'] as const;
+const LISTS = ['projects', 'states', 'assignees', 'authors', 'watchers', 'tags'] as const;
 const KEYS = [...LISTS, 'from', 'to'];
 
 const listOf = (v: unknown): string[] => (typeof v === 'string' && v ? v.split(',').filter(Boolean) : []);
@@ -31,6 +33,7 @@ export const noFilters = (): Filters => ({
   states: [],
   assignees: [],
   authors: [],
+  watchers: [],
   tags: [],
   from: '',
   to: '',
@@ -45,7 +48,15 @@ export function monthFilters(): Filters {
 }
 
 function readRemembered(): Remembered {
-  const empty: Remembered = { projects: [], states: [], assignees: [], authors: [], tags: [], period: null };
+  const empty: Remembered = {
+    projects: [],
+    states: [],
+    assignees: [],
+    authors: [],
+    watchers: [],
+    tags: [],
+    period: null,
+  };
   try {
     const raw = JSON.parse(localStorage.getItem(KEPT) ?? 'null') as Partial<Remembered> | null;
     return raw ? { ...empty, ...raw } : empty;
@@ -63,6 +74,7 @@ export function remember(f: Filters, base: Filters): void {
     states: f.states,
     assignees: f.assignees,
     authors: f.authors,
+    watchers: f.watchers,
     tags: f.tags,
     period: picked ? { from: f.from, to: f.to } : null,
   };
@@ -78,6 +90,7 @@ function rememberedFilters(base: Filters): Filters {
     states: [...r.states],
     assignees: [...r.assignees],
     authors: [...r.authors],
+    watchers: [...r.watchers],
     tags: [...r.tags],
     from: r.period ? r.period.from : base.from,
     to: r.period ? r.period.to : base.to,
@@ -91,6 +104,7 @@ export function filtersOf(query: LocationQuery, base: Filters = noFilters()): Fi
     states: listOf(query.states),
     assignees: listOf(query.assignees),
     authors: listOf(query.authors),
+    watchers: listOf(query.watchers),
     tags: listOf(query.tags),
     from: query.from !== undefined ? String(query.from ?? '') : base.from,
     to: query.to !== undefined ? String(query.to ?? '') : base.to,

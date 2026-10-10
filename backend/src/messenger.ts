@@ -133,7 +133,7 @@ function changesOf(detail: string | null, names: Map<string, string>): string {
   const changes = JSON.parse(detail ?? '[]') as { field: string; from: string | null; to: string | null }[];
   const show = (field: string, value: string | null): string => {
     if (!value) return '—';
-    if (field === 'assignee') return names.get(value) ?? value;
+    if (field === 'assignee' || field === 'watcher') return names.get(value) ?? value;
     if (field === 'due date') return dayOf(value);
     return value;
   };
@@ -154,7 +154,11 @@ function noticeNote(n: SendRow, names: Map<string, string>): Note | null {
     case 'mention':
       return note([`${who} mentioned you`], issue, said(n));
     case 'assigned':
-      return note([`${who} assigned you`], issue, n.due_date ? `Due ${dayOf(n.due_date)}` : '');
+      return note(
+        [`${who} ${n.detail === 'watcher' ? 'asked you to review' : 'assigned you'}`],
+        issue,
+        n.due_date ? `Due ${dayOf(n.due_date)}` : ''
+      );
     case 'ping':
       return note([`${who} pinged you`], issue);
     case 'reaction':

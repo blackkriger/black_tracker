@@ -14,6 +14,7 @@ export interface NoticeChange {
 export interface Notice {
   id: string;
   kind: NoticeKind;
+  review: boolean;
   commentId: string | null;
   emoji: string | null;
   changes: NoticeChange[];
@@ -40,7 +41,7 @@ export function showsAuthor(n: Notice, me: string | null | undefined): boolean {
 export function describeChanges(changes: NoticeChange[], name: (login: string) => string): string {
   const show = (c: NoticeChange, value: string | null): string => {
     if (!value) return '—';
-    if (c.field === 'assignee') return name(value);
+    if (c.field === 'assignee' || c.field === 'watcher') return name(value);
     if (c.field === 'due date') return shortDate(value, false);
     return value;
   };
