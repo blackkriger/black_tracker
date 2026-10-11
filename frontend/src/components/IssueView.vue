@@ -190,22 +190,35 @@ const bodyDraft = ref('');
 const importing = ref(false);
 const docUrl = ref('');
 const importBusy = ref(false);
+const importError = ref<string | null>(null);
+const docInput = ref<HTMLInputElement | null>(null);
+
+async function openImport(): Promise<void> {
+  importing.value = true;
+  await nextTick();
+  docInput.value?.focus();
+}
+
+function closeImport(): void {
+  importing.value = false;
+  docUrl.value = '';
+  importError.value = null;
+}
 
 async function importDoc(): Promise<void> {
   const url = docUrl.value.trim();
   if (!url || importBusy.value) return;
   importBusy.value = true;
-  error.value = null;
+  importError.value = null;
   try {
     const { html } = await api<{ html: string }>('/google-doc', { method: 'POST', body: { url } });
     const doc = fromGoogleDoc(html);
     if (doc.summary) titleDraft.value = doc.summary;
     bodyDraft.value = doc.description;
-    importing.value = false;
-    docUrl.value = '';
+    closeImport();
   } catch (err) {
     const status = err instanceof ApiError ? err.status : 0;
-    error.value =
+    importError.value =
       status === 422 ? t('issue.docClosed') : status === 400 ? t('issue.notDocLink') : t('issue.importFailed');
   } finally {
     importBusy.value = false;
@@ -708,7 +721,7 @@ function onFileClick(ev: MouseEvent, a: Attachment): void {
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
-  if (deleting.value || deletingComment.value || picking.value || makingTag.value || shown.value !== null) return;
+  if (deleting.value || deletingComment.value || picking.value || makingTag.value || importing.value || shown.value !== null) return;
   if (reading.value) return;
   if (reacting.value) {
     reacting.value = null;
@@ -1430,8 +1443,8 @@ async function removeIssue(): Promise<void> {
               type="button"
               :title="t('issue.importDoc')"
               :aria-label="t('issue.importDoc')"
-              :aria-expanded="importing"
-              @click="importing = !importing"
+              aria-haspopup="dialog"
+              @click="openImport"
             >
               <FileInput class="ic" />
             </button>
@@ -1525,10 +1538,6 @@ async function removeIssue(): Promise<void> {
 
         <div v-else ref="ivBox" class="iv" @scroll="onMainScroll">
           <div ref="mainBox" class="iv__main" @scroll="onMainScroll">
-            <form v-if="creating && importing" class="addrow iv__import" @submit.prevent="importDoc">
-              <input v-model="docUrl" class="input" type="url" :placeholder="t('issue.docLink')" autofocus />
-              <button class="btn" type="submit" :disabled="!docUrl.trim() || importBusy">{{ t('issue.import') }}</button>
-            </form>
             <input
               v-if="editing"
               v-model="titleDraft"
@@ -2225,6 +2234,19 @@ async function removeIssue(): Promise<void> {
           <button class="btn btn--danger" type="button" @click="removeIssue">{{ t('issue.deleteIssue') }}</button>
         </template>
       </Dialog>
+      <Dialog v-if="importing" :title="t('issue.importDoc')" :width="460" @close="closeImport">
+        <div class="field">
+          <label class="label" for="doc-url">{{ t('issue.docLink') }}</label>
+          <input id="doc-url" ref="docInput" v-model="docUrl" class="input" type="url" @keydown.enter.prevent="importDoc" />
+        </div>
+        <div v-if="importError" class="err">{{ importError }}</div>
+        <template #footer>
+          <button class="btn" type="button" @click="closeImport">{{ t('common.cancel') }}</button>
+          <button class="btn btn--primary" type="button" :disabled="!docUrl.trim() || importBusy" @click="importDoc">
+            {{ t('issue.import') }}
+          </button>
+        </template>
+      </Dialog>
       <Dialog v-if="deletingComment" :title="t('issue.deleteComment')" @close="deletingComment = null">
         <p class="iv__lede">{{ t('issue.deleteCommentText') }}</p>
         <template #footer>
@@ -2237,9 +2259,6 @@ async function removeIssue(): Promise<void> {
 </template>
 
 <style scoped>
-.iv__import {
-  margin: 0 0 var(--space-4);
-}
 .iv__scrim {
   position: fixed;
   inset: 0;
