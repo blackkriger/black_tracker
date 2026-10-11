@@ -8,5 +8,6 @@ export default {
   numbers: 'Numbered list',
   quote: 'Quote',
   link: 'Link',
+  image: 'Picture',
   linkTo: 'Link to',
 };

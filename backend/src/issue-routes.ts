@@ -506,10 +506,9 @@ async function changeState(
 }
 
 const INLINE_IMAGE = /data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+/g;
-const description = z
-  .string()
-  .max(25 * 1024 * 1024)
-  .refine((d) => d.replace(INLINE_IMAGE, '').length <= 20000, 'The description is too long.');
+const withinText = (text: string): boolean => text.replace(INLINE_IMAGE, '').length <= 20000;
+const description = z.string().max(25 * 1024 * 1024).refine(withinText, 'The description is too long.');
+const commentText = z.string().trim().min(1).max(25 * 1024 * 1024).refine(withinText);
 
 const issueCreate = z.object({
   summary: z.string().trim().min(1).max(300),
@@ -726,31 +725,63 @@ async function imageFrom(src: string): Promise<{ mime: string; body: Readable } 
   return { mime, body: Readable.fromWeb(res.body as WebStream) };
 }
 
-export async function adoptImages(issue: IssueRow, by: Actor & { login: string }, origin?: string): Promise<IssueRow> {
-  const found = [...new Set([...issue.description.matchAll(FOREIGN_IMAGE)].map((m) => m[1]))];
-  if (!found.length) return issue;
-  let description = issue.description;
-  let n = 0;
+async function adoptInto(
+  text: string,
+  issue: IssueRow,
+  by: Actor & { login: string },
+  origin: string | undefined,
+  commentId: string | null
+): Promise<string> {
+  const found = [...new Set([...text.matchAll(FOREIGN_IMAGE)].map((m) => m[1]))];
+  if (!found.length) return text;
+  const taken = await pool.query<{ n: number | null }>(
+    `select max(substring(filename from '^image-([0-9]{1,6})\\.')::int) as n from issue_attachments where issue_id = $1`,
+    [issue.id]
+  );
+  let out = text;
+  let n = taken.rows[0].n ?? 0;
   for (const raw of found) {
     try {
       const image = await imageFrom(raw);
       if (!image || !IMAGE_EXT[image.mime]) continue;
       const filename = `image-${++n}${IMAGE_EXT[image.mime]}`;
       const stored = await storeFile(issue.id, image.body, filename);
-      const saved = await recordFile(issue, { stored, filename, mime: image.mime, commentId: null }, by, origin);
-      description = description.split(`src="${raw}"`).join(`src="/api/attachments/${saved.id}"`);
+      const saved = await recordFile(
+        issue,
+        { stored, filename, mime: image.mime, commentId, touchComment: false },
+        by,
+        origin
+      );
+      out = out.split(`src="${raw}"`).join(`src="/api/attachments/${saved.id}"`);
     } catch (err) {
       console.error('[images] not adopted', (err as Error).message);
     }
   }
+  return out;
+}
+
+export async function adoptImages(issue: IssueRow, by: Actor & { login: string }, origin?: string): Promise<IssueRow> {
+  const description = await adoptInto(issue.description, issue, by, origin, null);
   if (description === issue.description) return issue;
   await pool.query('update issues set description = $2 where id = $1', [issue.id, description]);
   return { ...issue, description };
 }
 
+async function adoptCommentImages(
+  commentId: string,
+  text: string,
+  issue: IssueRow,
+  by: Actor & { login: string },
+  origin?: string
+): Promise<string> {
+  const adopted = await adoptInto(text, issue, by, origin, commentId);
+  if (adopted !== text) await pool.query('update issue_comments set text = $2 where id = $1', [commentId, adopted]);
+  return adopted;
+}
+
 export async function recordFile(
   issue: Pick<IssueRow, 'id' | 'board_id' | 'project_id' | 'readable_id'>,
-  file: { stored: string; filename: string; mime: string; commentId: string | null },
+  file: { stored: string; filename: string; mime: string; commentId: string | null; touchComment?: boolean },
   by: Actor & { login: string },
   origin?: string
 ): Promise<{ id: string; filename: string; size: number; createdAt: Date }> {
@@ -768,7 +799,7 @@ export async function recordFile(
     await unlink(onDisk(file.stored)).catch(() => {});
     throw err;
   }
-  if (file.commentId) {
+  if (file.commentId && file.touchComment !== false) {
     await pool.query('update issue_comments set edited_at = now() where id = $1', [file.commentId]);
   }
   await writeHistory(pool, issue.id, by, 'file added', null, filename);
@@ -1631,7 +1662,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!auth) return;
     const found = await loadIssueFor(req, reply, id);
     if (!found) return;
-    const parsed = z.object({ text: z.string().trim().min(1).max(20000) }).safeParse(req.body);
+    const parsed = z.object({ text: commentText }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'A comment needs some text.' });
     let starredNow = false;
     const row = await inTransaction(async (client) => {
@@ -1656,6 +1687,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return res.rows[0];
     });
     if (starredNow) tellStarred(auth.userId, found.issue);
+    row.text = await adoptCommentImages(row.id, row.text, found.issue, auth, tabOf(req));
     await writeHistory(pool, id, auth, 'comment added', null, null);
     void publish({
       type: 'comment.added',
@@ -1794,7 +1826,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { id } = req.params as { id: string };
-    const parsed = z.object({ text: z.string().trim().min(1).max(20000) }).safeParse(req.body);
+    const parsed = z.object({ text: commentText }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'A comment needs some text.' });
     const owner = await pool.query<{ author_id: string; issue_id: string }>(
       'select author_id, issue_id from issue_comments where id = $1',
@@ -1816,6 +1848,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return updated;
     });
     const host = await issueById(owner.rows[0].issue_id);
+    const text = host ? await adoptCommentImages(id, parsed.data.text, host, auth, tabOf(req)) : parsed.data.text;
     await writeHistory(pool, owner.rows[0].issue_id, auth, 'comment edited', null, null);
     void publish({
       type: 'comment.edited',
@@ -1828,7 +1861,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       origin: tabOf(req),
     });
     return reply.send({
-      data: { id, text: parsed.data.text, editedAt: res.rows[0].edited_at.toISOString() },
+      data: { id, text, editedAt: res.rows[0].edited_at.toISOString() },
     });
   });
 

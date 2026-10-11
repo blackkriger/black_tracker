@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   Code,
   Heading3,
+  ImagePlus,
   Italic,
   Link,
   List,
@@ -29,8 +30,12 @@ import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const body = defineModel<string>({ required: true });
-const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?: boolean }>();
-const emit = defineEmits<{ (e: 'files', list: FileList): void; (e: 'blur'): void }>();
+const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?: boolean; inlineImages?: boolean }>();
+const emit = defineEmits<{ (e: 'files', list: File[]): void; (e: 'blur'): void }>();
+
+const INLINE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const INLINE_LIMIT = 20 * 1024 * 1024;
+const picker = ref<HTMLInputElement | null>(null);
 
 const { people, load: loadPeople } = usePeople();
 const { roles, load: loadRoles } = useRoles();
@@ -50,7 +55,41 @@ function onPaste(ev: ClipboardEvent): void {
   if (!files?.length) return;
   ev.preventDefault();
   ev.stopPropagation();
-  emit('files', files);
+  takeFiles([...files]);
+}
+
+const inlinable = (file: File): boolean =>
+  !!props.inlineImages && INLINE_TYPES.includes(file.type) && file.size <= INLINE_LIMIT;
+
+function readUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function insertPictures(files: File[]): Promise<void> {
+  for (const file of files) {
+    const url = await readUrl(file);
+    if (!quill) return;
+    const at = quill.getSelection(true)?.index ?? quill.getLength();
+    quill.insertEmbed(at, 'image', url, 'user');
+    quill.setSelection(at + 1, 0, 'user');
+  }
+}
+
+function takeFiles(list: File[]): void {
+  const others = list.filter((f) => !inlinable(f));
+  if (others.length) emit('files', others);
+  void insertPictures(list.filter(inlinable));
+}
+
+function onPicked(ev: Event): void {
+  const input = ev.target as HTMLInputElement;
+  takeFiles([...(input.files ?? [])]);
+  input.value = '';
 }
 
 const carriesFiles = (ev: DragEvent): boolean =>
@@ -68,7 +107,7 @@ function onDrop(ev: DragEvent): void {
   ev.stopPropagation();
   overWithFiles.value = false;
   const list = ev.dataTransfer?.files;
-  if (list?.length) emit('files', list);
+  if (list?.length) takeFiles([...list]);
 }
 
 const marks = ref({
@@ -457,6 +496,18 @@ function addLink(): void {
       <button type="button" :aria-pressed="marks.ordered" :title="t('editor.numbers')" @click="toggle('list', 'ordered')"><ListOrdered class="ic" /></button>
       <button type="button" :aria-pressed="marks.blockquote" :title="t('editor.quote')" @click="toggle('blockquote')"><Quote class="ic" /></button>
       <button type="button" :title="t('editor.link')" @click="addLink"><Link class="ic" /></button>
+      <template v-if="inlineImages">
+        <button type="button" :title="t('editor.image')" @click="picker?.click()"><ImagePlus class="ic" /></button>
+        <input
+          ref="picker"
+          type="file"
+          multiple
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          class="sr"
+          tabindex="-1"
+          @change="onPicked"
+        />
+      </template>
       <span v-if="$slots.tools" class="mdbar__sep" aria-hidden="true"></span>
       <slot name="tools" />
     </div>

@@ -596,7 +596,7 @@ const pendingShots = computed(() => pending.value.filter(previewOf).map(shotOfFi
 const commentShots = computed(() => commentFiles.value.filter(previewOf).map(shotOfFile));
 const shotsOf = (commentId: string): Shot[] =>
   filesOf(commentId)
-    .filter((a) => isPicture(a.mime))
+    .filter((a) => isPicture(a.mime) && !inlinedIn(commentId).has(a.id))
     .map(shotOfAttachment);
 
 function openPending(key: string, from: 'issue' | 'comment'): void {
@@ -703,9 +703,11 @@ const freeTags = computed(() =>
 );
 const own = computed(() => (issue.value?.attachments ?? []).filter((a) => !a.commentId));
 const ownBytes = computed(() => own.value.reduce((all, a) => all + a.size, 0));
-const inlined = computed(
-  () => new Set([...(issue.value?.description ?? '').matchAll(/\/api\/attachments\/([0-9a-f-]{36})/g)].map((m) => m[1]))
-);
+const attachmentIds = (html: string): Set<string> =>
+  new Set([...html.matchAll(/\/api\/attachments\/([0-9a-f-]{36})/g)].map((m) => m[1]));
+const inlined = computed(() => attachmentIds(issue.value?.description ?? ''));
+const inlinedIn = (commentId: string): Set<string> =>
+  attachmentIds(issue.value?.comments.find((c) => c.id === commentId)?.text ?? '');
 const images = computed(() => own.value.filter((a) => isPicture(a.mime) && !inlined.value.has(a.id)));
 const files = computed(() => own.value.filter((a) => !isPicture(a.mime) || inlined.value.has(a.id)));
 const filesOf = (commentId: string) =>
@@ -1562,6 +1564,7 @@ async function removeIssue(): Promise<void> {
                 v-if="editing"
                 v-model="bodyDraft"
                 :placeholder="t('issue.bodyPlaceholder')"
+                inline-images
                 @files="upload"
                 @blur="keepNew"
               />
@@ -1818,6 +1821,7 @@ async function removeIssue(): Promise<void> {
                         v-model="commentEdit"
                         class="cm__edit"
                         min-height="90px"
+                        inline-images
                         @files="(list) => addToComment(c.id, list)"
                       >
                         <template #tools>
@@ -1859,7 +1863,7 @@ async function removeIssue(): Promise<void> {
                         </div>
                       </div>
                       <span
-                        v-for="a in filesOf(c.id).filter((x) => !isPicture(x.mime))"
+                        v-for="a in filesOf(c.id).filter((x) => !isPicture(x.mime) || inlinedIn(c.id).has(x.id))"
                         :key="a.id"
                         class="att__cap att__row"
                       >
@@ -1868,7 +1872,7 @@ async function removeIssue(): Promise<void> {
                           target="_blank"
                           @click="onFileClick($event, a)"
                         >{{ a.filename }}</a>
-                        <span class="stamp">{{ fileSize(a.size) }}</span>
+                        <span class="stamp">{{ fileSize(a.size) }}<template v-if="inlinedIn(c.id).has(a.id)">, {{ t('issue.inComment') }}</template></span>
                         <a
                           class="btn btn--sm btn--icon btn--ghost"
                           :href="`/api/attachments/${a.id}`"
@@ -1903,6 +1907,7 @@ async function removeIssue(): Promise<void> {
                     min-height="90px"
                     :placeholder="t('issue.commentPlaceholder')"
                     :disabled="posting"
+                    inline-images
                     @files="pickCommentFiles"
                     @blur="keepDraft"
                   >

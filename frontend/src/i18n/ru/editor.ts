@@ -11,6 +11,7 @@ const editor: Shape<typeof en> = {
   numbers: 'Нумерованный список',
   quote: 'Цитата',
   link: 'Ссылка',
+  image: 'Картинка',
   linkTo: 'Адрес ссылки',
 };
 

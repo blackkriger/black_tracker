@@ -121,6 +121,7 @@ const issue: Shape<typeof en> = {
   notDocLink: 'Это не ссылка на Google документ.',
   importFailed: 'Не получилось импортировать документ.',
   inDescription: 'встроено в описание',
+  inComment: 'встроено в комментарий',
 };
 
 export default issue;

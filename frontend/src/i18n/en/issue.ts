@@ -118,4 +118,5 @@ export default {
   notDocLink: 'That is not a Google Docs link.',
   importFailed: 'Could not import the document.',
   inDescription: 'embedded in the description',
+  inComment: 'embedded in the comment',
 };
