@@ -62,5 +62,66 @@ export function fromPlain(text: string): string {
 // Descriptions may be plain text (older rows, API writes), not editor HTML.
 export const looksLikeHtml = (text: string): boolean => /^\s*<(p|h3|h4|ul|ol|pre|blockquote)\b/i.test(text);
 
+const BARE_URL = /https?:\/\/[^\s<>"']+/gi;
+
+function trimUrl(raw: string): string {
+  let url = raw.replace(/[.,;:!?'"]+$/, '');
+  while (url.endsWith(')') && (url.match(/\(/g)?.length ?? 0) < (url.match(/\)/g)?.length ?? 0)) {
+    url = url.slice(0, -1).replace(/[.,;:!?'"]+$/, '');
+  }
+  return url;
+}
+
+function linkTo(url: string): HTMLAnchorElement | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const link = document.createElement('a');
+  link.href = url;
+  if (parsed.origin !== window.location.origin) {
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+  }
+  link.textContent = url;
+  return link;
+}
+
+export function paintLinks(html: string): string {
+  if (!/https?:\/\//i.test(html)) return html;
+  const box = document.createElement('div');
+  box.innerHTML = html;
+
+  const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+  const texts: Text[] = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.parentElement?.closest('a, code, pre')) continue;
+    if (/https?:\/\//i.test(node.nodeValue ?? '')) texts.push(node as Text);
+  }
+
+  let touched = false;
+  for (const node of texts) {
+    const text = node.nodeValue ?? '';
+    const parts = document.createDocumentFragment();
+    let at = 0;
+    for (const m of text.matchAll(BARE_URL)) {
+      const url = trimUrl(m[0]);
+      const link = linkTo(url);
+      if (!link) continue;
+      const from = m.index ?? 0;
+      parts.append(text.slice(at, from), link);
+      at = from + url.length;
+    }
+    if (!at) continue;
+    parts.append(text.slice(at));
+    node.replaceWith(parts);
+    touched = true;
+  }
+
+  return touched ? box.innerHTML : html;
+}
+
 export const asHtml = (text: string): string =>
-  !text ? '' : paintKeys(paintNames(trimBlank(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text)))));
+  !text ? '' : paintKeys(paintNames(paintLinks(trimBlank(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text))))));
