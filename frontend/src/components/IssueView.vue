@@ -703,8 +703,11 @@ const freeTags = computed(() =>
 );
 const own = computed(() => (issue.value?.attachments ?? []).filter((a) => !a.commentId));
 const ownBytes = computed(() => own.value.reduce((all, a) => all + a.size, 0));
-const images = computed(() => own.value.filter((a) => isPicture(a.mime)));
-const files = computed(() => own.value.filter((a) => !isPicture(a.mime)));
+const inlined = computed(
+  () => new Set([...(issue.value?.description ?? '').matchAll(/\/api\/attachments\/([0-9a-f-]{36})/g)].map((m) => m[1]))
+);
+const images = computed(() => own.value.filter((a) => isPicture(a.mime) && !inlined.value.has(a.id)));
+const files = computed(() => own.value.filter((a) => !isPicture(a.mime) || inlined.value.has(a.id)));
 const filesOf = (commentId: string) =>
   (issue.value?.attachments ?? []).filter((a) => a.commentId === commentId);
 const bytesOf = (commentId: string) =>
@@ -1630,7 +1633,7 @@ async function removeIssue(): Promise<void> {
                   target="_blank"
                   @click="onFileClick($event, a)"
                 >{{ a.filename }}</a>
-                <span class="stamp">{{ fileSize(a.size) }}</span>
+                <span class="stamp">{{ fileSize(a.size) }}<template v-if="inlined.has(a.id)">, {{ t('issue.inDescription') }}</template></span>
                 <a
                   class="btn btn--sm btn--icon btn--ghost"
                   :href="`/api/attachments/${a.id}`"

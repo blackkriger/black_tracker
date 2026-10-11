@@ -117,4 +117,5 @@ export default {
   docClosed: 'Open the document to anyone with the link, then try again.',
   notDocLink: 'That is not a Google Docs link.',
   importFailed: 'Could not import the document.',
+  inDescription: 'embedded in the description',
 };

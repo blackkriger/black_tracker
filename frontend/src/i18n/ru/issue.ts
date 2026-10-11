@@ -120,6 +120,7 @@ const issue: Shape<typeof en> = {
   docClosed: 'Открой документ всем, у кого есть ссылка, и попробуй снова.',
   notDocLink: 'Это не ссылка на Google документ.',
   importFailed: 'Не получилось импортировать документ.',
+  inDescription: 'встроено в описание',
 };
 
 export default issue;
