@@ -111,4 +111,10 @@ export default {
   deleteIssue: 'Delete issue',
   deleteComment: 'Delete comment',
   deleteCommentText: 'This takes its files and reactions with it. This cannot be undone.',
+  importDoc: 'Import from Google Docs',
+  docLink: 'Google Docs link',
+  import: 'Import',
+  docClosed: 'Open the document to anyone with the link, then try again.',
+  notDocLink: 'That is not a Google Docs link.',
+  importFailed: 'Could not import the document.',
 };

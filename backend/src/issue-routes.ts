@@ -3,7 +3,9 @@ import { ZipArchive } from 'archiver';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import type { ReadableStream as WebStream } from 'node:stream/web';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { DAY_RE, inTransaction, listOf, pool, ZONE } from './db.js';
@@ -503,9 +505,15 @@ async function changeState(
   );
 }
 
+const INLINE_IMAGE = /data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+/g;
+const description = z
+  .string()
+  .max(25 * 1024 * 1024)
+  .refine((d) => d.replace(INLINE_IMAGE, '').length <= 20000, 'The description is too long.');
+
 const issueCreate = z.object({
   summary: z.string().trim().min(1).max(300),
-  description: z.string().max(20000).optional(),
+  description: description.optional(),
   stateId: z.string().uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
@@ -529,7 +537,7 @@ export const REACTIONS = [
 const issuePatch = z.object({
   summary: z.string().trim().min(1).max(300).optional(),
   boardId: z.string().uuid().optional(),
-  description: z.string().max(20000).optional(),
+  description: description.optional(),
   stateId: z.string().uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
@@ -695,6 +703,51 @@ export async function storeFile(issueId: string, source: NodeJS.ReadableStream, 
   return name;
 }
 
+const FOREIGN_IMAGE =
+  /<img\b[^>]*?\bsrc="(https:\/\/[a-z0-9-]+\.googleusercontent\.com\/[^"]+|data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+)"[^>]*>/gi;
+const IMAGE_EXT: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+};
+const IMAGE_LIMIT = 20 * 1024 * 1024;
+
+async function imageFrom(src: string): Promise<{ mime: string; body: Readable } | null> {
+  const inline = /^data:(image\/[a-z]+);base64,(.+)$/i.exec(src);
+  if (inline) {
+    const bytes = Buffer.from(inline[2], 'base64');
+    return bytes.length && bytes.length <= IMAGE_LIMIT ? { mime: inline[1].toLowerCase(), body: Readable.from(bytes) } : null;
+  }
+  const res = await fetch(src.replace(/&amp;/g, '&'), { signal: AbortSignal.timeout(30_000) });
+  const mime = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  const size = Number(res.headers.get('content-length') ?? 0);
+  if (!res.ok || !res.body || !IMAGE_EXT[mime] || !size || size > IMAGE_LIMIT) return null;
+  return { mime, body: Readable.fromWeb(res.body as WebStream) };
+}
+
+export async function adoptImages(issue: IssueRow, by: Actor & { login: string }, origin?: string): Promise<IssueRow> {
+  const found = [...new Set([...issue.description.matchAll(FOREIGN_IMAGE)].map((m) => m[1]))];
+  if (!found.length) return issue;
+  let description = issue.description;
+  let n = 0;
+  for (const raw of found) {
+    try {
+      const image = await imageFrom(raw);
+      if (!image || !IMAGE_EXT[image.mime]) continue;
+      const filename = `image-${++n}${IMAGE_EXT[image.mime]}`;
+      const stored = await storeFile(issue.id, image.body, filename);
+      const saved = await recordFile(issue, { stored, filename, mime: image.mime, commentId: null }, by, origin);
+      description = description.split(`src="${raw}"`).join(`src="/api/attachments/${saved.id}"`);
+    } catch (err) {
+      console.error('[images] not adopted', (err as Error).message);
+    }
+  }
+  if (description === issue.description) return issue;
+  await pool.query('update issues set description = $2 where id = $1', [issue.id, description]);
+  return { ...issue, description };
+}
+
 export async function recordFile(
   issue: Pick<IssueRow, 'id' | 'board_id' | 'project_id' | 'readable_id'>,
   file: { stored: string; filename: string; mime: string; commentId: string | null },
@@ -776,7 +829,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     }
     const made = await createIssue(auth, id, board, parsed.data, { origin: tabOf(req) });
     if ('error' in made) return reply.code(400).send({ error: made.error });
-    return reply.code(201).send({ data: publicIssue(made.issue, made.tags) });
+    const issue = await adoptImages(made.issue, auth, tabOf(req));
+    return reply.code(201).send({ data: publicIssue(issue, made.tags) });
   });
 
   app.post('/boards/:id/issues/order', async (req, reply) => {
@@ -1149,7 +1203,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       }
     });
 
-    const row = await issueById(id);
+    let row = await issueById(id);
+    if (row && p.description !== undefined) row = await adoptImages(row, auth, tabOf(req));
     if (p.assigneeId && p.assigneeId !== issue.assignee_id && p.assigneeId !== auth.userId) {
       void publish({ type: 'notice.changed', only: p.assigneeId });
     }

@@ -344,6 +344,7 @@ onMounted(() => {
       'list',
       'header',
       'link',
+      'image',
       'mention',
       'issuekey',
     ],
@@ -589,6 +590,11 @@ function addLink(): void {
   flex: 1 1 auto;
   padding: 10px 12px;
   outline: none;
+}
+.rt__editor :deep(.ql-editor img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 .rt__editor :deep(.ql-editor.ql-blank::before) {
   content: attr(data-placeholder);

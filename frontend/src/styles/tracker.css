@@ -344,6 +344,7 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .md ol li[data-list="bullet"] { list-style-type: disc; }
 .md ol li[data-list="ordered"] { list-style-type: decimal; }
 .md code { font: 12.5px var(--font-mono); padding: 1px 5px; background: var(--bg); border: 1px solid var(--line); }
+.md img { display: block; max-width: 100%; height: auto; margin: 0 0 10px; }
 .md a { color: var(--accent); }
 .md .ikey { font-family: var(--font-num); text-decoration: none; }
 .md .ikey.is-closed { text-decoration: line-through; }

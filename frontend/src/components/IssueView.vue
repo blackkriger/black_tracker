@@ -7,6 +7,7 @@ import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
 import { ApiError, TAB_ID, api } from '../lib/api';
 import { asHtml, isBlank, trimBlank } from '../lib/richtext';
+import { fromGoogleDoc } from '../lib/googleDoc';
 import { forgetKeys, keyInfo, refreshKey } from '../lib/issueKeys';
 import { buddyAvatarStyle } from '../lib/avatar';
 import { useLive } from '../lib/live';
@@ -34,6 +35,7 @@ import {
   ChevronRight,
   FileArchive,
   FileDown,
+  FileInput,
   GitCommitHorizontal,
   GitMerge,
   Link2,
@@ -185,6 +187,30 @@ const editing = ref(false);
 const saving = ref(false);
 const titleDraft = ref('');
 const bodyDraft = ref('');
+const importing = ref(false);
+const docUrl = ref('');
+const importBusy = ref(false);
+
+async function importDoc(): Promise<void> {
+  const url = docUrl.value.trim();
+  if (!url || importBusy.value) return;
+  importBusy.value = true;
+  error.value = null;
+  try {
+    const { html } = await api<{ html: string }>('/google-doc', { method: 'POST', body: { url } });
+    const doc = fromGoogleDoc(html);
+    if (doc.summary) titleDraft.value = doc.summary;
+    bodyDraft.value = doc.description;
+    importing.value = false;
+    docUrl.value = '';
+  } catch (err) {
+    const status = err instanceof ApiError ? err.status : 0;
+    error.value =
+      status === 422 ? t('issue.docClosed') : status === 400 ? t('issue.notDocLink') : t('issue.importFailed');
+  } finally {
+    importBusy.value = false;
+  }
+}
 let titleBase = '';
 let bodyBase = '';
 
@@ -1399,6 +1425,16 @@ async function removeIssue(): Promise<void> {
           <div class="sp"></div>
           <Viewers v-if="features.presence && !creating" :logins="watching" class="iv__who" />
           <template v-if="creating">
+            <button
+              class="btn btn--sm btn--icon btn--ghost"
+              type="button"
+              :title="t('issue.importDoc')"
+              :aria-label="t('issue.importDoc')"
+              :aria-expanded="importing"
+              @click="importing = !importing"
+            >
+              <FileInput class="ic" />
+            </button>
             <button class="btn btn--sm" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
             <button
               class="btn btn--sm btn--primary"
@@ -1489,6 +1525,10 @@ async function removeIssue(): Promise<void> {
 
         <div v-else ref="ivBox" class="iv" @scroll="onMainScroll">
           <div ref="mainBox" class="iv__main" @scroll="onMainScroll">
+            <form v-if="creating && importing" class="addrow iv__import" @submit.prevent="importDoc">
+              <input v-model="docUrl" class="input" type="url" :placeholder="t('issue.docLink')" autofocus />
+              <button class="btn" type="submit" :disabled="!docUrl.trim() || importBusy">{{ t('issue.import') }}</button>
+            </form>
             <input
               v-if="editing"
               v-model="titleDraft"
@@ -2197,6 +2237,9 @@ async function removeIssue(): Promise<void> {
 </template>
 
 <style scoped>
+.iv__import {
+  margin: 0 0 var(--space-4);
+}
 .iv__scrim {
   position: fixed;
   inset: 0;

@@ -114,6 +114,12 @@ const issue: Shape<typeof en> = {
   deleteIssue: 'Удалить задачу',
   deleteComment: 'Удалить комментарий',
   deleteCommentText: 'Вместе с комментарием удалятся его файлы и реакции. Это нельзя отменить.',
+  importDoc: 'Импорт из Google Docs',
+  docLink: 'Ссылка на Google документ',
+  import: 'Импортировать',
+  docClosed: 'Открой документ всем, у кого есть ссылка, и попробуй снова.',
+  notDocLink: 'Это не ссылка на Google документ.',
+  importFailed: 'Не получилось импортировать документ.',
 };
 
 export default issue;
