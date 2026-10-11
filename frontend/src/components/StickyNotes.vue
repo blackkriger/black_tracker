@@ -6,7 +6,7 @@ import Dialog from './Dialog.vue';
 import { api } from '../lib/api';
 import { usePanelErrors } from '../lib/panelErrors';
 
-type NoteColor = 'amber' | 'blue' | 'green' | 'pink';
+type NoteColor = 'amber' | 'blue' | 'green' | 'pink' | 'red';
 
 interface Note {
   id: string;
@@ -18,7 +18,7 @@ interface Note {
   updatedAt: string;
 }
 
-const COLORS: NoteColor[] = ['amber', 'blue', 'green', 'pink'];
+const COLORS: NoteColor[] = ['amber', 'blue', 'green', 'pink', 'red'];
 
 const { t } = useI18n();
 const { errors, fail, clear } = usePanelErrors();
@@ -281,6 +281,9 @@ onBeforeUnmount(() => {
 }
 .sticky--pink {
   --h: var(--note-pink);
+}
+.sticky--red {
+  --h: var(--note-red);
 }
 .sticky {
   display: flex;

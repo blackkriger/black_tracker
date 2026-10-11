@@ -19,7 +19,7 @@ export default {
   deleteNote: 'Delete note',
   deleteNoteText: 'This cannot be undone.',
   noteColor: 'Note color',
-  noteColors: { amber: 'Amber', blue: 'Blue', green: 'Green', pink: 'Pink' },
+  noteColors: { amber: 'Amber', blue: 'Blue', green: 'Green', pink: 'Pink', red: 'Red' },
   notesFailed: 'Could not read your notes.',
   noteSaveFailed: 'Could not save the note.',
 };

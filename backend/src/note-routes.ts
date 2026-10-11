@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from './db.js';
 import { requireSession } from './auth.js';
 
-const COLORS = ['amber', 'blue', 'green', 'pink'] as const;
+const COLORS = ['amber', 'blue', 'green', 'pink', 'red'] as const;
 const MAX_NOTES = 40;
 const MAX_BODY = 4000;
 
