@@ -22,7 +22,7 @@ const me: Shape<typeof en> = {
   deleteNote: 'Удалить заметку',
   deleteNoteText: 'Это нельзя отменить.',
   noteColor: 'Цвет заметки',
-  noteColors: { amber: 'Янтарный', blue: 'Синий', green: 'Зелёный', pink: 'Розовый', violet: 'Фиолетовый', plain: 'Серый' },
+  noteColors: { amber: 'Янтарный', blue: 'Синий', green: 'Зелёный', pink: 'Розовый' },
   notesFailed: 'Не получилось прочитать заметки.',
   noteSaveFailed: 'Не получилось сохранить заметку.',
 };

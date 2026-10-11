@@ -6,18 +6,19 @@ import Dialog from './Dialog.vue';
 import { api } from '../lib/api';
 import { usePanelErrors } from '../lib/panelErrors';
 
-type NoteColor = 'amber' | 'blue' | 'green' | 'pink' | 'violet' | 'plain';
+type NoteColor = 'amber' | 'blue' | 'green' | 'pink';
 
 interface Note {
   id: string;
   body: string;
   color: NoteColor;
   position: number;
+  width: number | null;
   height: number | null;
   updatedAt: string;
 }
 
-const COLORS: NoteColor[] = ['amber', 'blue', 'green', 'pink', 'violet', 'plain'];
+const COLORS: NoteColor[] = ['amber', 'blue', 'green', 'pink'];
 
 const { t } = useI18n();
 const { errors, fail, clear } = usePanelErrors();
@@ -28,12 +29,13 @@ const adding = ref(false);
 const coloring = ref<string | null>(null);
 const deleting = ref<Note | null>(null);
 
+const root = ref<HTMLElement | null>(null);
+const room = ref<number | null>(null);
 const bodies = new Map<string, HTMLTextAreaElement>();
 const saves = new Map<string, number>();
-const resizes = new Map<string, number>();
-const seen = new Map<string, number>();
+let resizing: { note: Note; el: HTMLElement; width: number; height: number } | null = null;
 
-async function patch(note: Note, body: Partial<Pick<Note, 'body' | 'color' | 'height'>>): Promise<void> {
+async function patch(note: Note, body: Partial<Pick<Note, 'body' | 'color' | 'width' | 'height'>>): Promise<void> {
   clear('notes');
   try {
     await api(`/me/notes/${note.id}`, { method: 'PATCH', body });
@@ -108,9 +110,6 @@ async function remove(note: Note): Promise<void> {
   deleting.value = null;
   clearTimeout(saves.get(note.id));
   saves.delete(note.id);
-  clearTimeout(resizes.get(note.id));
-  resizes.delete(note.id);
-  seen.delete(note.id);
   bodies.delete(note.id);
   clear('notes');
   const before = notes.value;
@@ -134,34 +133,32 @@ function recolor(note: Note, color: NoteColor): void {
   void patch(note, { color });
 }
 
-const observer = new ResizeObserver((entries) => {
-  for (const entry of entries) {
-    const el = entry.target as HTMLElement;
-    const id = el.dataset.note;
-    if (!id) continue;
-    const height = Math.round(el.offsetHeight);
-    if (seen.get(id) === height) continue;
-    const first = !seen.has(id);
-    seen.set(id, height);
-    if (first) continue;
-    clearTimeout(resizes.get(id));
-    resizes.set(
-      id,
-      window.setTimeout(() => {
-        resizes.delete(id);
-        const note = notes.value.find((n) => n.id === id);
-        if (!note || note.height === height) return;
-        note.height = height;
-        void patch(note, { height });
-      }, 450)
-    );
-  }
-});
+function measureRoom(): void {
+  const el = root.value;
+  if (!el) return;
+  const host = el.closest<HTMLElement>('.page__body') ?? document.documentElement;
+  const box = host.getBoundingClientRect();
+  const right = box.left + host.clientLeft + host.clientWidth - parseFloat(getComputedStyle(host).paddingRight);
+  room.value = Math.max(200, Math.floor(right - el.getBoundingClientRect().left));
+}
 
-function watchSize(id: string, el: unknown): void {
-  if (!(el instanceof HTMLElement) || el.dataset.note === id) return;
-  el.dataset.note = id;
-  observer.observe(el);
+function startResize(note: Note, ev: PointerEvent): void {
+  const el = ev.currentTarget as HTMLElement;
+  if (ev.target !== el) return;
+  measureRoom();
+  resizing = { note, el, width: el.offsetWidth, height: el.offsetHeight };
+}
+
+function endResize(): void {
+  const r = resizing;
+  resizing = null;
+  if (!r) return;
+  const width = Math.round(r.el.offsetWidth);
+  const height = Math.round(r.el.offsetHeight);
+  if (width === r.width && height === r.height) return;
+  r.note.width = width;
+  r.note.height = height;
+  void patch(r.note, { width, height });
 }
 
 function keepBody(id: string, el: unknown): void {
@@ -172,24 +169,30 @@ function onKey(ev: KeyboardEvent): void {
   if (ev.key === 'Escape' && coloring.value) coloring.value = null;
 }
 
-onMounted(() => window.addEventListener('keydown', onKey));
+onMounted(() => {
+  measureRoom();
+  window.addEventListener('keydown', onKey);
+  window.addEventListener('pointerup', endResize);
+  window.addEventListener('resize', measureRoom);
+});
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey);
+  window.removeEventListener('pointerup', endResize);
+  window.removeEventListener('resize', measureRoom);
   for (const note of notes.value) flush(note);
-  observer.disconnect();
 });
 </script>
 
 <template>
-  <div class="stickies">
+  <div ref="root" class="stickies" :style="room ? { '--room': `${room}px` } : undefined">
     <span v-if="loading" class="sk sticky-sk"></span>
     <div
       v-for="n in notes"
       :key="n.id"
-      :ref="(el) => watchSize(n.id, el)"
       class="sticky"
       :class="[`sticky--${n.color}`, { 'is-empty': !n.body.trim() }]"
-      :style="n.height ? { height: `${n.height}px` } : undefined"
+      :style="{ width: n.width ? `${n.width}px` : undefined, height: n.height ? `${n.height}px` : undefined }"
+      @pointerdown="startResize(n, $event)"
     >
       <div class="sticky__head">
         <button
@@ -200,12 +203,13 @@ onBeforeUnmount(() => {
           :disabled="adding"
           @click="add"
         ><Plus class="ic" /></button>
+        <span class="sp"></span>
         <div v-if="coloring === n.id" class="sticky__colors" role="radiogroup" :aria-label="t('me.noteColor')">
           <button
             v-for="c in COLORS"
             :key="c"
-            class="sticky__color"
-            :class="`sticky--${c}`"
+            class="sticky__swatch"
+            :class="[`sticky--${c}`, { 'is-active': n.color === c }]"
             type="button"
             role="radio"
             :aria-checked="n.color === c"
@@ -214,7 +218,6 @@ onBeforeUnmount(() => {
             @click="recolor(n, c)"
           ></button>
         </div>
-        <span class="sp"></span>
         <button
           class="btn btn--sm btn--icon btn--ghost"
           :class="{ 'is-on': coloring === n.id }"
@@ -279,23 +282,19 @@ onBeforeUnmount(() => {
 .sticky--pink {
   --h: var(--note-pink);
 }
-.sticky--violet {
-  --h: var(--note-violet);
-}
-.sticky--plain {
-  --h: var(--note-plain);
-}
 .sticky {
   display: flex;
   flex-direction: column;
   height: 188px;
+  min-width: 200px;
+  max-width: var(--room, 100%);
   min-height: 96px;
   max-height: 4000px;
   background: color-mix(in oklab, var(--h) 10%, var(--card));
   border: 1px solid color-mix(in oklab, var(--h) 35%, var(--line));
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  resize: vertical;
+  resize: both;
 }
 .sticky.is-empty {
   opacity: 0.55;
@@ -321,20 +320,24 @@ onBeforeUnmount(() => {
 .sticky__colors {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-left: 6px;
+  gap: 4px;
+  padding-right: 4px;
 }
-.sticky__color {
-  width: 14px;
-  height: 14px;
+.sticky__swatch {
+  width: 22px;
+  height: 18px;
   padding: 0;
-  border: 1px solid color-mix(in oklab, var(--h) 60%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--black) 35%, transparent);
   background: var(--h);
   cursor: pointer;
 }
-.sticky__color[aria-checked='true'] {
+.sticky__swatch:hover {
+  outline: 1px solid var(--text-dim);
+  outline-offset: 1px;
+}
+.sticky__swatch.is-active {
   outline: 1px solid var(--text);
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
 .sticky__body {
   flex: 1 1 auto;
