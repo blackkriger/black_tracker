@@ -91,7 +91,7 @@ async function add(): Promise<void> {
   clear('notes');
   try {
     const note = await api<Note>('/me/notes', { method: 'POST', body: {} });
-    notes.value = [note, ...notes.value];
+    notes.value = [...notes.value, note];
     await nextTick();
     bodies.get(note.id)?.focus();
   } catch (err) {

@@ -70,7 +70,7 @@ export function registerNoteRoutes(app: FastifyInstance): void {
     }
     const res = await pool.query<NoteRow>(
       `insert into user_notes (user_id, body, color, position)
-       values ($1, $2, $3, coalesce((select min(position) - 1 from user_notes where user_id = $1), 0))
+       values ($1, $2, $3, coalesce((select max(position) + 1 from user_notes where user_id = $1), 0))
        returning ${COLUMNS}`,
       [auth.userId, parsed.data.body ?? '', parsed.data.color ?? 'amber']
     );
