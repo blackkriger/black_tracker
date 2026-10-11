@@ -14,4 +14,12 @@ export default {
   starred: 'Starred',
   nothingStarred: 'Nothing starred.',
   nothingForYou: 'Nothing for you yet.',
+  note: 'Note',
+  newNote: 'New note',
+  deleteNote: 'Delete note',
+  deleteNoteText: 'This cannot be undone.',
+  noteColor: 'Note color',
+  noteColors: { amber: 'Amber', blue: 'Blue', green: 'Green', pink: 'Pink', violet: 'Violet', plain: 'Grey' },
+  notesFailed: 'Could not read your notes.',
+  noteSaveFailed: 'Could not save the note.',
 };

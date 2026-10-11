@@ -25,6 +25,12 @@
   --ok: #8effa9;
   --male: #6cb2ff;
   --female: #ff86c2;
+  --note-amber: #faa457;
+  --note-blue: #6cb2ff;
+  --note-green: #8effa9;
+  --note-pink: #ff86c2;
+  --note-violet: #c28bcc;
+  --note-plain: #aaa1aa;
   --ink-shade: 0%;
   --code-keyword: #c98eff;
   --code-string: #8effa9;
@@ -74,6 +80,12 @@
   --ok: #2e8a4c;
   --male: #2369c4;
   --female: #c23a7e;
+  --note-amber: #b8621c;
+  --note-blue: #2369c4;
+  --note-green: #2e8a4c;
+  --note-pink: #c23a7e;
+  --note-violet: #7e3f8b;
+  --note-plain: #766c76;
   --ink-shade: 40%;
   --code-keyword: #8a4fb0;
   --code-string: #2e8a4c;

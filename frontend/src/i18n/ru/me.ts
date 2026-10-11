@@ -17,6 +17,14 @@ const me: Shape<typeof en> = {
   starred: 'В избранном',
   nothingStarred: 'В избранном пусто.',
   nothingForYou: 'Для тебя пока ничего нет.',
+  note: 'Заметка',
+  newNote: 'Новая заметка',
+  deleteNote: 'Удалить заметку',
+  deleteNoteText: 'Это нельзя отменить.',
+  noteColor: 'Цвет заметки',
+  noteColors: { amber: 'Янтарный', blue: 'Синий', green: 'Зелёный', pink: 'Розовый', violet: 'Фиолетовый', plain: 'Серый' },
+  notesFailed: 'Не получилось прочитать заметки.',
+  noteSaveFailed: 'Не получилось сохранить заметку.',
 };
 
 export default me;

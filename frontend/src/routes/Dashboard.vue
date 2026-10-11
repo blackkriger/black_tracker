@@ -16,6 +16,7 @@ import {
 import IssueView from '../components/IssueView.vue';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
+import StickyNotes from '../components/StickyNotes.vue';
 import { api } from '../lib/api';
 import {
   byDay,
@@ -220,7 +221,21 @@ async function load(): Promise<void> {
   }
 }
 
+const SHEET_W = 960;
+const NOTES_W = 240;
+const GAP = 24;
+const PAGE_PAD = 48;
+const pageBody = ref<HTMLElement | null>(null);
+const notesAside = ref<boolean | null>(null);
+const fits = new ResizeObserver(() => measureNotes());
+
+function measureNotes(): void {
+  if (pageBody.value) notesAside.value = pageBody.value.clientWidth >= SHEET_W + GAP + NOTES_W + PAGE_PAD;
+}
+
 onMounted(() => {
+  measureNotes();
+  if (pageBody.value) fits.observe(pageBody.value);
   void loadPeople();
   void loadProjects();
   void loadFeed();
@@ -231,6 +246,7 @@ onMounted(() => {
   window.addEventListener('pointerup', onPickUp);
 });
 onBeforeUnmount(() => {
+  fits.disconnect();
   window.removeEventListener('pointermove', onPickMove);
   window.removeEventListener('pointerup', onPickUp);
 });
@@ -362,7 +378,8 @@ function closeIssue(): void {
 
 <template>
   <div class="page">
-    <div class="page__body">
+    <div ref="pageBody" class="page__body">
+      <div class="me" :class="{ 'me--aside': notesAside }">
       <div class="sheet sheet--cal">
           <section class="panel sheet__wide">
             <header class="panel__h">
@@ -606,9 +623,12 @@ function closeIssue(): void {
               </div>
             </div>
           </section>
-
-
+          <StickyNotes v-if="notesAside === false" />
         </div>
+      </div>
+      <aside v-if="notesAside" class="me__notes">
+        <StickyNotes />
+      </aside>
       </div>
     </div>
 
@@ -688,6 +708,20 @@ function closeIssue(): void {
 }
 .sheet--cal {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+.me--aside {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-5);
+}
+.me--aside > .sheet {
+  flex: none;
+  margin: 0;
+}
+.me__notes {
+  flex: none;
+  width: 240px;
 }
 @media (max-width: 880px) {
   .sheet--cal {
