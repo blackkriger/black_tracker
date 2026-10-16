@@ -587,13 +587,13 @@ watch(
       >
         <header class="col__head">
           <h2 class="col__name">{{ s.name }}</h2>
-          <span class="col__count">{{ issuesOf(s.id).length }}</span>
           <button
             class="add add--plus"
             type="button"
             :aria-label="t('board.addTo', { name: s.name })"
             @click="creatingIn = s.id"
           ><Plus class="ic" /></button>
+          <span class="col__count">{{ issuesOf(s.id).length }}</span>
         </header>
 
         <div class="col__body">
@@ -791,6 +791,9 @@ watch(
   color: var(--text);
 }
 .col__head .add--plus {
-  margin-right: -8px;
+  margin-left: auto;
+}
+.col__head .add--plus + .col__count {
+  margin-left: 0;
 }
 </style>
