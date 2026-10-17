@@ -344,7 +344,8 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .md ol li[data-list="bullet"] { list-style-type: disc; }
 .md ol li[data-list="ordered"] { list-style-type: decimal; }
 .md li[data-list="checked"], .md li[data-list="unchecked"], .rt__editor .ql-editor li[data-list="checked"], .rt__editor .ql-editor li[data-list="unchecked"] { position: relative; padding-left: 0; list-style-type: none; }
-.md li[data-list="checked"], .rt__editor .ql-editor li[data-list="checked"] { color: var(--text-muted); text-decoration: line-through; }
+.md li.strikable { cursor: pointer; }
+.md li.strikable:hover { font-weight: 600; }
 .tick, .rt__editor .ql-editor li[data-list="checked"] > .ql-ui, .rt__editor .ql-editor li[data-list="unchecked"] > .ql-ui { position: absolute; left: -24px; top: calc(0.5lh - 8px); width: 16px; height: 16px; margin: 0; padding: 0; border: 1px solid var(--line-2); background: var(--bg); display: grid; place-items: center; cursor: pointer; }
 .tick:disabled { cursor: default; }
 .tick[aria-checked="true"], .rt__editor .ql-editor li[data-list="checked"] > .ql-ui { border-color: var(--accent-fill); background: var(--accent-fill); }

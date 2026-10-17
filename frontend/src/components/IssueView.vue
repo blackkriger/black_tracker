@@ -6,7 +6,7 @@ import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
 import { ApiError, TAB_ID, api } from '../lib/api';
-import { asHtml, flipCheck, isBlank, trimBlank } from '../lib/richtext';
+import { asHtml, flipCheck, flipStrike, isBlank, trimBlank } from '../lib/richtext';
 import { fromGoogleDoc } from '../lib/googleDoc';
 import { forgetKeys, keyInfo, refreshKey } from '../lib/issueKeys';
 import { buddyAvatarStyle } from '../lib/avatar';
@@ -44,7 +44,6 @@ import {
   Pin,
   SmilePlus,
   Star,
-  Target,
   Trash2,
   X,
 } from 'lucide-vue-next';
@@ -1107,18 +1106,18 @@ async function postComment(): Promise<void> {
   }
 }
 
-async function flip(where: 'description' | 'expected' | Comment, index: number): Promise<void> {
+async function rewrite(where: 'description' | 'expected' | Comment, change: (html: string) => string): Promise<void> {
   const current = issue.value;
   if (!current) return;
   if (typeof where === 'string') {
     const before = current[where];
-    const next = flipCheck(before, index);
+    const next = change(before);
     if (next === before) return;
     issue.value = { ...current, [where]: next };
     if (!(await patch({ [where]: next }))) issue.value = { ...(issue.value ?? current), [where]: before };
     return;
   }
-  const next = flipCheck(where.text, index);
+  const next = change(where.text);
   if (next === where.text) return;
   const swap = (text: string): void => {
     const now = issue.value ?? current;
@@ -1134,13 +1133,19 @@ async function flip(where: 'description' | 'expected' | Comment, index: number):
 }
 
 function onTextClick(ev: MouseEvent, where: 'description' | 'expected' | Comment): void {
-  const mark = (ev.target as HTMLElement | null)?.closest<HTMLElement>('.tick[data-check]');
-  if (!mark) {
-    followKey(ev);
+  const target = ev.target as HTMLElement | null;
+  const mark = target?.closest<HTMLElement>('.tick[data-check]');
+  if (mark) {
+    ev.preventDefault();
+    void rewrite(where, (html) => flipCheck(html, Number(mark.dataset.check)));
     return;
   }
-  ev.preventDefault();
-  void flip(where, Number(mark.dataset.check));
+  const item = where === 'expected' && !target?.closest('a') ? target?.closest<HTMLElement>('li[data-strike]') : null;
+  if (item && (window.getSelection()?.isCollapsed ?? true)) {
+    void rewrite(where, (html) => flipStrike(html, Number(item.dataset.strike)));
+    return;
+  }
+  followKey(ev);
 }
 
 async function saveComment(c: Comment): Promise<void> {
@@ -1628,13 +1633,9 @@ async function removeIssue(): Promise<void> {
                 v-html="asHtml(issue.description, true)"
               ></div>
               <div v-else class="iv__body hint faint">{{ t('issue.nothingWritten') }}</div>
-            </div>
 
             <div v-if="editing" class="iv__expected">
-              <div class="sec-h">
-                <Target class="ic" aria-hidden="true" />
-                <span>{{ t('issue.expected') }}</span>
-              </div>
+              <div class="sec-h">{{ t('issue.expected') }}</div>
               <RichText v-model="expectedDraft" min-height="90px" inline-images @files="upload" @blur="keepNew" />
             </div>
             <div
@@ -1642,11 +1643,9 @@ async function removeIssue(): Promise<void> {
               class="iv__expected"
               :class="{ 'is-fresh': fresh.has('expected') }"
             >
-              <div class="sec-h">
-                <Target class="ic" aria-hidden="true" />
-                <span>{{ t('issue.expected') }}</span>
-              </div>
-              <div class="md iv__body" @click="onTextClick($event, 'expected')" v-html="asHtml(issue.expected, true)"></div>
+              <div class="sec-h">{{ t('issue.expected') }}</div>
+              <div class="md iv__body" @click="onTextClick($event, 'expected')" v-html="asHtml(issue.expected, true, true)"></div>
+            </div>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
@@ -2344,7 +2343,7 @@ async function removeIssue(): Promise<void> {
 
 <style scoped>
 .iv__expected {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
 }
 .iv__scrim {
   position: fixed;

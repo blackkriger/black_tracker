@@ -153,10 +153,46 @@ export function flipCheck(html: string, index: number): string {
   return box.innerHTML;
 }
 
-export const asHtml = (text: string, editable = false): string =>
-  !text
-    ? ''
-    : paintChecks(
-        paintKeys(paintNames(paintLinks(trimBlank(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text)))))),
-        editable
-      );
+const LIST_ITEM = 'li[data-list="bullet"], li[data-list="ordered"]';
+
+export function paintStrikes(html: string): string {
+  if (!html.includes('data-list="bullet"') && !html.includes('data-list="ordered"')) return html;
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  box.querySelectorAll<HTMLElement>(LIST_ITEM).forEach((li, i) => {
+    li.classList.add('strikable');
+    li.dataset.strike = String(i);
+  });
+  return box.innerHTML;
+}
+
+export function flipStrike(html: string, index: number): string {
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  const li = box.querySelectorAll(LIST_ITEM)[index];
+  if (!li) return html;
+  const walker = document.createTreeWalker(li, NodeFilter.SHOW_TEXT);
+  let words = false;
+  let struck = true;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.nodeValue?.trim()) continue;
+    words = true;
+    if (!node.parentElement?.closest('s')) struck = false;
+  }
+  li.querySelectorAll('s').forEach((s) => s.replaceWith(...s.childNodes));
+  if (words && !struck) {
+    const s = document.createElement('s');
+    s.append(...li.childNodes);
+    li.append(s);
+  }
+  return box.innerHTML;
+}
+
+export const asHtml = (text: string, editable = false, strikable = false): string => {
+  if (!text) return '';
+  const html = paintChecks(
+    paintKeys(paintNames(paintLinks(trimBlank(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text)))))),
+    editable
+  );
+  return strikable ? paintStrikes(html) : html;
+};
