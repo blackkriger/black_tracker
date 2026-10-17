@@ -711,6 +711,8 @@ const own = computed(() => (issue.value?.attachments ?? []).filter((a) => !a.com
 const ownBytes = computed(() => own.value.reduce((all, a) => all + a.size, 0));
 const attachmentIds = (html: string): Set<string> =>
   new Set([...html.matchAll(/\/api\/attachments\/([0-9a-f-]{36})/g)].map((m) => m[1]));
+const hasDescription = computed(() => !!issue.value?.description && !isBlank(issue.value.description));
+const hasExpected = computed(() => !!issue.value?.expected && !isBlank(issue.value.expected));
 const inlined = computed(() => attachmentIds(issue.value?.description ?? ''));
 const inExpected = computed(() => attachmentIds(issue.value?.expected ?? ''));
 const inlinedIn = (commentId: string): Set<string> =>
@@ -1616,7 +1618,7 @@ async function removeIssue(): Promise<void> {
               :class="{ 'is-fresh': fresh.has('summary') }"
             >{{ issue?.summary }}</h1>
 
-            <div>
+            <div v-if="editing || hasDescription || !hasExpected">
               <RichText
                 v-if="editing"
                 v-model="bodyDraft"
@@ -1626,33 +1628,27 @@ async function removeIssue(): Promise<void> {
                 @blur="keepNew"
               />
               <div
-                v-else-if="issue?.description && !isBlank(issue.description)"
+                v-else-if="hasDescription"
                 class="md iv__body"
                 :class="{ 'is-fresh': fresh.has('description') }"
                 @click="onTextClick($event, 'description')"
-                v-html="asHtml(issue.description, true)"
+                v-html="asHtml(issue?.description ?? '', true)"
               ></div>
               <div v-else class="iv__body hint faint">{{ t('issue.nothingWritten') }}</div>
+            </div>
 
-            <div v-if="editing" class="iv__expected">
+            <RichText
+              v-if="editing"
+              v-model="expectedDraft"
+              min-height="90px"
+              :placeholder="t('issue.expectedPlaceholder')"
+              inline-images
+              @files="upload"
+              @blur="keepNew"
+            />
+            <div v-else-if="hasExpected" :class="{ 'is-fresh': fresh.has('expected') }">
               <div class="sec-h">{{ t('issue.expected') }}</div>
-              <RichText
-                v-model="expectedDraft"
-                min-height="90px"
-                :placeholder="t('issue.expectedPlaceholder')"
-                inline-images
-                @files="upload"
-                @blur="keepNew"
-              />
-            </div>
-            <div
-              v-else-if="issue?.expected && !isBlank(issue.expected)"
-              class="iv__expected"
-              :class="{ 'is-fresh': fresh.has('expected') }"
-            >
-              <div class="sec-h">{{ t('issue.expected') }}</div>
-              <div class="md iv__body" @click="onTextClick($event, 'expected')" v-html="asHtml(issue.expected, true, true)"></div>
-            </div>
+              <div class="md iv__body" @click="onTextClick($event, 'expected')" v-html="asHtml(issue?.expected ?? '', true, true)"></div>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
@@ -2349,9 +2345,6 @@ async function removeIssue(): Promise<void> {
 </template>
 
 <style scoped>
-.iv__expected {
-  margin-top: var(--space-2);
-}
 .iv__scrim {
   position: fixed;
   inset: 0;
