@@ -50,35 +50,34 @@ export function mergeOf(message: string): { from: string; into: string | null } 
 }
 
 export async function recordCommits(events: CommitEvent[]): Promise<Linked[]> {
+  if (!events.length) return [];
   const wanted = [...new Set(events.flatMap((e) => e.keys))];
-  if (!wanted.length) return [];
-  const issues = await pool.query<{ id: string; readable_id: string; board_id: string; project_id: string }>(
-    'select id, readable_id, board_id, project_id from issues where readable_id = any($1::text[])',
-    [wanted]
-  );
+  const issues = wanted.length
+    ? await pool.query<{ id: string; readable_id: string; board_id: string; project_id: string }>(
+        'select id, readable_id, board_id, project_id from issues where readable_id = any($1::text[])',
+        [wanted]
+      )
+    : { rows: [] };
   const byKey = new Map(issues.rows.map((r) => [r.readable_id, r]));
   const linked = new Map<string, Linked>();
   for (const e of events) {
+    const stored = await pool.query<{ id: string }>(
+      `insert into repo_commits (repo, sha, kind, message, branch, merged_from, author_name, author_login, at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       on conflict (repo, sha) do update set repo = excluded.repo
+       returning id`,
+      [e.repo, e.sha, e.kind, e.message.slice(0, 4000), e.branch, e.mergedFrom, e.authorName, e.authorLogin, e.at]
+    );
+    const commitId = stored.rows[0].id;
     for (const key of new Set(e.keys)) {
       const issue = byKey.get(key);
       if (!issue) continue;
       const res = await pool.query(
-        `insert into issue_commits
-           (issue_id, kind, repo, sha, message, branch, merged_from, author_name, author_login, at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         on conflict (issue_id, sha) do nothing`,
-        [
-          issue.id,
-          e.kind,
-          e.repo,
-          e.sha,
-          e.message.slice(0, 4000),
-          e.branch,
-          e.mergedFrom,
-          e.authorName,
-          e.authorLogin,
-          e.at,
-        ]
+        `insert into issue_commits (issue_id, commit_id)
+         select $1, $2
+          where not exists (select 1 from commit_unlinks where issue_id = $1 and commit_id = $2)
+         on conflict (issue_id, commit_id) do nothing`,
+        [issue.id, commitId]
       );
       if (res.rowCount) {
         linked.set(issue.id, {

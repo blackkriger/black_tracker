@@ -4,6 +4,7 @@ import auth from './en/auth';
 import board from './en/board';
 import calendar from './en/calendar';
 import colors from './en/colors';
+import commits from './en/commits';
 import common from './en/common';
 import editor from './en/editor';
 import fields from './en/fields';
@@ -30,6 +31,7 @@ export default {
   board,
   calendar,
   colors,
+  commits,
   common,
   editor,
   fields,

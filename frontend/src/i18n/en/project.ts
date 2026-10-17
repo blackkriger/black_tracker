@@ -1,4 +1,5 @@
 export default {
+  repo: 'GitHub repository',
   loadFailed: 'Could not load the project.',
   defaultStatus: 'Default status',
   defaultAssignee: 'Default assignee',

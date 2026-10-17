@@ -2,6 +2,7 @@ import type en from '../en/project';
 import type { Shape } from '../shape';
 
 const project: Shape<typeof en> = {
+  repo: 'Репозиторий GitHub',
   loadFailed: 'Не получилось загрузить проект.',
   defaultStatus: 'Статус по умолчанию',
   defaultAssignee: 'Исполнитель по умолчанию',

@@ -409,7 +409,7 @@ async function noteStarred(
 
 type Actor = { userId: string; kind?: Auth['kind'] };
 
-async function writeHistory(
+export async function writeHistory(
   client: { query: typeof pool.query },
   issueId: string,
   actor: Actor,
@@ -998,12 +998,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       linksOf(issue.id, auth),
       starredBy(auth.userId, [issue.id]),
       pool.query<CommitRow>(
-        `select c.id, c.kind, c.repo, c.sha, c.message, c.branch, c.merged_from, c.author_name,
+        `select l.id, c.kind, c.repo, c.sha, c.message, c.branch, c.merged_from, c.author_name,
                 c.author_login, c.at, u.login as by_login
-           from issue_commits c
+           from issue_commits l
+           join repo_commits c on c.id = l.commit_id
            left join users u on u.github_login is not null
             and lower(u.github_login) = lower(coalesce(c.author_login, c.author_name))
-          where c.issue_id = $1
+          where l.issue_id = $1
           order by c.at`,
         [issue.id]
       ),
@@ -1296,11 +1297,18 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const parsed = commitPick.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Which commits?' });
     await inTransaction(async (client) => {
-      const gone = await client.query<{ sha: string }>(
-        'delete from issue_commits where issue_id = $1 and id = any($2::uuid[]) returning sha',
+      const gone = await client.query<{ commit_id: string; sha: string }>(
+        `delete from issue_commits l using repo_commits c
+          where c.id = l.commit_id and l.issue_id = $1 and l.id = any($2::uuid[])
+          returning l.commit_id, c.sha`,
         [id, parsed.data.ids]
       );
-      if (gone.rowCount) await writeHistory(client, id, found.auth, 'commits unlinked', null, shortShas(gone.rows));
+      if (!gone.rowCount) return;
+      await client.query(
+        `insert into commit_unlinks (issue_id, commit_id) select $1, unnest($2::uuid[]) on conflict do nothing`,
+        [id, gone.rows.map((r) => r.commit_id)]
+      );
+      await writeHistory(client, id, found.auth, 'commits unlinked', null, shortShas(gone.rows));
     });
     return reply.send({ data: { ok: true } });
   });
@@ -1321,20 +1329,25 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'That issue is not open to you.' });
     }
     await inTransaction(async (client) => {
-      const moving = await client.query<{ sha: string }>(
-        'select sha from issue_commits where issue_id = $1 and id = any($2::uuid[]) order by at',
+      const moving = await client.query<{ commit_id: string; sha: string }>(
+        `select l.commit_id, c.sha from issue_commits l join repo_commits c on c.id = l.commit_id
+          where l.issue_id = $1 and l.id = any($2::uuid[]) order by c.at`,
         [id, parsed.data.ids]
       );
       if (!moving.rowCount) return;
+      const commitIds = moving.rows.map((r) => r.commit_id);
+      await client.query('delete from issue_commits where issue_id = $1 and commit_id = any($2::uuid[])', [id, commitIds]);
       await client.query(
-        `delete from issue_commits s using issue_commits t
-          where s.issue_id = $1 and s.id = any($2::uuid[]) and t.issue_id = $3 and t.sha = s.sha`,
-        [id, parsed.data.ids, target.id]
+        `insert into issue_commits (issue_id, commit_id) select $1, unnest($2::uuid[]) on conflict do nothing`,
+        [target.id, commitIds]
       );
-      await client.query('update issue_commits set issue_id = $3 where issue_id = $1 and id = any($2::uuid[])', [
-        id,
-        parsed.data.ids,
+      await client.query(
+        `insert into commit_unlinks (issue_id, commit_id) select $1, unnest($2::uuid[]) on conflict do nothing`,
+        [id, commitIds]
+      );
+      await client.query('delete from commit_unlinks where issue_id = $1 and commit_id = any($2::uuid[])', [
         target.id,
+        commitIds,
       ]);
       const shas = shortShas(moving.rows);
       await writeHistory(client, id, found.auth, 'commits moved', shas, target.readable_id);

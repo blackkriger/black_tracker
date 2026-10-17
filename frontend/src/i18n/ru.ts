@@ -4,6 +4,7 @@ import auth from './ru/auth';
 import board from './ru/board';
 import calendar from './ru/calendar';
 import colors from './ru/colors';
+import commits from './ru/commits';
 import common from './ru/common';
 import editor from './ru/editor';
 import fields from './ru/fields';
@@ -30,6 +31,7 @@ export default {
   board,
   calendar,
   colors,
+  commits,
   common,
   editor,
   fields,

@@ -2,6 +2,7 @@ export default {
   issues: 'Issues',
   analytics: 'Analytics',
   feedback: 'Feedback',
+  commits: 'Commits',
   settings: 'Settings',
   signOut: 'Sign out',
   projects: 'Projects',

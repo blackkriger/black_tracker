@@ -21,6 +21,7 @@ interface ProjectRow {
   next_issue_number: number;
   archived: boolean;
   position: number;
+  repo: string | null;
 }
 
 const publicProject = (r: ProjectRow) => ({
@@ -30,6 +31,7 @@ const publicProject = (r: ProjectRow) => ({
   description: r.description,
   archived: r.archived,
   position: r.position,
+  repo: r.repo,
   nextKey: `${r.short_name}-${r.next_issue_number}`,
 });
 
@@ -50,6 +52,12 @@ const projectPatch = z.object({
   description: z.string().max(4000).optional(),
   archived: z.boolean().optional(),
   position: z.number().int().min(0).optional(),
+  repo: z
+    .string()
+    .trim()
+    .max(200)
+    .regex(/^(?:[\w.-]+\/[\w.-]+)?$/, 'Write it as owner/name, e.g. owner/repo')
+    .optional(),
 });
 
 export async function projectByShort(shortName: string): Promise<ProjectRow | null> {
@@ -202,10 +210,19 @@ export function registerProjectRoutes(app: FastifyInstance): void {
           set name = coalesce($2, name),
               description = coalesce($3, description),
               archived = coalesce($4, archived),
-              position = coalesce($5, position)
+              position = coalesce($5, position),
+              repo = case when $6 then nullif($7, '') else repo end
         where id = $1
         returning *`,
-      [project.id, p.name ?? null, p.description ?? null, p.archived ?? null, p.position ?? null]
+      [
+        project.id,
+        p.name ?? null,
+        p.description ?? null,
+        p.archived ?? null,
+        p.position ?? null,
+        p.repo !== undefined,
+        p.repo ?? null,
+      ]
     );
     return reply.send({ data: publicProject(res.rows[0]) });
   });

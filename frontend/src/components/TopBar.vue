@@ -23,6 +23,7 @@ import {
   Bell,
   ChartColumn,
   ContactRound,
+  GitCommitHorizontal,
   ListChecks,
   Menu,
   MessageSquareText,
@@ -59,7 +60,7 @@ const at = (name: string): 'page' | undefined => (section.value === name ? 'page
 
 const drawer = ref(false);
 watch([() => route.fullPath, narrow], () => (drawer.value = false));
-const SECTIONS = ['issues', 'analytics', 'feedback', 'settings'];
+const SECTIONS = ['issues', 'commits', 'analytics', 'feedback', 'settings'];
 const place = computed(() => {
   if (here.value) {
     const p = live.value.find((x) => x.shortName === currentShort.value);
@@ -273,7 +274,10 @@ async function signOut(): Promise<void> {
         <span class="av" :style="buddyAvatarStyle(session.me.value?.login ?? '')"></span>
         {{ session.me.value?.login }}
       </RouterLink>
-      <RouterLink v-if="hasRole" class="topitem" :to="issuesTo" :aria-current="at('issues')">{{ t('nav.issues') }}</RouterLink>
+      <span v-if="hasRole" class="topboards">
+        <RouterLink class="topitem topitem__board" :to="issuesTo" :aria-current="at('issues')">{{ t('nav.issues') }}</RouterLink>
+        <RouterLink class="topitem topitem__board" :to="{ name: 'commits' }" :aria-current="at('commits')">{{ t('nav.commits') }}</RouterLink>
+      </span>
       <span v-if="hasRole" class="topboards">
         <RouterLink class="topitem topitem__board" :to="analyticsTo" :aria-current="at('analytics')">{{ t('nav.analytics') }}</RouterLink>
         <RouterLink class="topitem topitem__board" :to="{ name: 'feedback' }" :aria-current="at('feedback')">{{ t('nav.feedback') }}</RouterLink>
@@ -288,6 +292,7 @@ async function signOut(): Promise<void> {
     <nav v-if="hasRole" class="rail__sections" :aria-label="t('nav.sections')">
       <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />{{ t('nav.issues') }}</RouterLink>
       <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />{{ t('nav.analytics') }}</RouterLink>
+      <RouterLink class="topitem" :to="{ name: 'commits' }" :aria-current="at('commits')"><GitCommitHorizontal class="ic" />{{ t('nav.commits') }}</RouterLink>
       <RouterLink class="topitem" :to="{ name: 'feedback' }" :aria-current="at('feedback')"><MessageSquareText class="ic" />{{ t('nav.feedback') }}</RouterLink>
     </nav>
 
@@ -542,7 +547,8 @@ async function signOut(): Promise<void> {
 }
 .rail__sections {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, max-content);
+  column-gap: var(--space-3);
 }
 .rail__sections > :last-child:nth-child(odd) {
   grid-column: 1 / -1;

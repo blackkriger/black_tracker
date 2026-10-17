@@ -5,6 +5,7 @@ const nav: Shape<typeof en> = {
   issues: 'Задачи',
   analytics: 'Аналитика',
   feedback: 'Обратная связь',
+  commits: 'Коммиты',
   settings: 'Настройки',
   signOut: 'Выйти',
   projects: 'Проекты',

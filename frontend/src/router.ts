@@ -19,6 +19,7 @@ const SettingsUsers = () => import('./routes/settings/Users.vue');
 const Join = () => import('./routes/Join.vue');
 const Reset = () => import('./routes/Reset.vue');
 const Dashboard = () => import('./routes/Dashboard.vue');
+const Commits = () => import('./routes/Commits.vue');
 const Analytics = () => import('./routes/Analytics.vue');
 const FeedbackReport = () => import('./routes/FeedbackReport.vue');
 const Issues = () => import('./routes/Issues.vue');
@@ -51,6 +52,7 @@ export const router = createRouter({
         { path: '/calendar', redirect: { name: 'me', query: { calendar: 'full' } } },
         { path: '/issues/:key?', name: 'issues', component: Issues },
         { path: '/analytics', name: 'analytics', component: Analytics },
+        { path: '/commits', name: 'commits', component: Commits },
         { path: '/feedback', name: 'feedback', component: FeedbackReport },
         { path: '/analytics/feedback', redirect: (to) => ({ name: 'feedback', query: to.query }) },
         { path: '/settings', name: 'settings', component: SettingsIndex },

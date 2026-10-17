@@ -37,6 +37,7 @@ interface Project {
   shortName: string;
   name: string;
   archived: boolean;
+  repo: string | null;
   boards: Board[];
 }
 
@@ -115,6 +116,20 @@ async function toggleArchived(): Promise<void> {
     });
     project.value = { ...project.value, archived: updated.archived };
     await projectsStore.load(true);
+  } catch (err) {
+    fail('project', err);
+  }
+}
+
+async function saveRepo(repo: string): Promise<void> {
+  if (!project.value || repo.trim() === (project.value.repo ?? '')) return;
+  clear('project');
+  try {
+    const updated = await api<Project>(`/projects/${encodeURIComponent(project.value.shortName)}`, {
+      method: 'PATCH',
+      body: { repo: repo.trim() },
+    });
+    project.value = { ...project.value, repo: updated.repo };
   } catch (err) {
     fail('project', err);
   }
@@ -351,6 +366,18 @@ async function onDrop(b: Board, target: State): Promise<void> {
             <label class="label" for="p-name">{{ t('settings.name') }}</label>
             <input id="p-name" class="input" :value="project.name" tabindex="-1" readonly />
           </div>
+          <div class="field p-repo">
+            <label class="label" for="p-repo">{{ t('project.repo') }}</label>
+            <input
+              id="p-repo"
+              class="input"
+              :value="project.repo ?? ''"
+              maxlength="200"
+              placeholder="owner/name"
+              spellcheck="false"
+              @change="saveRepo(($event.target as HTMLInputElement).value)"
+            />
+          </div>
           <button class="btn p-btn" type="button" @click="toggleArchived">
             {{ project.archived ? t('project.restore') : t('project.archive') }}
           </button>
@@ -572,6 +599,9 @@ async function onDrop(b: Board, target: State): Promise<void> {
   width: 120px;
 }
 .p-name {
+  flex: 1 1 220px;
+}
+.p-repo {
   flex: 1 1 220px;
 }
 .dialog__lede {
