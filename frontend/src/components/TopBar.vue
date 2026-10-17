@@ -23,7 +23,7 @@ import {
   Bell,
   ChartColumn,
   ContactRound,
-  GitCommitHorizontal,
+  FolderGit2,
   ListChecks,
   Menu,
   MessageSquareText,
@@ -292,7 +292,7 @@ async function signOut(): Promise<void> {
     <nav v-if="hasRole" class="rail__sections" :aria-label="t('nav.sections')">
       <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />{{ t('nav.issues') }}</RouterLink>
       <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />{{ t('nav.analytics') }}</RouterLink>
-      <RouterLink class="topitem" :to="{ name: 'commits' }" :aria-current="at('commits')"><GitCommitHorizontal class="ic" />{{ t('nav.commits') }}</RouterLink>
+      <RouterLink class="topitem" :to="{ name: 'commits' }" :aria-current="at('commits')"><FolderGit2 class="ic" />{{ t('nav.commits') }}</RouterLink>
       <RouterLink class="topitem" :to="{ name: 'feedback' }" :aria-current="at('feedback')"><MessageSquareText class="ic" />{{ t('nav.feedback') }}</RouterLink>
     </nav>
 
