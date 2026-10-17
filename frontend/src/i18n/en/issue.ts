@@ -76,6 +76,7 @@ export default {
   edit: 'Edit',
   titlePlaceholder: 'What needs doing?',
   bodyPlaceholder: 'What is this about?',
+  expectedPlaceholder: 'What should we end up with?',
   nothingWritten: 'Nothing written yet.',
   noLinks: 'No links yet.',
   addLink: 'Add link…',

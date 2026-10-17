@@ -1636,7 +1636,14 @@ async function removeIssue(): Promise<void> {
 
             <div v-if="editing" class="iv__expected">
               <div class="sec-h">{{ t('issue.expected') }}</div>
-              <RichText v-model="expectedDraft" min-height="90px" inline-images @files="upload" @blur="keepNew" />
+              <RichText
+                v-model="expectedDraft"
+                min-height="90px"
+                :placeholder="t('issue.expectedPlaceholder')"
+                inline-images
+                @files="upload"
+                @blur="keepNew"
+              />
             </div>
             <div
               v-else-if="issue?.expected && !isBlank(issue.expected)"

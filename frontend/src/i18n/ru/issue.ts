@@ -79,6 +79,7 @@ const issue: Shape<typeof en> = {
   edit: 'Изменить',
   titlePlaceholder: 'Что нужно сделать?',
   bodyPlaceholder: 'О чём эта задача?',
+  expectedPlaceholder: 'Что должно получиться в итоге?',
   nothingWritten: 'Описания пока нет.',
   noLinks: 'Связей пока нет.',
   addLink: 'Добавить связь…',
