@@ -1286,6 +1286,63 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     return reply.send({ data: publicIssue(row as IssueRow, tags.get(id) ?? [], stars.has(id)) });
   });
 
+  const commitPick = z.object({ ids: z.array(z.string().uuid()).min(1).max(500) });
+  const shortShas = (rows: { sha: string }[]): string => rows.map((r) => r.sha.slice(0, 7)).join(', ');
+
+  app.post('/issues/:id/commits/unlink', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const found = await loadIssueFor(req, reply, id);
+    if (!found) return;
+    const parsed = commitPick.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Which commits?' });
+    await inTransaction(async (client) => {
+      const gone = await client.query<{ sha: string }>(
+        'delete from issue_commits where issue_id = $1 and id = any($2::uuid[]) returning sha',
+        [id, parsed.data.ids]
+      );
+      if (gone.rowCount) await writeHistory(client, id, found.auth, 'commits unlinked', null, shortShas(gone.rows));
+    });
+    return reply.send({ data: { ok: true } });
+  });
+
+  app.post('/issues/:id/commits/move', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const found = await loadIssueFor(req, reply, id);
+    if (!found) return;
+    const parsed = commitPick.extend({ key: z.string().trim().min(3).max(30) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Which commits, and to which issue?' });
+    const other = await pool.query<IssueRow>(`${ISSUE_SELECT} where lower(i.readable_id) = lower($1)`, [
+      parsed.data.key,
+    ]);
+    const target = other.rows[0];
+    if (!target) return reply.code(404).send({ error: 'No issue with that key.' });
+    if (target.id === id) return reply.code(400).send({ error: 'These commits are already on this issue.' });
+    if (!(await mayOpenBoard(found.auth, target.board_id, target.project_id))) {
+      return reply.code(403).send({ error: 'That issue is not open to you.' });
+    }
+    await inTransaction(async (client) => {
+      const moving = await client.query<{ sha: string }>(
+        'select sha from issue_commits where issue_id = $1 and id = any($2::uuid[]) order by at',
+        [id, parsed.data.ids]
+      );
+      if (!moving.rowCount) return;
+      await client.query(
+        `delete from issue_commits s using issue_commits t
+          where s.issue_id = $1 and s.id = any($2::uuid[]) and t.issue_id = $3 and t.sha = s.sha`,
+        [id, parsed.data.ids, target.id]
+      );
+      await client.query('update issue_commits set issue_id = $3 where issue_id = $1 and id = any($2::uuid[])', [
+        id,
+        parsed.data.ids,
+        target.id,
+      ]);
+      const shas = shortShas(moving.rows);
+      await writeHistory(client, id, found.auth, 'commits moved', shas, target.readable_id);
+      await writeHistory(client, target.id, found.auth, 'commits linked', found.issue.readable_id, shas);
+    });
+    return reply.send({ data: { ok: true } });
+  });
+
   app.put('/issues/:id/favourite', async (req, reply) => {
     const { id } = req.params as { id: string };
     const found = await loadIssueFor(req, reply, id);

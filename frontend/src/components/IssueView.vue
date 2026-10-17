@@ -33,6 +33,7 @@ import {
   Bot,
   ChevronDown,
   ChevronRight,
+  Ellipsis,
   FileArchive,
   FileDown,
   FileInput,
@@ -288,6 +289,73 @@ watch(linkQuery, (term) => {
     }
   }, 200);
 });
+
+const commitGroup = ref<Pushed | null>(null);
+const chosenCommits = ref<Set<string>>(new Set());
+const moveQuery = ref('');
+const moveTargets = ref<IssueLink[]>([]);
+const moveSearching = ref(false);
+const commitBusy = ref(false);
+const commitError = ref<string | null>(null);
+let moveTimer: ReturnType<typeof setTimeout> | null = null;
+let moveSearches = 0;
+
+function openCommits(group: Pushed): void {
+  commitGroup.value = group;
+  chosenCommits.value = new Set(group.commits.map((k) => k.id));
+  moveQuery.value = '';
+  moveTargets.value = [];
+  commitError.value = null;
+}
+
+function toggleCommit(id: string): void {
+  const next = new Set(chosenCommits.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  chosenCommits.value = next;
+}
+
+watch(moveQuery, (term) => {
+  if (moveTimer) clearTimeout(moveTimer);
+  const q = term.trim();
+  if (!q) {
+    ++moveSearches;
+    moveSearching.value = false;
+    moveTargets.value = [];
+    return;
+  }
+  moveTimer = setTimeout(async () => {
+    const mine = ++moveSearches;
+    moveSearching.value = true;
+    try {
+      const rows = await api<IssueLink[]>(`/issues/search?q=${encodeURIComponent(q)}&exclude=${issue.value?.id ?? ''}`);
+      if (mine === moveSearches) moveTargets.value = rows;
+    } catch {
+      if (mine === moveSearches) moveTargets.value = [];
+    } finally {
+      if (mine === moveSearches) moveSearching.value = false;
+    }
+  }, 200);
+});
+
+async function changeCommits(path: 'unlink' | 'move', key?: string): Promise<void> {
+  const current = issue.value;
+  if (!current || commitBusy.value || !chosenCommits.value.size) return;
+  commitBusy.value = true;
+  commitError.value = null;
+  try {
+    await api(`/issues/${current.id}/commits/${path}`, {
+      method: 'POST',
+      body: { ids: [...chosenCommits.value], ...(key ? { key } : {}) },
+    });
+    commitGroup.value = null;
+    await reload();
+  } catch (err) {
+    commitError.value = err instanceof Error ? err.message : t('issue.commitsFailed');
+  } finally {
+    commitBusy.value = false;
+  }
+}
 
 function openPicker(): void {
   picking.value = true;
@@ -1819,6 +1887,13 @@ async function removeIssue(): Promise<void> {
                         <template #n>{{ e.commits.length }}</template>
                         <template #branch><span class="ev__ref">{{ e.branch }}</span></template>
                       </i18n-t>
+                      <button
+                        class="btn btn--sm btn--icon btn--ghost ev__more"
+                        type="button"
+                        :title="t('issue.commits')"
+                        :aria-label="t('issue.commits')"
+                        @click="openCommits(e)"
+                      ><Ellipsis class="ic" /></button>
                     </div>
                     <a
                       v-for="k in e.commits"
@@ -2255,6 +2330,51 @@ async function removeIssue(): Promise<void> {
           <p v-if="searching" class="hint">{{ t('issue.searching') }}</p>
           <p v-else-if="linkQuery.trim() && !pickable.length" class="hint">{{ t('issues.nothingFound') }}</p>
         </div>
+      </Dialog>
+
+      <Dialog v-if="commitGroup" :title="t('issue.commits')" :width="560" @close="commitGroup = null">
+        <div class="pick">
+          <label v-for="k in commitGroup.commits" :key="k.id" class="check pick__line">
+            <input type="checkbox" :checked="chosenCommits.has(k.id)" @change="toggleCommit(k.id)" />
+            <span class="key">{{ k.sha.slice(0, 7) }}</span>
+            <span class="pick__sum">{{ k.message }}</span>
+          </label>
+        </div>
+        <div class="hr"></div>
+        <div class="sec-h">{{ t('issue.moveCommitsTo') }}</div>
+        <input
+          v-model="moveQuery"
+          class="input"
+          :placeholder="t('issue.keyOrTitle')"
+          @keydown.enter.prevent="moveTargets[0] && changeCommits('move', moveTargets[0].key)"
+        />
+        <div class="pick">
+          <button
+            v-for="r in moveTargets"
+            :key="r.id"
+            class="pick__row"
+            type="button"
+            :disabled="commitBusy || !chosenCommits.size"
+            @click="changeCommits('move', r.key)"
+          >
+            <span class="key">{{ r.key }}</span>
+            <span class="pick__sum">{{ r.summary }}</span>
+            <span class="pick__state" :style="{ color: ink(r.stateColor) }">{{ r.stateName }}</span>
+          </button>
+          <p v-if="moveSearching" class="hint">{{ t('issue.searching') }}</p>
+          <p v-else-if="moveQuery.trim() && !moveTargets.length" class="hint">{{ t('issues.nothingFound') }}</p>
+        </div>
+        <div v-if="commitError" class="err">{{ commitError }}</div>
+        <template #footer>
+          <div class="sp"></div>
+          <button class="btn" type="button" @click="commitGroup = null">{{ t('common.cancel') }}</button>
+          <button
+            class="btn btn--danger"
+            type="button"
+            :disabled="commitBusy || !chosenCommits.size"
+            @click="changeCommits('unlink')"
+          >{{ t('issue.unlinkCommits') }}</button>
+        </template>
       </Dialog>
 
       <Dialog v-if="makingTag" :title="t('issue.newTag')" :width="420" @close="makingTag = false">
@@ -2801,6 +2921,10 @@ async function removeIssue(): Promise<void> {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 8px;
+}
+.ev__more {
+  align-self: center;
+  margin-left: auto;
 }
 .ev__head .nick {
   margin-left: 0;
