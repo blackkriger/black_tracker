@@ -2,24 +2,18 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Download, ExternalLink } from 'lucide-vue-next';
+import PersonName from './PersonName.vue';
 import { buildLink, useBuilds, type Build } from '../lib/builds';
 import { fileSize, stamp } from '../lib/issues';
-import { usePeople } from '../lib/people';
 
 const props = defineProps<{ project: string }>();
 
 const { t } = useI18n();
 const { builds, loaded } = useBuilds();
-const { nameOf } = usePeople();
 
 const mine = computed(() => builds.value.filter((b) => b.project === props.project));
 
-const metaOf = (b: Build): { text: string; num: boolean }[] =>
-  [
-    b.size !== null ? { text: fileSize(b.size), num: true } : null,
-    { text: stamp(b.at), num: true },
-    b.by ? { text: nameOf(b.by), num: false } : null,
-  ].filter((part): part is { text: string; num: boolean } => part !== null);
+const numbersOf = (b: Build): string[] => [...(b.size !== null ? [fileSize(b.size)] : []), stamp(b.at)];
 </script>
 
 <template>
@@ -40,10 +34,11 @@ const metaOf = (b: Build): { text: string; num: boolean }[] =>
       <span class="build__body">
         <span class="build__name">{{ b.name }}</span>
         <span class="build__meta">
-          <template v-for="(part, i) in metaOf(b)" :key="i">
+          <template v-for="(part, i) in numbersOf(b)" :key="i">
             <template v-if="i">, </template>
-            <span :class="{ build__num: part.num }">{{ part.text }}</span>
+            <span class="build__num">{{ part }}</span>
           </template>
+          <template v-if="b.by">, <PersonName :login="b.by" /></template>
         </span>
       </span>
     </a>
