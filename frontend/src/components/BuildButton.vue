@@ -5,7 +5,7 @@ import { Download, ExternalLink, Package } from 'lucide-vue-next';
 import BuildActions from './BuildActions.vue';
 import BuildList from './BuildList.vue';
 import Dialog from './Dialog.vue';
-import { buildLink, useBuilds } from '../lib/builds';
+import { buildLink, useBuilds, viewerPlatform } from '../lib/builds';
 import { useLive } from '../lib/live';
 
 const props = defineProps<{ project: string }>();
@@ -13,7 +13,11 @@ const props = defineProps<{ project: string }>();
 const { t } = useI18n();
 const { builds, load } = useBuilds();
 
-const latest = computed(() => builds.value.find((b) => b.project === props.project) ?? null);
+const latest = computed(() => {
+  const mine = builds.value.filter((b) => b.project === props.project);
+  const platform = viewerPlatform();
+  return mine.find((b) => b.platform === platform) ?? [...mine].sort((a, b) => b.at.localeCompare(a.at))[0] ?? null;
+});
 const open = ref(false);
 const error = ref<string | null>(null);
 

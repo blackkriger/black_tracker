@@ -6,6 +6,7 @@ const builds: Shape<typeof en> = {
   upload: 'Загрузить',
   uploading: 'Загрузка {percent}%',
   driveLink: 'Ссылка на Google Диск',
+  platform: 'Платформа',
   add: 'Добавить',
   none: 'Билдов пока нет.',
   tooLarge: 'Билд не больше 1 ГБ.',

@@ -19,9 +19,12 @@ const SYSTEMS: [RegExp, string][] = [
   [/Linux/, 'Linux'],
 ];
 
+export const systemOf = (agent: string): string | undefined =>
+  SYSTEMS.find(([pattern]) => pattern.test(agent))?.[1];
+
 export function describeAgent(agent: string | null): string {
   const browser = agent ? BROWSERS.find(([pattern]) => pattern.test(agent))?.[1] : undefined;
   if (!browser) return i18n.global.t('profile.unknownBrowser');
-  const system = SYSTEMS.find(([pattern]) => pattern.test(agent as string))?.[1];
+  const system = systemOf(agent as string);
   return system ? `${browser}, ${system}` : browser;
 }

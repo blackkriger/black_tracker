@@ -3,6 +3,7 @@ export default {
   upload: 'Upload',
   uploading: 'Uploading {percent}%',
   driveLink: 'Google Drive link',
+  platform: 'Platform',
   add: 'Add',
   none: 'No builds yet.',
   tooLarge: '1 GB max for a build.',

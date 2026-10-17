@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Download, ExternalLink } from 'lucide-vue-next';
 import PersonName from './PersonName.vue';
-import { buildLink, useBuilds, type Build } from '../lib/builds';
+import { buildLink, platformLabel, useBuilds, type Build } from '../lib/builds';
 import { fileSize, stamp } from '../lib/issues';
 
 const props = defineProps<{ project: string }>();
@@ -22,18 +22,12 @@ const numbersOf = (b: Build): string[] => [...(b.size !== null ? [fileSize(b.siz
       <span class="sk sk--line" style="width: 80%"></span>
       <span class="sk sk--line" style="width: 55%"></span>
     </template>
-    <a
-      v-for="(b, n) in mine"
-      v-else
-      :key="b.id"
-      class="build"
-      :class="{ 'build--old': n > 0 }"
-      v-bind="buildLink(b)"
-    >
+    <a v-for="b in mine" v-else :key="b.id" class="build" v-bind="buildLink(b)">
       <component :is="b.url ? ExternalLink : Download" class="ic ic--sm build__i" />
       <span class="build__body">
         <span class="build__name">{{ b.name }}</span>
         <span class="build__meta">
+          {{ platformLabel(b.platform) }},
           <template v-for="(part, i) in numbersOf(b)" :key="i">
             <template v-if="i">, </template>
             <span class="build__num">{{ part }}</span>
@@ -63,9 +57,6 @@ const numbersOf = (b: Build): string[] => [...(b.size !== null ? [fileSize(b.siz
 }
 .build:hover {
   color: var(--text);
-}
-.build--old {
-  opacity: 0.55;
 }
 .build__i {
   flex: none;

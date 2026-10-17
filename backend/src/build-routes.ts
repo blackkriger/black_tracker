@@ -13,15 +13,18 @@ import { disposition, onDisk } from './issue-routes.js';
 import { projectByShort } from './project-routes.js';
 
 export const BUILD_MAX_BYTES = 1024 * 1024 * 1024;
-const KEPT = 2;
+const PLATFORM = z.enum(['windows', 'macos']);
+type Platform = z.infer<typeof PLATFORM>;
 const PAGE_LIMIT = 5 * 1024 * 1024;
 const CLOSED = { error: 'Open the file to anyone with the link.' };
 const TOO_LARGE = { error: '1 GB max for a build.' };
+const NOT_DRIVE = { error: 'That is not a Google Drive link.' };
 
 interface BuildRow {
   id: string;
   project: string;
   name: string;
+  platform: Platform;
   size: string | null;
   url: string | null;
   by: string | null;
@@ -29,7 +32,7 @@ interface BuildRow {
 }
 
 const SELECT = `
-  select b.id, p.short_name as project, b.name, b.size, b.url, u.login as by, b.created_at
+  select b.id, p.short_name as project, b.name, b.platform, b.size, b.url, u.login as by, b.created_at
     from project_builds b
     join projects p on p.id = b.project_id
     left join users u on u.id = b.uploaded_by`;
@@ -38,6 +41,7 @@ const publicBuild = (r: BuildRow) => ({
   id: r.id,
   project: r.project,
   name: r.name,
+  platform: r.platform,
   size: r.size === null ? null : Number(r.size),
   url: r.url,
   by: r.by,
@@ -59,21 +63,19 @@ async function openProject(auth: Auth, short: string): Promise<{ id: string; sho
 async function keep(
   auth: Auth,
   projectId: string,
+  platform: Platform,
   build: { name: string; storagePath: string | null; size: number | null; url: string | null }
 ): Promise<BuildRow> {
   const { id, gone } = await inTransaction(async (client) => {
     await client.query('select 1 from projects where id = $1 for update', [projectId]);
-    const made = await client.query<{ id: string }>(
-      `insert into project_builds (project_id, name, storage_path, size, url, uploaded_by, created_at)
-       values ($1, $2, $3, $4, $5, $6, clock_timestamp()) returning id`,
-      [projectId, build.name, build.storagePath, build.size, build.url, auth.userId]
-    );
     const old = await client.query<{ storage_path: string | null }>(
-      `delete from project_builds
-        where id in (select id from project_builds where project_id = $1
-                      order by created_at desc, id desc offset ${KEPT})
-       returning storage_path`,
-      [projectId]
+      'delete from project_builds where project_id = $1 and platform = $2 returning storage_path',
+      [projectId, platform]
+    );
+    const made = await client.query<{ id: string }>(
+      `insert into project_builds (project_id, platform, name, storage_path, size, url, uploaded_by)
+       values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+      [projectId, platform, build.name, build.storagePath, build.size, build.url, auth.userId]
     );
     return { id: made.rows[0].id, gone: old.rows.map((r) => r.storage_path).filter((p): p is string => !!p) };
   });
@@ -117,6 +119,25 @@ function driveName(html: string): string {
   return decodeEntities(og ?? title ?? '').trim().slice(0, 200);
 }
 
+async function readDrive(raw: string): Promise<{ name: string } | { code: number; body: { error: string } }> {
+  const target = driveTarget(raw);
+  if (!target) return { code: 400, body: NOT_DRIVE };
+  let res: Response;
+  try {
+    res = await fetch(target, { signal: AbortSignal.timeout(30_000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+  } catch {
+    return { code: 502, body: { error: 'Google did not answer.' } };
+  }
+  const page =
+    res.ok &&
+    new URL(res.url).hostname === 'drive.google.com' &&
+    (res.headers.get('content-type') ?? '').startsWith('text/html') &&
+    Number(res.headers.get('content-length') ?? 0) <= PAGE_LIMIT;
+  const name = page ? driveName((await res.text()).slice(0, PAGE_LIMIT)) : '';
+  if (!name || /^Google\s+\S+$/u.test(name)) return { code: 422, body: CLOSED };
+  return { name };
+}
+
 export function registerBuildRoutes(app: FastifyInstance): void {
   app.get('/builds', async (req, reply) => {
     const auth = await requireAuth(req, reply);
@@ -124,7 +145,7 @@ export function registerBuildRoutes(app: FastifyInstance): void {
     const denied = auth.isAdmin ? [] : [...(await deniedFor(auth.roleId)).projects];
     const res = await pool.query<BuildRow>(
       `${SELECT} where not p.archived and not (p.id = any($1::uuid[]))
-        order by p.short_name, b.created_at desc, b.id desc`,
+        order by p.short_name, b.platform = 'macos', b.created_at desc`,
       [denied]
     );
     return reply.send({ data: res.rows.map(publicBuild) });
@@ -136,6 +157,8 @@ export function registerBuildRoutes(app: FastifyInstance): void {
     const { short } = req.params as { short: string };
     const project = await openProject(auth, short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
+    const platform = PLATFORM.safeParse((req.query as { platform?: string }).platform);
+    if (!platform.success) return reply.code(400).send({ error: 'Which platform?' });
     const file = await req.file({ limits: { fileSize: BUILD_MAX_BYTES, files: 1 } });
     if (!file) return reply.code(400).send({ error: 'Send a file.' });
 
@@ -156,7 +179,7 @@ export function registerBuildRoutes(app: FastifyInstance): void {
     }
     let saved: BuildRow;
     try {
-      saved = await keep(auth, project.id, {
+      saved = await keep(auth, project.id, platform.data, {
         name: path.basename(file.filename).trim().slice(0, 200) || 'build',
         storagePath: stored,
         size: (await stat(onDisk(stored))).size,
@@ -176,25 +199,30 @@ export function registerBuildRoutes(app: FastifyInstance): void {
     const { short } = req.params as { short: string };
     const project = await openProject(auth, short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
-    const parsed = z.object({ url: z.string().trim().max(2000) }).safeParse(req.body);
-    const target = parsed.success ? driveTarget(parsed.data.url) : null;
-    if (!parsed.success || !target) return reply.code(400).send({ error: 'That is not a Google Drive link.' });
-    let res: Response;
-    try {
-      res = await fetch(target, { signal: AbortSignal.timeout(30_000), headers: { 'User-Agent': 'Mozilla/5.0' } });
-    } catch {
-      return reply.code(502).send({ error: 'Google did not answer.' });
-    }
-    const page =
-      res.ok &&
-      new URL(res.url).hostname === 'drive.google.com' &&
-      (res.headers.get('content-type') ?? '').startsWith('text/html') &&
-      Number(res.headers.get('content-length') ?? 0) <= PAGE_LIMIT;
-    const name = page ? driveName((await res.text()).slice(0, PAGE_LIMIT)) : '';
-    if (!name || /^Google\s+\S+$/u.test(name)) return reply.code(422).send(CLOSED);
-    const saved = await keep(auth, project.id, { name, storagePath: null, size: null, url: parsed.data.url });
+    const parsed = z.object({ url: z.string().trim().max(2000), platform: PLATFORM }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send(NOT_DRIVE);
+    const drive = await readDrive(parsed.data.url);
+    if ('code' in drive) return reply.code(drive.code).send(drive.body);
+    const saved = await keep(auth, project.id, parsed.data.platform, {
+      name: drive.name,
+      storagePath: null,
+      size: null,
+      url: parsed.data.url,
+    });
     void publish({ type: 'build.changed', projectId: project.id, by: auth.login, origin: tabOf(req) });
     return reply.code(201).send({ data: publicBuild(saved) });
+  });
+
+  app.post('/builds/:short/drive/name', async (req, reply) => {
+    const auth = await requireAuth(req, reply);
+    if (!auth) return;
+    const { short } = req.params as { short: string };
+    if (!(await openProject(auth, short))) return reply.code(404).send({ error: 'No such project.' });
+    const parsed = z.object({ url: z.string().trim().max(2000) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send(NOT_DRIVE);
+    const drive = await readDrive(parsed.data.url);
+    if ('code' in drive) return reply.code(drive.code).send(drive.body);
+    return reply.send({ data: { name: drive.name } });
   });
 
   app.get('/builds/:id/file', async (req, reply) => {
