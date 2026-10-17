@@ -38,9 +38,11 @@ onUnmounted(() => {
       <section class="dlg dialog" role="dialog" aria-modal="true" :style="{ width: `${width ?? 360}px` }">
         <header class="dlg__h">
           <span>{{ title }}</span>
-          <button class="btn btn--sm btn--icon btn--ghost" type="button" :aria-label="t('common.close')" @click="emit('close')">
-            <X class="ic" />
-          </button>
+          <slot name="actions">
+            <button class="btn btn--sm btn--icon btn--ghost" type="button" :aria-label="t('common.close')" @click="emit('close')">
+              <X class="ic" />
+            </button>
+          </slot>
         </header>
         <div class="dlg__b"><slot /></div>
         <div class="dlg__f"><slot name="footer" /></div>

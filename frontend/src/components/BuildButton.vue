@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Download, ExternalLink, Package } from 'lucide-vue-next';
+import BuildActions from './BuildActions.vue';
 import BuildList from './BuildList.vue';
 import Dialog from './Dialog.vue';
 import { buildLink, useBuilds } from '../lib/builds';
@@ -43,7 +44,10 @@ useLive(
     @click="open = true"
   ><Package class="ic" /></button>
   <Dialog v-if="open" :title="t('builds.title')" :width="460" @close="close">
-    <BuildList :project="project" @error="error = $event" />
+    <template #actions>
+      <BuildActions :project="project" @error="error = $event" />
+    </template>
+    <BuildList :project="project" />
     <div v-if="error" class="err">{{ error }}</div>
   </Dialog>
 </template>

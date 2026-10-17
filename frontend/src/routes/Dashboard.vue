@@ -13,7 +13,6 @@ import {
   Smile,
   Star,
 } from 'lucide-vue-next';
-import BuildsPanel from '../components/BuildsPanel.vue';
 import IssueView from '../components/IssueView.vue';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
@@ -624,12 +623,10 @@ function closeIssue(): void {
               </div>
             </div>
           </section>
-          <BuildsPanel v-if="notesAside === false" />
           <StickyNotes v-if="notesAside === false" />
         </div>
       </div>
-      <aside v-if="notesAside" class="me__notes stack">
-        <BuildsPanel />
+      <aside v-if="notesAside" class="me__notes">
         <StickyNotes />
       </aside>
       </div>
