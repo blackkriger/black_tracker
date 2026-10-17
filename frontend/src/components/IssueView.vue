@@ -1637,17 +1637,18 @@ async function removeIssue(): Promise<void> {
               <div v-else class="iv__body hint faint">{{ t('issue.nothingWritten') }}</div>
             </div>
 
-            <RichText
-              v-if="editing"
-              v-model="expectedDraft"
-              min-height="90px"
-              :placeholder="t('issue.expectedPlaceholder')"
-              inline-images
-              @files="upload"
-              @blur="keepNew"
-            />
+            <div v-if="editing">
+              <RichText
+                v-model="expectedDraft"
+                min-height="90px"
+                :placeholder="t('issue.expectedPlaceholder')"
+                inline-images
+                @files="upload"
+                @blur="keepNew"
+              />
+            </div>
             <div v-else-if="hasExpected" :class="{ 'is-fresh': fresh.has('expected') }">
-              <div class="sec-h">{{ t('issue.expected') }}</div>
+              <div v-if="hasDescription" class="sec-h">{{ t('issue.expected') }}</div>
               <div class="md iv__body" @click="onTextClick($event, 'expected')" v-html="asHtml(issue?.expected ?? '', true, true)"></div>
             </div>
 
