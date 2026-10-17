@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, type LocationQuery } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { Ellipsis, Search } from 'lucide-vue-next';
-import DateRangePicker from '../components/DateRangePicker.vue';
 import Dialog from '../components/Dialog.vue';
+import FilterBar from '../components/FilterBar.vue';
 import FilterMenu from '../components/FilterMenu.vue';
 import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
 import { useBoards, type BoardFull } from '../lib/boards';
+import {
+  COMMIT_FILTERS,
+  commitQuery,
+  filtersOf,
+  filtersQuery,
+  noFilters,
+  remember,
+  rememberedFilters,
+  sameQuery,
+  type Filters,
+} from '../lib/filters';
 import { stampAt, type Issue, type IssueLink, type IssueTag } from '../lib/issues';
 import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
@@ -57,38 +68,42 @@ const listOf = (v: unknown): string[] => String(v ?? '').split(',').filter(Boole
 
 const typed = ref('');
 const q = ref('');
-const authors = ref<string[]>([]);
+const filters = ref<Filters>(noFilters());
+const committers = ref<string[]>([]);
 const branches = ref<string[]>([]);
-const chosenProjects = ref<string[]>([]);
-const chosenTags = ref<string[]>([]);
 const linked = ref<Linked>('');
-const from = ref('');
-const to = ref('');
+
+function sharedOf(query: LocationQuery): Filters {
+  const kept = rememberedFilters(noFilters());
+  if (!COMMIT_FILTERS.some((key) => query[key] !== undefined)) return kept;
+  const got = filtersOf(query);
+  return { ...kept, projects: got.projects, tags: got.tags, from: got.from, to: got.to };
+}
 
 function fromQuery(): void {
   const query = route.query;
+  filters.value = sharedOf(query);
   q.value = String(query.q ?? '');
   typed.value = q.value;
-  authors.value = listOf(query.authors);
+  committers.value = listOf(query.committers);
   branches.value = listOf(query.branches);
-  chosenProjects.value = listOf(query.projects);
-  chosenTags.value = listOf(query.tags);
   linked.value = query.linked === 'yes' || query.linked === 'no' ? query.linked : '';
-  from.value = String(query.from ?? '');
-  to.value = String(query.to ?? '');
 }
 
 function toQuery(): Record<string, string> {
-  const out: Record<string, string> = {};
+  const out = commitQuery(filtersQuery(filters.value));
   if (q.value) out.q = q.value;
-  if (authors.value.length) out.authors = authors.value.join(',');
+  if (committers.value.length) out.committers = committers.value.join(',');
   if (branches.value.length) out.branches = branches.value.join(',');
-  if (chosenProjects.value.length) out.projects = chosenProjects.value.join(',');
-  if (chosenTags.value.length) out.tags = chosenTags.value.join(',');
   if (linked.value) out.linked = linked.value;
-  if (from.value) out.from = from.value;
-  if (to.value) out.to = to.value;
   return out;
+}
+
+function apiQuery(): URLSearchParams {
+  const query = new URLSearchParams(toQuery());
+  query.delete('committers');
+  if (committers.value.length) query.set('authors', committers.value.join(','));
+  return query;
 }
 
 fromQuery();
@@ -108,7 +123,7 @@ let reads = 0;
 async function load(append = false): Promise<void> {
   const mine = ++reads;
   clear('list');
-  const query = new URLSearchParams(toQuery());
+  const query = apiQuery();
   if (append) query.set('offset', String(rows.value.length));
   if (append) more.value = true;
   try {
@@ -141,45 +156,35 @@ async function loadFacets(): Promise<void> {
   } catch {}
 }
 
-const projectChoices = computed(() =>
-  projects.value.filter((p) => !p.archived).map((p) => ({ value: p.shortName, key: p.shortName, label: p.name }))
-);
+const ownDirty = computed(() => !!q.value || !!committers.value.length || !!branches.value.length || !!linked.value);
 
-const changed = computed(() => Object.keys(toQuery()).length > 0);
-
-const tagChoices = computed(() => {
-  const scope = projects.value.filter(
-    (p) => !p.archived && (!chosenProjects.value.length || chosenProjects.value.includes(p.shortName))
-  );
-  const onBoards = new Set(scope.flatMap((p) => p.boards.map((b) => b.id)));
-  return tags.value.filter((tag) => tag.boardIds.some((id) => onBoards.has(id)));
-});
-
-function toggleTag(id: string): void {
-  chosenTags.value = chosenTags.value.includes(id)
-    ? chosenTags.value.filter((v) => v !== id)
-    : [...chosenTags.value, id];
-}
-
-function clearAll(): void {
+function clearOwn(): void {
   typed.value = '';
   q.value = '';
-  authors.value = [];
+  committers.value = [];
   branches.value = [];
-  chosenProjects.value = [];
-  chosenTags.value = [];
   linked.value = '';
-  from.value = '';
-  to.value = '';
 }
 
 watch(
-  [q, authors, branches, chosenProjects, chosenTags, linked, from, to],
+  [filters, q, committers, branches, linked],
   () => {
-    void router.replace({ name: 'commits', params: route.params, query: toQuery() });
+    remember(filters.value, noFilters());
+    const next = toQuery();
+    if (!sameQuery(next, route.query as Record<string, unknown>)) {
+      void router.replace({ name: 'commits', params: route.params, query: next });
+    }
     void load();
   },
   { deep: true }
+);
+
+watch(
+  () => route.query,
+  () => {
+    if (route.name !== 'commits') return;
+    if (!sameQuery(toQuery(), route.query as Record<string, unknown>)) fromQuery();
+  }
 );
 
 const openKey = computed(() => (route.name === 'commits' && route.params.key ? String(route.params.key) : null));
@@ -328,28 +333,10 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
                 </label>
               </div>
             </div>
-            <div class="fbar">
-              <FilterMenu v-model="chosenProjects" :label="t('fields.projects')" :options="projectChoices" />
-              <FilterMenu v-model="authors" :label="t('commits.author')" :options="authorChoices" />
+            <FilterBar v-model="filters" :menus="['projects']" :dirty="ownDirty" @clear="clearOwn">
+              <FilterMenu v-model="committers" :label="t('commits.author')" :options="authorChoices" />
               <FilterMenu v-model="branches" :label="t('commits.branch')" :options="branchChoices" />
-              <span class="fbar__sep" aria-hidden="true"></span>
-              <span class="fbar__period" :class="{ 'is-on': from || to }">
-                <DateRangePicker :from="from" :to="to" @change="from = $event.from; to = $event.to" />
-              </span>
-              <button
-                v-for="tag in tagChoices"
-                :key="tag.id"
-                class="taglabel taglabel--plain taglabel--pick"
-                :class="{ 'is-off': chosenTags.length && !chosenTags.includes(tag.id) }"
-                type="button"
-                :aria-pressed="chosenTags.includes(tag.id)"
-                :style="{ '--c': tag.color }"
-                @click="toggleTag(tag.id)"
-              >{{ tag.name }}</button>
-              <button v-if="changed" class="btn btn--sm btn--ghost" type="button" @click="clearAll">
-                {{ t('filters.clearAll') }}
-              </button>
-            </div>
+            </FilterBar>
           </div>
 
           <div class="panel__table">
@@ -357,10 +344,10 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
               <thead>
                 <tr>
                   <th class="list__sha">{{ t('commits.sha') }}</th>
+                  <th class="list__branch">{{ t('commits.branch') }}</th>
                   <th class="list__summary">{{ t('commits.message') }}</th>
                   <th class="list__issues">{{ t('commits.issues') }}</th>
                   <th class="list__who">{{ t('commits.author') }}</th>
-                  <th class="list__branch">{{ t('commits.branch') }}</th>
                   <th class="list__when">{{ t('commits.when') }}</th>
                   <th class="list__act"></th>
                 </tr>
@@ -368,10 +355,10 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
               <tbody v-if="loading">
                 <tr v-for="n in 6" :key="n">
                   <td class="list__sha"><span class="sk sk--line" style="width: 52px"></span></td>
+                  <td class="list__branch"><span class="sk sk--line" style="width: 80px"></span></td>
                   <td class="list__what"><span class="sk sk--line" :style="{ width: `${40 + ((n * 17) % 45)}%` }"></span></td>
                   <td class="list__issues"><span class="sk sk--line" style="width: 44px"></span></td>
                   <td class="list__who"><span class="sk sk--line" style="width: 56px"></span></td>
-                  <td class="list__branch"><span class="sk sk--line" style="width: 80px"></span></td>
                   <td class="list__when"><span class="sk sk--line" style="width: 90px"></span></td>
                   <td class="list__act"></td>
                 </tr>
@@ -381,6 +368,7 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
                   <td class="key list__sha">
                     <a :href="r.url" target="_blank" rel="noopener noreferrer">{{ r.sha.slice(0, 7) }}</a>
                   </td>
+                  <td class="list__dim list__branch">{{ r.branch }}</td>
                   <td class="list__what" :title="r.message">{{ r.message }}</td>
                   <td class="list__issues">
                     <RouterLink
@@ -393,7 +381,6 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
                     >{{ i.key }}</RouterLink>
                   </td>
                   <td class="list__who" :style="{ color: r.by ? ink(colorOf(r.by)) : undefined }">{{ authorOf(r) }}</td>
-                  <td class="list__dim list__branch">{{ r.branch }}</td>
                   <td class="stamp list__when">{{ stampAt(r.at) }}</td>
                   <td class="list__act">
                     <button
@@ -538,30 +525,6 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
 .seg__i:has(input:focus-visible) {
   box-shadow: var(--focus-ring);
 }
-.fbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.fbar__sep {
-  flex: none;
-  width: 1px;
-  height: 16px;
-  margin: 0 6px;
-  background: var(--line-2);
-}
-.taglabel--pick {
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-.taglabel--pick.is-off {
-  opacity: 0.35;
-}
-.fbar__period:not(.is-on) :deep(.drp__trigger) {
-  color: var(--text-muted);
-}
 .list {
   table-layout: auto;
 }
@@ -652,9 +615,6 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
   font-size: 12px;
 }
 @media (max-width: 760px) {
-  .fbar__sep {
-    display: none;
-  }
   .list__branch,
   .list__who {
     display: none;

@@ -11,7 +11,10 @@ import { useProjects } from '../lib/projects';
 import { useTags } from '../lib/tags';
 
 const { t } = useI18n();
-const props = defineProps<{ modelValue: Filters; base?: Filters; dirty?: boolean }>();
+type Menu = 'projects' | 'states' | 'assignees' | 'watchers' | 'authors';
+const ALL_MENUS: Menu[] = ['projects', 'states', 'assignees', 'watchers', 'authors'];
+
+const props = defineProps<{ modelValue: Filters; base?: Filters; dirty?: boolean; menus?: Menu[] }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: Filters): void; (e: 'clear'): void }>();
 
 const { projects, loaded: projectsLoaded, load: loadProjects } = useProjects();
@@ -20,6 +23,8 @@ const { tags, loaded: tagsLoaded, load: loadTags } = useTags();
 const { boards, boardOf, forget } = useBoards();
 
 const set = (part: Partial<Filters>): void => emit('update:modelValue', { ...props.modelValue, ...part });
+const shown = computed(() => props.menus ?? ALL_MENUS);
+const shows = (menu: Menu): boolean => shown.value.includes(menu);
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
 const scope = computed(() =>
@@ -30,6 +35,7 @@ const scope = computed(() =>
 watch(
   scope,
   (now) => {
+    if (!shows('states')) return;
     for (const p of now) for (const b of p.boards) void boardOf(b.id).catch(() => {});
   },
   { immediate: true }
@@ -63,12 +69,17 @@ const periodOn = computed(() => {
   const base = props.base ?? noFilters();
   return props.modelValue.from !== base.from || props.modelValue.to !== base.to;
 });
-const changed = computed(
-  () => props.dirty || Object.keys(filtersQuery(props.modelValue, props.base ?? noFilters())).length > 0
-);
+const changed = computed(() => {
+  const base = props.base ?? noFilters();
+  const own = filtersQuery(props.modelValue, base);
+  return props.dirty || Object.keys(own).some((key) => !ALL_MENUS.includes(key as Menu) || shows(key as Menu));
+});
 
 function clearAll(): void {
-  emit('update:modelValue', { ...(props.base ?? noFilters()), projects: [] });
+  const base = props.base ?? noFilters();
+  const cleared: Partial<Filters> = { tags: base.tags, from: base.from, to: base.to };
+  for (const menu of shown.value) cleared[menu] = menu === 'projects' ? [] : base[menu];
+  set(cleared);
   emit('clear');
 }
 
@@ -90,35 +101,41 @@ onMounted(() => {
 <template>
   <div class="fbar">
     <FilterMenu
+      v-if="shows('projects')"
       :model-value="modelValue.projects"
       :label="t('fields.projects')"
       :options="projectChoices"
       @update:model-value="set({ projects: $event })"
     />
     <FilterMenu
+      v-if="shows('states')"
       :model-value="modelValue.states"
       :label="t('fields.status')"
       :options="stateChoices"
       @update:model-value="set({ states: $event })"
     />
     <FilterMenu
+      v-if="shows('assignees')"
       :model-value="modelValue.assignees"
       :label="t('fields.assignee')"
       :options="assigneeChoices"
       @update:model-value="set({ assignees: $event })"
     />
     <FilterMenu
+      v-if="shows('watchers')"
       :model-value="modelValue.watchers"
       :label="t('fields.watcher')"
       :options="personChoices"
       @update:model-value="set({ watchers: $event })"
     />
     <FilterMenu
+      v-if="shows('authors')"
       :model-value="modelValue.authors"
       :label="t('fields.author')"
       :options="personChoices"
       @update:model-value="set({ authors: $event })"
     />
+    <slot />
     <span class="fbar__sep" aria-hidden="true"></span>
     <span class="fbar__period" :class="{ 'is-on': periodOn }">
       <DateRangePicker

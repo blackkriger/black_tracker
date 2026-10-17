@@ -83,7 +83,7 @@ export function remember(f: Filters, base: Filters): void {
   } catch {}
 }
 
-function rememberedFilters(base: Filters): Filters {
+export function rememberedFilters(base: Filters): Filters {
   const r = remembered.value;
   return {
     projects: [...r.projects],
@@ -124,6 +124,11 @@ export function linkQuery(base: Filters, project?: string | null): Record<string
   if (project) f.projects = [project];
   return filtersQuery(f, base);
 }
+
+export const COMMIT_FILTERS: readonly string[] = ['projects', 'tags', 'from', 'to'];
+
+export const commitQuery = (query: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(Object.entries(query).filter(([key]) => COMMIT_FILTERS.includes(key)));
 
 export const sameQuery = (a: Record<string, unknown>, b: Record<string, unknown>): boolean =>
   JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());

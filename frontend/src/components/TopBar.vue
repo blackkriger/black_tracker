@@ -15,7 +15,7 @@ import { api } from '../lib/api';
 import { todayKey, type Mark } from '../lib/calendar';
 import { stamp } from '../lib/issues';
 import { buddyAvatarStyle } from '../lib/avatar';
-import { linkQuery, monthFilters, noFilters } from '../lib/filters';
+import { commitQuery, linkQuery, monthFilters, noFilters } from '../lib/filters';
 import { features } from '../lib/features';
 import { layout, narrow } from '../lib/layout';
 import {
@@ -51,6 +51,7 @@ const here = computed(() => PLACES.includes(String(route.name)));
 const currentShort = computed(() => (here.value ? String(route.params.short) : null));
 const issuesTo = computed(() => ({ name: 'issues', query: linkQuery(noFilters(), currentShort.value) }));
 const analyticsTo = computed(() => ({ name: 'analytics', query: linkQuery(monthFilters(), currentShort.value) }));
+const commitsTo = computed(() => ({ name: 'commits', query: commitQuery(linkQuery(noFilters(), currentShort.value)) }));
 const currentSlug = computed(() => (here.value ? String(route.params.slug ?? '').toLowerCase() : ''));
 const section = computed(() => {
   const name = String(route.name ?? '');
@@ -276,7 +277,7 @@ async function signOut(): Promise<void> {
       </RouterLink>
       <span v-if="hasRole" class="topboards">
         <RouterLink class="topitem topitem__board" :to="issuesTo" :aria-current="at('issues')">{{ t('nav.issues') }}</RouterLink>
-        <RouterLink class="topitem topitem__board" :to="{ name: 'commits' }" :aria-current="at('commits')">{{ t('nav.commits') }}</RouterLink>
+        <RouterLink class="topitem topitem__board" :to="commitsTo" :aria-current="at('commits')">{{ t('nav.commits') }}</RouterLink>
       </span>
       <span v-if="hasRole" class="topboards">
         <RouterLink class="topitem topitem__board" :to="analyticsTo" :aria-current="at('analytics')">{{ t('nav.analytics') }}</RouterLink>
@@ -292,7 +293,7 @@ async function signOut(): Promise<void> {
     <nav v-if="hasRole" class="rail__sections" :aria-label="t('nav.sections')">
       <RouterLink class="topitem" :to="issuesTo" :aria-current="at('issues')"><ListChecks class="ic" />{{ t('nav.issues') }}</RouterLink>
       <RouterLink class="topitem" :to="analyticsTo" :aria-current="at('analytics')"><ChartColumn class="ic" />{{ t('nav.analytics') }}</RouterLink>
-      <RouterLink class="topitem" :to="{ name: 'commits' }" :aria-current="at('commits')"><FolderGit2 class="ic" />{{ t('nav.commits') }}</RouterLink>
+      <RouterLink class="topitem" :to="commitsTo" :aria-current="at('commits')"><FolderGit2 class="ic" />{{ t('nav.commits') }}</RouterLink>
       <RouterLink class="topitem" :to="{ name: 'feedback' }" :aria-current="at('feedback')"><MessageSquareText class="ic" />{{ t('nav.feedback') }}</RouterLink>
     </nav>
 
