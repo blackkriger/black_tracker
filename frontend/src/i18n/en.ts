@@ -2,6 +2,7 @@ import analytics from './en/analytics';
 import api from './en/api';
 import auth from './en/auth';
 import board from './en/board';
+import builds from './en/builds';
 import calendar from './en/calendar';
 import colors from './en/colors';
 import commits from './en/commits';
@@ -29,6 +30,7 @@ export default {
   api,
   auth,
   board,
+  builds,
   calendar,
   colors,
   commits,

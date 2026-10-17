@@ -2,6 +2,7 @@ import analytics from './ru/analytics';
 import api from './ru/api';
 import auth from './ru/auth';
 import board from './ru/board';
+import builds from './ru/builds';
 import calendar from './ru/calendar';
 import colors from './ru/colors';
 import commits from './ru/commits';
@@ -29,6 +30,7 @@ export default {
   api,
   auth,
   board,
+  builds,
   calendar,
   colors,
   commits,

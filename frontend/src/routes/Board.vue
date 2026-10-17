@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, type Directive } from 'vue';
+import BuildButton from '../components/BuildButton.vue';
 import Viewers from '../components/Viewers.vue';
 import { features } from '../lib/features';
 import { boardViewers, here } from '../lib/presence';
@@ -476,6 +477,7 @@ watch(
   <div class="page">
 
     <div v-if="current && !failed" class="tagbar">
+      <BuildButton v-if="project" :project="project.shortName" />
       <Select
         :model-value="order"
         class="filter"

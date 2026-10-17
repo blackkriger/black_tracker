@@ -42,7 +42,7 @@ const READ_MAX = 512 * 1024;
 const readable = (filename: string): boolean =>
   READABLE.has(filename.split('.').pop()?.toLowerCase() ?? '');
 
-function disposition(kind: 'inline' | 'attachment', name: string): string {
+export function disposition(kind: 'inline' | 'attachment', name: string): string {
   const plain = name.replace(/[^\x20-\x7e]|["\\]/g, '_');
   // RFC 5987 needs ' ( ) * percent-encoded; encodeURIComponent leaves them as is.
   const encoded = encodeURIComponent(name).replace(
@@ -549,7 +549,7 @@ const issuePatch = z.object({
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
-const onDisk = (stored: string): string => path.join(env.uploadDir, stored);
+export const onDisk = (stored: string): string => path.join(env.uploadDir, stored);
 
 // Call before deleting the issues: their attachment rows cascade away with the paths.
 export async function filesOfIssues(issueIds: string[]): Promise<string[]> {

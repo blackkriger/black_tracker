@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-vue-next';
+import BuildsPanel from '../components/BuildsPanel.vue';
 import FilterBar from '../components/FilterBar.vue';
 import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
@@ -230,6 +231,7 @@ onMounted(() => {
   <div class="page">
     <div class="page__body">
       <div class="sheet">
+        <BuildsPanel class="sheet__wide" :projects="filters.projects" />
         <section class="panel sheet__wide">
           <header class="panel__h">
             {{ t('nav.issues') }}

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter, type LocationQuery } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { Ellipsis, Search } from 'lucide-vue-next';
+import BuildsPanel from '../components/BuildsPanel.vue';
 import Dialog from '../components/Dialog.vue';
 import FilterBar from '../components/FilterBar.vue';
 import FilterMenu from '../components/FilterMenu.vue';
@@ -300,6 +301,7 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
   <div class="page">
     <div class="page__body">
       <div class="sheet">
+        <BuildsPanel class="sheet__wide" :projects="filters.projects" />
         <section class="panel sheet__wide">
           <header class="panel__h">
             {{ t('nav.commits') }}

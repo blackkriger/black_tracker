@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { pool } from './db.js';
+import { sweepBuilds } from './build-routes.js';
 import { filesOfIssues, sweepFiles } from './issue-routes.js';
 import { requireAuth, requireDeleter } from './auth.js';
 import {
@@ -189,6 +190,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const paths = await filesOfIssues(ids);
     await pool.query('delete from projects where id = $1', [project.id]);
     await sweepFiles(ids, paths);
+    await sweepBuilds(project.id);
     return reply.send({ data: { ok: true, issues: doomed.rowCount ?? 0 } });
   });
 
