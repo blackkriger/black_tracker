@@ -587,12 +587,6 @@ watch(
       >
         <header class="col__head">
           <h2 class="col__name">{{ s.name }}</h2>
-          <button
-            class="add add--plus"
-            type="button"
-            :aria-label="t('board.addTo', { name: s.name })"
-            @click="creatingIn = s.id"
-          ><Plus class="ic" /></button>
           <span class="col__count">{{ issuesOf(s.id).length }}</span>
         </header>
 
@@ -656,6 +650,13 @@ watch(
               :style="{ height: `${slotHeight}px` }"
               aria-hidden="true"
             ></div>
+
+            <button
+              class="add add--plus"
+              type="button"
+              :aria-label="t('board.addTo', { name: s.name })"
+              @click="creatingIn = s.id"
+            ><Plus class="ic" /></button>
           </template>
         </div>
       </section>
@@ -789,11 +790,5 @@ watch(
 .add--plus:hover {
   background: none;
   color: var(--text);
-}
-.col__head .add--plus {
-  margin-left: auto;
-}
-.col__head .add--plus + .col__count {
-  margin-left: 0;
 }
 </style>
