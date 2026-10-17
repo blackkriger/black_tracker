@@ -52,7 +52,7 @@ export const router = createRouter({
         { path: '/calendar', redirect: { name: 'me', query: { calendar: 'full' } } },
         { path: '/issues/:key?', name: 'issues', component: Issues },
         { path: '/analytics', name: 'analytics', component: Analytics },
-        { path: '/commits', name: 'commits', component: Commits },
+        { path: '/commits/:key?', name: 'commits', component: Commits },
         { path: '/feedback', name: 'feedback', component: FeedbackReport },
         { path: '/analytics/feedback', redirect: (to) => ({ name: 'feedback', query: to.query }) },
         { path: '/settings', name: 'settings', component: SettingsIndex },

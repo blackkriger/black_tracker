@@ -12,6 +12,7 @@ const listQuery = z.object({
   authors: z.string().max(2000).optional(),
   branches: z.string().max(4000).optional(),
   projects: z.string().max(400).optional(),
+  tags: z.string().max(4000).optional(),
   linked: z.enum(['yes', 'no']).optional(),
   from: z.string().regex(DAY_RE).optional(),
   to: z.string().regex(DAY_RE).optional(),
@@ -76,6 +77,7 @@ export function registerCommitRoutes(app: FastifyInstance): void {
     const authors = listOf(p.authors);
     const branches = listOf(p.branches);
     const projects = listOf(p.projects);
+    const tags = listOf(p.tags).filter((v) => /^[0-9a-f-]{36}$/i.test(v));
     const res = await pool.query<ListedRow>(
       `select c.id, c.repo, c.sha, c.kind, c.message, c.branch, c.merged_from, ${AUTHOR} as author,
               c.author_name, u.login as by_login, c.at, rp.short_name as project,
@@ -104,6 +106,9 @@ export function registerCommitRoutes(app: FastifyInstance): void {
                or ($7 = 'yes') = exists (select 1 from issue_commits l where l.commit_id = c.id))
           and ($8::date is null or (c.at at time zone '${ZONE}')::date >= $8)
           and ($9::date is null or (c.at at time zone '${ZONE}')::date <= $9)
+          and (cardinality($11::uuid[]) = 0 or exists (
+                select 1 from issue_commits l join issue_tags it on it.issue_id = l.issue_id
+                 where l.commit_id = c.id and it.tag_id = any($11::uuid[])))
         order by c.at desc, c.id desc
         limit ${PAGE} offset $10`,
       [
@@ -117,6 +122,7 @@ export function registerCommitRoutes(app: FastifyInstance): void {
         p.from ?? null,
         p.to ?? null,
         p.offset ?? 0,
+        tags,
       ]
     );
     return reply.send({

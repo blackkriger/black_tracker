@@ -6,12 +6,15 @@ import { Ellipsis, Search } from 'lucide-vue-next';
 import DateRangePicker from '../components/DateRangePicker.vue';
 import Dialog from '../components/Dialog.vue';
 import FilterMenu from '../components/FilterMenu.vue';
+import IssueView from '../components/IssueView.vue';
 import { api } from '../lib/api';
-import { stampAt, type IssueLink } from '../lib/issues';
+import { useBoards, type BoardFull } from '../lib/boards';
+import { stampAt, type Issue, type IssueLink, type IssueTag } from '../lib/issues';
 import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
+import { useTags } from '../lib/tags';
 import { ink } from '../lib/theme';
 
 interface CommitIssue {
@@ -47,6 +50,8 @@ const router = useRouter();
 const { projects, load: loadProjects } = useProjects();
 const { nameOf, colorOf, load: loadPeople } = usePeople();
 const { errors, fail, clear } = usePanelErrors();
+const { tags, load: loadTags } = useTags();
+const { boardOf, forget } = useBoards();
 
 const listOf = (v: unknown): string[] => String(v ?? '').split(',').filter(Boolean);
 
@@ -55,6 +60,7 @@ const q = ref('');
 const authors = ref<string[]>([]);
 const branches = ref<string[]>([]);
 const chosenProjects = ref<string[]>([]);
+const chosenTags = ref<string[]>([]);
 const linked = ref<Linked>('');
 const from = ref('');
 const to = ref('');
@@ -66,6 +72,7 @@ function fromQuery(): void {
   authors.value = listOf(query.authors);
   branches.value = listOf(query.branches);
   chosenProjects.value = listOf(query.projects);
+  chosenTags.value = listOf(query.tags);
   linked.value = query.linked === 'yes' || query.linked === 'no' ? query.linked : '';
   from.value = String(query.from ?? '');
   to.value = String(query.to ?? '');
@@ -77,6 +84,7 @@ function toQuery(): Record<string, string> {
   if (authors.value.length) out.authors = authors.value.join(',');
   if (branches.value.length) out.branches = branches.value.join(',');
   if (chosenProjects.value.length) out.projects = chosenProjects.value.join(',');
+  if (chosenTags.value.length) out.tags = chosenTags.value.join(',');
   if (linked.value) out.linked = linked.value;
   if (from.value) out.from = from.value;
   if (to.value) out.to = to.value;
@@ -139,31 +147,77 @@ const projectChoices = computed(() =>
 
 const changed = computed(() => Object.keys(toQuery()).length > 0);
 
+const tagChoices = computed(() => {
+  const scope = projects.value.filter(
+    (p) => !p.archived && (!chosenProjects.value.length || chosenProjects.value.includes(p.shortName))
+  );
+  const onBoards = new Set(scope.flatMap((p) => p.boards.map((b) => b.id)));
+  return tags.value.filter((tag) => tag.boardIds.some((id) => onBoards.has(id)));
+});
+
+function toggleTag(id: string): void {
+  chosenTags.value = chosenTags.value.includes(id)
+    ? chosenTags.value.filter((v) => v !== id)
+    : [...chosenTags.value, id];
+}
+
 function clearAll(): void {
   typed.value = '';
   q.value = '';
   authors.value = [];
   branches.value = [];
   chosenProjects.value = [];
+  chosenTags.value = [];
   linked.value = '';
   from.value = '';
   to.value = '';
 }
 
 watch(
-  [q, authors, branches, chosenProjects, linked, from, to],
+  [q, authors, branches, chosenProjects, chosenTags, linked, from, to],
   () => {
-    void router.replace({ name: 'commits', query: toQuery() });
+    void router.replace({ name: 'commits', params: route.params, query: toQuery() });
     void load();
   },
   { deep: true }
 );
 
+const openKey = computed(() => (route.name === 'commits' && route.params.key ? String(route.params.key) : null));
+const open = ref<{ key: string; project: string; board: BoardFull } | null>(null);
+
+async function showIssue(key: string | null): Promise<void> {
+  if (!key) {
+    open.value = null;
+    return;
+  }
+  try {
+    const got = await api<Issue>(`/issues/${encodeURIComponent(key)}`);
+    forget(got.boardId);
+    open.value = {
+      key,
+      project: projects.value.find((p) => p.id === got.projectId)?.shortName ?? '',
+      board: await boardOf(got.boardId),
+    };
+  } catch (err) {
+    fail('list', err);
+  }
+}
+watch(openKey, (key) => void showIssue(key));
+
+const boardsOf = (short: string) => projects.value.find((p) => p.shortName === short)?.boards ?? [];
+const tagsOf = (board: BoardFull): IssueTag[] => tags.value.filter((t) => board.tagIds.includes(t.id));
+
+function closeIssue(): void {
+  void router.push({ name: 'commits', params: {}, query: route.query });
+}
+
 onMounted(async () => {
-  void loadProjects();
+  await loadProjects();
+  void loadTags();
   await loadPeople();
   void loadFacets();
   void load();
+  void showIssue(openKey.value);
 });
 
 const reloadAll = settled(() => {
@@ -282,6 +336,16 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
               <span class="fbar__period" :class="{ 'is-on': from || to }">
                 <DateRangePicker :from="from" :to="to" @change="from = $event.from; to = $event.to" />
               </span>
+              <button
+                v-for="tag in tagChoices"
+                :key="tag.id"
+                class="taglabel taglabel--plain taglabel--pick"
+                :class="{ 'is-off': chosenTags.length && !chosenTags.includes(tag.id) }"
+                type="button"
+                :aria-pressed="chosenTags.includes(tag.id)"
+                :style="{ '--c': tag.color }"
+                @click="toggleTag(tag.id)"
+              >{{ tag.name }}</button>
               <button v-if="changed" class="btn btn--sm btn--ghost" type="button" @click="clearAll">
                 {{ t('filters.clearAll') }}
               </button>
@@ -323,7 +387,7 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
                       v-for="i in r.issues"
                       :key="i.id"
                       class="key list__key"
-                      :to="`/${i.projectShort}/${i.boardSlug}/${i.key}`"
+                      :to="{ name: 'commits', params: { key: i.key }, query: route.query }"
                       :title="`${i.summary}, ${i.stateName}`"
                       :style="{ color: ink(i.stateColor) }"
                     >{{ i.key }}</RouterLink>
@@ -392,6 +456,21 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
       </div>
       <div v-if="actError" class="err">{{ actError }}</div>
     </Dialog>
+
+    <IssueView
+      v-if="open"
+      :key="open.key"
+      :issue-key="open.key"
+      :board="open.board"
+      :boards="boardsOf(open.project)"
+      :tags="tagsOf(open.board)"
+      :project="open.project"
+      @close="closeIssue"
+      @changed="reloadAll"
+      @linked="reloadAll"
+      @moved="reloadAll(); showIssue(open.key)"
+      @deleted="closeIssue(); reloadAll()"
+    />
   </div>
 </template>
 
@@ -471,6 +550,14 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
   height: 16px;
   margin: 0 6px;
   background: var(--line-2);
+}
+.taglabel--pick {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.taglabel--pick.is-off {
+  opacity: 0.35;
 }
 .fbar__period:not(.is-on) :deep(.drp__trigger) {
   color: var(--text-muted);
