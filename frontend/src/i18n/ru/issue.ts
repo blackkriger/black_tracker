@@ -23,6 +23,7 @@ const issue: Shape<typeof en> = {
     status: 'статус',
     summary: 'название',
     descriptionEdited: 'описание изменено',
+    expectedEdited: 'ожидаемый результат изменён',
     priority: 'приоритет',
     dueDate: 'срок',
     assignee: 'исполнитель',
@@ -122,6 +123,8 @@ const issue: Shape<typeof en> = {
   importFailed: 'Не получилось импортировать документ.',
   inDescription: 'встроено в описание',
   inComment: 'встроено в комментарий',
+  inExpected: 'встроено в ожидаемый результат',
+  expected: 'Ожидаемый результат',
 };
 
 export default issue;

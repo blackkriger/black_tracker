@@ -20,6 +20,7 @@ export default {
     status: 'status',
     summary: 'summary',
     descriptionEdited: 'description edited',
+    expectedEdited: 'expected result edited',
     priority: 'priority',
     dueDate: 'due date',
     assignee: 'assignee',
@@ -119,4 +120,6 @@ export default {
   importFailed: 'Could not import the document.',
   inDescription: 'embedded in the description',
   inComment: 'embedded in the comment',
+  inExpected: 'embedded in the expected result',
+  expected: 'Expected result',
 };

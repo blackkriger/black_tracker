@@ -21,6 +21,7 @@ import {
   Italic,
   Link,
   List,
+  ListChecks,
   ListOrdered,
   Quote,
   Strikethrough,
@@ -118,6 +119,7 @@ const marks = ref({
   blockquote: false,
   bullet: false,
   ordered: false,
+  check: false,
   header: false,
 });
 
@@ -133,6 +135,7 @@ function readMarks(): void {
     blockquote: !!f.blockquote,
     bullet: f.list === 'bullet',
     ordered: f.list === 'ordered',
+    check: f.list === 'checked' || f.list === 'unchecked',
     header: f.header === 3,
   };
 }
@@ -457,6 +460,14 @@ watch(body, (next) => {
   }, 0);
 });
 
+function toggleChecklist(): void {
+  if (!quill) return;
+  const list = quill.getFormat().list;
+  quill.format('list', list === 'checked' || list === 'unchecked' ? false : 'unchecked', 'user');
+  quill.focus();
+  readMarks();
+}
+
 function toggle(format: string, value: unknown = true): void {
   if (!quill) return;
   const has = quill.getFormat()[format];
@@ -494,6 +505,7 @@ function addLink(): void {
       <button type="button" :aria-pressed="marks.header" :title="t('editor.heading')" @click="toggle('header', 3)"><Heading3 class="ic" /></button>
       <button type="button" :aria-pressed="marks.bullet" :title="t('editor.bullets')" @click="toggle('list', 'bullet')"><List class="ic" /></button>
       <button type="button" :aria-pressed="marks.ordered" :title="t('editor.numbers')" @click="toggle('list', 'ordered')"><ListOrdered class="ic" /></button>
+      <button type="button" :aria-pressed="marks.check" :title="t('editor.checklist')" @click="toggleChecklist"><ListChecks class="ic" /></button>
       <button type="button" :aria-pressed="marks.blockquote" :title="t('editor.quote')" @click="toggle('blockquote')"><Quote class="ic" /></button>
       <button type="button" :title="t('editor.link')" @click="addLink"><Link class="ic" /></button>
       <span v-if="inlineImages || $slots.tools" class="mdbar__sep" aria-hidden="true"></span>

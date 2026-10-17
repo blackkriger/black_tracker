@@ -6,7 +6,7 @@ import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
 import { ApiError, TAB_ID, api } from '../lib/api';
-import { asHtml, isBlank, trimBlank } from '../lib/richtext';
+import { asHtml, flipCheck, isBlank, trimBlank } from '../lib/richtext';
 import { fromGoogleDoc } from '../lib/googleDoc';
 import { forgetKeys, keyInfo, refreshKey } from '../lib/issueKeys';
 import { buddyAvatarStyle } from '../lib/avatar';
@@ -44,6 +44,7 @@ import {
   Pin,
   SmilePlus,
   Star,
+  Target,
   Trash2,
   X,
 } from 'lucide-vue-next';
@@ -187,6 +188,7 @@ const editing = ref(false);
 const saving = ref(false);
 const titleDraft = ref('');
 const bodyDraft = ref('');
+const expectedDraft = ref('');
 const importing = ref(false);
 const docUrl = ref('');
 const importBusy = ref(false);
@@ -226,6 +228,7 @@ async function importDoc(): Promise<void> {
 }
 let titleBase = '';
 let bodyBase = '';
+let expectedBase = '';
 
 const picking = ref(false);
 const linkQuery = ref('');
@@ -301,19 +304,19 @@ let keptDraft = '';
 const draftSaved = ref(false);
 let draftNote: ReturnType<typeof setTimeout> | null = null;
 
-function readNew(): { summary: string; description: string } | null {
+function readNew(): { summary: string; description: string; expected?: string } | null {
   try {
     const kept = localStorage.getItem(NEW_DRAFTS + props.board.id);
-    return kept ? (JSON.parse(kept) as { summary: string; description: string }) : null;
+    return kept ? (JSON.parse(kept) as { summary: string; description: string; expected?: string }) : null;
   } catch {
     return null;
   }
 }
 
-function writeNew(summary: string, description: string): void {
+function writeNew(summary: string, description: string, expected = ''): void {
   try {
-    if (summary || description) {
-      localStorage.setItem(NEW_DRAFTS + props.board.id, JSON.stringify({ summary, description }));
+    if (summary || description || expected) {
+      localStorage.setItem(NEW_DRAFTS + props.board.id, JSON.stringify({ summary, description, expected }));
     } else {
       localStorage.removeItem(NEW_DRAFTS + props.board.id);
     }
@@ -322,7 +325,11 @@ function writeNew(summary: string, description: string): void {
 
 function keepNew(): void {
   if (!creating.value) return;
-  writeNew(titleDraft.value.trim(), isBlank(bodyDraft.value) ? '' : bodyDraft.value);
+  writeNew(
+    titleDraft.value.trim(),
+    isBlank(bodyDraft.value) ? '' : bodyDraft.value,
+    isBlank(expectedDraft.value) ? '' : expectedDraft.value
+  );
 }
 
 function readDraft(): string {
@@ -706,10 +713,12 @@ const ownBytes = computed(() => own.value.reduce((all, a) => all + a.size, 0));
 const attachmentIds = (html: string): Set<string> =>
   new Set([...html.matchAll(/\/api\/attachments\/([0-9a-f-]{36})/g)].map((m) => m[1]));
 const inlined = computed(() => attachmentIds(issue.value?.description ?? ''));
+const inExpected = computed(() => attachmentIds(issue.value?.expected ?? ''));
 const inlinedIn = (commentId: string): Set<string> =>
   attachmentIds(issue.value?.comments.find((c) => c.id === commentId)?.text ?? '');
-const images = computed(() => own.value.filter((a) => isPicture(a.mime) && !inlined.value.has(a.id)));
-const files = computed(() => own.value.filter((a) => !isPicture(a.mime) || inlined.value.has(a.id)));
+const embedded = (id: string): boolean => inlined.value.has(id) || inExpected.value.has(id);
+const images = computed(() => own.value.filter((a) => isPicture(a.mime) && !embedded(a.id)));
+const files = computed(() => own.value.filter((a) => !isPicture(a.mime) || embedded(a.id)));
 const filesOf = (commentId: string) =>
   (issue.value?.attachments ?? []).filter((a) => a.commentId === commentId);
 const bytesOf = (commentId: string) =>
@@ -867,6 +876,7 @@ async function load(): Promise<void> {
     const kept = readNew();
     titleDraft.value = kept?.summary ?? '';
     bodyDraft.value = kept?.description ?? '';
+    expectedDraft.value = kept?.expected ?? '';
     editing.value = true;
     loading.value = false;
     return;
@@ -931,6 +941,7 @@ async function create(): Promise<void> {
       body: {
         summary,
         description: trimBlank(bodyDraft.value),
+        expected: isBlank(expectedDraft.value) ? '' : trimBlank(expectedDraft.value),
         stateId: draft.value.stateId,
         priority: draft.value.priority,
         assigneeId: draft.value.assigneeId,
@@ -988,8 +999,10 @@ async function toggleFavourite(): Promise<void> {
 function startEditing(): void {
   titleBase = issue.value?.summary ?? '';
   bodyBase = issue.value?.description ?? '';
+  expectedBase = issue.value?.expected ?? '';
   titleDraft.value = titleBase;
   bodyDraft.value = bodyBase;
+  expectedDraft.value = expectedBase;
   editing.value = true;
 }
 
@@ -1004,6 +1017,9 @@ async function saveText(): Promise<void> {
   const body: Record<string, unknown> = {};
   if (summary !== titleBase) body.summary = summary;
   if (bodyDraft.value !== bodyBase) body.description = trimBlank(bodyDraft.value);
+  if (expectedDraft.value !== expectedBase) {
+    body.expected = isBlank(expectedDraft.value) ? '' : trimBlank(expectedDraft.value);
+  }
   saving.value = true;
   try {
     if (Object.keys(body).length && !(await patch(body))) return;
@@ -1089,6 +1105,42 @@ async function postComment(): Promise<void> {
   } finally {
     posting.value = false;
   }
+}
+
+async function flip(where: 'description' | 'expected' | Comment, index: number): Promise<void> {
+  const current = issue.value;
+  if (!current) return;
+  if (typeof where === 'string') {
+    const before = current[where];
+    const next = flipCheck(before, index);
+    if (next === before) return;
+    issue.value = { ...current, [where]: next };
+    if (!(await patch({ [where]: next }))) issue.value = { ...(issue.value ?? current), [where]: before };
+    return;
+  }
+  const next = flipCheck(where.text, index);
+  if (next === where.text) return;
+  const swap = (text: string): void => {
+    const now = issue.value ?? current;
+    issue.value = { ...now, comments: now.comments.map((row) => (row.id === where.id ? { ...row, text } : row)) };
+  };
+  swap(next);
+  try {
+    await api(`/comments/${where.id}`, { method: 'PATCH', body: { text: next } });
+  } catch (err) {
+    swap(where.text);
+    error.value = err instanceof Error ? err.message : t('issue.commentSaveFailed');
+  }
+}
+
+function onTextClick(ev: MouseEvent, where: 'description' | 'expected' | Comment): void {
+  const mark = (ev.target as HTMLElement | null)?.closest<HTMLElement>('.tick[data-check]');
+  if (!mark) {
+    followKey(ev);
+    return;
+  }
+  ev.preventDefault();
+  void flip(where, Number(mark.dataset.check));
 }
 
 async function saveComment(c: Comment): Promise<void> {
@@ -1572,10 +1624,29 @@ async function removeIssue(): Promise<void> {
                 v-else-if="issue?.description && !isBlank(issue.description)"
                 class="md iv__body"
                 :class="{ 'is-fresh': fresh.has('description') }"
-                @click="followKey"
-                v-html="asHtml(issue.description)"
+                @click="onTextClick($event, 'description')"
+                v-html="asHtml(issue.description, true)"
               ></div>
               <div v-else class="iv__body hint faint">{{ t('issue.nothingWritten') }}</div>
+            </div>
+
+            <div v-if="editing" class="iv__expected">
+              <div class="sec-h">
+                <Target class="ic" aria-hidden="true" />
+                <span>{{ t('issue.expected') }}</span>
+              </div>
+              <RichText v-model="expectedDraft" min-height="90px" inline-images @files="upload" @blur="keepNew" />
+            </div>
+            <div
+              v-else-if="issue?.expected && !isBlank(issue.expected)"
+              class="iv__expected"
+              :class="{ 'is-fresh': fresh.has('expected') }"
+            >
+              <div class="sec-h">
+                <Target class="ic" aria-hidden="true" />
+                <span>{{ t('issue.expected') }}</span>
+              </div>
+              <div class="md iv__body" @click="onTextClick($event, 'expected')" v-html="asHtml(issue.expected, true)"></div>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
@@ -1636,7 +1707,7 @@ async function removeIssue(): Promise<void> {
                   target="_blank"
                   @click="onFileClick($event, a)"
                 >{{ a.filename }}</a>
-                <span class="stamp">{{ fileSize(a.size) }}<template v-if="inlined.has(a.id)">, {{ t('issue.inDescription') }}</template></span>
+                <span class="stamp">{{ fileSize(a.size) }}<template v-if="inlined.has(a.id)">, {{ t('issue.inDescription') }}</template><template v-else-if="inExpected.has(a.id)">, {{ t('issue.inExpected') }}</template></span>
                 <a
                   class="btn btn--sm btn--icon btn--ghost"
                   :href="`/api/attachments/${a.id}`"
@@ -1843,7 +1914,12 @@ async function removeIssue(): Promise<void> {
                         <button class="btn btn--sm btn--primary" type="button" @click="saveComment(c)">{{ t('common.save') }}</button>
                       </div>
                     </template>
-                    <div v-else class="md cm__body" @click="followKey" v-html="asHtml(c.text)"></div>
+                    <div
+                      v-else
+                      class="md cm__body"
+                      @click="onTextClick($event, c)"
+                      v-html="asHtml(c.text, c.author.id === session.me.value?.id)"
+                    ></div>
 
                     <div v-if="filesOf(c.id).length" class="cm__files">
                       <div v-if="filesOf(c.id).length > 1" class="att__cap att__row att__all">
@@ -2267,6 +2343,9 @@ async function removeIssue(): Promise<void> {
 </template>
 
 <style scoped>
+.iv__expected {
+  margin-top: var(--space-4);
+}
 .iv__scrim {
   position: fixed;
   inset: 0;

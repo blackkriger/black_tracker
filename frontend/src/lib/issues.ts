@@ -28,6 +28,7 @@ export interface Issue {
   boardId: string;
   summary: string;
   description: string;
+  expected: string;
   stateId: string;
   priority: Priority;
   assignee: Person | null;

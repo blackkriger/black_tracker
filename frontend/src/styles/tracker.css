@@ -343,6 +343,13 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 .md pre { margin: 0 0 10px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); font: 12.5px var(--font-mono); overflow-x: auto; }
 .md ol li[data-list="bullet"] { list-style-type: disc; }
 .md ol li[data-list="ordered"] { list-style-type: decimal; }
+.md li[data-list="checked"], .md li[data-list="unchecked"], .rt__editor .ql-editor li[data-list="checked"], .rt__editor .ql-editor li[data-list="unchecked"] { position: relative; padding-left: 0; list-style-type: none; }
+.md li[data-list="checked"], .rt__editor .ql-editor li[data-list="checked"] { color: var(--text-muted); text-decoration: line-through; }
+.tick, .rt__editor .ql-editor li[data-list="checked"] > .ql-ui, .rt__editor .ql-editor li[data-list="unchecked"] > .ql-ui { position: absolute; left: -24px; top: calc(0.5lh - 8px); width: 16px; height: 16px; margin: 0; padding: 0; border: 1px solid var(--line-2); background: var(--bg); display: grid; place-items: center; cursor: pointer; }
+.tick:disabled { cursor: default; }
+.tick[aria-checked="true"], .rt__editor .ql-editor li[data-list="checked"] > .ql-ui { border-color: var(--accent-fill); background: var(--accent-fill); }
+.tick[aria-checked="true"]::after, .rt__editor .ql-editor li[data-list="checked"] > .ql-ui::after { content: ""; width: 8px; height: 4px; border-left: 2px solid var(--on-accent); border-bottom: 2px solid var(--on-accent); transform: rotate(-45deg) translate(1px, -1px); }
+.rt__editor .ql-editor li[data-list="checked"] > .ql-ui::before, .rt__editor .ql-editor li[data-list="unchecked"] > .ql-ui::before { content: none; }
 .md code { font: 12.5px var(--font-mono); padding: 1px 5px; background: var(--bg); border: 1px solid var(--line); }
 .md img { display: block; max-width: 100%; height: auto; margin: 0 0 10px; }
 .md a { color: var(--accent); }

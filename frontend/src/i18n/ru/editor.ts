@@ -9,6 +9,7 @@ const editor: Shape<typeof en> = {
   heading: 'Заголовок',
   bullets: 'Маркированный список',
   numbers: 'Нумерованный список',
+  checklist: 'Чеклист',
   quote: 'Цитата',
   link: 'Ссылка',
   image: 'Картинка',

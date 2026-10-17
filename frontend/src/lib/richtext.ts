@@ -123,5 +123,40 @@ export function paintLinks(html: string): string {
   return touched ? box.innerHTML : html;
 }
 
-export const asHtml = (text: string): string =>
-  !text ? '' : paintKeys(paintNames(paintLinks(trimBlank(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text))))));
+const CHECK_ITEM = 'li[data-list="checked"], li[data-list="unchecked"]';
+
+export function paintChecks(html: string, editable: boolean): string {
+  if (!html.includes('checked"')) return html;
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  const items = box.querySelectorAll(CHECK_ITEM);
+  if (!items.length) return html;
+  items.forEach((li, i) => {
+    const mark = document.createElement('button');
+    mark.type = 'button';
+    mark.className = 'tick';
+    mark.setAttribute('role', 'checkbox');
+    mark.setAttribute('aria-checked', String(li.getAttribute('data-list') === 'checked'));
+    if (editable) mark.dataset.check = String(i);
+    else mark.disabled = true;
+    li.prepend(mark);
+  });
+  return box.innerHTML;
+}
+
+export function flipCheck(html: string, index: number): string {
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  const li = box.querySelectorAll(CHECK_ITEM)[index];
+  if (!li) return html;
+  li.setAttribute('data-list', li.getAttribute('data-list') === 'checked' ? 'unchecked' : 'checked');
+  return box.innerHTML;
+}
+
+export const asHtml = (text: string, editable = false): string =>
+  !text
+    ? ''
+    : paintChecks(
+        paintKeys(paintNames(paintLinks(trimBlank(looksLikeHtml(text) ? clean(text) : clean(fromPlain(text)))))),
+        editable
+      );

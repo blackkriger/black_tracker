@@ -48,7 +48,7 @@ export default {
     analytics: 'The numbers behind Analytics',
     events: 'Live stream of every change you may see',
     createIssue: 'Write a new issue onto that board',
-    patchIssue: 'Change summary, description, status, priority, assignee, watcher, due date, tags, board',
+    patchIssue: 'Change summary, description, expected result, status, priority, assignee, watcher, due date, tags, board',
     deleteIssue: 'Delete an issue, if your role can',
     link: 'Link it to another issue',
     unlink: 'Unlink the two',

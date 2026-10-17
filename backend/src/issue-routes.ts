@@ -60,6 +60,7 @@ interface IssueRow {
   number: number;
   summary: string;
   description: string;
+  expected: string;
   state_id: string;
   priority: string;
   assignee_id: string | null;
@@ -115,6 +116,7 @@ const publicIssue = (r: IssueRow, tags: TagRow[] = [], favourite = false) => ({
   boardId: r.board_id,
   summary: r.summary,
   description: r.description,
+  expected: r.expected,
   stateId: r.state_id,
   priority: r.priority,
   assignee: person(r.assignee_id, r.assignee_login),
@@ -513,6 +515,7 @@ const commentText = z.string().trim().min(1).max(25 * 1024 * 1024).refine(within
 const issueCreate = z.object({
   summary: z.string().trim().min(1).max(300),
   description: description.optional(),
+  expected: description.optional(),
   stateId: z.string().uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
@@ -537,6 +540,7 @@ const issuePatch = z.object({
   summary: z.string().trim().min(1).max(300).optional(),
   boardId: z.string().uuid().optional(),
   description: description.optional(),
+  expected: description.optional(),
   stateId: z.string().uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
@@ -617,8 +621,8 @@ export async function createIssue(
     const row = await client.query<{ id: string }>(
       `insert into issues
          (readable_id, project_id, board_id, number, summary, description, state_id,
-          priority, assignee_id, author_id, due_date, position, via_bot, watcher_id)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          priority, assignee_id, author_id, due_date, position, via_bot, watcher_id, expected)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        returning id`,
       [
         `${short}-${number}`,
@@ -635,6 +639,7 @@ export async function createIssue(
         top.rows[0].pos,
         options.viaBot ?? false,
         watcherId,
+        p.expected ?? '',
       ]
     );
     if (p.tagIds?.length) {
@@ -762,9 +767,10 @@ async function adoptInto(
 
 export async function adoptImages(issue: IssueRow, by: Actor & { login: string }, origin?: string): Promise<IssueRow> {
   const description = await adoptInto(issue.description, issue, by, origin, null);
-  if (description === issue.description) return issue;
-  await pool.query('update issues set description = $2 where id = $1', [issue.id, description]);
-  return { ...issue, description };
+  const expected = await adoptInto(issue.expected, issue, by, origin, null);
+  if (description === issue.description && expected === issue.expected) return issue;
+  await pool.query('update issues set description = $2, expected = $3 where id = $1', [issue.id, description, expected]);
+  return { ...issue, description, expected };
 }
 
 async function adoptCommentImages(
@@ -1107,6 +1113,9 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       if (p.description !== undefined && p.description !== issue.description) {
         await writeHistory(client, id, auth, 'description edited', null, null);
       }
+      if (p.expected !== undefined && p.expected !== issue.expected) {
+        await writeHistory(client, id, auth, 'expected edited', null, null);
+      }
       if (p.priority !== undefined && p.priority !== issue.priority) {
         await writeHistory(client, id, auth, 'priority', issue.priority, p.priority);
       }
@@ -1187,6 +1196,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
                 assignee_id = case when $6 then $7::uuid else assignee_id end,
                 due_date = case when $8 then $9::date else due_date end,
                 watcher_id = case when $10 then $11::uuid else watcher_id end,
+                expected = coalesce($12, expected),
                 updated_at = now()
           where id = $1`,
         [
@@ -1201,6 +1211,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           p.dueDate ?? null,
           p.watcherId !== undefined,
           p.watcherId ?? null,
+          p.expected ?? null,
         ]
       );
 
@@ -1235,7 +1246,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     });
 
     let row = await issueById(id);
-    if (row && p.description !== undefined) row = await adoptImages(row, auth, tabOf(req));
+    if (row && (p.description !== undefined || p.expected !== undefined)) row = await adoptImages(row, auth, tabOf(req));
     if (p.assigneeId && p.assigneeId !== issue.assignee_id && p.assigneeId !== auth.userId) {
       void publish({ type: 'notice.changed', only: p.assigneeId });
     }
@@ -1378,7 +1389,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const tagged = await tagsFor(res.rows.map((r) => r.id));
     return reply.send({
       data: res.rows.map((r) => {
-        const { description, ...issue } = publicIssue(r, tagged.get(r.id) ?? []);
+        const { description, expected, ...issue } = publicIssue(r, tagged.get(r.id) ?? []);
         return {
           ...issue,
           stateName: r.state_name,
