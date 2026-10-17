@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, type Directive } from 'vue';
 import Viewers from '../components/Viewers.vue';
 import { features } from '../lib/features';
 import { boardViewers, here } from '../lib/presence';
@@ -22,7 +22,7 @@ import { lastBoard, lastProject } from '../lib/lastProject';
 import { useLive } from '../lib/live';
 import { Plus, Search, Star } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
-import { vSplitLine } from '../lib/splitLine';
+import { vSplitLine as splitLine } from '../lib/splitLine';
 
 interface State {
   id: string;
@@ -53,6 +53,8 @@ interface Project {
   archived: boolean;
   boards: Board[];
 }
+
+const vSplitLine: Directive<HTMLElement> = features.splitCardTags ? splitLine : {};
 
 const { t } = useI18n();
 const route = useRoute();
