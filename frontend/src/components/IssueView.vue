@@ -300,68 +300,6 @@ const commitError = ref<string | null>(null);
 let moveTimer: ReturnType<typeof setTimeout> | null = null;
 let moveSearches = 0;
 
-interface FoundCommit {
-  id: string;
-  sha: string;
-  message: string;
-  issues: { id: string; key: string }[];
-}
-
-const attaching = ref(false);
-const commitQuery = ref('');
-const commitHits = ref<FoundCommit[]>([]);
-const commitSearching = ref(false);
-const attachError = ref<string | null>(null);
-let commitTimer: ReturnType<typeof setTimeout> | null = null;
-let commitSearches = 0;
-
-function openAttach(): void {
-  attaching.value = true;
-  commitQuery.value = '';
-  commitHits.value = [];
-  attachError.value = null;
-}
-
-watch(commitQuery, (term) => {
-  if (commitTimer) clearTimeout(commitTimer);
-  const q = term.trim();
-  if (!q) {
-    ++commitSearches;
-    commitSearching.value = false;
-    commitHits.value = [];
-    return;
-  }
-  commitTimer = setTimeout(async () => {
-    const mine = ++commitSearches;
-    commitSearching.value = true;
-    try {
-      const got = await api<{ commits: FoundCommit[] }>(`/commits?q=${encodeURIComponent(q)}`);
-      if (mine !== commitSearches) return;
-      commitHits.value = got.commits.filter((k) => !k.issues.some((i) => i.id === issue.value?.id));
-    } catch {
-      if (mine === commitSearches) commitHits.value = [];
-    } finally {
-      if (mine === commitSearches) commitSearching.value = false;
-    }
-  }, 200);
-});
-
-async function attachCommit(k: FoundCommit): Promise<void> {
-  const current = issue.value;
-  if (!current || commitBusy.value) return;
-  commitBusy.value = true;
-  attachError.value = null;
-  try {
-    await api(`/commits/${k.id}/link`, { method: 'POST', body: { key: current.key } });
-    attaching.value = false;
-    await reload();
-  } catch (err) {
-    attachError.value = err instanceof Error ? err.message : t('issue.commitsFailed');
-  } finally {
-    commitBusy.value = false;
-  }
-}
-
 function openCommits(group: Pushed): void {
   commitGroup.value = group;
   chosenCommits.value = new Set(group.commits.map((k) => k.id));
@@ -873,7 +811,6 @@ function onKeydown(ev: KeyboardEvent): void {
     makingTag.value ||
     importing.value ||
     commitGroup.value ||
-    attaching.value ||
     shown.value !== null
   )
     return;
@@ -1928,9 +1865,6 @@ async function removeIssue(): Promise<void> {
                 {{ t('issue.historyTab') }}<span class="n">{{ issue.history.length }}</span>
               </button>
               <div class="sp"></div>
-              <button v-if="tab === 'comments'" class="btn btn--sm btn--ghost" type="button" @click="openAttach">
-                {{ t('issue.attachCommit') }}
-              </button>
               <button
                 v-if="tab === 'comments'"
                 class="itab itab--order"
@@ -2405,33 +2339,6 @@ async function removeIssue(): Promise<void> {
           <p v-if="searching" class="hint">{{ t('issue.searching') }}</p>
           <p v-else-if="linkQuery.trim() && !pickable.length" class="hint">{{ t('issues.nothingFound') }}</p>
         </div>
-      </Dialog>
-
-      <Dialog v-if="attaching" :title="t('issue.attachCommit')" :width="560" @close="attaching = false">
-        <input
-          v-model="commitQuery"
-          class="input"
-          :placeholder="t('commits.search')"
-          autofocus
-          @keydown.enter.prevent="commitHits[0] && attachCommit(commitHits[0])"
-        />
-        <div class="pick">
-          <button
-            v-for="k in commitHits"
-            :key="k.id"
-            class="pick__row"
-            type="button"
-            :disabled="commitBusy"
-            @click="attachCommit(k)"
-          >
-            <span class="key">{{ k.sha.slice(0, 7) }}</span>
-            <span class="pick__sum">{{ k.message }}</span>
-            <span class="pick__state">{{ k.issues.map((i) => i.key).join(', ') }}</span>
-          </button>
-          <p v-if="commitSearching" class="hint">{{ t('issue.searching') }}</p>
-          <p v-else-if="commitQuery.trim() && !commitHits.length" class="hint">{{ t('commits.none') }}</p>
-        </div>
-        <div v-if="attachError" class="err">{{ attachError }}</div>
       </Dialog>
 
       <Dialog v-if="commitGroup" :title="t('issue.commits')" :width="560" @close="commitGroup = null">

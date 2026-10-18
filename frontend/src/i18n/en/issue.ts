@@ -111,7 +111,6 @@ export default {
   moveCommitsTo: 'Move the checked ones to issue',
   unlinkCommits: 'Unlink',
   commitsFailed: 'Could not change the commits.',
-  attachCommit: 'Link a commit',
   linkKind: 'Kind of link',
   keyOrTitle: 'Key or title…',
   searching: 'Searching…',

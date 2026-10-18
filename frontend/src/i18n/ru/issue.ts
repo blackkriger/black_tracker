@@ -114,7 +114,6 @@ const issue: Shape<typeof en> = {
   moveCommitsTo: 'Перенести отмеченные в задачу',
   unlinkCommits: 'Отвязать',
   commitsFailed: 'Не получилось изменить коммиты.',
-  attachCommit: 'Привязать коммит',
   linkKind: 'Тип связи',
   keyOrTitle: 'Ключ или название…',
   searching: 'Ищем…',
