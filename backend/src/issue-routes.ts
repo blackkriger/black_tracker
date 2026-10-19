@@ -614,8 +614,8 @@ export async function createIssue(
       [projectId]
     );
     const { short_name: short, next_issue_number: number } = counter.rows[0];
-    const top = await client.query<{ pos: number }>(
-      'select coalesce(min(position), 0) - 1 as pos from issues where board_id = $1 and state_id = $2',
+    const bottom = await client.query<{ pos: number }>(
+      'select coalesce(max(position), 0) + 1 as pos from issues where board_id = $1 and state_id = $2',
       [boardId, stateId]
     );
     const row = await client.query<{ id: string }>(
@@ -636,7 +636,7 @@ export async function createIssue(
         assigneeId ?? null,
         by.userId,
         p.dueDate ?? null,
-        top.rows[0].pos,
+        bottom.rows[0].pos,
         options.viaBot ?? false,
         watcherId,
         p.expected ?? '',
