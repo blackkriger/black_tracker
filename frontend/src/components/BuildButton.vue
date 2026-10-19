@@ -37,8 +37,8 @@ useLive(
 
 <template>
   <a v-if="latest" class="btn btn--sm btn--ghost buildbtn" :title="latest.name" v-bind="buildLink(latest)">
-    <component :is="latest.url ? ExternalLink : Download" class="ic" />
     <span class="buildbtn__name">{{ latest.name }}</span>
+    <component :is="latest.url ? ExternalLink : Download" class="ic" />
   </a>
   <button
     class="btn btn--sm btn--icon btn--ghost"
