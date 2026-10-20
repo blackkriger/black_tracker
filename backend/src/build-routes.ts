@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
+import { env } from './env.js';
 import { requireAuth, type Auth } from './auth.js';
 import { deniedFor, mayOpenProject } from './board-service.js';
 import { publish, tabOf } from './events.js';
@@ -138,7 +139,62 @@ async function readDrive(raw: string): Promise<{ name: string } | { code: number
   return { name };
 }
 
+interface DemoRow {
+  platform: Platform;
+  name: string;
+  size: string | null;
+  url: string | null;
+  storage_path: string | null;
+  created_at: Date;
+}
+
+async function demoBuilds(): Promise<Partial<Record<Platform, DemoRow>>> {
+  const res = await pool.query<DemoRow>(
+    `select b.platform, b.name, b.size, b.url, b.storage_path, b.created_at
+       from project_builds b join projects p on p.id = b.project_id
+      where lower(p.short_name) = lower($1) and not p.archived`,
+    [env.demoProject]
+  );
+  return Object.fromEntries(res.rows.map((r) => [r.platform, r]));
+}
+
+const publicDemo = (platform: Platform, r: DemoRow | undefined) =>
+  r
+    ? {
+        name: r.name,
+        size: r.size === null ? null : Number(r.size),
+        at: r.created_at.toISOString(),
+        href: r.url ?? `/demo/${platform}`,
+      }
+    : null;
+
 export function registerBuildRoutes(app: FastifyInstance): void {
+  app.get('/public/demo', async (_req, reply) => {
+    const builds = await demoBuilds();
+    reply.header('Cache-Control', 'no-store');
+    return reply.send({ data: { windows: publicDemo('windows', builds.windows), macos: publicDemo('macos', builds.macos) } });
+  });
+
+  app.get('/public/demo/entry', async (_req, reply) => {
+    const builds = await demoBuilds();
+    reply.header('Cache-Control', 'no-store');
+    if (builds.windows?.url && !builds.macos) return reply.redirect(builds.windows.url, 302);
+    reply.header('X-Accel-Redirect', '/demo/index.html');
+    return reply.send('');
+  });
+
+  app.get('/public/demo/:platform', async (req, reply) => {
+    const platform = PLATFORM.safeParse((req.params as { platform: string }).platform);
+    const build = platform.success ? (await demoBuilds())[platform.data] : undefined;
+    if (!build) return reply.code(404).send({ error: 'No such build.' });
+    reply.header('Cache-Control', 'no-store');
+    if (build.url) return reply.redirect(build.url, 302);
+    reply.header('Content-Type', 'application/octet-stream');
+    reply.header('Content-Disposition', disposition('attachment', build.name));
+    reply.header('X-Accel-Redirect', `/demo-files/${build.storage_path}`);
+    return reply.send('');
+  });
+
   app.get('/builds', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
