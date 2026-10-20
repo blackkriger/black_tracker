@@ -179,6 +179,7 @@ export function registerBuildRoutes(app: FastifyInstance): void {
     const builds = await demoBuilds();
     reply.header('Cache-Control', 'no-store');
     if (builds.windows?.url && !builds.macos) return reply.redirect(builds.windows.url, 302);
+    reply.header('Content-Type', 'text/html; charset=utf-8');
     reply.header('X-Accel-Redirect', '/demo/index.html');
     return reply.send('');
   });
