@@ -438,6 +438,7 @@ async function signOut(): Promise<void> {
 .datechip {
   flex-direction: column;
   align-items: flex-end;
+  justify-content: center;
   gap: 1px;
 }
 .datechip__now {
