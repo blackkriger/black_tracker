@@ -43,19 +43,10 @@ npm run dev               # 127.0.0.1:5174, proxies /api to 127.0.0.1:3100
 
 `npm run typecheck` in either half. The backend runs through `tsx`, so a type error there is a runtime crash — check before deploying.
 
-## Server
+## Deploying
 
-`server.example`, Debian 13, 1 GB of memory plus 1 GB of swap, ufw open on 22, 80 and 443 only. `tracker.example.com` is an A record. nginx terminates HTTPS for it with a Let's Encrypt certificate that `certbot.timer` renews, and proxies `/api/` to `127.0.0.1:3100`; the built frontend is served from `/var/www/tracker`. The backend lives in `/opt/issues_tracker` and runs on Node 24 under PM2 as `tracker-api`, brought up at boot by `pm2-root.service`. PostgreSQL 18 from PGDG, role and database `tracker`. Uploads land in `/var/lib/tracker/uploads`, 100 MB a file, served by the API behind the same board check as the issue they hang off.
+The tracker is not tied to one server or address. `./deploy.sh` from the repo root does the whole round: push, build the SPA, ship `dist` to the docroot, then `git pull` + `npm install` + `npm run migrate` + pm2 restart on the server, and poll the health URL. Commit first — the server pulls. Where it goes comes from `deploy.env` (copy `deploy.env.example`): the ssh target, the code and docroot paths, the pm2 app and the health URL. It stays local and out of git, and so does `INSTANCE.md`, the notes on the instance a checkout deploys to.
 
-`https://tracker.example.com/db/` is a **pgweb** on the tracker database (`pgweb-tracker.service`, `127.0.0.1:8082`, connection string in `/etc/pgweb-tracker.env`) behind its own nginx basic auth — `/etc/nginx/htpasswd-tracker`. The tracker's own sign-in does not guard it.
+The server needs Node, PostgreSQL, pm2 and nginx: nginx serves the built frontend, proxies `/api/` to the backend port and terminates HTTPS. The backend reads its settings from `backend/.env` (see `.env.example`): `PUBLIC_URL` is the address links in messages and webhooks point at, `DEMO_PROJECT` the project whose builds the public demo page serves. Uploads land in `UPLOAD_DIR`, 100 MB a file, served by the API behind the same board check as the issue they hang off.
 
-`./deploy.sh` from the repo root does the whole round: push, build the SPA, ship `dist` to the docroot, then `git pull` + `npm install` + `npm run migrate` + pm2 restart on the server, and poll `/health`. Commit first — the server pulls.
-
-```bash
-ssh root@server.example
-cd /opt/issues_tracker/backend
-npm run create-user -- <login> <password> admin "Full name"   # also resets a password
-pm2 logs tracker-api --lines 50
-pm2 restart tracker-api --update-env
-runuser -u postgres -- psql -d tracker
-```
+`site/` is a separate static site that uses the tracker's public endpoints, feedback forms and builds. It ships with its own `site/deploy.sh`, configured by `site/deploy.env`, and the tracker's deploy does not touch it.

@@ -20,7 +20,7 @@ export const env = {
   geoipDir: process.env.GEOIP_DIR ?? path.resolve(process.env.UPLOAD_DIR ?? './uploads', '..', 'geoip'),
   secureCookies: process.env.SECURE_COOKIES === 'true',
   githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? '',
-  publicUrl: (process.env.PUBLIC_URL ?? 'https://tracker.example.com').replace(/\/$/, ''),
+  publicUrl: (process.env.PUBLIC_URL ?? 'http://127.0.0.1:5174').replace(/\/$/, ''),
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
   telegramBotName: process.env.TELEGRAM_BOT_NAME ?? '',
   telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? '',
