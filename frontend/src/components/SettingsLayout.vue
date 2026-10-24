@@ -2,15 +2,16 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ExternalLink } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
-import { api } from '../lib/api';
+import RollText from './RollText.vue';
 import { stamp } from '../lib/issues';
 import { useLive } from '../lib/live';
 import { useProjects } from '../lib/projects';
+import { useVersion } from '../lib/version';
 
 const { t } = useI18n();
 const { projects, loaded, load } = useProjects();
 
-const updated = ref<string | null>(null);
+const { updatedAt, refresh } = useVersion();
 const nav = ref<HTMLElement | null>(null);
 
 const live = computed(() => projects.value.filter((p) => !p.archived));
@@ -26,13 +27,10 @@ async function showCurrent(): Promise<void> {
 }
 watch(loaded, () => void showCurrent());
 
-onMounted(async () => {
+onMounted(() => {
   void load();
   void showCurrent();
-  try {
-    const got = await api<{ updatedAt: string }>('/version');
-    updated.value = got.updatedAt;
-  } catch {}
+  void refresh();
 });
 
 useLive(
@@ -73,7 +71,7 @@ useLive(
         </a>
 
         <span class="side__foot stamp">
-          <template v-if="updated">{{ t('settings.updated', { date: stamp(updated) }) }}</template>
+          <RollText v-if="updatedAt" :text="t('settings.updated', { date: stamp(updatedAt) })" />
         </span>
         <i18n-t keypath="settings.by" tag="span" class="side__by stamp">
           <template #name>
@@ -124,6 +122,8 @@ useLive(
   margin-top: auto;
 }
 .side__foot {
+  display: block;
+  min-height: 31px;
   padding: 14px 10px 4px;
 }
 .side__by {
