@@ -24,6 +24,7 @@ import { useProjects } from '../lib/projects';
 import { useFocus } from '../lib/focus';
 import { useNotices } from '../lib/notices';
 import { useSession } from '../lib/session';
+import { useTitle } from '../lib/title';
 import {
   ArrowDownWideNarrow,
   ArrowUp,
@@ -120,6 +121,7 @@ const draft = ref({
 });
 
 const issue = ref<IssueFull | null>(null);
+useTitle(() => (props.issueKey && issue.value ? `${props.issueKey} ${issue.value.summary}` : ''));
 let issueReads = 0;
 const loading = ref(true);
 const error = ref<string | null>(null);

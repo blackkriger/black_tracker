@@ -18,6 +18,7 @@ import { buddyAvatarStyle } from '../lib/avatar';
 import { commitQuery, linkQuery, monthFilters, noFilters } from '../lib/filters';
 import { features } from '../lib/features';
 import { layout, narrow } from '../lib/layout';
+import { useTitle } from '../lib/title';
 import {
   AtSign,
   Bell,
@@ -71,6 +72,11 @@ const place = computed(() => {
   const login = session.me.value?.login ?? '';
   if (section.value === 'me') return { key: null, name: login, avatar: login };
   return SECTIONS.includes(section.value) ? { key: null, name: t(`nav.${section.value}`), avatar: null } : null;
+});
+useTitle(() => {
+  const p = place.value;
+  if (p) return p.key ? `${p.key} ${p.name}` : p.name;
+  return route.name === 'profile' ? t('settings.profile') : '';
 });
 
 const today = computed(() => stamp(new Date().toISOString()));

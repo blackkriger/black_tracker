@@ -1,4 +1,4 @@
-# tracker
+# Tracker
 
 A small issue tracker with boards for our own projects. Private instance, no sign-up: an admin mints an invite link and whoever opens it picks their own login and password.
 

@@ -4,9 +4,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>tracker</title>
+    <title></title>
     <script>
       try {
+        var moved = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          if ((localStorage.key(i) || '').indexOf('tracker:') === 0) moved.push(localStorage.key(i));
+        }
+        moved.forEach(function (old) {
+          var key = 'tracker:' + old.slice('tracker:'.length);
+          if (localStorage.getItem(key) === null) localStorage.setItem(key, localStorage.getItem(old));
+          localStorage.removeItem(old);
+        });
         var theme = localStorage.getItem('tracker:theme') || 'system';
         if (theme === 'light' || (theme === 'system' && matchMedia('(prefers-color-scheme: light)').matches)) {
           document.documentElement.dataset.theme = 'light';

@@ -57,7 +57,7 @@ const projectPatch = z.object({
     .string()
     .trim()
     .max(200)
-    .regex(/^(?:[\w.-]+\/[\w.-]+)?$/, 'Write it as owner/name, e.g. owner/repo')
+    .regex(/^(?:[\w.-]+\/[\w.-]+)?$/, 'Write it as owner/name.')
     .optional(),
 });
 

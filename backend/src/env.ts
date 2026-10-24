@@ -26,7 +26,7 @@ export const env = {
   telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? '',
   vkGroupToken: process.env.VK_GROUP_TOKEN ?? '',
   vkSecret: process.env.VK_SECRET ?? '',
-  demoProject: process.env.DEMO_PROJECT ?? 'PROJ',
+  demoProject: process.env.DEMO_PROJECT ?? '',
 };
 
 export const telegramReady = (): boolean =>

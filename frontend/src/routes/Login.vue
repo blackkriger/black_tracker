@@ -3,9 +3,10 @@ import { ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSession } from '../lib/session';
-import banner from '../assets/banner.png';
+import { useTitle } from '../lib/title';
 
 const { t } = useI18n();
+useTitle(() => t('auth.signIn'));
 const login = ref('');
 const password = ref('');
 const error = ref<string | null>(null);
@@ -34,8 +35,6 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <div class="signin">
-    <img class="signin__banner" :src="banner" alt="" width="462" height="174" />
-
     <section class="panel signin__panel" aria-labelledby="signin-title">
       <header class="panel__h" id="signin-title">{{ t('auth.signIn') }}</header>
       <form class="panel__b signin__form" @submit.prevent="onSubmit">

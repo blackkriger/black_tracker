@@ -57,7 +57,7 @@ async function create(): Promise<void> {
         </div>
         <div class="field">
           <label class="label" for="name">{{ t('settings.name') }}</label>
-          <input id="name" v-model="name" class="input" maxlength="200" placeholder="Project" />
+          <input id="name" v-model="name" class="input" maxlength="200" />
         </div>
         <div class="row-end">
           <button class="btn btn--primary" type="submit" :disabled="!canCreate">{{ t('settings.createProject') }}</button>

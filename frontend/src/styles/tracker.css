@@ -402,7 +402,6 @@ textarea.input { height: auto; padding: 10px; line-height: 1.55; resize: vertica
 
 .dlg__h .panel__end { flex: none; }
 .signin { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-6); padding: var(--space-5); }
-.signin__banner { display: block; width: 462px; max-width: 100%; height: auto; }
 .signin__panel { width: 360px; max-width: 100%; }
 .signin__form { display: flex; flex-direction: column; gap: var(--space-4); }
 .signin__err { padding: 10px 12px; background: color-mix(in srgb, var(--danger) 8%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); color: var(--danger-text); font-size: 12.5px; }

@@ -3,9 +3,10 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { api } from '../lib/api';
-import banner from '../assets/banner.png';
+import { useTitle } from '../lib/title';
 
 const { t } = useI18n();
+useTitle(() => t('auth.newPassword'));
 const route = useRoute();
 
 const token = String(route.params.token ?? '');
@@ -58,8 +59,6 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <div class="signin">
-    <img class="signin__banner" :src="banner" alt="" width="462" height="174" />
-
     <section class="panel signin__panel" aria-labelledby="reset-title">
       <header id="reset-title" class="panel__h">{{ t('auth.newPassword') }}</header>
 
