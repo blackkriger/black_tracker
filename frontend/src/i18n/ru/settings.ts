@@ -10,6 +10,7 @@ const settings: Shape<typeof en> = {
   workspace: 'Рабочее пространство',
   usersAccess: 'Пользователи и доступ',
   updated: 'ОБНОВЛЕНО {date}',
+  by: 'by {name}',
   newProject: 'Новый проект',
   key: 'Ключ',
   keyHint: 'Заглавные латинские буквы и цифры.',

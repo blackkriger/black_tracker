@@ -7,6 +7,7 @@ export default {
   workspace: 'Workspace',
   usersAccess: 'Users & access',
   updated: 'UPDATED {date}',
+  by: 'by {name}',
   newProject: 'New project',
   key: 'Key',
   keyHint: 'Upper-case letters and digits.',

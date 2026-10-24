@@ -75,6 +75,11 @@ useLive(
         <span class="side__foot stamp">
           <template v-if="updated">{{ t('settings.updated', { date: stamp(updated) }) }}</template>
         </span>
+        <i18n-t keypath="settings.by" tag="span" class="side__by stamp">
+          <template #name>
+            <a href="https://github.com/blackkriger" target="_blank" rel="noopener noreferrer">blackkriger</a>
+          </template>
+        </i18n-t>
       </nav>
 
       <div class="sheet">
@@ -120,6 +125,20 @@ useLive(
 }
 .side__foot {
   padding: 14px 10px 4px;
+}
+.side__by {
+  padding: 0 10px 4px;
+}
+.side__by a {
+  display: inline;
+  height: auto;
+  padding: 0;
+  font: inherit;
+  color: var(--text-dim);
+}
+.side__by a:hover {
+  background: none;
+  color: var(--text);
 }
 @media (max-width: 1240px) {
   .page__body {
