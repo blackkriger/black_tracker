@@ -1,33 +1,33 @@
 # Tracker
 
-A self-hosted issue tracker with boards, built for a small team, with GitHub and Telegram integrations. No sign-up: an admin sends an invite link, whoever opens it picks a login and password.
+A self-hosted issue tracker with boards, built for a small team, with GitHub and Telegram integrations. An admin sends an invite link, whoever opens it picks a login and password. 
 
 ## What it does
 
-- Projects with boards. Each board has its own statuses, and cards are dragged between and within columns.
-- An issue window with a rich-text description (checklists, images, Google Docs import), an expected result, status, priority, assignee, watcher, due date, tags, files, links to other issues, private stars, comments that can be pinned and quoted, and the full history of changes.
-- Filters by project, status, assignee, author, watcher, tags, text and period; an Issues list and Analytics across projects; a calendar of key dates and sticky notes on the dashboard.
+- Projects with boards. Each board has its own statuses, and tasks are dragged between and within columns.
+- An issue window with a rich-text description (checklists, images, Google Docs import), an expected result, status, priority, assignee, watcher, due date, tags, files, links to other issues, private stars, comments that can be pinned and quoted, and the full history of changes. 
+- Filters by project, status, assignee, author, watcher, tags, text and period, an issues list and analytics across projects, a calendar of key dates and sticky notes on the dashboard.
 - Live updates: every change reaches open tabs over a server-sent event stream.
 - Roles with per-project and per-board denials, and two rights a role may hold: deleting things and handing out roles.
-- Personal API tokens for scripts and integrations. A token moves work along; comments and everything it writes carry an API mark.
-- GitHub pushes linked to issues by key, a Commits page, and unlinking or moving commits by hand.
-- Builds per project for Windows and macOS, uploaded up to 1 GB or linked from Google Drive, with public endpoints that serve the latest one.
-- Notifications in Telegram and VK; public endpoints for an external feedback form, with a report inside the tracker.
-- Russian and English, dark and light themes.
+- Personal API tokens for scripts and integrations alike. A token moves work along, comments and everything it writes carry an API mark.
+- GitHub pushes linked to issues by key, a Commits page, and unlinking or moving commits by hand also.
+- Builds per project for Windows and macOS, uploaded up to 1 GB or linked from Google Drive, with public endpoints that serve the latest one. 
+- Notifications in Telegram and VK, public endpoints for an external feedback form, with a report inside the tracker.
+- Russian and English, dark and light themes. 
 
 ## Stack
 
-- **backend** — Node + Fastify + PostgreSQL, TypeScript run through `tsx` (no build step). No ORM; migrations are numbered `.sql` files.
-- **frontend** — Vue 3 + Vite, one stylesheet (`src/styles/tracker.css`) carrying the whole visual system, Quill 2 + DOMPurify for the text people write, `lucide-vue-next` for icons.
+- **backend:** Node + Fastify + PostgreSQL, TypeScript run through `tsx` (no build step). No ORM, migrations are numbered `.sql` files.
+- **frontend**: is Vue 3 + Vite, one stylesheet (`src/styles/tracker.css`) carrying the whole visual system, Quill 2 + DOMPurify for the text people write, `lucide-vue-next` for icons. 
 
 ## Decisions everything leans on
 
-- **A project starts empty.** Its boards are added from its settings screen, each arriving with the starting four statuses.
-- **Statuses are rows, not an enum.** Adding one is an insert; the board grows a column with no deploy. `is_resolved` is what "closed" means and stamps `issues.resolved_at`.
-- **A board owns its columns.** Statuses hang off `boards`, so two boards in one project can run different workflows, and an issue lives on exactly one board.
-- **An issue's key belongs to the project.** `PROJ-12` comes from the project's own counter, so moving a card between boards never changes it.
-- **Access is a denial list on roles.** A role can be shut out of a whole project or of single boards; someone with no role reaches nothing but their own profile.
-- **The settings screens are everyone's; two rights are not.** `roles.can_delete` allows deleting anything people made, `roles.can_manage_roles` allows handing someone a role and minting invite links. What a role itself may do, and the accounts behind people, stay with the admin.
+- A project starts empty. Its boards are added from its settings screen, each arriving with the starting four statuses.
+- Statuses are rows, not an enum. Adding one is an insert, the board grows a column with no deploy. `is_resolved` is what "closed" means and stamps `issues.resolved_at`.
+- A board owns its columns. Statuses hang off `boards`, so two boards in one project can run different workflows, and an issue lives on exactly one board.
+- An issue's key belongs to the project. `PROJ-12` comes from the project's own counter, so moving a card between boards never changes it.
+- Access is a denial list on roles. A role can be shut out of a whole project or of single boards, someone with no role reaches nothing but their own profile.
+- The settings screens are everyone's, two rights are not, `roles.can_delete` allows deleting anything people made, `roles.can_manage_roles` allows handing someone a role and minting invite links. What a role itself may do, and the accounts behind people, stay with the admin. 
 
 ## Installing on a server
 
@@ -118,11 +118,11 @@ server {
 }
 ```
 
-Reload nginx and add HTTPS with `certbot --nginx -d tracker.example.com`. Open the site and sign in as the admin; everyone else joins through invite links from Settings → Users & access.
+Reload nginx and add HTTPS with `certbot --nginx -d tracker.example.com`. Open the site and sign in as the admin, everyone else joins through invite links from Settings → Users & access.
 
 ## Connecting
 
-**API.** Settings → API creates a personal token, shown once. Calls carry it as a bearer token:
+Settings → API creates a personal token, shown once. Calls carry it as a bearer token:
 
 ```bash
 curl -H "Authorization: Bearer trk_…" https://tracker.example.com/api/issues/PROJ-1
@@ -130,7 +130,7 @@ curl -H "Authorization: Bearer trk_…" https://tracker.example.com/api/issues/P
 
 A token reads and creates issues, changes their fields, moves them between statuses and boards, writes, edits, pins and deletes comments, attaches files and marks notices read. Reactions and account settings need a browser session.
 
-**GitHub.** Set `GITHUB_WEBHOOK_SECRET`, then add a webhook to the repository: payload URL `https://tracker.example.com/api/git/github`, content type `application/json`, the same secret, the push event only. In the tracker, set the project's repository (`owner/name`) on its settings screen. A commit that mentions an issue key such as `PROJ-12` is linked to that issue; each person fills in their GitHub name in Profile so their commits show under them.
+**GitHub.** Set `GITHUB_WEBHOOK_SECRET`, then add a webhook to the repository: payload URL `https://tracker.example.com/api/git/github`, content type `application/json`, the same secret, the push event only. In the tracker, set the project's repository (`owner/name`) on its settings screen. A commit that mentions an issue key such as `PROJ-12` is linked to that issue, each person fills in their GitHub name in Profile so their commits show under them.
 
 **Telegram.** Create a bot with @BotFather and set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_NAME` (without `@`) and a random `TELEGRAM_WEBHOOK_SECRET`. On start the backend registers its webhook at `PUBLIC_URL/api/telegram`. Each person connects the bot from Profile; it then delivers notices and creates issues with `/issue`.
 
