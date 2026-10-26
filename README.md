@@ -1,6 +1,6 @@
 # Tracker
 
-A self-hosted issue tracker with boards, built for a small team. No sign-up: an admin sends an invite link, whoever opens it picks a login and password.
+A self-hosted issue tracker with boards, built for a small team, with GitHub and Telegram integrations. No sign-up: an admin sends an invite link, whoever opens it picks a login and password.
 
 ## What it does
 
@@ -134,7 +134,7 @@ A token reads and creates issues, changes their fields, moves them between statu
 
 **Telegram.** Create a bot with @BotFather and set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_NAME` (without `@`) and a random `TELEGRAM_WEBHOOK_SECRET`. On start the backend registers its webhook at `PUBLIC_URL/api/telegram`. Each person connects the bot from Profile; it then delivers notices and creates issues with `/issue`.
 
-**VK.** Set `VK_GROUP_TOKEN`, a community token that can manage the community and send messages, and a random `VK_SECRET`. On start the backend registers its callback server at `PUBLIC_URL/api/vk`. People connect it from Profile, as with Telegram.
+**VK.** Set `VK_GROUP_TOKEN`, a community token that can manage the community and send messages, and a random `VK_SECRET`. On start the backend registers its callback server at `PUBLIC_URL/api/vk`. People connect it from Profile, as with Telegram. я это не тестил (:
 
 **Public endpoints.** These need no account and are meant for an external site:
 
