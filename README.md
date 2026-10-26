@@ -1,4 +1,4 @@
-# Tracker
+# black_tracker
 
 A self-hosted issue tracker with boards, built for a small team, with GitHub and Telegram integrations. An admin sends an invite link, whoever opens it picks a login and password. 
 
@@ -43,7 +43,7 @@ sudo -u postgres psql -c "create database tracker owner tracker"
 **2. Backend**
 
 ```bash
-git clone https://github.com/blackkriger/issues_tracker.git /opt/tracker
+git clone https://github.com/blackkriger/black_tracker.git /opt/tracker
 cd /opt/tracker/backend
 cp .env.example .env
 npm install
