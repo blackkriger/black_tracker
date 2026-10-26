@@ -1,6 +1,6 @@
 # Tracker
 
-A self-hosted issue tracker with boards, built for a small team and the AI agents working alongside it. No sign-up: an admin sends an invite link, whoever opens it picks a login and password.
+A self-hosted issue tracker with boards, built for a small team. No sign-up: an admin sends an invite link, whoever opens it picks a login and password.
 
 ## What it does
 
@@ -9,7 +9,7 @@ A self-hosted issue tracker with boards, built for a small team and the AI agent
 - Filters by project, status, assignee, author, watcher, tags, text and period; an Issues list and Analytics across projects; a calendar of key dates and sticky notes on the dashboard.
 - Live updates: every change reaches open tabs over a server-sent event stream.
 - Roles with per-project and per-board denials, and two rights a role may hold: deleting things and handing out roles.
-- Personal API tokens for agents and scripts. A token moves work along; comments and everything it writes carry an API mark.
+- Personal API tokens for scripts and integrations. A token moves work along; comments and everything it writes carry an API mark.
 - GitHub pushes linked to issues by key, a Commits page, and unlinking or moving commits by hand.
 - Builds per project for Windows and macOS, uploaded up to 1 GB or linked from Google Drive, with public endpoints that serve the latest one.
 - Notifications in Telegram and VK; public endpoints for an external feedback form, with a report inside the tracker.
@@ -122,7 +122,7 @@ Reload nginx and add HTTPS with `certbot --nginx -d tracker.example.com`. Open t
 
 ## Connecting
 
-**Agents and scripts.** Settings → API creates a personal token, shown once. Calls carry it as a bearer token:
+**API.** Settings → API creates a personal token, shown once. Calls carry it as a bearer token:
 
 ```bash
 curl -H "Authorization: Bearer trk_…" https://tracker.example.com/api/issues/PROJ-1
