@@ -18,6 +18,7 @@ export const env = {
     .filter(Boolean),
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
   geoipDir: process.env.GEOIP_DIR ?? path.resolve(process.env.UPLOAD_DIR ?? './uploads', '..', 'geoip'),
+  feedbackFormsDir: process.env.FEEDBACK_FORMS_DIR ?? '',
   secureCookies: process.env.SECURE_COOKIES === 'true',
   githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? '',
   publicUrl: (process.env.PUBLIC_URL ?? 'http://127.0.0.1:5174').replace(/\/$/, ''),

@@ -26,5 +26,4 @@ export default {
   scales: 'Scales',
   dims: { country: 'Country', device: 'Device', os: 'System', browser: 'Browser', browserLang: 'Browser language', lang: 'Page language', theme: 'Theme' },
   devices: { desktop: 'Desktop', phone: 'Phone', tablet: 'Tablet' },
-  formNames: { demo: 'Demo feedback' },
 };

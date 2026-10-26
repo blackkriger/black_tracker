@@ -138,7 +138,7 @@ A token reads and creates issues, changes their fields, moves them between statu
 
 **Public endpoints.** These need no account and are meant for an external site:
 
-- `POST /api/public/feedback/send` and `/api/public/feedback/track` take answers and visit statistics for a feedback form; the report is under Feedback in the tracker.
+- `POST /api/public/feedback/send` and `/api/public/feedback/track` take answers and visit statistics for a feedback form; the report is under Feedback in the tracker. Each form is a `<form>.json` in `FEEDBACK_FORMS_DIR` holding its questions in English and Russian, see `backend/feedback-form.example.json`; answers are checked against it, and an edited file is picked up without a restart.
 - `GET /api/public/demo` lists the latest Windows and macOS builds of `DEMO_PROJECT`; `/api/public/demo/entry` and `/api/public/demo/windows|macos` serve a page or a download through nginx `X-Accel-Redirect` to an internal `/demo-files/` location aliased to `UPLOAD_DIR`, or redirect to Google Drive.
 
 ## Configuration
@@ -150,6 +150,7 @@ A token reads and creates issues, changes their fields, moves them between statu
 - `PUBLIC_URL` — the address links in messages and webhooks point at.
 - `CORS_ORIGIN` — allowed origins, comma-separated.
 - `SECURE_COOKIES` — `true` behind HTTPS.
+- `FEEDBACK_FORMS_DIR` — where feedback forms are described, one `<form>.json` each.
 - `UPLOAD_DIR` — where files and builds are stored; `GEOIP_DIR` — where the free DB-IP country database is kept for the feedback report.
 - `DEMO_PROJECT` — the project key whose latest builds the public demo endpoints serve.
 - `GITHUB_WEBHOOK_SECRET` — secret of the GitHub webhook.

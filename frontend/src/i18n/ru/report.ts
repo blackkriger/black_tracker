@@ -29,7 +29,6 @@ const report: Shape<typeof en> = {
   scales: 'Шкалы',
   dims: { country: 'Страна', device: 'Устройство', os: 'Система', browser: 'Браузер', browserLang: 'Язык браузера', lang: 'Язык страницы', theme: 'Тема' },
   devices: { desktop: 'Компьютер', phone: 'Телефон', tablet: 'Планшет' },
-  formNames: { demo: 'Фидбек по демо' },
 };
 
 export default report;

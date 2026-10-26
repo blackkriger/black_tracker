@@ -1,0 +1,49 @@
+{
+  "name": { "en": "Beta feedback", "ru": "Отзывы о бете" },
+  "sections": [
+    {
+      "id": "about",
+      "title": { "en": "About you", "ru": "О тебе" },
+      "items": [
+        {
+          "kind": "choice",
+          "key": "used",
+          "required": true,
+          "title": { "en": "How long have you used it?", "ru": "Как долго пользуешься?" },
+          "options": {
+            "day": { "en": "a day", "ru": "день" },
+            "week": { "en": "a week", "ru": "неделю" },
+            "month": { "en": "a month or more", "ru": "месяц и больше" }
+          }
+        },
+        {
+          "kind": "text",
+          "key": "aboutText",
+          "title": { "en": "What do you use it for?", "ru": "Для чего пользуешься?" }
+        }
+      ]
+    },
+    {
+      "id": "ratings",
+      "title": { "en": "Ratings", "ru": "Оценки" },
+      "items": [
+        {
+          "kind": "ratings",
+          "key": "ratings",
+          "required": true,
+          "title": { "en": "Rate from 1 to 5", "ru": "Оцени от 1 до 5" },
+          "aspects": {
+            "speed": { "en": "Speed", "ru": "Скорость" },
+            "looks": { "en": "Looks", "ru": "Внешний вид" }
+          }
+        },
+        {
+          "kind": "scale",
+          "key": "clear",
+          "title": { "en": "Was it clear what to do?", "ru": "Было понятно, что делать?" },
+          "short": { "en": "Clarity", "ru": "Понятность" }
+        }
+      ]
+    }
+  ]
+}

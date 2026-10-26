@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from './auth.js';
 import { DAY_RE, pool, ZONE } from './db.js';
 import { publish } from './events.js';
+import { feedbackForm, feedbackForms, formId } from './feedback-forms.js';
 import { countryOf } from './geoip.js';
 import { readAgent } from './user-agent.js';
 
@@ -24,15 +25,7 @@ function allow(key: string, limit: number): boolean {
   return ok;
 }
 
-async function formExists(id: string): Promise<boolean> {
-  const res = await pool.query('select 1 from feedback_forms where id = $1', [id]);
-  return !!res.rowCount;
-}
-
 const lang = z.enum(['ru', 'en']);
-const formId = z.string().regex(/^[a-z0-9-]{1,40}$/);
-const rating = z.number().int().min(1).max(5);
-const scale = rating.optional();
 const text = (max = 4000) =>
   z
     .string()
@@ -41,40 +34,11 @@ const text = (max = 4000) =>
     .optional()
     .transform((v) => v || undefined);
 
-const answers = z
-  .object({
-    played: z.enum(['lt15', '15-30', '30-60', '1-2h', 'gt2h']),
-    device: z.enum(['kbm', 'gamepad', 'both']),
-    genre: z.enum(['mine', 'some', 'first']),
-    genreText: text(),
-    stopped: z.enum(['finished', 'bored', 'stuck', 'hard', 'crash', 'other']),
-    stoppedText: text(),
-    ratings: z
-      .object({ exploration: rating, combat: rating, visuals: rating, narrative: rating, progression: rating })
-      .strict(),
-    ratingsText: text(),
-    startClear: scale,
-    startText: text(),
-    readAttacks: scale,
-    potions: z.enum(['enough', 'barely', 'short']).optional(),
-    deathsFair: scale,
-    combatText: text(),
-    upgrades: scale,
-    coins: z.enum(['enough', 'barely', 'short', 'unclear']).optional(),
-    lost: scale,
-    lostText: text(),
-    interact: scale,
-    bugsText: text(),
-    addText: text(),
-    removeText: text(),
-  })
-  .strict();
-
 const submission = z.object({
-  form: formId.default('demo'),
+  form: formId,
   session: z.string().uuid().optional(),
   lang,
-  answers,
+  answers: z.record(z.unknown()),
   name: text(100),
   email: z
     .string()
@@ -108,13 +72,15 @@ export function registerFeedbackRoutes(app: FastifyInstance): void {
     if (!parsed.success) return reply.code(400).send({ error: 'Bad feedback.' });
     const p = parsed.data;
     if (p.website) return reply.code(201).send({ data: { ok: true } });
-    if (!(await formExists(p.form))) return reply.code(400).send({ error: 'Bad feedback.' });
+    const form = await feedbackForm(p.form, req.log);
+    const answers = form?.answers.safeParse(p.answers);
+    if (!answers?.success) return reply.code(400).send({ error: 'Bad feedback.' });
     if (!allow(`send:${req.ip}`, SENDS_PER_HOUR)) {
       return reply.code(429).send({ error: 'Too many sends from here. Try again later.' });
     }
     await pool.query(
       'insert into feedback_responses (form_id, lang, answers, name, email) values ($1, $2, $3, $4, $5)',
-      [p.form, p.lang, JSON.stringify(p.answers), p.name ?? null, p.email ?? null]
+      [p.form, p.lang, JSON.stringify(answers.data), p.name ?? null, p.email ?? null]
     );
     if (p.session) {
       await pool.query('update feedback_sessions set sent = true where id = $1 and form_id = $2', [
@@ -131,7 +97,7 @@ export function registerFeedbackRoutes(app: FastifyInstance): void {
     if (!parsed.success) return reply.code(400).send({ error: 'Bad visit.' });
     const p = parsed.data;
     if (!allow(`track:${req.ip}`, TRACKS_PER_HOUR)) return reply.code(429).send({ error: 'Too many.' });
-    if (!(await formExists(p.form))) return reply.code(400).send({ error: 'Bad visit.' });
+    if (!(await feedbackForm(p.form, req.log))) return reply.code(400).send({ error: 'Bad visit.' });
     const agent = readAgent(String(req.headers['user-agent'] ?? ''), p.touch ?? false);
     await pool.query(
       `insert into feedback_sessions
@@ -172,6 +138,7 @@ export function registerFeedbackRoutes(app: FastifyInstance): void {
     const q = req.query as { form?: string; from?: string; to?: string };
     const from = q.from && DAY_RE.test(q.from) ? q.from : null;
     const to = q.to && DAY_RE.test(q.to) ? q.to : null;
+    const configured = await feedbackForms(req.log);
     const forms = await pool.query<{ id: string; name: string }>(
       'select id, name from feedback_forms order by created_at desc, id'
     );
@@ -234,8 +201,12 @@ export function registerFeedbackRoutes(app: FastifyInstance): void {
 
     return reply.send({
       data: {
-        forms: forms.rows,
+        forms: forms.rows.map((f) => ({
+          id: f.id,
+          name: configured.find((c) => c.id === f.id)?.definition.name ?? { en: f.name, ru: f.name },
+        })),
         form,
+        sections: configured.find((c) => c.id === form)?.definition.sections ?? [],
         ...totals.rows[0],
         reached: Object.fromEntries(reached.rows.map((r) => [r.reached, r.n])),
         sectionMs: Object.fromEntries(sections.rows.map((r) => [r.section, Math.round(r.ms)])),

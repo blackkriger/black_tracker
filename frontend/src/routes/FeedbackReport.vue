@@ -7,7 +7,7 @@ import DateRangePicker from '../components/DateRangePicker.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import Select from '../components/Select.vue';
 import { api } from '../lib/api';
-import { feedbackForm, type FeedbackItem } from '../lib/feedback';
+import { feedbackForm, type FeedbackItem, type RawSection, type Words } from '../lib/feedback';
 import { locale } from '../i18n';
 import { stampAt } from '../lib/issues';
 import { settled, useLive } from '../lib/live';
@@ -26,8 +26,9 @@ interface Answer {
 }
 
 interface Report {
-  forms: { id: string; name: string }[];
+  forms: { id: string; name: Words }[];
   form: string;
+  sections: RawSection[];
   sessions: number;
   views: number;
   sent: number;
@@ -43,7 +44,7 @@ const SHOWN_PER_DIM = 6;
 const SCORES = ['1', '2', '3', '4', '5'];
 
 const route = useRoute();
-const { t, te } = useI18n();
+const { t } = useI18n();
 const router = useRouter();
 const { errors, fail, clear } = usePanelErrors();
 
@@ -94,10 +95,10 @@ useLive(
 const formChoices = computed(() =>
   (report.value?.forms ?? []).map((f) => ({
     value: f.id,
-    label: te(`report.formNames.${f.id}`) ? t(`report.formNames.${f.id}`) : f.name,
+    label: f.name[locale.value],
   }))
 );
-const sections = computed(() => feedbackForm(report.value?.form ?? '', locale.value));
+const sections = computed(() => feedbackForm(report.value?.sections ?? [], locale.value));
 const items = computed<FeedbackItem[]>(() => sections.value.flatMap((s) => s.items));
 const responses = computed(() => report.value?.responses ?? []);
 
