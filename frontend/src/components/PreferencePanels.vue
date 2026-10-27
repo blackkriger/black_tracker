@@ -247,6 +247,7 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
   border: 1px solid var(--line-2);
   color: var(--text-faint);
   cursor: pointer;
+  border-radius: var(--radius);
 }
 .layout:hover {
   border-color: var(--line-3);
@@ -272,5 +273,6 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
   height: 64px;
   background: var(--bg);
   font: 500 34px/1 var(--font-ui);
+  border-radius: var(--radius);
 }
 </style>

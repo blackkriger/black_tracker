@@ -277,6 +277,7 @@ const CALLS = computed<{ group: string; calls: Call[] }[]>(() => [
   padding: 14px 16px;
   border: 1px solid var(--line-2);
   background: var(--bg);
+  border-radius: var(--radius);
 }
 .token__can-h {
   color: var(--accent);
@@ -357,6 +358,7 @@ const CALLS = computed<{ group: string; calls: Call[] }[]>(() => [
   font: 12.5px/1.6 var(--font-mono);
   overflow-x: auto;
   white-space: pre;
+  border-radius: var(--radius);
 }
 @media (max-width: 760px) {
   .api__table {

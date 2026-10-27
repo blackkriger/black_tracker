@@ -281,6 +281,7 @@ onUnmounted(() => {
   padding: 14px 16px;
   border: 1px solid var(--line);
   background: var(--surface);
+  border-radius: var(--radius);
 }
 :root[data-theme='light'] .fv__said {
   width: fit-content;
@@ -308,6 +309,7 @@ onUnmounted(() => {
   border: 1px solid var(--line);
   background: var(--surface);
   font: 12.5px/1.6 var(--font-mono);
+  border-radius: var(--radius);
 }
 .fv__num {
   position: sticky;
@@ -346,6 +348,7 @@ onUnmounted(() => {
   border: 1px solid var(--line);
   background: var(--surface);
   visibility: hidden;
+  border-radius: var(--radius);
 }
 .fv__drawio.is-sized {
   visibility: visible;

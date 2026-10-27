@@ -283,6 +283,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow-md);
   font-weight: 400;
+  border-radius: var(--radius);
 }
 .drp__pop.is-right {
   left: auto;

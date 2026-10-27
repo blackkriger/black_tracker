@@ -416,6 +416,7 @@ onMounted(() => {
   height: 30px;
   border: 1px solid var(--line-2);
   background: var(--bg);
+  border-radius: var(--radius);
 }
 .seg__i {
   display: inline-flex;

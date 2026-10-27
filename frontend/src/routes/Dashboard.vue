@@ -678,6 +678,7 @@ function closeIssue(): void {
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  border-radius: var(--radius);
 }
 .mine__row:hover {
   border-color: var(--line-2);
@@ -766,6 +767,7 @@ function closeIssue(): void {
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  border-radius: var(--radius-sm);
 }
 .day__what {
   display: flex;

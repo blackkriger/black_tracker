@@ -2608,6 +2608,7 @@ async function removeIssue(): Promise<void> {
   height: 32px;
   border: 1px solid var(--line);
   margin-top: 8px;
+  border-radius: var(--radius);
 }
 .att__row a,
 .att__name {
@@ -2693,6 +2694,7 @@ async function removeIssue(): Promise<void> {
   padding: 0 8px;
   border: 1px solid var(--line-2);
   text-decoration: none;
+  border-radius: var(--radius);
 }
 .lk:hover {
   background: var(--card-hover);
@@ -2729,6 +2731,7 @@ async function removeIssue(): Promise<void> {
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  border-radius: var(--radius);
 }
 .pick__row:hover {
   border-color: var(--line-2);
@@ -2843,6 +2846,7 @@ async function removeIssue(): Promise<void> {
   min-width: 26px;
   color: var(--text-dim);
   cursor: pointer;
+  border-radius: var(--radius);
 }
 .rt__clip:hover {
   color: var(--text);

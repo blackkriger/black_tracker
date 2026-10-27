@@ -367,6 +367,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow-md);
   user-select: none;
+  border-radius: var(--radius);
 }
 .cp.is-left::before,
 .cp.is-left::after {
@@ -417,6 +418,7 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--black) 35%, transparent);
   cursor: pointer;
+  border-radius: var(--radius-sm);
 }
 .cp__swatch:hover {
   outline: 1px solid var(--text-dim);
@@ -480,6 +482,7 @@ onBeforeUnmount(() => {
   flex: none;
   width: 56px;
   border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
 }
 .cp__inputs {
   flex: 1;

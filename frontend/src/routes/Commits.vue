@@ -508,6 +508,7 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
   height: 30px;
   border: 1px solid var(--line-2);
   background: var(--bg);
+  border-radius: var(--radius);
 }
 .seg__i {
   display: inline-flex;
@@ -601,6 +602,7 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  border-radius: var(--radius);
 }
 .pick__row:hover {
   border-color: var(--line-2);

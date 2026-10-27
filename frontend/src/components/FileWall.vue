@@ -54,6 +54,8 @@ const pack = useWall(wall, () => props.shots.length);
   max-width: 100%;
   border: 1px solid var(--line);
   background: var(--bg);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 .wait--waiting {
   border: 1px dashed var(--line-2);

@@ -298,6 +298,7 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-sm);
   overflow: hidden;
   resize: both;
+  border-radius: var(--radius);
 }
 .sticky.is-empty {
   opacity: 0.55;
@@ -333,6 +334,7 @@ onBeforeUnmount(() => {
   border: 1px solid color-mix(in srgb, var(--black) 35%, transparent);
   background: var(--h);
   cursor: pointer;
+  border-radius: var(--radius-sm);
 }
 .sticky__swatch:hover {
   outline: 1px solid var(--text-dim);

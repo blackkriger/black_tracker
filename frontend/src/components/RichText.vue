@@ -643,6 +643,7 @@ function addLink(): void {
   font: 13.5px/1.6 var(--font-ui);
   overflow-y: auto;
   max-height: 340px;
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 .rt__editor.is-drop {
   border-style: dashed;
@@ -689,6 +690,7 @@ function addLink(): void {
   background: var(--surface);
   border: 1px solid var(--line);
   font: 12.5px var(--font-mono);
+  border-radius: var(--radius-sm);
 }
 .rt__editor :deep(ol),
 .rt__editor :deep(ul) {

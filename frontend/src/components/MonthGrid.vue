@@ -212,6 +212,7 @@ function onEnter(ev: PointerEvent, c: Cell): void {
   color: var(--text-dim);
   font: 12px var(--font-num);
   cursor: pointer;
+  border-radius: var(--radius-sm);
 }
 .cal--compact .cal__day {
   font-size: 11px;

@@ -302,6 +302,7 @@ async function openNotice(n: Notice): Promise<void> {
   color: var(--text);
   font-size: 13px;
   text-align: left;
+  border-radius: var(--radius);
 }
 .mark--kept {
   flex-direction: column;
