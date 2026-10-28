@@ -298,7 +298,6 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-sm);
   overflow: hidden;
   resize: both;
-  border-radius: var(--radius);
 }
 .sticky.is-empty {
   opacity: 0.55;
