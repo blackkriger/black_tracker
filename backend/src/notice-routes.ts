@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
-import { DAY_RE, pool, ZONE } from './db.js';
+import { DAY_RE, onDays, pool } from './db.js';
 import { requireAuth } from './auth.js';
 import { denialsOf } from './board-service.js';
 
@@ -110,8 +110,7 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
         where n.user_id = $1
           and i.project_id <> all($2::uuid[])
           and i.board_id <> all($3::uuid[])
-          and ($4::date is null or (n.created_at at time zone '${ZONE}')::date >= $4)
-          and ($5::date is null or (n.created_at at time zone '${ZONE}')::date <= $5)
+          and ${onDays('n.created_at', '$4', '$5')}
           and ($6::uuid is null or exists (
                 select 1 from notices c
                  where c.id = $6 and c.user_id = $1

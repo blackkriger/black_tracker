@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { pool, ZONE } from './db.js';
+import { onDays, pool, ZONE } from './db.js';
 import { requireAuth, requireDeleter, type Auth } from './auth.js';
 import { denialsOf, mayOpenProject, shutOut } from './board-service.js';
 import { projectByShort } from './project-routes.js';
@@ -126,7 +126,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
            from issue_history h
            join issues i on i.id = h.issue_id
            join users u on u.id = h.user_id
-          where (h.created_at at time zone '${ZONE}')::date between $1::date and $2::date
+          where ${onDays('h.created_at', '$1', '$2')}
             and u.login = $3
             and i.project_id <> all($4::uuid[])
             and i.board_id <> all($5::uuid[])
@@ -143,7 +143,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
            left join issue_comments c on c.id = n.comment_id
            join issues i on i.id = coalesce(c.issue_id, n.issue_id)
           where n.user_id = $1
-            and (n.created_at at time zone '${ZONE}')::date between $2::date and $3::date
+            and ${onDays('n.created_at', '$2', '$3')}
             and i.project_id <> all($4::uuid[])
             and i.board_id <> all($5::uuid[])
           group by 1, 2`,

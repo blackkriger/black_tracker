@@ -34,6 +34,10 @@ export async function inTransaction<T>(
 }
 
 export const ZONE = 'Europe/Moscow';
+
+export const onDays = (column: string, from: string, to: string): string =>
+  `(${column} >= coalesce(${from}::date::timestamp at time zone '${ZONE}', '-infinity')
+    and ${column} < coalesce((${to}::date + 1)::timestamp at time zone '${ZONE}', 'infinity'))`;
 export const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const listOf = (value: string | undefined): string[] | null => {

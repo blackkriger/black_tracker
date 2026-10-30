@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { DAY_RE, inTransaction, pool, ZONE } from './db.js';
+import { DAY_RE, inTransaction, onDays, pool } from './db.js';
 import { requireAuth, type Auth } from './auth.js';
 import { mayOpenBoard, shutOut } from './board-service.js';
 import { writeHistory } from './issue-routes.js';
@@ -98,8 +98,7 @@ export function registerCommitRoutes(app: FastifyInstance): void {
                  where l.commit_id = c.id and ip.short_name = any($6::text[])))
           and ($7::text is null
                or ($7 = 'yes') = exists (select 1 from issue_commits l where l.commit_id = c.id))
-          and ($8::date is null or (c.at at time zone '${ZONE}')::date >= $8)
-          and ($9::date is null or (c.at at time zone '${ZONE}')::date <= $9)
+          and ${onDays('c.at', '$8', '$9')}
           and (cardinality($11::uuid[]) = 0 or exists (
                 select 1 from issue_commits l join issue_tags it on it.issue_id = l.issue_id
                  where l.commit_id = c.id and it.tag_id = any($11::uuid[])))

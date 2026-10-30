@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from './auth.js';
-import { DAY_RE, pool, ZONE } from './db.js';
+import { DAY_RE, onDays, pool, ZONE } from './db.js';
 import { publish } from './events.js';
 import { feedbackForm, feedbackForms, formId } from './feedback-forms.js';
 import { countryOf } from './geoip.js';
@@ -193,7 +193,7 @@ export function registerFeedbackRoutes(app: FastifyInstance): void {
         `select id, created_at, lang, answers, name, email
            from feedback_responses
           where form_id = $1
-            and (created_at at time zone '${ZONE}')::date between coalesce($2::date, '-infinity') and coalesce($3::date, 'infinity')
+            and ${onDays('created_at', '$2', '$3')}
           order by created_at desc`,
         span
       ),

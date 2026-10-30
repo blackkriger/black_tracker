@@ -8,7 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebStream } from 'node:stream/web';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { DAY_RE, inTransaction, listOf, pool, ZONE } from './db.js';
+import { DAY_RE, inTransaction, listOf, onDays, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { denialsOf, mayOpenBoard } from './board-service.js';
@@ -1434,8 +1434,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
                 select count(*) from issue_tags it where it.issue_id = i.id and it.tag_id = any($7)
               ) = cardinality($7))
           and ($8::boolean or not s.is_resolved)
-          and ($9::date is null or (i.created_at at time zone '${ZONE}')::date >= $9)
-          and ($10::date is null or (i.created_at at time zone '${ZONE}')::date <= $10)
+          and ${onDays('i.created_at', '$9', '$10')}
           and ($11::text is null or i.summary ilike '%' || $11 || '%' or i.readable_id ilike $11 || '%'
                or split_part(i.readable_id, '-', 2) = $11)
           and ($12::text[] is null or v.login = any($12))

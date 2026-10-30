@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { DAY_RE, listOf, pool, ZONE } from './db.js';
+import { DAY_RE, listOf, onDays, pool, ZONE } from './db.js';
 import { requireAuth } from './auth.js';
 import { shutOut } from './board-service.js';
 import { stretchesOf, workOf, type HandRow } from './work.js';
@@ -238,7 +238,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
            join projects p on p.id = b.project_id
            join states s on s.board_id = b.id
            left join issues i on i.board_id = b.id and i.state_id = s.id
-            and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+            and ${onDays('i.created_at', '$5', '$6')}
 ${ISSUE_PICKS}
           where b.id <> all($1::uuid[]) and b.project_id <> all($2::uuid[])
             and ($3::text[] is null or p.short_name = any($3))
@@ -269,13 +269,13 @@ ${ISSUE_PICKS}
       pool.query<PersonRow>(
         `select u.login, r.color as role_color,
                 count(i.id) filter (
-                  where i.resolved_at is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+                  where i.resolved_at is null and ${onDays('i.created_at', '$5', '$6')}
                 ) as open,
                 count(i.id) filter (
                   where i.resolved_at is null and i.due_date < (now() at time zone '${ZONE}')::date
-                    and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+                    and ${onDays('i.created_at', '$5', '$6')}
                 ) as late,
-                count(i.id) filter (where (i.resolved_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')) as closed
+                count(i.id) filter (where ${onDays('i.resolved_at', '$5', '$6')}) as closed
            from users u
            left join roles r on r.id = u.role_id
            left join issues i on i.assignee_id = u.id
@@ -287,7 +287,7 @@ ${ISSUE_PICKS}
             and ($8::text[] is null or u.login = any($8))
           group by u.login, r.color
           order by count(i.id) filter (
-                     where i.resolved_at is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+                     where i.resolved_at is null and ${onDays('i.created_at', '$5', '$6')}
                    ) desc, lower(u.login)`,
         within
       ),
@@ -299,7 +299,7 @@ ${ISSUE_PICKS}
            join projects p on p.id = i.project_id
            join boards b on b.id = i.board_id
            join states s on s.id = i.state_id
-          where i.resolved_at is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+          where i.resolved_at is null and ${onDays('i.created_at', '$5', '$6')}
             and b.id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text[] is null or p.short_name = any($3))
             and ($4::text[] is null or s.name = any($4))
@@ -312,7 +312,7 @@ ${ISSUE_PICKS}
            from issues i
            join projects p on p.id = i.project_id
           join states s on s.id = i.state_id
-          where i.resolved_at is null and i.assignee_id is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+          where i.resolved_at is null and i.assignee_id is null and ${onDays('i.created_at', '$5', '$6')}
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text[] is null or p.short_name = any($3))
             and ($4::text[] is null or s.name = any($4))
@@ -324,7 +324,7 @@ ${ISSUE_PICKS}`,
            from issues i
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
-          where i.resolved_at is null and (i.created_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+          where i.resolved_at is null and ${onDays('i.created_at', '$5', '$6')}
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text[] is null or p.short_name = any($3))
             and ($4::text[] is null or s.name = any($4))
@@ -340,7 +340,7 @@ ${ISSUE_PICKS}
            from issues i
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
-          where i.resolved_at is not null and (i.resolved_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+          where i.resolved_at is not null and ${onDays('i.resolved_at', '$5', '$6')}
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text[] is null or p.short_name = any($3))
             and ($4::text[] is null or s.name = any($4))
@@ -363,7 +363,7 @@ ${ISSUE_PICKS}`,
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
           cross join lateral (select extract(epoch from (i.resolved_at - i.created_at)) as secs) t
-          where i.resolved_at is not null and (i.resolved_at at time zone '${ZONE}')::date between coalesce($5::date, '-infinity') and coalesce($6::date, 'infinity')
+          where i.resolved_at is not null and ${onDays('i.resolved_at', '$5', '$6')}
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text[] is null or p.short_name = any($3))
             and ($4::text[] is null or s.name = any($4))
