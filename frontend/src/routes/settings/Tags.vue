@@ -130,7 +130,7 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
           <span v-for="w in [64, 92, 48, 76]" :key="w" class="sk tag-sk" :style="{ width: `${w}px` }"></span>
         </div>
         <div class="addrow">
-          <span class="sk field-sk"></span>
+          <span class="sk sk--field"></span>
           <span class="sk btn-sk"></span>
         </div>
       </div>
@@ -205,10 +205,8 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
   display: block;
   height: 24px;
 }
-.field-sk {
-  display: block;
+.addrow .sk--field {
   flex: 1 1 auto;
-  height: 34px;
 }
 .btn-sk {
   display: block;

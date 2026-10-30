@@ -623,9 +623,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
   width: 220px;
   height: 30px;
 }
-.sk--right {
-  margin-left: auto;
-}
 .board-prefs {
   display: flex;
   gap: 24px;
