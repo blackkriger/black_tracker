@@ -77,7 +77,17 @@ export function stretchesOf(born: number, now: string | null, changes: HandRow[]
   return out;
 }
 
+export interface WorkTrail {
+  worked: Worked[];
+  changes: Map<string, HandRow[]>;
+  colors: Map<string, string>;
+}
+
 export async function workOf(f: WorkFilter): Promise<Worked[]> {
+  return (await workTrail(f)).worked;
+}
+
+export async function workTrail(f: WorkFilter): Promise<WorkTrail> {
   const issues = await pool.query<WorkIssue>(
     `select i.id, u.login, i.board_id, i.project_id, i.readable_id, i.summary, i.created_at,
             p.short_name, b.slug, s.name as state_name, s.color
@@ -115,7 +125,7 @@ export async function workOf(f: WorkFilter): Promise<Worked[]> {
       f.watchers ?? null,
     ]
   );
-  if (!issues.rows.length) return [];
+  if (!issues.rows.length) return { worked: [], changes: new Map(), colors: new Map() };
 
   const [history, kinds] = await Promise.all([
     pool.query<HandRow>(
@@ -157,7 +167,7 @@ export async function workOf(f: WorkFilter): Promise<Worked[]> {
     return !!kind && !kind.is_resolved && !kind.starting;
   };
 
-  return issues.rows.map((r) => {
+  const worked = issues.rows.map((r) => {
     const trail = changes.get(r.id) ?? [];
     const born = r.created_at.getTime();
     const hands = stretchesOf(born, r.login, trail.filter((c) => c.field === 'assignee'));
@@ -175,4 +185,6 @@ export async function workOf(f: WorkFilter): Promise<Worked[]> {
     }
     return { issue: r, spans, colorOf: (state: string) => kindOf(r, state)?.color ?? null };
   });
+  const colors = new Map(kinds.rows.map((k) => [`${k.board_id}:${k.name}`, k.color]));
+  return { worked, changes, colors };
 }

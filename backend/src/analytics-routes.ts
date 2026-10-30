@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { DAY_RE, listOf, onDays, pool, ZONE } from './db.js';
 import { requireAuth } from './auth.js';
 import { shutOut } from './board-service.js';
-import { stretchesOf, workOf, type HandRow } from './work.js';
+import { stretchesOf, workTrail, type HandRow } from './work.js';
 
 const ISSUE_PICKS = `
             and ($7::uuid[] is null or (
@@ -217,7 +217,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
     const within = [...seen, inState, from, to, tagged, holders, writers, watchers];
     const people_ = holders?.filter((login) => login !== '-') ?? null;
 
-    const [statuses, cells, dues, people, held, loose, priorities, cycle, months, worked, bounds] =
+    const [statuses, cells, dues, people, held, priorities, cycle, trail, bounds] =
       await Promise.all([
       pool.query<{ name: string; color: string }>(
         `select s.name, (array_agg(s.color order by p.position, p.short_name, b.position))[1] as color
@@ -307,20 +307,9 @@ ${ISSUE_PICKS}
           order by lower(u.login), i.due_date nulls last, i.readable_id`,
         within
       ),
-      pool.query<{ n: string }>(
-        `select count(*) as n
-           from issues i
-           join projects p on p.id = i.project_id
-          join states s on s.id = i.state_id
-          where i.resolved_at is null and i.assignee_id is null and ${onDays('i.created_at', '$5', '$6')}
-            and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
-            and ($3::text[] is null or p.short_name = any($3))
-            and ($4::text[] is null or s.name = any($4))
-${ISSUE_PICKS}`,
-        within
-      ),
-      pool.query<{ priority: string; state_name: string; n: string }>(
-        `select i.priority, s.name as state_name, count(*) as n
+      pool.query<{ priority: string; state_name: string; n: string; loose: string }>(
+        `select i.priority, s.name as state_name, count(*) as n,
+                count(*) filter (where i.assignee_id is null) as loose
            from issues i
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
@@ -332,23 +321,8 @@ ${ISSUE_PICKS}
           group by i.priority, s.name`,
         within
       ),
-      pool.query<{ median: string | null; closed: string }>(
-        `select percentile_cont(0.5) within group (
-                  order by extract(epoch from (i.resolved_at - i.created_at)) / 86400
-                ) as median,
-                count(*) as closed
-           from issues i
-           join projects p on p.id = i.project_id
-           join states s on s.id = i.state_id
-          where i.resolved_at is not null and ${onDays('i.resolved_at', '$5', '$6')}
-            and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
-            and ($3::text[] is null or p.short_name = any($3))
-            and ($4::text[] is null or s.name = any($4))
-${ISSUE_PICKS}`,
-        within
-      ),
-      pool.query<{ month: string; median: string | null; closed: string; buckets: string[] }>(
-        `select to_char(date_trunc('month', i.resolved_at at time zone '${ZONE}'), 'YYYY-MM') as month,
+      pool.query<{ month: string | null; median: string | null; closed: string; buckets: string[] }>(
+        `select t.month,
                 percentile_cont(0.5) within group (order by t.secs / 86400) as median,
                 count(*) as closed,
                 array[
@@ -362,17 +336,20 @@ ${ISSUE_PICKS}`,
            from issues i
            join projects p on p.id = i.project_id
            join states s on s.id = i.state_id
-          cross join lateral (select extract(epoch from (i.resolved_at - i.created_at)) as secs) t
+          cross join lateral (
+                  select extract(epoch from (i.resolved_at - i.created_at)) as secs,
+                         to_char(date_trunc('month', i.resolved_at at time zone '${ZONE}'), 'YYYY-MM') as month
+                ) t
           where i.resolved_at is not null and ${onDays('i.resolved_at', '$5', '$6')}
             and i.board_id <> all($1::uuid[]) and i.project_id <> all($2::uuid[])
             and ($3::text[] is null or p.short_name = any($3))
             and ($4::text[] is null or s.name = any($4))
 ${ISSUE_PICKS}
-          group by 1
-          order by 1`,
+          group by grouping sets ((t.month), ())
+          order by t.month nulls first`,
         within
       ),
-      workOf({
+      workTrail({
         boards: denied.boards,
         projects: denied.projects,
         projectNames: only,
@@ -390,31 +367,9 @@ ${ISSUE_PICKS}
       ),
     ]);
 
-    const traced = held.rows.map((r) => r.id);
-    const [handRows, palette] = await Promise.all([
-      traced.length
-        ? pool.query<HandRow>(
-            `select issue_id, field, old_value, new_value, created_at
-               from issue_history
-              where issue_id = any($1::uuid[]) and field in ('assignee', 'status')
-              order by issue_id, created_at`,
-            [traced]
-          )
-        : { rows: [] as HandRow[] },
-      held.rows.length
-        ? pool.query<{ board_id: string; name: string; color: string }>(
-            'select board_id, name, color from states where board_id = any($1::uuid[])',
-            [[...new Set(held.rows.map((r) => r.board_id))]]
-          )
-        : { rows: [] as { board_id: string; name: string; color: string }[] },
-    ]);
-    const colors = new Map(palette.rows.map((r) => [`${r.board_id}:${r.name}`, r.color]));
-    const changes = new Map<string, HandRow[]>();
-    for (const row of handRows.rows) {
-      const list = changes.get(row.issue_id);
-      if (list) list.push(row);
-      else changes.set(row.issue_id, [row]);
-    }
+    const { worked, changes, colors } = trail;
+    const overall = cycle.rows.find((r) => r.month === null);
+    const monthly = cycle.rows.filter((r) => r.month !== null);
 
     const boards: {
       id: string;
@@ -551,7 +506,7 @@ ${ISSUE_PICKS}
             issues: issues.sort((a, b) => b.days - a.days),
           }))
           .sort((a, b) => b.days - a.days || a.login.localeCompare(b.login)),
-        unassigned: Number(loose.rows[0]?.n ?? 0),
+        unassigned: priorities.rows.reduce((all, r) => all + Number(r.loose), 0),
         priorities: [...new Set(priorities.rows.map((r) => r.priority))].map((name) => {
           const mine = priorities.rows.filter((r) => r.priority === name);
           return {
@@ -561,10 +516,10 @@ ${ISSUE_PICKS}
           };
         }),
         cycle: {
-          median: cycle.rows[0]?.median === null ? null : Number(cycle.rows[0]?.median),
-          closed: Number(cycle.rows[0]?.closed ?? 0),
-          months: months.rows.map((r) => ({
-            month: r.month,
+          median: overall?.median == null ? null : Number(overall.median),
+          closed: Number(overall?.closed ?? 0),
+          months: monthly.map((r) => ({
+            month: r.month as string,
             median: r.median === null ? null : Number(r.median),
             closed: Number(r.closed),
             buckets: r.buckets.map(Number),
