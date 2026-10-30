@@ -201,10 +201,6 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
 </template>
 
 <style scoped>
-.tag-sk {
-  display: block;
-  height: 24px;
-}
 .addrow .sk--field {
   flex: 1 1 auto;
 }
@@ -212,14 +208,6 @@ async function toggleOnBoard(tag: Tag, boardId: string): Promise<void> {
   display: block;
   flex: 0 0 56px;
   height: 34px;
-}
-.taglabel--pick {
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-.taglabel--pick.is-off {
-  opacity: 0.35;
 }
 .tagmap__head,
 .tagmap__row {

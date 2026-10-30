@@ -588,9 +588,6 @@ async function openIssue(w: Where): Promise<void> {
 
 <style scoped>
 .page__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: var(--space-6) var(--space-5);
   overflow-y: auto;
 }
 .nums {
@@ -760,25 +757,6 @@ async function openIssue(w: Where): Promise<void> {
   display: inline-flex;
   gap: 5px;
 }
-.skel {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 6px 2px 0;
-}
-.skel__ridge {
-  display: grid;
-  grid-template-columns: 96px 1fr 44px;
-  gap: 12px;
-  align-items: center;
-}
-.skel__ridge .sk:last-child {
-  justify-self: end;
-}
-.skel__hill {
-  flex: 1 1 auto;
-  height: 6px;
-}
 .skel__line {
   cursor: default;
 }
@@ -803,10 +781,7 @@ async function openIssue(w: Where): Promise<void> {
     padding-top: 8px;
     padding-bottom: 8px;
   }
-  .skel__ridge {
-    grid-template-columns: 72px 1fr 36px;
-  }
-  .who {
+    .who {
     grid-template-columns: minmax(0, 1fr) 32px 32px 40px 44px;
     gap: 6px;
   }

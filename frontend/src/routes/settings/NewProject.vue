@@ -69,11 +69,6 @@ async function create(): Promise<void> {
 </template>
 
 <style scoped>
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
 .row-end {
   display: flex;
   justify-content: flex-end;

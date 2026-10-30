@@ -1543,7 +1543,7 @@ async function removeIssue(): Promise<void> {
 <template>
   <Teleport to="body">
     <div
-      class="iv__scrim"
+      class="scrim iv__scrim"
       @pointerdown="pressedScrim = $event.target === $event.currentTarget"
       @click.self="pressedScrim && emit('close')"
     >
@@ -2444,7 +2444,7 @@ async function removeIssue(): Promise<void> {
       <FileViewer :file="reading" @close="reading = null" />
 
       <Dialog v-if="deleting" :title="t('common.deleteNamed', { name: issueKey })" @close="deleting = false">
-        <p class="iv__lede">{{ t('issue.deleteText') }}</p>
+        <p class="lede">{{ t('issue.deleteText') }}</p>
         <template #footer>
           <button class="btn" type="button" @click="deleting = false">{{ t('common.cancel') }}</button>
           <button class="btn btn--danger" type="button" @click="removeIssue">{{ t('issue.deleteIssue') }}</button>
@@ -2464,7 +2464,7 @@ async function removeIssue(): Promise<void> {
         </template>
       </Dialog>
       <Dialog v-if="deletingComment" :title="t('issue.deleteComment')" @close="deletingComment = null">
-        <p class="iv__lede">{{ t('issue.deleteCommentText') }}</p>
+        <p class="lede">{{ t('issue.deleteCommentText') }}</p>
         <template #footer>
           <button class="btn" type="button" @click="deletingComment = null">{{ t('common.cancel') }}</button>
           <button class="btn btn--danger" type="button" @click="confirmRemoveComment">{{ t('issue.deleteComment') }}</button>
@@ -2475,16 +2475,6 @@ async function removeIssue(): Promise<void> {
 </template>
 
 <style scoped>
-.iv__scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
-  background: var(--scrim);
-}
 .iv__win {
   display: flex;
   flex-direction: column;
@@ -2700,50 +2690,9 @@ async function removeIssue(): Promise<void> {
 .lk__key {
   font-size: 11.5px;
 }
-.pick__line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 8px;
-}
 .pick__group {
   flex: none;
   padding: 0 8px;
-}
-.pick {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-.pick__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  background: none;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-  border-radius: var(--radius);
-}
-.pick__row:hover {
-  border-color: var(--line-2);
-  background: var(--card-hover);
-}
-.pick__sum {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-}
-.pick__state {
-  font-size: 12px;
 }
 .cm__files {
   display: flex;
@@ -2872,12 +2821,6 @@ async function removeIssue(): Promise<void> {
 }
 .iv__err {
   padding: 0 24px 16px;
-}
-.iv__lede {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--text-dim);
 }
 .props__toggle {
   display: none;

@@ -503,7 +503,7 @@ watch(
         :label="t('board.orderLabel')"
         @update:model-value="setOrder"
       />
-      <span class="tagbar__sep" aria-hidden="true"></span>
+      <span class="vsep" aria-hidden="true"></span>
       <span class="search">
         <Search class="ic ic--sm search__i" />
         <input
@@ -721,14 +721,6 @@ watch(
 .board--tags {
   padding-top: 0;
 }
-.taglabel--pick {
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-.taglabel--pick.is-off {
-  opacity: 0.35;
-}
 .star.is-on {
   color: var(--accent);
 }
@@ -746,30 +738,9 @@ watch(
 .board__who {
   margin-left: auto;
 }
-.tagbar__sep {
-  flex: none;
-  width: 1px;
-  height: 16px;
-  margin: 0 6px;
-  background: var(--line-2);
-}
-.search {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.search__i {
-  position: absolute;
-  left: 7px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
 .search__f {
   width: 170px;
   padding-left: 25px;
-}
-.search__f::placeholder {
-  color: var(--text-muted);
 }
 .card {
   user-select: none;

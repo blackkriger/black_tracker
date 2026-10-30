@@ -213,29 +213,6 @@ async function addDrive(): Promise<void> {
   font-size: 13px;
 }
 .seg {
-  display: inline-flex;
   align-self: flex-start;
-  height: 30px;
-  border: 1px solid var(--line-2);
-  background: var(--bg);
-  border-radius: var(--radius);
-}
-.seg__i {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 10px;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-}
-.seg__i + .seg__i {
-  border-left: 1px solid var(--line-2);
-}
-.seg__i:hover,
-.seg__i.is-on {
-  color: var(--text);
-}
-.seg__i:has(input:focus-visible) {
-  box-shadow: var(--focus-ring);
 }
 </style>

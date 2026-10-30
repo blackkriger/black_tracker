@@ -208,7 +208,7 @@ onBeforeUnmount(() => {
           <button
             v-for="c in COLORS"
             :key="c"
-            class="sticky__swatch"
+            class="swatch sticky__swatch"
             :class="[`sticky--${c}`, { 'is-active': n.color === c }]"
             type="button"
             role="radio"
@@ -327,21 +327,7 @@ onBeforeUnmount(() => {
   padding-right: 4px;
 }
 .sticky__swatch {
-  width: 22px;
-  height: 18px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--black) 35%, transparent);
   background: var(--h);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-}
-.sticky__swatch:hover {
-  outline: 1px solid var(--text-dim);
-  outline-offset: 1px;
-}
-.sticky__swatch.is-active {
-  outline: 1px solid var(--text);
-  outline-offset: 1px;
 }
 .sticky__body {
   flex: 1 1 auto;

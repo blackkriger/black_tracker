@@ -141,10 +141,4 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
 .iviewer__img:active {
   cursor: grabbing;
 }
-.iviewer__n {
-  min-width: 56px;
-  text-align: center;
-  font: 12px/1 var(--font-num);
-  color: var(--accent);
-}
 </style>

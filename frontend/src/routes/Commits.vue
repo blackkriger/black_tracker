@@ -464,72 +464,8 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
 </template>
 
 <style scoped>
-.page__body {
-  padding: var(--space-6) var(--space-5);
-}
-.list__tools {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-bottom: 14px;
-}
-.list__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.list__search {
-  flex: 1 1 0;
-  min-width: 0;
-}
 .list__search .search__f {
   width: 100%;
-}
-.search {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.search__i {
-  position: absolute;
-  left: 7px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-.search__f {
-  padding-left: 25px;
-}
-.search__f::placeholder {
-  color: var(--text-muted);
-}
-.seg {
-  display: inline-flex;
-  height: 30px;
-  border: 1px solid var(--line-2);
-  background: var(--bg);
-  border-radius: var(--radius);
-}
-.seg__i {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 10px;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-}
-.seg__i + .seg__i {
-  border-left: 1px solid var(--line-2);
-}
-.seg__i:hover,
-.seg__i.is-on {
-  color: var(--text);
-}
-.seg__i:has(input:focus-visible) {
-  box-shadow: var(--focus-ring);
-}
-.list {
-  table-layout: auto;
 }
 .list__sha a {
   color: var(--text-dim);
@@ -537,12 +473,6 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
 }
 .list__sha a:hover {
   color: var(--text);
-}
-.list__what {
-  width: 100%;
-  max-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .list__issues {
   white-space: nowrap;
@@ -553,9 +483,6 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
 .list__key {
   text-decoration: none;
 }
-.list__dim {
-  color: var(--text-dim);
-}
 .list__branch {
   max-width: 180px;
   overflow: hidden;
@@ -563,9 +490,6 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
 }
 .list__act {
   width: 1%;
-}
-.list__none {
-  padding: 16px 12px 4px;
 }
 .list__more {
   display: flex;
@@ -576,47 +500,6 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
   margin: 0 0 8px;
   color: var(--text);
   font-size: 13px;
-}
-.pick {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-.pick__line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 8px;
-}
-.pick__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  background: none;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-  border-radius: var(--radius);
-}
-.pick__row:hover {
-  border-color: var(--line-2);
-  background: var(--card-hover);
-}
-.pick__sum {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-}
-.pick__state {
-  font-size: 12px;
 }
 @media (max-width: 760px) {
   .list__branch,

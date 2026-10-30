@@ -255,12 +255,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.iviewer__n {
-  min-width: 56px;
-  text-align: center;
-  font: 12px/1 var(--font-num);
-  color: var(--accent);
-}
 .fv__page {
   flex: 1 1 auto;
   min-height: 0;

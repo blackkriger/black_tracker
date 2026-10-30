@@ -31,7 +31,7 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div
-      class="dialog__scrim"
+      class="scrim"
       @pointerdown="pressedScrim = $event.target === $event.currentTarget"
       @click.self="pressedScrim && emit('close')"
     >
@@ -52,16 +52,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.dialog__scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
-  background: var(--scrim);
-}
 .dialog {
   display: flex;
   flex-direction: column;

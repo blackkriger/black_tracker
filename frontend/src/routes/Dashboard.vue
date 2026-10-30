@@ -707,9 +707,6 @@ function closeIssue(): void {
   text-align: right;
 }
 .page__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: var(--space-6) var(--space-5);
   overflow-y: auto;
 }
 .sheet--cal {

@@ -271,7 +271,7 @@ onBeforeUnmount(() => {
                 v-for="c in BASIC_PALETTE"
                 :key="c"
                 type="button"
-                class="cp__swatch"
+                class="swatch"
                 :class="{ 'is-active': c === hex }"
                 :style="{ background: c }"
                 :title="c"
@@ -286,7 +286,7 @@ onBeforeUnmount(() => {
                 v-for="d in DEFAULT_COLORS"
                 :key="d.name"
                 type="button"
-                class="cp__swatch"
+                class="swatch"
                 :class="{ 'is-active': d.color === hex }"
                 :style="{ background: d.color }"
                 :title="d.name"
@@ -411,22 +411,6 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(8, 22px);
   grid-auto-rows: 18px;
   gap: 4px;
-}
-.cp__swatch {
-  width: 22px;
-  height: 18px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--black) 35%, transparent);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-}
-.cp__swatch:hover {
-  outline: 1px solid var(--text-dim);
-  outline-offset: 1px;
-}
-.cp__swatch.is-active {
-  outline: 1px solid var(--text);
-  outline-offset: 1px;
 }
 .cp__field {
   display: flex;

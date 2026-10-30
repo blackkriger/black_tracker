@@ -390,11 +390,6 @@ async function changePassword(): Promise<void> {
 </template>
 
 <style scoped>
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
 .messenger {
   margin-top: 0;
 }

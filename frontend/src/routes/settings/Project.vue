@@ -550,7 +550,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
       :title="t('common.deleteNamed', { name: deletingBoard.name })"
       @close="deletingBoard = null"
     >
-      <p class="dialog__lede">
+      <p class="lede">
         {{ t('project.deleteBoardText') }}
       </p>
       <div v-if="errors.deleteBoard" class="err">{{ errors.deleteBoard }}</div>
@@ -565,7 +565,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
       :title="t('common.deleteNamed', { name: project.name })"
       @close="deleting = false; confirmKey = ''"
     >
-      <p class="dialog__lede">
+      <p class="lede">
         {{ t('project.deleteProjectText') }}
       </p>
       <div class="field">
@@ -603,12 +603,6 @@ async function onDrop(b: Board, target: State): Promise<void> {
 }
 .p-repo {
   flex: 1 1 220px;
-}
-.dialog__lede {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--text-dim);
 }
 .p-btn {
   height: 34px;

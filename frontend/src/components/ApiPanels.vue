@@ -159,7 +159,7 @@ const CALLS = computed<{ group: string; calls: Call[] }[]>(() => [
     <section class="panel sheet__wide">
       <header class="panel__h">{{ t('api.token') }}</header>
       <div class="panel__b form">
-        <i18n-t keypath="api.lede" tag="p" class="token__lede">
+        <i18n-t keypath="api.lede" tag="p" class="lede token__lede">
           <template #your><strong>{{ t('api.your') }}</strong></template>
           <template #api><span class="api">API</span></template>
         </i18n-t>
@@ -242,17 +242,6 @@ const CALLS = computed<{ group: string; calls: Call[] }[]>(() => [
 </template>
 
 <style scoped>
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.token__lede {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--text-dim);
-}
 .token__lede strong {
   color: var(--text);
 }

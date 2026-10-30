@@ -94,11 +94,6 @@ useLive(
 .side__sk {
   margin: 0 10px;
 }
-.page {
-  min-height: calc(100vh - var(--top-h));
-  display: flex;
-  flex-direction: column;
-}
 .page__body {
   flex: 1 1 auto;
   display: flex;

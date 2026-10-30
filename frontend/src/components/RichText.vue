@@ -508,7 +508,7 @@ function addLink(): void {
       <button type="button" :aria-pressed="marks.check" :title="t('editor.checklist')" @click="toggleChecklist"><ListChecks class="ic" /></button>
       <button type="button" :aria-pressed="marks.blockquote" :title="t('editor.quote')" @click="toggle('blockquote')"><Quote class="ic" /></button>
       <button type="button" :title="t('editor.link')" @click="addLink"><Link class="ic" /></button>
-      <span v-if="inlineImages || $slots.tools" class="mdbar__sep" aria-hidden="true"></span>
+      <span v-if="inlineImages || $slots.tools" class="vsep" aria-hidden="true"></span>
       <template v-if="inlineImages">
         <button type="button" :title="t('editor.image')" @click="picker?.click()"><ImagePlus class="ic" /></button>
         <input

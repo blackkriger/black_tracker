@@ -567,9 +567,6 @@ function exportCsv(): void {
 
 <style scoped>
 .page__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: var(--space-6) var(--space-5);
   overflow-y: auto;
 }
 .lead {
@@ -602,25 +599,6 @@ function exportCsv(): void {
 .funnel__sk {
   display: inline-block;
   width: 32px;
-}
-.skel {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 6px 2px 0;
-}
-.skel__ridge {
-  display: grid;
-  grid-template-columns: 96px 1fr 44px;
-  gap: 12px;
-  align-items: center;
-}
-.skel__ridge .sk:last-child {
-  justify-self: end;
-}
-.skel__hill {
-  flex: 1 1 auto;
-  height: 6px;
 }
 .tbl--plain tbody tr:last-child td {
   border-bottom: 0;
@@ -803,10 +781,7 @@ function exportCsv(): void {
     padding-top: 8px;
     padding-bottom: 8px;
   }
-  .skel__ridge {
-    grid-template-columns: 72px 1fr 36px;
-  }
-  .funnel th,
+    .funnel th,
   .funnel td {
     padding: 0 6px;
   }

@@ -136,7 +136,7 @@ onMounted(() => {
       @update:model-value="set({ authors: $event })"
     />
     <slot />
-    <span class="fbar__sep" aria-hidden="true"></span>
+    <span class="vsep fbar__sep" aria-hidden="true"></span>
     <span class="fbar__period" :class="{ 'is-on': periodOn }">
       <DateRangePicker
         :from="modelValue.from"
@@ -169,25 +169,6 @@ onMounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-.taglabel--pick {
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-.taglabel--pick.is-off {
-  opacity: 0.35;
-}
-.fbar__sep {
-  flex: none;
-  width: 1px;
-  height: 16px;
-  margin: 0 6px;
-  background: var(--line-2);
-}
-.tag-sk {
-  display: block;
-  height: 24px;
 }
 .fbar__period:not(.is-on) :deep(.drp__trigger) {
   color: var(--text-muted);

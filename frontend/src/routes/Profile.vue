@@ -15,12 +15,4 @@ import PreferencePanels from '../components/PreferencePanels.vue';
 </template>
 
 <style scoped>
-.page {
-  min-height: calc(100vh - var(--top-h));
-  display: flex;
-  flex-direction: column;
-}
-.page__body {
-  padding: var(--space-6) var(--space-5);
-}
 </style>

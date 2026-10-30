@@ -372,81 +372,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page__body {
-  padding: var(--space-6) var(--space-5);
-}
-.list__tools {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-bottom: 14px;
-}
-.list__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.list__search {
-  flex: 1 1 0;
-  min-width: 0;
-}
 .list__search .search__f {
   width: 100%;
 }
-.search {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.search__i {
-  position: absolute;
-  left: 7px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-.search__f {
-  padding-left: 25px;
-}
-.search__f::placeholder {
-  color: var(--text-muted);
-}
-.seg {
-  display: inline-flex;
-  height: 30px;
-  border: 1px solid var(--line-2);
-  background: var(--bg);
-  border-radius: var(--radius);
-}
-.seg__i {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 10px;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-}
-.seg__i + .seg__i {
-  border-left: 1px solid var(--line-2);
-}
-.seg__i:hover,
-.seg__i.is-on {
-  color: var(--text);
-}
-.seg__i:has(input:focus-visible) {
-  box-shadow: var(--focus-ring);
-}
-.list {
-  table-layout: auto;
-}
 .list__row-i {
   cursor: pointer;
-}
-.list__what {
-  width: 100%;
-  max-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .list__text {
   margin-right: 6px;
@@ -455,18 +385,9 @@ onMounted(() => {
   margin-right: 4px;
   vertical-align: middle;
 }
-.list__dim {
-  color: var(--text-dim);
-}
 .is-closed .list__text {
   color: var(--text-muted);
   text-decoration: line-through;
-}
-.is-late {
-  color: var(--danger-text);
-}
-.list__none {
-  padding: 16px 12px 4px;
 }
 .prio {
   margin-left: 0;
