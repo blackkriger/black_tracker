@@ -4,16 +4,15 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import MonthGrid from './MonthGrid.vue';
-import { api } from '../lib/api';
+import { api, latest } from '../lib/api';
 import {
   byDay,
   longDate,
   monthName,
   monthRange,
-  type Activity,
+  peakOf,
+  type CalendarSpan,
   type DayInfo,
-  type DayMentions,
-  type Due,
   type Mark,
 } from '../lib/calendar';
 import { useFocus } from '../lib/focus';
@@ -56,21 +55,16 @@ const calMonth = ref(now.getMonth());
 const calDays = ref(new Map<string, DayInfo>());
 const calPeak = ref(1);
 
-let monthReads = 0;
+const monthReads = latest();
 
 async function readMonth(): Promise<void> {
   const { from, to } = monthRange(calYear.value, calMonth.value);
-  const mine = ++monthReads;
+  const mine = monthReads();
   try {
-    const got = await api<{
-      marks: Mark[];
-      dues: { day: string; issues: Due[] }[];
-      activity: Activity[];
-      mentions: DayMentions[];
-    }>(`/calendar?from=${from}&to=${to}`);
-    if (mine !== monthReads) return;
+    const got = await api<CalendarSpan>(`/calendar?from=${from}&to=${to}`);
+    if (!mine()) return;
     calDays.value = byDay(got.marks, got.dues, got.activity, got.mentions);
-    calPeak.value = Math.max(1, ...[...calDays.value.values()].map((d) => d.worked));
+    calPeak.value = peakOf(calDays.value);
   } catch {}
 }
 

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { lastProject } from '../lib/lastProject';
 import { useProjects } from '../lib/projects';
+import { messageOf } from '../lib/panelErrors';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -20,7 +21,7 @@ onMounted(async () => {
     const target = remembered ?? open[0];
     if (target) await router.replace(`/${target.shortName}`);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('common.projectsFailed');
+    error.value = messageOf(err, t('common.projectsFailed'));
   } finally {
     loading.value = false;
   }

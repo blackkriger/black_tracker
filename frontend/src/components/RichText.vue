@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { usePeople } from '../lib/people';
 import { useRoles } from '../lib/roles';
 import { useProjects } from '../lib/projects';
-import { api } from '../lib/api';
+import { api, latest } from '../lib/api';
 import type { IssueLink } from '../lib/issues';
 import Quill from '../lib/quill';
 import 'quill/dist/quill.core.css';
@@ -143,7 +143,7 @@ function readMarks(): void {
 const naming = ref<{ from: number; query: string } | null>(null);
 const keying = ref<{ from: number; query: string; moved: boolean } | null>(null);
 const issueHits = ref<IssueLink[]>([]);
-let keySearch = 0;
+const keySearch = latest();
 let keyTimer = 0;
 const chosen = ref(0);
 const list = ref<HTMLDivElement | null>(null);
@@ -225,25 +225,25 @@ function place(): void {
 }
 
 function findIssues(query: string): void {
-  const mine = ++keySearch;
+  const mine = keySearch();
   window.clearTimeout(keyTimer);
   keyTimer = window.setTimeout(async () => {
     try {
       const rows = await api<IssueLink[]>(`/issues/search?q=${encodeURIComponent(query)}`);
-      if (mine !== keySearch) return;
+      if (!mine()) return;
       const prefix = query.includes('-') ? query : `${query}-`;
       issueHits.value = rows.filter((r) => r.key.startsWith(prefix)).slice(0, 8);
       chosen.value = 0;
       void nextTick(place);
     } catch {
-      if (mine === keySearch) issueHits.value = [];
+      if (mine()) issueHits.value = [];
     }
   }, 150);
 }
 
 watch(keying, (now) => {
   if (now) return;
-  ++keySearch;
+  keySearch();
   issueHits.value = [];
 });
 

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
-import { IssueView } from '../lib/issueView';
+import { IssueView, useIssueOverlay } from '../lib/issueView';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import FilterBar from '../components/FilterBar.vue';
-import { api } from '../lib/api';
-import { filtersOf, filtersQuery, monthFilters, remember, sameQuery, type Filters } from '../lib/filters';
+import { api, latest } from '../lib/api';
+import { filtersOf, filtersQuery, monthFilters, remember, useQuerySync, type Filters } from '../lib/filters';
 import { dayAndMonth } from '../lib/calendar';
-import { PRIORITIES, priorityColor, type IssueTag, type Priority } from '../lib/issues';
+import { PRIORITIES, priorityColor, type Priority } from '../lib/issues';
+import { toggled } from '../lib/lists';
 import { ridgeShape } from '../lib/ridge';
 import { RU_MONTHS_SHORT } from '../lib/calendar';
 import { locale } from '../i18n';
@@ -81,33 +82,27 @@ interface Numbers {
 }
 
 const { t } = useI18n();
-const { projects, load: loadProjects } = useProjects();
-const { errors, fail, clear } = usePanelErrors();
+const { load: loadProjects } = useProjects();
+const { errors, fail, clear, attempt } = usePanelErrors();
 const { nameOf, load: loadPeople } = usePeople();
 
 const route = useRoute();
-const router = useRouter();
 const base = monthFilters();
 const filters = ref<Filters>(filtersOf(route.query, base));
+const syncUrl = useQuerySync(
+  'analytics',
+  () => filtersQuery(filters.value, base),
+  () => {
+    filters.value = filtersOf(route.query, base);
+  }
+);
 watch(
   filters,
   (now) => {
     remember(now, base);
-    const next = filtersQuery(now, base);
-    if (!sameQuery(next, route.query as Record<string, unknown>)) {
-      void router.replace({ name: 'analytics', query: next });
-    }
+    syncUrl();
   },
   { deep: true, immediate: true }
-);
-watch(
-  () => route.query,
-  (query) => {
-    if (route.name !== 'analytics') return;
-    if (!sameQuery(filtersQuery(filters.value, base), query as Record<string, unknown>)) {
-      filters.value = filtersOf(query, base);
-    }
-  }
 );
 const loading = ref(true);
 const data = ref<Numbers | null>(null);
@@ -116,15 +111,15 @@ const openWorkers = ref<string[]>([]);
 const foldedSplits = ref<string[]>([]);
 const flippedIssues = ref<string[]>([]);
 
-let reads = 0;
+const reads = latest();
 
 async function load(): Promise<void> {
   clear('numbers');
-  const mine = ++reads;
+  const mine = reads();
   try {
     const query = new URLSearchParams(filtersQuery(filters.value)).toString();
     const got = await api<Numbers>(`/analytics${query ? `?${query}` : ''}`);
-    if (mine !== reads) return;
+    if (!mine()) return;
     data.value = got;
   } catch (err) {
     fail('numbers', err, t('analytics.countFailed'));
@@ -241,60 +236,29 @@ const closeRows = computed<RidgeRow[]>(() =>
 );
 
 function togglePerson(login: string): void {
-  openPeople.value = openPeople.value.includes(login)
-    ? openPeople.value.filter((l) => l !== login)
-    : [...openPeople.value, login];
+  openPeople.value = toggled(openPeople.value, login);
 }
 function toggleWorker(login: string): void {
-  openWorkers.value = openWorkers.value.includes(login)
-    ? openWorkers.value.filter((l) => l !== login)
-    : [...openWorkers.value, login];
+  openWorkers.value = toggled(openWorkers.value, login);
 }
 function toggleSplit(id: string): void {
-  foldedSplits.value = foldedSplits.value.includes(id)
-    ? foldedSplits.value.filter((k) => k !== id)
-    : [...foldedSplits.value, id];
+  foldedSplits.value = toggled(foldedSplits.value, id);
 }
 const handsOpen = (i: Held): boolean => i.hands.length > 1 !== flippedIssues.value.includes(i.key);
 function toggleIssue(key: string): void {
-  flippedIssues.value = flippedIssues.value.includes(key)
-    ? flippedIssues.value.filter((k) => k !== key)
-    : [...flippedIssues.value, key];
+  flippedIssues.value = toggled(flippedIssues.value, key);
 }
 
-interface OpenIssue {
-  key: string;
-  project: string;
-  board: {
-    id: string;
-    name: string;
-    slug: string;
-    states: { id: string; name: string; color: string }[];
-    tagIds: string[];
-  };
-}
-const open = ref<OpenIssue | null>(null);
-const openTags = ref<IssueTag[]>([]);
-const openBoards = computed(
-  () => projects.value.find((p) => p.shortName === open.value?.project)?.boards ?? []
-);
+const { open, tags: openTags, boards: openBoards, boardAt, withTags } = useIssueOverlay();
 
 async function openIssue(w: Where): Promise<void> {
-  const board = projects.value
-    .find((p) => p.shortName === w.projectShort)
-    ?.boards.find((b) => b.slug === w.boardSlug);
+  const board = boardAt(w.projectShort, w.boardSlug);
   if (!board) return;
-  clear('numbers');
-  try {
-    const [full, tags] = await Promise.all([
-      api<OpenIssue['board']>(`/boards/${board.id}`),
-      api<IssueTag[]>('/tags'),
-    ]);
-    openTags.value = tags.filter((t) => full.tagIds.includes(t.id));
-    open.value = { key: w.key, project: w.projectShort, board: full };
-  } catch (err) {
-    fail('numbers', err, t('me.openFailed'));
-  }
+  await attempt('numbers', async () => {
+    const got = await withTags(board.id);
+    openTags.value = got.tags;
+    open.value = { key: w.key, project: w.projectShort, board: got.board };
+  }, t('me.openFailed'));
 }
 </script>
 

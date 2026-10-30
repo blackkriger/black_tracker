@@ -6,12 +6,12 @@ import SettingsLayout from '../../components/SettingsLayout.vue';
 import Select from '../../components/Select.vue';
 import Dialog from '../../components/Dialog.vue';
 import ColorPicker from '../../components/ColorPicker.vue';
-import { api } from '../../lib/api';
+import { api, latest } from '../../lib/api';
 import { useLive } from '../../lib/live';
-import { usePanelErrors } from '../../lib/panelErrors';
+import { messageOf, usePanelErrors } from '../../lib/panelErrors';
 import { useSession } from '../../lib/session';
 import { useProjects } from '../../lib/projects';
-import { usePeople } from '../../lib/people';
+import { personChoice, usePeople } from '../../lib/people';
 import { GripVertical, Palette, X } from 'lucide-vue-next';
 import { ink } from '../../lib/theme';
 
@@ -51,7 +51,7 @@ const project = ref<Project | null>(null);
 const boards = ref<Board[]>([]);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
-const { errors, fail, clear } = usePanelErrors();
+const { errors, fail, clear, attempt } = usePanelErrors();
 const newBoard = ref('');
 const deleting = ref(false);
 const confirmKey = ref('');
@@ -61,27 +61,27 @@ const { people, load: loadPeople } = usePeople();
 void loadPeople();
 const assigneeChoices = computed(() => [
   { value: '', label: '—' },
-  ...people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor })),
+  ...people.value.map((p) => personChoice(p, p.id)),
 ]);
 
-let projectReads = 0;
+const projectReads = latest();
 
 async function load(quiet = false): Promise<void> {
   if (!quiet) loading.value = true;
   loadError.value = null;
-  const mine = ++projectReads;
+  const mine = projectReads();
   try {
     const short = String(route.params.short ?? '');
     const p = await api<Project>(`/projects/${encodeURIComponent(short)}`);
-    if (mine !== projectReads) return;
+    if (!mine()) return;
     project.value = p;
     boards.value = [...p.boards].sort((a, b) => a.position - b.position);
   } catch (err) {
-    if (mine !== projectReads) return;
+    if (!mine()) return;
     project.value = null;
-    loadError.value = err instanceof Error ? err.message : t('project.loadFailed');
+    loadError.value = messageOf(err, t('project.loadFailed'));
   } finally {
-    if (mine === projectReads) loading.value = false;
+    if (mine()) loading.value = false;
   }
 }
 
@@ -181,15 +181,12 @@ async function patchBoard(b: Board, body: Record<string, unknown>): Promise<void
 async function deleteBoard(): Promise<void> {
   const b = deletingBoard.value;
   if (!b) return;
-  clear('deleteBoard');
-  try {
+  await attempt('deleteBoard', async () => {
     await api(`/boards/${b.id}`, { method: 'DELETE' });
     boards.value = boards.value.filter((row) => row.id !== b.id);
     deletingBoard.value = null;
     await projectsStore.load(true);
-  } catch (err) {
-    fail('deleteBoard', err);
-  }
+  });
 }
 
 async function addStatus(b: Board): Promise<void> {

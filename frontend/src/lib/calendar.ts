@@ -54,6 +54,13 @@ export interface DayInfo {
   unreadOf: Record<string, number>;
 }
 
+export interface CalendarSpan {
+  marks: Mark[];
+  dues: { day: string; issues: Due[] }[];
+  activity: Activity[];
+  mentions: DayMentions[];
+}
+
 const WEEKDAYS = {
   en: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
   ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
@@ -204,3 +211,6 @@ export function byDay(
   }
   return map;
 }
+
+export const peakOf = (days: Map<string, DayInfo>): number =>
+  Math.max(1, ...[...days.values()].map((d) => d.worked));

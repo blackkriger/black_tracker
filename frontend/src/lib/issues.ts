@@ -1,5 +1,6 @@
-import { locale } from '../i18n';
+import { i18n, locale } from '../i18n';
 import { RU_MONTHS_SHORT, todayKey } from './calendar';
+import { stored } from './storage';
 
 export interface Person {
   id: string;
@@ -132,16 +133,10 @@ export type CommentOrder = 'oldest' | 'newest';
 
 export const commentOrder = {
   get(): CommentOrder {
-    try {
-      return localStorage.getItem(ORDER_KEY) === 'newest' ? 'newest' : 'oldest';
-    } catch {
-      return 'oldest';
-    }
+    return stored.get(ORDER_KEY) === 'newest' ? 'newest' : 'oldest';
   },
   set(order: CommentOrder): void {
-    try {
-      localStorage.setItem(ORDER_KEY, order);
-    } catch {}
+    stored.set(ORDER_KEY, order);
   },
 };
 
@@ -150,17 +145,11 @@ export type CardOrder = 'manual' | 'priority' | 'due';
 
 export const cardOrder = {
   get(boardId: string): CardOrder {
-    try {
-      const kept = localStorage.getItem(CARD_ORDER_KEY + boardId);
-      return kept === 'priority' || kept === 'due' ? kept : 'manual';
-    } catch {
-      return 'manual';
-    }
+    const kept = stored.get(CARD_ORDER_KEY + boardId);
+    return kept === 'priority' || kept === 'due' ? kept : 'manual';
   },
   set(boardId: string, order: CardOrder): void {
-    try {
-      localStorage.setItem(CARD_ORDER_KEY + boardId, order);
-    } catch {}
+    stored.set(CARD_ORDER_KEY + boardId, order);
   },
 };
 
@@ -174,6 +163,12 @@ export const priorityColor = (p: Priority): string =>
 
 export const priorityClass = (p: Priority): string =>
   ({ Critical: 'p4', Major: 'p3', Normal: 'p2', Minor: 'p1' })[p];
+
+export const priorityChoice = (p: Priority): { value: Priority; label: string; color: string } => ({
+  value: p,
+  label: i18n.global.t(`priority.${p}`),
+  color: priorityColor(p),
+});
 
 const ruShort = (d: Date, withYear: boolean): string =>
   `${String(d.getDate()).padStart(2, '0')} ${RU_MONTHS_SHORT[d.getMonth()].toUpperCase()}${withYear ? ` ${d.getFullYear()}` : ''}`;

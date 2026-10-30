@@ -9,6 +9,12 @@ export interface Person {
   gender: 'm' | 'f' | null;
 }
 
+export const personChoice = (p: Person, value: string): { value: string; label: string; color: string | null } => ({
+  value,
+  label: p.fullName || p.login,
+  color: p.roleColor,
+});
+
 const people = ref<Person[]>([]);
 const loaded = ref(false);
 const read = latestRead<Person[]>('/people', (rows) => {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ChevronDown } from 'lucide-vue-next';
+import { toggled } from '../lib/lists';
 import { ink } from '../lib/theme';
 import { useI18n } from 'vue-i18n';
 
@@ -24,12 +25,7 @@ const summary = computed(() => {
 const root = ref<HTMLElement | null>(null);
 
 function toggle(value: string): void {
-  emit(
-    'update:modelValue',
-    props.modelValue.includes(value)
-      ? props.modelValue.filter((v) => v !== value)
-      : [...props.modelValue, value]
-  );
+  emit('update:modelValue', toggled(props.modelValue, value));
 }
 
 function onOutside(ev: PointerEvent): void {

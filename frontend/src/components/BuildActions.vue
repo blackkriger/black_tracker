@@ -3,7 +3,8 @@ import { nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Link, Upload } from 'lucide-vue-next';
 import Dialog from './Dialog.vue';
-import { ApiError, api } from '../lib/api';
+import Segmented from './Segmented.vue';
+import { ApiError, api, latest } from '../lib/api';
 import {
   MAX_BUILD_BYTES,
   PLATFORMS,
@@ -64,7 +65,7 @@ const driveBusy = ref(false);
 const driveError = ref<string | null>(null);
 const driveInput = ref<HTMLInputElement | null>(null);
 let naming: ReturnType<typeof setTimeout> | null = null;
-let names = 0;
+const names = latest();
 
 async function openDrive(): Promise<void> {
   drivePlatform.value = viewerPlatform();
@@ -88,7 +89,7 @@ function chooseDrive(platform: Platform): void {
 watch(driveUrl, (raw) => {
   if (naming) clearTimeout(naming);
   const url = raw.trim();
-  const mine = ++names;
+  const mine = names();
   if (!url || driveChosen.value) return;
   naming = setTimeout(async () => {
     try {
@@ -97,7 +98,7 @@ watch(driveUrl, (raw) => {
         body: { url },
       });
       const guess = platformOfName(name);
-      if (mine === names && guess && !driveChosen.value) drivePlatform.value = guess;
+      if (mine() && guess && !driveChosen.value) drivePlatform.value = guess;
     } catch {}
   }, 400);
 });
@@ -149,12 +150,7 @@ async function addDrive(): Promise<void> {
 
     <Dialog v-if="picked" :title="t('builds.upload')" :width="460" @close="picked = null">
       <p class="bacts__file">{{ picked.name }}</p>
-      <div class="seg" role="radiogroup" :aria-label="t('builds.platform')">
-        <label v-for="p in PLATFORMS" :key="p.value" class="seg__i" :class="{ 'is-on': pickedPlatform === p.value }">
-          <input v-model="pickedPlatform" class="sr" type="radio" name="build-platform" :value="p.value" />
-          {{ p.label }}
-        </label>
-      </div>
+      <Segmented v-model="pickedPlatform" :label="t('builds.platform')" name="build-platform" :options="PLATFORMS" />
       <template #footer>
         <button class="btn" type="button" @click="picked = null">{{ t('common.cancel') }}</button>
         <button class="btn btn--primary" type="button" @click="upload">{{ t('builds.upload') }}</button>
@@ -171,19 +167,13 @@ async function addDrive(): Promise<void> {
         :aria-label="t('builds.driveLink')"
         @keydown.enter.prevent="addDrive"
       />
-      <div class="seg" role="radiogroup" :aria-label="t('builds.platform')">
-        <label v-for="p in PLATFORMS" :key="p.value" class="seg__i" :class="{ 'is-on': drivePlatform === p.value }">
-          <input
-            class="sr"
-            type="radio"
-            name="drive-platform"
-            :value="p.value"
-            :checked="drivePlatform === p.value"
-            @change="chooseDrive(p.value)"
-          />
-          {{ p.label }}
-        </label>
-      </div>
+      <Segmented
+        :model-value="drivePlatform"
+        :label="t('builds.platform')"
+        name="drive-platform"
+        :options="PLATFORMS"
+        @update:model-value="chooseDrive"
+      />
       <div v-if="driveError" class="err">{{ driveError }}</div>
       <template #footer>
         <button class="btn" type="button" @click="closeDrive">{{ t('common.cancel') }}</button>

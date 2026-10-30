@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import { createI18n } from 'vue-i18n';
 import en from './en';
 import ru from './ru';
+import { stored } from '../lib/storage';
 
 export type Locale = 'en' | 'ru';
 export type LangChoice = 'system' | Locale;
@@ -14,10 +15,8 @@ export function browserLocale(): Locale {
 }
 
 function remembered(): Locale {
-  try {
-    const saved = localStorage.getItem(KEY);
-    if (saved === 'en' || saved === 'ru') return saved;
-  } catch {}
+  const saved = stored.get(KEY);
+  if (saved === 'en' || saved === 'ru') return saved;
   return browserLocale();
 }
 
@@ -44,9 +43,7 @@ export const locale = computed(() => i18n.global.locale.value as Locale);
 export function applyLocale(next: Locale): void {
   i18n.global.locale.value = next;
   document.documentElement.lang = next;
-  try {
-    localStorage.setItem(KEY, next);
-  } catch {}
+  stored.set(KEY, next);
 }
 
 document.documentElement.lang = i18n.global.locale.value;

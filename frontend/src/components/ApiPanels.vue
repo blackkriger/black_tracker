@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Check, X } from 'lucide-vue-next';
 import { api } from '../lib/api';
+import { copyText } from '../lib/clipboard';
 import { useLive } from '../lib/live';
 import { features } from '../lib/features';
 import { stamp } from '../lib/issues';
@@ -65,12 +66,7 @@ async function revoke(): Promise<void> {
 
 async function copyToken(): Promise<void> {
   if (!freshToken.value) return;
-  try {
-    await navigator.clipboard.writeText(freshToken.value);
-    copied.value = true;
-  } catch {
-    copied.value = false;
-  }
+  copied.value = await copyText(freshToken.value);
 }
 
 const BASE = `${window.location.origin}/api`;

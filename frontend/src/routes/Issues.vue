@@ -5,10 +5,11 @@ import { useI18n } from 'vue-i18n';
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-vue-next';
 import BuildsPanel from '../components/BuildsPanel.vue';
 import FilterBar from '../components/FilterBar.vue';
-import { IssueView } from '../lib/issueView';
-import { api } from '../lib/api';
+import Segmented from '../components/Segmented.vue';
+import { IssueView, useIssueOverlay } from '../lib/issueView';
+import { api, latest } from '../lib/api';
 import { useBoards, type BoardFull } from '../lib/boards';
-import { filtersOf, filtersQuery, noFilters, remember, sameQuery, type Filters } from '../lib/filters';
+import { filtersOf, filtersQuery, noFilters, remember, useQuerySync, type Filters } from '../lib/filters';
 import { PRIORITIES, dueLabel, priorityClass, type Issue, type IssueTag } from '../lib/issues';
 import { small, tiny } from '../lib/layout';
 import { settled, useLive } from '../lib/live';
@@ -34,7 +35,7 @@ const router = useRouter();
 const { projects, load: loadProjects } = useProjects();
 const { nameOf, colorOf, load: loadPeople } = usePeople();
 const { tags, load: loadTags } = useTags();
-const { boardOf, forget } = useBoards();
+const { forget } = useBoards();
 const { errors, fail, clear } = usePanelErrors();
 
 const filters = ref<Filters>(filtersOf(route.query));
@@ -42,6 +43,10 @@ const q = ref('');
 const typed = ref('');
 const closed = ref(false);
 const sort = ref('');
+const SHOWN_CHOICES = computed(() => [
+  { value: false, label: t('issues.open') },
+  { value: true, label: t('issues.all') },
+]);
 
 function fromQuery(): void {
   const query = route.query;
@@ -61,53 +66,39 @@ function toQuery(): Record<string, string> {
 }
 
 fromQuery();
+const syncUrl = useQuerySync('issues', toQuery, fromQuery);
 
-let typing: ReturnType<typeof setTimeout> | null = null;
-watch(typed, (text) => {
-  if (typing) clearTimeout(typing);
-  typing = setTimeout(() => (q.value = text.trim()), 250);
-});
+watch(typed, settled(() => (q.value = typed.value.trim()), 250));
 
 const rows = ref<Row[]>([]);
 const loading = ref(true);
 const skBody = ref<HTMLElement | null>(null);
 const skRows = ref(6);
-let reads = 0;
+const reads = latest();
 
 async function load(): Promise<void> {
-  const mine = ++reads;
+  const mine = reads();
   clear('list');
   const query = new URLSearchParams(toQuery());
   query.delete('sort');
   try {
     const got = await api<Row[]>(`/issues?${query}`);
-    if (mine !== reads) return;
+    if (!mine()) return;
     rows.value = got;
   } catch (err) {
-    if (mine === reads) fail('list', err);
+    if (mine()) fail('list', err);
   } finally {
-    if (mine === reads) loading.value = false;
+    if (mine()) loading.value = false;
   }
 }
 
 watch(
   [filters, q, closed, sort],
   () => {
-    const next = toQuery();
     remember(filters.value, noFilters());
-    if (!sameQuery(next, route.query as Record<string, unknown>)) {
-      void router.replace({ name: 'issues', params: route.params, query: next });
-    }
+    syncUrl();
   },
   { deep: true }
-);
-
-watch(
-  () => route.query,
-  () => {
-    if (route.name !== 'issues') return;
-    if (!sameQuery(toQuery(), route.query as Record<string, unknown>)) fromQuery();
-  }
 );
 
 watch([filters, q, closed], () => void load(), {
@@ -155,7 +146,7 @@ const sorted = computed(() => {
 });
 
 const openKey = computed(() => (route.name === 'issues' && route.params.key ? String(route.params.key) : null));
-const open = ref<{ key: string; project: string; board: BoardFull } | null>(null);
+const { open, byKey } = useIssueOverlay();
 
 async function showIssue(key: string | null): Promise<void> {
   if (!key) {
@@ -163,16 +154,8 @@ async function showIssue(key: string | null): Promise<void> {
     return;
   }
   try {
-    let row = rows.value.find((r) => r.key === key);
-    let boardId = row?.boardId;
-    let project = row?.projectShort;
-    if (!boardId) {
-      const got = await api<Issue>(`/issues/${encodeURIComponent(key)}`);
-      boardId = got.boardId;
-      project = projects.value.find((p) => p.id === got.projectId)?.shortName;
-    }
-    forget(boardId);
-    open.value = { key, project: project ?? '', board: await boardOf(boardId) };
+    const row = rows.value.find((r) => r.key === key);
+    open.value = await byKey(key, row && { boardId: row.boardId, project: row.projectShort });
   } catch (err) {
     fail('list', err);
   }
@@ -209,10 +192,7 @@ useLive(
 
 onMounted(() => {
   remember(filters.value, noFilters());
-  const next = toQuery();
-  if (!sameQuery(next, route.query as Record<string, unknown>)) {
-    void router.replace({ name: 'issues', params: route.params, query: next });
-  }
+  syncUrl();
   void loadProjects();
   void loadPeople();
   void loadTags();
@@ -250,16 +230,7 @@ onMounted(() => {
                   :aria-label="t('issues.searchLabel')"
                 />
               </span>
-              <div class="seg" role="radiogroup" :aria-label="t('issues.shown')">
-                <label class="seg__i" :class="{ 'is-on': !closed }">
-                  <input v-model="closed" class="sr" type="radio" name="issues-shown" :value="false" />
-                  {{ t('issues.open') }}
-                </label>
-                <label class="seg__i" :class="{ 'is-on': closed }">
-                  <input v-model="closed" class="sr" type="radio" name="issues-shown" :value="true" />
-                  {{ t('issues.all') }}
-                </label>
-              </div>
+              <Segmented v-model="closed" :label="t('issues.shown')" name="issues-shown" :options="SHOWN_CHOICES" />
             </div>
             <FilterBar v-model="filters" :dirty="!!q || closed" @clear="clearOwn" />
           </div>

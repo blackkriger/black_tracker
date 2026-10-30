@@ -7,9 +7,10 @@ import BuildsPanel from '../components/BuildsPanel.vue';
 import Dialog from '../components/Dialog.vue';
 import FilterBar from '../components/FilterBar.vue';
 import FilterMenu from '../components/FilterMenu.vue';
-import { IssueView } from '../lib/issueView';
-import { api } from '../lib/api';
-import { useBoards, type BoardFull } from '../lib/boards';
+import Segmented from '../components/Segmented.vue';
+import { IssueView, useIssueOverlay } from '../lib/issueView';
+import { api, latest } from '../lib/api';
+import type { BoardFull } from '../lib/boards';
 import {
   COMMIT_FILTERS,
   commitQuery,
@@ -18,12 +19,13 @@ import {
   noFilters,
   remember,
   rememberedFilters,
-  sameQuery,
+  useQuerySync,
   type Filters,
 } from '../lib/filters';
-import { stampAt, type Issue, type IssueLink, type IssueTag } from '../lib/issues';
+import { stampAt, type IssueTag } from '../lib/issues';
+import { useIssueSearch } from '../lib/issueKeys';
 import { settled, useLive } from '../lib/live';
-import { usePanelErrors } from '../lib/panelErrors';
+import { messageOf, usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
 import { useTags } from '../lib/tags';
@@ -59,11 +61,10 @@ type Linked = '' | 'yes' | 'no';
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
-const { projects, load: loadProjects } = useProjects();
+const { load: loadProjects } = useProjects();
 const { nameOf, colorOf, load: loadPeople } = usePeople();
 const { errors, fail, clear } = usePanelErrors();
 const { tags, load: loadTags } = useTags();
-const { boardOf, forget } = useBoards();
 
 const listOf = (v: unknown): string[] => String(v ?? '').split(',').filter(Boolean);
 
@@ -73,6 +74,11 @@ const filters = ref<Filters>(noFilters());
 const committers = ref<string[]>([]);
 const branches = ref<string[]>([]);
 const linked = ref<Linked>('');
+const LINKED_CHOICES = computed<{ value: Linked; label: string }[]>(() => [
+  { value: '', label: t('commits.all') },
+  { value: 'yes', label: t('commits.linked') },
+  { value: 'no', label: t('commits.unlinked') },
+]);
 
 function sharedOf(query: LocationQuery): Filters {
   const kept = rememberedFilters(noFilters());
@@ -108,34 +114,31 @@ function apiQuery(): URLSearchParams {
 }
 
 fromQuery();
+const syncUrl = useQuerySync('commits', toQuery, fromQuery);
 
-let typing: ReturnType<typeof setTimeout> | null = null;
-watch(typed, (text) => {
-  if (typing) clearTimeout(typing);
-  typing = setTimeout(() => (q.value = text.trim()), 250);
-});
+watch(typed, settled(() => (q.value = typed.value.trim()), 250));
 
 const rows = ref<Row[]>([]);
 const total = ref(0);
 const loading = ref(true);
 const more = ref(false);
-let reads = 0;
+const reads = latest();
 
 async function load(append = false): Promise<void> {
-  const mine = ++reads;
+  const mine = reads();
   clear('list');
   const query = apiQuery();
   if (append) query.set('offset', String(rows.value.length));
   if (append) more.value = true;
   try {
     const got = await api<{ total: number; commits: Row[] }>(`/commits?${query}`);
-    if (mine !== reads) return;
+    if (!mine()) return;
     total.value = got.total;
     rows.value = append ? [...rows.value, ...got.commits] : got.commits;
   } catch (err) {
-    if (mine === reads) fail('list', err, t('commits.loadFailed'));
+    if (mine()) fail('list', err, t('commits.loadFailed'));
   } finally {
-    if (mine === reads) {
+    if (mine()) {
       loading.value = false;
       more.value = false;
     }
@@ -171,25 +174,14 @@ watch(
   [filters, q, committers, branches, linked],
   () => {
     remember(filters.value, noFilters());
-    const next = toQuery();
-    if (!sameQuery(next, route.query as Record<string, unknown>)) {
-      void router.replace({ name: 'commits', params: route.params, query: next });
-    }
+    syncUrl();
     void load();
   },
   { deep: true }
 );
 
-watch(
-  () => route.query,
-  () => {
-    if (route.name !== 'commits') return;
-    if (!sameQuery(toQuery(), route.query as Record<string, unknown>)) fromQuery();
-  }
-);
-
 const openKey = computed(() => (route.name === 'commits' && route.params.key ? String(route.params.key) : null));
-const open = ref<{ key: string; project: string; board: BoardFull } | null>(null);
+const { open, boards: openBoards, byKey } = useIssueOverlay();
 
 async function showIssue(key: string | null): Promise<void> {
   if (!key) {
@@ -197,20 +189,13 @@ async function showIssue(key: string | null): Promise<void> {
     return;
   }
   try {
-    const got = await api<Issue>(`/issues/${encodeURIComponent(key)}`);
-    forget(got.boardId);
-    open.value = {
-      key,
-      project: projects.value.find((p) => p.id === got.projectId)?.shortName ?? '',
-      board: await boardOf(got.boardId),
-    };
+    open.value = await byKey(key);
   } catch (err) {
     fail('list', err);
   }
 }
 watch(openKey, (key) => void showIssue(key));
 
-const boardsOf = (short: string) => projects.value.find((p) => p.shortName === short)?.boards ?? [];
 const tagsOf = (board: BoardFull): IssueTag[] => tags.value.filter((t) => board.tagIds.includes(t.id));
 
 function closeIssue(): void {
@@ -241,12 +226,11 @@ const authorOf = (r: Row): string => (r.by ? nameOf(r.by) : r.author);
 
 const acting = ref<Row | null>(null);
 const findQuery = ref('');
-const found = ref<IssueLink[]>([]);
-const finding = ref(false);
+const { results: found, searching: finding } = useIssueSearch(findQuery, {
+  taken: () => acting.value?.issues.map((i) => i.id),
+});
 const actBusy = ref(false);
 const actError = ref<string | null>(null);
-let findTimer: ReturnType<typeof setTimeout> | null = null;
-let finds = 0;
 
 function openActions(r: Row): void {
   acting.value = r;
@@ -254,31 +238,6 @@ function openActions(r: Row): void {
   found.value = [];
   actError.value = null;
 }
-
-watch(findQuery, (term) => {
-  if (findTimer) clearTimeout(findTimer);
-  const text = term.trim();
-  if (!text) {
-    ++finds;
-    finding.value = false;
-    found.value = [];
-    return;
-  }
-  findTimer = setTimeout(async () => {
-    const mine = ++finds;
-    finding.value = true;
-    try {
-      const got = await api<IssueLink[]>(`/issues/search?q=${encodeURIComponent(text)}`);
-      if (mine !== finds) return;
-      const already = new Set(acting.value?.issues.map((i) => i.id));
-      found.value = got.filter((r) => !already.has(r.id));
-    } catch {
-      if (mine === finds) found.value = [];
-    } finally {
-      if (mine === finds) finding.value = false;
-    }
-  }, 200);
-});
 
 async function act(path: 'link' | 'unlink', body: Record<string, string>): Promise<void> {
   const row = acting.value;
@@ -290,7 +249,7 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
     acting.value = null;
     await load();
   } catch (err) {
-    actError.value = err instanceof Error ? err.message : t('commits.changeFailed');
+    actError.value = messageOf(err, t('commits.changeFailed'));
   } finally {
     actBusy.value = false;
   }
@@ -320,20 +279,7 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
                   :aria-label="t('commits.searchLabel')"
                 />
               </span>
-              <div class="seg" role="radiogroup" :aria-label="t('commits.shown')">
-                <label class="seg__i" :class="{ 'is-on': linked === '' }">
-                  <input v-model="linked" class="sr" type="radio" name="commits-linked" value="" />
-                  {{ t('commits.all') }}
-                </label>
-                <label class="seg__i" :class="{ 'is-on': linked === 'yes' }">
-                  <input v-model="linked" class="sr" type="radio" name="commits-linked" value="yes" />
-                  {{ t('commits.linked') }}
-                </label>
-                <label class="seg__i" :class="{ 'is-on': linked === 'no' }">
-                  <input v-model="linked" class="sr" type="radio" name="commits-linked" value="no" />
-                  {{ t('commits.unlinked') }}
-                </label>
-              </div>
+              <Segmented v-model="linked" :label="t('commits.shown')" name="commits-linked" :options="LINKED_CHOICES" />
             </div>
             <FilterBar v-model="filters" :menus="['projects']" :dirty="ownDirty" @clear="clearOwn">
               <FilterMenu v-model="committers" :label="t('commits.author')" :options="authorChoices" />
@@ -451,7 +397,7 @@ async function act(path: 'link' | 'unlink', body: Record<string, string>): Promi
       :key="open.key"
       :issue-key="open.key"
       :board="open.board"
-      :boards="boardsOf(open.project)"
+      :boards="openBoards"
       :tags="tagsOf(open.board)"
       :project="open.project"
       @close="closeIssue"

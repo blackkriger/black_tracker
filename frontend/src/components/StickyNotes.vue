@@ -21,7 +21,7 @@ interface Note {
 const COLORS: NoteColor[] = ['amber', 'blue', 'green', 'pink', 'red'];
 
 const { t } = useI18n();
-const { errors, fail, clear } = usePanelErrors();
+const { errors, fail, clear, attempt } = usePanelErrors();
 
 const notes = ref<Note[]>([]);
 const loading = ref(true);
@@ -36,12 +36,9 @@ const saves = new Map<string, number>();
 let resizing: { note: Note; el: HTMLElement; width: number; height: number } | null = null;
 
 async function patch(note: Note, body: Partial<Pick<Note, 'body' | 'color' | 'width' | 'height'>>): Promise<void> {
-  clear('notes');
-  try {
+  await attempt('notes', async () => {
     await api(`/me/notes/${note.id}`, { method: 'PATCH', body });
-  } catch (err) {
-    fail('notes', err, t('me.noteSaveFailed'));
-  }
+  }, t('me.noteSaveFailed'));
 }
 
 async function ensureOne(): Promise<void> {

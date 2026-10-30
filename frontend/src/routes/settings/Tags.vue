@@ -20,7 +20,7 @@ const { projects, load: loadProjects } = useProjects();
 
 const tags = ref<Tag[]>([]);
 const loading = ref(true);
-const { errors, fail, clear } = usePanelErrors();
+const { errors, fail, clear, attempt } = usePanelErrors();
 
 const byName = (a: TagItem, b: TagItem) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 
@@ -52,23 +52,17 @@ onMounted(async () => {
 });
 
 async function add(name: string): Promise<void> {
-  clear('tags');
-  try {
+  await attempt('tags', async () => {
     const created = await api<Tag>('/tags', { method: 'POST', body: { name } });
     tags.value = [...tags.value, created].sort(byName);
-  } catch (err) {
-    fail('tags', err);
-  }
+  });
 }
 
 async function rename(tag: TagItem, name: string): Promise<void> {
-  clear('tags');
-  try {
+  await attempt('tags', async () => {
     const updated = await api<Tag>(`/tags/${tag.id}`, { method: 'PATCH', body: { name } });
     tags.value = tags.value.map((row) => (row.id === tag.id ? updated : row)).sort(byName);
-  } catch (err) {
-    fail('tags', err);
-  }
+  });
 }
 
 const picking = ref<{ tag: TagItem; anchor: HTMLElement } | null>(null);
@@ -81,23 +75,17 @@ async function applyColor(color: string): Promise<void> {
   const p = picking.value;
   picking.value = null;
   if (!p || color === p.tag.color) return;
-  clear('tags');
-  try {
+  await attempt('tags', async () => {
     const updated = await api<Tag>(`/tags/${p.tag.id}`, { method: 'PATCH', body: { color } });
     tags.value = tags.value.map((row) => (row.id === p.tag.id ? updated : row));
-  } catch (err) {
-    fail('tags', err);
-  }
+  });
 }
 
 async function remove(tag: TagItem): Promise<void> {
-  clear('tags');
-  try {
+  await attempt('tags', async () => {
     await api(`/tags/${tag.id}`, { method: 'DELETE' });
     tags.value = tags.value.filter((row) => row.id !== tag.id);
-  } catch (err) {
-    fail('tags', err);
-  }
+  });
 }
 
 function setOnBoard(tagId: string, boardId: string, on: boolean): void {

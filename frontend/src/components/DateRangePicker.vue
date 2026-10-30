@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { CalendarDays } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
-import { monthName, shortDate as fmt, spanLabel, weekdayNames } from '../lib/calendar';
+import { dayKey, monthName, pad2, shortDate as fmt, spanLabel, todayKey, weekdayNames } from '../lib/calendar';
 
 const props = withDefaults(defineProps<{ from?: string; to?: string }>(), { from: '', to: '' });
 const emit = defineEmits<{
@@ -12,17 +12,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const MONTHS_BACK = 23;
 const MONTHS_AHEAD = 12;
-
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
-}
-function ymdOf(y: number, m0: number, d: number): string {
-  return `${y}-${pad(m0 + 1)}-${pad(d)}`;
-}
-function todayYmd(): string {
-  const now = new Date();
-  return ymdOf(now.getFullYear(), now.getMonth(), now.getDate());
-}
 
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
@@ -99,8 +88,8 @@ const months = computed(() => {
     const daysIn = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
     const cells: ({ day: number; ymd: string } | null)[] = [];
     for (let i = 0; i < lead; i++) cells.push(null);
-    for (let d = 1; d <= daysIn; d++) cells.push({ day: d, ymd: ymdOf(y, m, d) });
-    out.push({ key: `${y}-${pad(m + 1)}`, label: monthName(y, m), cells });
+    for (let d = 1; d <= daysIn; d++) cells.push({ day: d, ymd: dayKey(y, m, d) });
+    out.push({ key: `${y}-${pad2(m + 1)}`, label: monthName(y, m), cells });
     m += 1;
     if (m > 11) {
       m = 0;
@@ -110,7 +99,7 @@ const months = computed(() => {
   return out;
 });
 
-const today = todayYmd();
+const today = todayKey();
 function inRange(ymd: string): boolean {
   const { lo, hi } = activeRange.value;
   return lo != null && hi != null && ymd >= lo && ymd <= hi;

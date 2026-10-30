@@ -1,5 +1,5 @@
-import { reactive, ref } from 'vue';
-import { api } from './api';
+import { reactive, ref, watch, type Ref } from 'vue';
+import { api, latest } from './api';
 import type { IssueLink } from './issues';
 import { ink } from './theme';
 
@@ -12,6 +12,42 @@ let timer = 0;
 export async function findKeys(keys: string[]): Promise<IssueLink[]> {
   if (!keys.length) return [];
   return api<IssueLink[]>(`/issues/keys?keys=${encodeURIComponent(keys.join(','))}`);
+}
+
+export function useIssueSearch(
+  query: Ref<string>,
+  options: { exclude?: () => string | undefined; taken?: () => string[] | undefined } = {}
+) {
+  const results = ref<IssueLink[]>([]);
+  const searching = ref(false);
+  const searches = latest();
+  let wait: ReturnType<typeof setTimeout> | null = null;
+  watch(query, (term) => {
+    if (wait) clearTimeout(wait);
+    const q = term.trim();
+    if (!q) {
+      searches();
+      searching.value = false;
+      results.value = [];
+      return;
+    }
+    wait = setTimeout(async () => {
+      const mine = searches();
+      searching.value = true;
+      try {
+        const exclude = options.exclude ? `&exclude=${options.exclude() ?? ''}` : '';
+        const rows = await api<IssueLink[]>(`/issues/search?q=${encodeURIComponent(q)}${exclude}`);
+        if (!mine()) return;
+        const taken = options.taken && new Set(options.taken());
+        results.value = taken ? rows.filter((r) => !taken.has(r.id)) : rows;
+      } catch {
+        if (mine()) results.value = [];
+      } finally {
+        if (mine()) searching.value = false;
+      }
+    }, 200);
+  });
+  return { results, searching };
 }
 
 async function ask(keys: string[]): Promise<void> {

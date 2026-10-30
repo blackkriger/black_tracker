@@ -8,22 +8,24 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IssueView, preloadIssueView } from '../lib/issueView';
 import Select from '../components/Select.vue';
-import { usePeople } from '../lib/people';
-import { api } from '../lib/api';
+import { personChoice, usePeople } from '../lib/people';
+import { api, latest } from '../lib/api';
 import {
   PRIORITIES,
   cardOrder,
   dueLabel,
+  priorityChoice,
   priorityClass,
-  priorityColor,
   type CardOrder,
   type Issue,
 } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
-import { settled, useLive } from '../lib/live';
+import { toggled } from '../lib/lists';
+import { settled, useFlash, useLive } from '../lib/live';
 import { Plus, Search, Star } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
 import { vSplitLine as splitLine } from '../lib/splitLine';
+import { messageOf } from '../lib/panelErrors';
 
 interface State {
   id: string;
@@ -63,8 +65,8 @@ const router = useRouter();
 const project = ref<Project | null>(null);
 const issues = ref<Issue[]>([]);
 const issuesLoading = ref(true);
-let issuesRead = 0;
-let projectRead = 0;
+const issuesRead = latest();
+const projectRead = latest();
 
 const dragId = ref<string | null>(null);
 const lifted = ref<string | null>(null);
@@ -84,14 +86,14 @@ const byTags = ref<string[]>([]);
 const starred = ref(false);
 
 const personChoices = computed(() =>
-  people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor }))
+  people.value.map((p) => personChoice(p, p.id))
 );
 const assigneeChoices = computed(() => [
   { value: 'none', label: t('fields.nobody') },
   ...personChoices.value,
 ]);
 const priorityChoices = computed(() =>
-  PRIORITIES.map((p) => ({ value: p, label: t(`priority.${p}`), color: priorityColor(p) }))
+  PRIORITIES.map(priorityChoice)
 );
 
 const filtering = computed(
@@ -116,9 +118,7 @@ function clearFilters(): void {
 }
 
 function toggleTag(id: string): void {
-  byTags.value = byTags.value.includes(id)
-    ? byTags.value.filter((t) => t !== id)
-    : [...byTags.value, id];
+  byTags.value = toggled(byTags.value, id);
 }
 
 const filtered = computed(() => {
@@ -148,23 +148,14 @@ function tagCreated(tag: Tag): void {
   if (board && !board.tagIds.includes(tag.id)) board.tagIds = [...board.tagIds, tag.id];
 }
 
-const fresh = ref<Set<string>>(new Set());
-
-function flash(issueId: string): void {
-  fresh.value = new Set(fresh.value).add(issueId);
-  setTimeout(() => {
-    const next = new Set(fresh.value);
-    next.delete(issueId);
-    fresh.value = next;
-  }, 2000);
-}
+const { fresh, flash } = useFlash();
 
 const changed = new Set<string>();
 const reloadIssues = settled(() => {
   const board = current.value;
   const ids = [...changed];
   changed.clear();
-  if (board) void loadIssues(board.id, true).then(() => ids.forEach((id) => flash(id)));
+  if (board) void loadIssues(board.id, true).then(() => ids.forEach((id) => flash([id])));
 });
 
 useLive((ev) => {
@@ -262,21 +253,21 @@ const columns = computed(() => {
 const issuesOf = (stateId: string): Issue[] => columns.value.get(stateId) ?? [];
 
 async function loadIssues(boardId: string, quiet = false): Promise<void> {
-  const mine = ++issuesRead;
+  const mine = issuesRead();
   if (!quiet) issuesLoading.value = true;
   try {
     const rows = await api<Issue[]>(`/boards/${boardId}/issues`);
-    if (mine !== issuesRead) return;
+    if (!mine()) return;
     issues.value = rows;
     error.value = null;
     failed.value = false;
   } catch (err) {
-    if (mine !== issuesRead) return;
+    if (!mine()) return;
     issues.value = [];
-    error.value = err instanceof Error ? err.message : t('board.issuesFailed');
+    error.value = messageOf(err, t('board.issuesFailed'));
     failed.value = true;
   } finally {
-    if (mine === issuesRead) issuesLoading.value = false;
+    if (mine()) issuesLoading.value = false;
   }
 }
 
@@ -344,7 +335,7 @@ async function onDrop(): Promise<void> {
   if (target.beforeId === moved.id) return;
   if (target.stateId === moved.stateId && target.beforeId === nextAfter(moved)) return;
   if (order.value !== 'manual' && target.stateId === moved.stateId) return;
-  issuesRead += 1;
+  issuesRead();
 
   // Send the whole column, not the filtered view, or hidden cards get renumbered out of place.
   const column = issues.value
@@ -361,7 +352,7 @@ async function onDrop(): Promise<void> {
       body: { issueId: moved.id, stateId: target.stateId, ids: column.map((i) => i.id) },
     });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('board.moveFailed');
+    error.value = messageOf(err, t('board.moveFailed'));
     await loadIssues(board.id);
   }
 }
@@ -431,7 +422,7 @@ watch(current, (board) => {
 });
 
 async function load(short: string, quiet = false): Promise<void> {
-  const mine = ++projectRead;
+  const mine = projectRead();
   if (!quiet) {
     loading.value = true;
     project.value = null;
@@ -444,17 +435,17 @@ async function load(short: string, quiet = false): Promise<void> {
       api<Project>(`/projects/${encodeURIComponent(short)}`),
       api<Tag[]>('/tags'),
     ]);
-    if (mine !== projectRead) return;
+    if (!mine()) return;
     project.value = loaded;
     tags.value = tagRows;
     lastProject.set(loaded.shortName);
   } catch (err) {
-    if (mine !== projectRead) return;
+    if (!mine()) return;
     project.value = null;
     tags.value = [];
-    error.value = err instanceof Error ? err.message : t('project.loadFailed');
+    error.value = messageOf(err, t('project.loadFailed'));
   } finally {
-    if (mine === projectRead) loading.value = false;
+    if (mine()) loading.value = false;
   }
 }
 

@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue';
 import { api } from './api';
 import { i18n } from '../i18n';
 import { shortDate } from './calendar';
+import { toggled } from './lists';
 import { useSession, type Me } from './session';
 
 export type NoticeKind = 'mention' | 'reaction' | 'assigned' | 'starred' | 'ping';
@@ -170,7 +171,7 @@ export function useNotices() {
     loadMore,
     unreadOf,
     toggleKind(kind: NoticeKind): Promise<void> {
-      return setOff(off.value.includes(kind) ? off.value.filter((k) => k !== kind) : [...off.value, kind]);
+      return setOff(toggled(off.value, kind));
     },
     load: refresh,
     async markRead(id?: string): Promise<void> {

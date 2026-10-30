@@ -16,7 +16,7 @@ import { browserLocale, type LangChoice } from '../i18n';
 
 const { t } = useI18n();
 const session = useSession();
-const { errors, fail, clear } = usePanelErrors();
+const { errors, fail, clear, attempt } = usePanelErrors();
 const me = session.me;
 const { off, toggleKind } = useNotices();
 
@@ -63,13 +63,10 @@ const STARS = computed<{ key: keyof Me['autoStar']; body: string; label: string 
 ]);
 
 async function setAutoStar(body: string, on: boolean): Promise<void> {
-  clear('prefs');
-  try {
+  await attempt('prefs', async () => {
     const updated = await api<Me>('/me', { method: 'PATCH', body: { [body]: on } });
     me.value = { ...(me.value as Me), ...updated };
-  } catch (err) {
-    fail('prefs', err);
-  }
+  });
 }
 </script>
 

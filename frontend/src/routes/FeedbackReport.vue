@@ -6,10 +6,11 @@ import { ChevronDown, ChevronRight, Download } from 'lucide-vue-next';
 import DateRangePicker from '../components/DateRangePicker.vue';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import Select from '../components/Select.vue';
-import { api } from '../lib/api';
+import { api, latest } from '../lib/api';
 import { feedbackForm, type FeedbackItem, type RawSection, type Words } from '../lib/feedback';
 import { locale } from '../i18n';
 import { stampAt } from '../lib/issues';
+import { toggled } from '../lib/lists';
 import { settled, useLive } from '../lib/live';
 import { usePanelErrors } from '../lib/panelErrors';
 import { ridgeShape } from '../lib/ridge';
@@ -64,19 +65,19 @@ function pick(part: Partial<{ form: string; from: string; to: string }>): void {
 
 const loading = ref(true);
 const report = ref<Report | null>(null);
-let reads = 0;
+const reads = latest();
 
 async function load(): Promise<void> {
   clear('report');
-  const mine = ++reads;
+  const mine = reads();
   try {
     const query = new URLSearchParams(Object.entries(asked.value).filter(([, v]) => v)).toString();
     const got = await api<Report | null>(`/feedback/report${query ? `?${query}` : ''}`);
-    if (mine === reads) report.value = got;
+    if (mine()) report.value = got;
   } catch (err) {
-    if (mine === reads) fail('report', err, t('report.readFailed'));
+    if (mine()) fail('report', err, t('report.readFailed'));
   } finally {
-    if (mine === reads) loading.value = false;
+    if (mine()) loading.value = false;
   }
 }
 
@@ -289,7 +290,7 @@ function answerText(it: FeedbackItem, value: unknown): string {
 
 const opened = ref<string[]>([]);
 const toggle = (id: string): void => {
-  opened.value = opened.value.includes(id) ? opened.value.filter((x) => x !== id) : [...opened.value, id];
+  opened.value = toggled(opened.value, id);
 };
 const answersOf = (r: Answer) =>
   items.value

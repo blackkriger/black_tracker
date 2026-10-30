@@ -52,10 +52,13 @@ export function isBlank(html: string): boolean {
   return !/<img\b/i.test(cleaned) && cleaned.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() === '';
 }
 
+export const escapeHtml = (text: string): string =>
+  text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
+
 export function fromPlain(text: string): string {
   return text
     .split(/\n{2,}/)
-    .map((block) => `<p>${block.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c] as string).replace(/\n/g, '<br>')}</p>`)
+    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
     .join('');
 }
 

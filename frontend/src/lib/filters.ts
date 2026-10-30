@@ -1,5 +1,6 @@
-import { ref } from 'vue';
-import type { LocationQuery } from 'vue-router';
+import { ref, watch } from 'vue';
+import { useRoute, useRouter, type LocationQuery } from 'vue-router';
+import { stored } from './storage';
 
 export interface Filters {
   projects: string[];
@@ -78,9 +79,7 @@ export function remember(f: Filters, base: Filters): void {
     tags: f.tags,
     period: picked ? { from: f.from, to: f.to } : null,
   };
-  try {
-    localStorage.setItem(KEPT, JSON.stringify(remembered.value));
-  } catch {}
+  stored.set(KEPT, JSON.stringify(remembered.value));
 }
 
 export function rememberedFilters(base: Filters): Filters {
@@ -132,3 +131,21 @@ export const commitQuery = (query: Record<string, string>): Record<string, strin
 
 export const sameQuery = (a: Record<string, unknown>, b: Record<string, unknown>): boolean =>
   JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+
+export function useQuerySync(name: string, toQuery: () => Record<string, string>, fromQuery: () => void): () => void {
+  const route = useRoute();
+  const router = useRouter();
+  watch(
+    () => route.query,
+    () => {
+      if (route.name !== name) return;
+      if (!sameQuery(toQuery(), route.query as Record<string, unknown>)) fromQuery();
+    }
+  );
+  return () => {
+    const next = toQuery();
+    if (!sameQuery(next, route.query as Record<string, unknown>)) {
+      void router.replace({ name, params: route.params, query: next });
+    }
+  };
+}

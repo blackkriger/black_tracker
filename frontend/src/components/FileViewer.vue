@@ -6,6 +6,7 @@ import DOMPurify from '../lib/purify';
 import { api } from '../lib/api';
 import { langOf, setWrapLines, wrapLines as wrapped } from '../lib/files';
 import { shownTheme } from '../lib/theme';
+import { messageOf } from '../lib/panelErrors';
 
 const { t } = useI18n();
 const props = defineProps<{ file: { id: string; name: string } | null }>();
@@ -151,7 +152,7 @@ async function read(): Promise<void> {
     truncated.value = got.truncated;
     await paint();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('files.readFailed');
+    error.value = messageOf(err, t('files.readFailed'));
   } finally {
     loading.value = false;
   }

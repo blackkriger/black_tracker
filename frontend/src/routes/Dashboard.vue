@@ -13,11 +13,11 @@ import {
   Smile,
   Star,
 } from 'lucide-vue-next';
-import { IssueView } from '../lib/issueView';
+import { IssueView, useIssueOverlay } from '../lib/issueView';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import StickyNotes from '../components/StickyNotes.vue';
-import { api, latestRead } from '../lib/api';
+import { api, latest, latestRead } from '../lib/api';
 import {
   byDay,
   dayAndMonth,
@@ -25,14 +25,15 @@ import {
   dayKey,
   daysInMonth,
   monthName,
+  peakOf,
   spanLabel,
   type Activity,
+  type CalendarSpan,
   type DayInfo,
   type DayMentions,
   type Due,
   type Mark,
 } from '../lib/calendar';
-import type { IssueTag } from '../lib/issues';
 import { priorityColor, stampAt, type Priority } from '../lib/issues';
 import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
@@ -49,8 +50,8 @@ const route = useRoute();
 const router = useRouter();
 const session = useSession();
 const { nameOf, colorOf, genderOf, load: loadPeople } = usePeople();
-const { projects, load: loadProjects } = useProjects();
-const { errors, fail, clear } = usePanelErrors();
+const { load: loadProjects } = useProjects();
+const { errors, fail, clear, attempt } = usePanelErrors();
 const { ask } = useFocus();
 const { off, markRead, toggleKind } = useNotices();
 
@@ -116,18 +117,18 @@ const pickedDays = computed(() =>
   dragging.value ? ordered(dragging.value.start, dragging.value.end) : feedDays.value
 );
 
-let feedReads = 0;
+const feedReads = latest();
 
 async function loadFeed(): Promise<void> {
-  const mine = ++feedReads;
+  const mine = feedReads();
   const { from, to } = feedDays.value;
   try {
     const got = await api<Notice[]>(`/notices?from=${from}&to=${to}`);
-    if (mine === feedReads) feed.value = got;
+    if (mine()) feed.value = got;
   } catch {
-    if (mine === feedReads) feed.value = [];
+    if (mine()) feed.value = [];
   } finally {
-    if (mine === feedReads) feedLoaded.value = true;
+    if (mine()) feedLoaded.value = true;
   }
 }
 
@@ -192,14 +193,14 @@ const mentions = ref<DayMentions[]>([]);
 const days = computed<Map<string, DayInfo>>(() =>
   byDay(marks.value, dues.value, activity.value, mentions.value)
 );
-const peak = computed(() => Math.max(1, ...[...days.value.values()].map((d) => d.worked)));
+const peak = computed(() => peakOf(days.value));
 const yearMarks = computed(() => [...marks.value].sort((a, b) => a.day.localeCompare(b.day)));
 
-let reads = 0;
+const reads = latest();
 
 async function load(): Promise<void> {
   clear('month');
-  const mine = ++reads;
+  const mine = reads();
   const first = shownMonths.value[0];
   const last = shownMonths.value[shownMonths.value.length - 1];
   const from = dayKey(first.year, first.month, 1);
@@ -207,13 +208,8 @@ async function load(): Promise<void> {
   const login = session.me.value?.login;
   const user = login ? `&user=${encodeURIComponent(login)}` : '';
   try {
-    const got = await api<{
-      marks: Mark[];
-      dues: { day: string; issues: Due[] }[];
-      activity: Activity[];
-      mentions: DayMentions[];
-    }>(`/calendar?from=${from}&to=${to}${user}`);
-    if (mine !== reads) return;
+    const got = await api<CalendarSpan>(`/calendar?from=${from}&to=${to}${user}`);
+    if (!mine()) return;
     marks.value = got.marks;
     dues.value = got.dues;
     activity.value = got.activity;
@@ -295,44 +291,19 @@ function openDay(key: string): void {
   picked.value = key;
 }
 
-interface OpenIssue {
-  key: string;
-  project: string;
-  comment?: string;
-  board: {
-    id: string;
-    name: string;
-    states: { id: string; name: string; color: string }[];
-    tagIds: string[];
-  };
-}
-const open = ref<OpenIssue | null>(null);
+const { open, tags: openTags, boards: openBoards, boardAt, withTags } = useIssueOverlay();
 const lookAt = ref<string | undefined>(undefined);
-const openTags = ref<IssueTag[]>([]);
-const openBoards = computed(
-  () => projects.value.find((p) => p.shortName === open.value?.project)?.boards ?? []
-);
 
 async function openNotice(n: Notice): Promise<void> {
   if (!n.read) {
     await markRead(n.id);
     feed.value = feed.value.map((f) => (f.id === n.id ? { ...f, read: true } : f));
   }
-  const board = projects.value
-    .find((p) => p.shortName === n.projectShort)
-    ?.boards.find((b) => b.slug === n.boardSlug);
+  const board = boardAt(n.projectShort, n.boardSlug);
   if (!board) return;
   lookAt.value = n.commentId ?? undefined;
   ask(n.commentId);
-  await openIssue({
-    key: n.key,
-    summary: '',
-    projectShort: n.projectShort,
-    boardId: board.id,
-    boardSlug: n.boardSlug,
-    color: '',
-    done: false,
-  });
+  await openIssue({ key: n.key, projectShort: n.projectShort, boardId: board.id });
 }
 
 async function openFromDay(where: {
@@ -341,38 +312,21 @@ async function openFromDay(where: {
   boardSlug: string;
   comment?: string;
 }): Promise<void> {
-  const board = projects.value
-    .find((p) => p.shortName === where.projectShort)
-    ?.boards.find((b) => b.slug === where.boardSlug);
+  const board = boardAt(where.projectShort, where.boardSlug);
   if (!board) return;
   if (where.comment) ask(where.comment);
   picked.value = null;
-  await openIssue({
-    key: where.key,
-    summary: '',
-    projectShort: where.projectShort,
-    boardId: board.id,
-    boardSlug: where.boardSlug,
-    color: '',
-    done: false,
-    assignee: null,
-  } as unknown as Due);
+  await openIssue({ key: where.key, projectShort: where.projectShort, boardId: board.id });
 }
 
-async function openIssue(d: Due): Promise<void> {
-  clear('day');
-  try {
-    const [board, tags] = await Promise.all([
-      api<OpenIssue['board']>(`/boards/${d.boardId}`),
-      api<IssueTag[]>('/tags'),
-    ]);
-    openTags.value = tags.filter((t) => board.tagIds.includes(t.id));
-    open.value = { key: d.key, project: d.projectShort, board, comment: lookAt.value };
+async function openIssue(d: Pick<Due, 'key' | 'projectShort' | 'boardId'>): Promise<void> {
+  await attempt('day', async () => {
+    const got = await withTags(d.boardId);
+    openTags.value = got.tags;
+    open.value = { key: d.key, project: d.projectShort, board: got.board, comment: lookAt.value };
     lookAt.value = undefined;
     picked.value = null;
-  } catch (err) {
-    fail('day', err, t('me.openFailed'));
-  }
+  }, t('me.openFailed'));
 }
 
 function closeIssue(): void {

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { api } from '../lib/api';
 import { useTitle } from '../lib/title';
+import { messageOf } from '../lib/panelErrors';
 
 const { t } = useI18n();
 useTitle(() => t('auth.newPassword'));
@@ -33,7 +34,7 @@ onMounted(async () => {
     login.value = found.login;
     valid.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('auth.linkGone');
+    error.value = messageOf(err, t('auth.linkGone'));
   } finally {
     checking.value = false;
   }
@@ -50,7 +51,7 @@ async function onSubmit(): Promise<void> {
     });
     window.location.assign('/');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('auth.linkGone');
+    error.value = messageOf(err, t('auth.linkGone'));
   } finally {
     busy.value = false;
   }

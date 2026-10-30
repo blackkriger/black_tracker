@@ -5,8 +5,9 @@ import DateRangePicker from './DateRangePicker.vue';
 import FilterMenu from './FilterMenu.vue';
 import { useBoards } from '../lib/boards';
 import { filtersQuery, noFilters, type Filters } from '../lib/filters';
+import { toggled } from '../lib/lists';
 import { useLive } from '../lib/live';
-import { usePeople } from '../lib/people';
+import { personChoice, usePeople } from '../lib/people';
 import { useProjects } from '../lib/projects';
 import { useTags } from '../lib/tags';
 
@@ -52,7 +53,7 @@ const stateChoices = computed(() => {
   return [...seen].map(([name, color]) => ({ value: name, label: name, color }));
 });
 const personChoices = computed(() =>
-  people.value.map((p) => ({ value: p.login, label: p.fullName || p.login, color: p.roleColor }))
+  people.value.map((p) => personChoice(p, p.login))
 );
 const assigneeChoices = computed(() => [{ value: '-', label: t('fields.nobody') }, ...personChoices.value]);
 const tagChoices = computed(() => {
@@ -61,8 +62,7 @@ const tagChoices = computed(() => {
 });
 
 function toggleTag(id: string): void {
-  const picked = props.modelValue.tags;
-  set({ tags: picked.includes(id) ? picked.filter((t) => t !== id) : [...picked, id] });
+  set({ tags: toggled(props.modelValue.tags, id) });
 }
 
 const periodOn = computed(() => {

@@ -5,17 +5,18 @@ import { useI18n } from 'vue-i18n';
 import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
-import { ApiError, api } from '../lib/api';
-import { asHtml, flipCheck, flipStrike, isBlank, trimBlank } from '../lib/richtext';
+import { ApiError, api, latest } from '../lib/api';
+import { asHtml, escapeHtml, flipCheck, flipStrike, isBlank, trimBlank } from '../lib/richtext';
 import { fromGoogleDoc } from '../lib/googleDoc';
-import { forgetKeys, keyInfo, refreshKey } from '../lib/issueKeys';
+import { forgetKeys, keyInfo, refreshKey, useIssueSearch } from '../lib/issueKeys';
+import { stored } from '../lib/storage';
 import { buddyAvatarStyle } from '../lib/avatar';
-import { useLive } from '../lib/live';
+import { useFlash, useLive } from '../lib/live';
 import FileViewer from './FileViewer.vue';
 import FileWall from './FileWall.vue';
 import Select from './Select.vue';
 import { canRead, isPicture } from '../lib/files';
-import { usePeople } from '../lib/people';
+import { personChoice, usePeople } from '../lib/people';
 import { features } from '../lib/features';
 import { here, issueViewers } from '../lib/presence';
 import PersonName from './PersonName.vue';
@@ -56,6 +57,7 @@ import {
   REACTIONS,
   commentOrder,
   fileSize,
+  priorityChoice,
   priorityColor,
   stampAt,
   type Attachment,
@@ -71,6 +73,7 @@ import {
   type Shot,
 } from '../lib/issues';
 import { ink } from '../lib/theme';
+import { messageOf } from '../lib/panelErrors';
 
 interface State {
   id: string;
@@ -122,7 +125,7 @@ const draft = ref({
 
 const issue = ref<IssueFull | null>(null);
 useTitle(() => (props.issueKey && issue.value ? `${props.issueKey} ${issue.value.summary}` : ''));
-let issueReads = 0;
+const issueReads = latest();
 const loading = ref(true);
 const error = ref<string | null>(null);
 const { people, colorOf, colorOfId, nameOf, genderOf, load: loadPeople } = usePeople();
@@ -241,12 +244,12 @@ let expectedBase = '';
 
 const picking = ref(false);
 const linkQuery = ref('');
-const linkResults = ref<IssueLink[]>([]);
-const searching = ref(false);
+const { results: linkResults, searching } = useIssueSearch(linkQuery, {
+  exclude: () => issue.value?.id,
+  taken: () => shownLinks.value.map((l) => l.id),
+});
 const linking = ref(false);
 const pendingLinks = ref<IssueLink[]>([]);
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
-let searches = 0;
 
 type LinkPick = 'related' | 'parentOf' | 'subtaskOf' | 'duplicateOf' | 'duplicatedBy';
 const LINK_KINDS: { value: LinkPick; kind: LinkKind }[] = [
@@ -272,42 +275,14 @@ const pickable = computed(() =>
     : linkResults.value
 );
 
-watch(linkQuery, (term) => {
-  if (searchTimer) clearTimeout(searchTimer);
-  const q = term.trim();
-  if (!q) {
-    ++searches;
-    searching.value = false;
-    linkResults.value = [];
-    return;
-  }
-  searchTimer = setTimeout(async () => {
-    const mine = ++searches;
-    searching.value = true;
-    try {
-      const rows = await api<IssueLink[]>(
-        `/issues/search?q=${encodeURIComponent(q)}&exclude=${issue.value?.id ?? ''}`
-      );
-      if (mine !== searches) return;
-      const already = new Set(shownLinks.value.map((l) => l.id));
-      linkResults.value = rows.filter((r) => !already.has(r.id));
-    } catch {
-      if (mine === searches) linkResults.value = [];
-    } finally {
-      if (mine === searches) searching.value = false;
-    }
-  }, 200);
-});
-
 const commitGroup = ref<Pushed | null>(null);
 const chosenCommits = ref<Set<string>>(new Set());
 const moveQuery = ref('');
-const moveTargets = ref<IssueLink[]>([]);
-const moveSearching = ref(false);
+const { results: moveTargets, searching: moveSearching } = useIssueSearch(moveQuery, {
+  exclude: () => issue.value?.id,
+});
 const commitBusy = ref(false);
 const commitError = ref<string | null>(null);
-let moveTimer: ReturnType<typeof setTimeout> | null = null;
-let moveSearches = 0;
 
 function openCommits(group: Pushed): void {
   commitGroup.value = group;
@@ -324,29 +299,6 @@ function toggleCommit(id: string): void {
   chosenCommits.value = next;
 }
 
-watch(moveQuery, (term) => {
-  if (moveTimer) clearTimeout(moveTimer);
-  const q = term.trim();
-  if (!q) {
-    ++moveSearches;
-    moveSearching.value = false;
-    moveTargets.value = [];
-    return;
-  }
-  moveTimer = setTimeout(async () => {
-    const mine = ++moveSearches;
-    moveSearching.value = true;
-    try {
-      const rows = await api<IssueLink[]>(`/issues/search?q=${encodeURIComponent(q)}&exclude=${issue.value?.id ?? ''}`);
-      if (mine === moveSearches) moveTargets.value = rows;
-    } catch {
-      if (mine === moveSearches) moveTargets.value = [];
-    } finally {
-      if (mine === moveSearches) moveSearching.value = false;
-    }
-  }, 200);
-});
-
 async function changeCommits(path: 'unlink' | 'move', key?: string): Promise<void> {
   const current = issue.value;
   if (!current || commitBusy.value || !chosenCommits.value.size) return;
@@ -360,7 +312,7 @@ async function changeCommits(path: 'unlink' | 'move', key?: string): Promise<voi
     commitGroup.value = null;
     await reload();
   } catch (err) {
-    commitError.value = err instanceof Error ? err.message : t('issue.commitsFailed');
+    commitError.value = messageOf(err, t('issue.commitsFailed'));
   } finally {
     commitBusy.value = false;
   }
@@ -390,13 +342,11 @@ function readNew(): { summary: string; description: string; expected?: string } 
 }
 
 function writeNew(summary: string, description: string, expected = ''): void {
-  try {
-    if (summary || description || expected) {
-      localStorage.setItem(NEW_DRAFTS + props.board.id, JSON.stringify({ summary, description, expected }));
-    } else {
-      localStorage.removeItem(NEW_DRAFTS + props.board.id);
-    }
-  } catch {}
+  if (summary || description || expected) {
+    stored.set(NEW_DRAFTS + props.board.id, JSON.stringify({ summary, description, expected }));
+  } else {
+    stored.drop(NEW_DRAFTS + props.board.id);
+  }
 }
 
 function keepNew(): void {
@@ -410,19 +360,13 @@ function keepNew(): void {
 
 function readDraft(): string {
   if (!props.issueKey) return '';
-  try {
-    return localStorage.getItem(DRAFTS + props.issueKey) ?? '';
-  } catch {
-    return '';
-  }
+  return stored.get(DRAFTS + props.issueKey) ?? '';
 }
 
 function writeDraft(text: string): void {
   if (!props.issueKey) return;
-  try {
-    if (text) localStorage.setItem(DRAFTS + props.issueKey, text);
-    else localStorage.removeItem(DRAFTS + props.issueKey);
-  } catch {}
+  if (text) stored.set(DRAFTS + props.issueKey, text);
+  else stored.drop(DRAFTS + props.issueKey);
 }
 
 function keepDraft(): void {
@@ -521,9 +465,6 @@ function copySelection(): void {
   popup.value = null;
 }
 
-const escapeHtml = (text: string): string =>
-  text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
-
 function replyToSelection(): void {
   const id = popup.value?.commentId;
   const c = issue.value?.comments.find((row) => row.id === id);
@@ -541,7 +482,7 @@ const posting = ref(false);
 const editingComment = ref<string | null>(null);
 const commentEdit = ref('');
 
-const fresh = ref<Set<string>>(new Set());
+const { fresh, flash } = useFlash();
 const litComment = ref<string | null>(null);
 
 watch(() => props.focusComment, lookAtComment);
@@ -600,18 +541,6 @@ const FIELD_OF: Record<string, string> = {
   tagIds: 'tags',
 };
 
-function flash(names: string[]): void {
-  if (!names.length) return;
-  const next = new Set(fresh.value);
-  for (const n of names) next.add(n);
-  fresh.value = next;
-  setTimeout(() => {
-    const after = new Set(fresh.value);
-    for (const n of names) after.delete(n);
-    fresh.value = after;
-  }, 2000);
-}
-
 const uploading = ref(false);
 const dragOver = ref(false);
 const pending = ref<File[]>([]);
@@ -649,11 +578,11 @@ const stateChoices = computed(() =>
   (hostStates.value ?? props.board.states).map((s) => ({ value: s.id, label: s.name, color: s.color }))
 );
 const priorityChoices = computed(() =>
-  PRIORITIES.map((p) => ({ value: p, label: t(`priority.${p}`), color: priorityColor(p) }))
+  PRIORITIES.map(priorityChoice)
 );
 const assigneeChoices = computed(() => [
   { value: '', label: '—' },
-  ...people.value.map((p) => ({ value: p.id, label: p.fullName || p.login, color: p.roleColor })),
+  ...people.value.map((p) => personChoice(p, p.id)),
 ]);
 const boardChoices = computed(() => props.boards.map((b) => ({ value: b.id, label: b.name })));
 const tagChoices = computed(() => [
@@ -750,7 +679,7 @@ async function ping(): Promise<void> {
     await api(`/issues/${issue.value.id}/ping`, { method: 'POST' });
     rang.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('common.wentWrong');
+    error.value = messageOf(err, t('common.wentWrong'));
   } finally {
     pinging = false;
   }
@@ -941,10 +870,10 @@ async function closeIfGone(): Promise<void> {
 
 async function reload(): Promise<void> {
   if (!props.issueKey) return;
-  const mine = ++issueReads;
+  const mine = issueReads();
   try {
     const got = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
-    if (mine === issueReads) issue.value = got;
+    if (mine()) issue.value = got;
   } catch {}
 }
 
@@ -970,17 +899,17 @@ async function load(): Promise<void> {
   }
   loading.value = true;
   error.value = props.carriedError ?? null;
-  const mine = ++issueReads;
+  const mine = issueReads();
   try {
     const got = await api<IssueFull>(`/issues/${encodeURIComponent(props.issueKey)}`);
-    if (mine !== issueReads) return;
+    if (!mine()) return;
     issue.value = got;
     keptDraft = readDraft();
     if (keptDraft) commentDraft.value = keptDraft;
     void lookAtComment(askedFor() ?? props.focusComment);
   } catch (err) {
     issue.value = null;
-    error.value = err instanceof Error ? err.message : t('issue.loadFailed');
+    error.value = messageOf(err, t('issue.loadFailed'));
   } finally {
     loading.value = false;
   }
@@ -998,7 +927,7 @@ async function patch(body: Record<string, unknown>): Promise<boolean> {
     await reload();
     return true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.saveFailed');
+    error.value = messageOf(err, t('issue.saveFailed'));
     return false;
   }
 }
@@ -1047,7 +976,7 @@ async function create(): Promise<void> {
             body: { key: link.key, kind: LINK_KINDS.find((p) => p.kind === link.kind)?.value },
           });
         } catch (err) {
-          problem = err instanceof Error ? err.message : t('issue.createdNoLink');
+          problem = messageOf(err, t('issue.createdNoLink'));
         }
       }
       pendingLinks.value = [];
@@ -1057,13 +986,13 @@ async function create(): Promise<void> {
       try {
         await sendFiles(made.id, pending.value);
       } catch (err) {
-        problem = err instanceof Error ? err.message : t('issue.createdNoFiles');
+        problem = messageOf(err, t('issue.createdNoFiles'));
       }
       pending.value = [];
     }
     emit('created', made, problem);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.createFailed');
+    error.value = messageOf(err, t('issue.createFailed'));
   } finally {
     saving.value = false;
   }
@@ -1079,7 +1008,7 @@ async function toggleFavourite(): Promise<void> {
     emit('changed', { ...current, favourite: next });
   } catch (err) {
     issue.value = { ...(issue.value as IssueFull), favourite: current.favourite };
-    error.value = err instanceof Error ? err.message : t('issue.starFailed');
+    error.value = messageOf(err, t('issue.starFailed'));
   }
 }
 
@@ -1146,7 +1075,7 @@ async function createTag(): Promise<void> {
     makingTag.value = false;
     toggleTag(created.id, true);
   } catch (err) {
-    tagError.value = err instanceof Error ? err.message : t('issue.tagFailed');
+    tagError.value = messageOf(err, t('issue.tagFailed'));
   } finally {
     tagBusy.value = false;
   }
@@ -1174,7 +1103,7 @@ async function postComment(): Promise<void> {
       try {
         await sendFiles(current.id, commentFiles.value, created.id);
       } catch (err) {
-        error.value = err instanceof Error ? err.message : t('issue.postedNoFiles');
+        error.value = messageOf(err, t('issue.postedNoFiles'));
       }
       commentFiles.value = [];
     }
@@ -1188,7 +1117,7 @@ async function postComment(): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.postFailed');
+    error.value = messageOf(err, t('issue.postFailed'));
   } finally {
     posting.value = false;
   }
@@ -1216,7 +1145,7 @@ async function rewrite(where: 'description' | 'expected' | Comment, change: (htm
     await api(`/comments/${where.id}`, { method: 'PATCH', body: { text: next } });
   } catch (err) {
     swap(where.text);
-    error.value = err instanceof Error ? err.message : t('issue.commentSaveFailed');
+    error.value = messageOf(err, t('issue.commentSaveFailed'));
   }
 }
 
@@ -1260,7 +1189,7 @@ async function saveComment(c: Comment): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.commentSaveFailed');
+    error.value = messageOf(err, t('issue.commentSaveFailed'));
   }
 }
 
@@ -1291,7 +1220,7 @@ async function addLink(key: string): Promise<void> {
     }
     emit('linked');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.linkFailed');
+    error.value = messageOf(err, t('issue.linkFailed'));
   } finally {
     linking.value = false;
   }
@@ -1311,7 +1240,7 @@ async function removeLink(link: IssueLink): Promise<void> {
     issue.value = { ...now, links: now.links.filter((l) => l.id !== link.id) };
     emit('linked');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.unlinkFailed');
+    error.value = messageOf(err, t('issue.unlinkFailed'));
   }
 }
 
@@ -1361,7 +1290,7 @@ async function react(c: Comment, emoji: string): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.reactFailed');
+    error.value = messageOf(err, t('issue.reactFailed'));
   }
 }
 
@@ -1383,7 +1312,7 @@ async function togglePin(c: Comment): Promise<void> {
     };
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.pinFailed');
+    error.value = messageOf(err, t('issue.pinFailed'));
   }
 }
 
@@ -1405,7 +1334,7 @@ async function removeComment(c: Comment): Promise<void> {
     void readNotices();
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.commentDeleteFailed');
+    error.value = messageOf(err, t('issue.commentDeleteFailed'));
   }
 }
 
@@ -1450,7 +1379,7 @@ async function upload(list: FileList | File[] | null): Promise<void> {
     await sendFiles(issue.value.id, chosen);
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.uploadFailed');
+    error.value = messageOf(err, t('issue.uploadFailed'));
   } finally {
     uploading.value = false;
   }
@@ -1508,7 +1437,7 @@ async function addToComment(commentId: string, list: FileList | File[] | null): 
     await sendFiles(issue.value.id, chosen, commentId);
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.uploadFailed');
+    error.value = messageOf(err, t('issue.uploadFailed'));
   } finally {
     uploading.value = false;
   }
@@ -1523,7 +1452,7 @@ async function removeAttachment(a: Attachment): Promise<void> {
     issue.value = { ...now, attachments: now.attachments.filter((row) => row.id !== a.id) };
     await reload();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('issue.fileDeleteFailed');
+    error.value = messageOf(err, t('issue.fileDeleteFailed'));
   }
 }
 
@@ -1535,7 +1464,7 @@ async function removeIssue(): Promise<void> {
     emit('deleted', current.id);
   } catch (err) {
     deleting.value = false;
-    error.value = err instanceof Error ? err.message : t('issue.deleteFailed');
+    error.value = messageOf(err, t('issue.deleteFailed'));
   }
 }
 </script>

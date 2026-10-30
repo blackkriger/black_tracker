@@ -4,8 +4,9 @@ import { useI18n } from 'vue-i18n';
 import SettingsLayout from '../../components/SettingsLayout.vue';
 import Dialog from '../../components/Dialog.vue';
 import Select from '../../components/Select.vue';
-import { api } from '../../lib/api';
+import { api, latest } from '../../lib/api';
 import { buddyAvatarStyle } from '../../lib/avatar';
+import { copyText } from '../../lib/clipboard';
 import { stamp, stampAt } from '../../lib/issues';
 import { tellTab, useLive } from '../../lib/live';
 import { usePanelErrors } from '../../lib/panelErrors';
@@ -57,7 +58,7 @@ const { t } = useI18n();
 const roles = ref<Role[]>([]);
 const removingRole = ref<Role | null>(null);
 const loading = ref(true);
-const { errors, fail, clear } = usePanelErrors();
+const { errors, fail, clear, attempt } = usePanelErrors();
 const { nameOf, load: loadPeople } = usePeople();
 
 const inviteRole = ref('');
@@ -88,7 +89,7 @@ const copied = ref(false);
 const newRole = ref('');
 const accessFor = ref<Role | null>(null);
 const accessRead = ref(false);
-let accessReads = 0;
+const accessReads = latest();
 const accessCanDelete = ref(false);
 const accessCanManageRoles = ref(false);
 const deniedProjects = ref<string[]>([]);
@@ -140,27 +141,21 @@ useLive(
 );
 
 async function patchUser(u: User, body: Record<string, unknown>): Promise<void> {
-  clear('users');
-  try {
+  await attempt('users', async () => {
     const updated = await api<User>(`/users/${u.id}`, { method: 'PATCH', body });
     users.value = users.value.map((row) => (row.id === u.id ? updated : row));
     tellTab('user.changed');
-  } catch (err) {
-    fail('users', err);
-  }
+  });
 }
 
 async function addRole(): Promise<void> {
   const name = newRole.value.trim();
   if (!name) return;
-  clear('roles');
-  try {
+  await attempt('roles', async () => {
     roles.value = [...roles.value, await api<Role>('/roles', { method: 'POST', body: { name } })];
     newRole.value = '';
     tellTab('role.changed');
-  } catch (err) {
-    fail('roles', err);
-  }
+  });
 }
 
 async function patchRole(role: Role, body: Record<string, unknown>, panel = 'roles'): Promise<void> {
@@ -179,16 +174,13 @@ function renameRole(role: Role, name: string): void {
 async function removeRole(): Promise<void> {
   const role = removingRole.value;
   if (!role) return;
-  clear('removeRole');
-  try {
+  await attempt('removeRole', async () => {
     await api(`/roles/${role.id}`, { method: 'DELETE' });
     roles.value = roles.value.filter((r) => r.id !== role.id);
     users.value = users.value.map((u) => (u.role?.id === role.id ? { ...u, role: null } : u));
     removingRole.value = null;
     tellTab('role.changed');
-  } catch (err) {
-    fail('removeRole', err);
-  }
+  });
 }
 
 async function createInvite(): Promise<void> {
@@ -220,12 +212,7 @@ async function createInvite(): Promise<void> {
 
 async function copyLink(): Promise<void> {
   if (!freshLink.value) return;
-  try {
-    await navigator.clipboard.writeText(freshLink.value);
-    copied.value = true;
-  } catch {
-    copied.value = false;
-  }
+  copied.value = await copyText(freshLink.value);
 }
 
 const revokingInvite = ref<Invite | null>(null);
@@ -237,13 +224,10 @@ async function confirmRevokeInvite(): Promise<void> {
 }
 
 async function revokeInvite(i: Invite): Promise<void> {
-  clear('invites');
-  try {
+  await attempt('invites', async () => {
     await api(`/invites/${i.id}`, { method: 'DELETE' });
     invites.value = invites.value.filter((row) => row.id !== i.id);
-  } catch (err) {
-    fail('invites', err);
-  }
+  });
 }
 
 async function openAccess(role: Role): Promise<void> {
@@ -254,17 +238,17 @@ async function openAccess(role: Role): Promise<void> {
   deniedBoards.value = [];
   accessRead.value = false;
   clear('access');
-  const mine = ++accessReads;
+  const mine = accessReads();
   try {
     const res = await api<{ deniedProjects: string[]; deniedBoards: string[] }>(
       `/roles/${role.id}/access`
     );
-    if (mine !== accessReads) return;
+    if (!mine()) return;
     deniedProjects.value = res.deniedProjects;
     deniedBoards.value = res.deniedBoards;
     accessRead.value = true;
   } catch (err) {
-    if (mine !== accessReads) return;
+    if (!mine()) return;
     fail('access', err, t('users.accessFailed'));
   }
 }

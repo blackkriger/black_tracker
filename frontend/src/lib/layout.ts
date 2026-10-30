@@ -1,15 +1,12 @@
 import { ref } from 'vue';
+import { stored } from './storage';
 
 export type Layout = 'top' | 'side';
 
 const KEY = 'tracker:layout';
 
 function readLayout(): Layout {
-  try {
-    return localStorage.getItem(KEY) === 'side' ? 'side' : 'top';
-  } catch {
-    return 'top';
-  }
+  return stored.get(KEY) === 'side' ? 'side' : 'top';
 }
 
 export const layout = ref<Layout>(readLayout());
@@ -32,9 +29,7 @@ function applyLayout(): void {
 
 export function setLayout(next: Layout): void {
   layout.value = next;
-  try {
-    localStorage.setItem(KEY, next);
-  } catch {}
+  stored.set(KEY, next);
   applyLayout();
 }
 

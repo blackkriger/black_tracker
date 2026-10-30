@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { stored } from './storage';
 
 export type Theme = 'dark' | 'light' | 'system';
 
@@ -7,12 +8,8 @@ const THEMES: Theme[] = ['dark', 'light', 'system'];
 const prefersLight = window.matchMedia('(prefers-color-scheme: light)');
 
 function readTheme(): Theme {
-  try {
-    const saved = localStorage.getItem(KEY) as Theme | null;
-    return saved && THEMES.includes(saved) ? saved : 'system';
-  } catch {
-    return 'system';
-  }
+  const saved = stored.get(KEY) as Theme | null;
+  return saved && THEMES.includes(saved) ? saved : 'system';
 }
 
 export const theme = ref<Theme>(readTheme());
@@ -26,9 +23,7 @@ function applyTheme(): void {
 
 export function setTheme(next: Theme): void {
   theme.value = next;
-  try {
-    localStorage.setItem(KEY, next);
-  } catch {}
+  stored.set(KEY, next);
   applyTheme();
 }
 

@@ -1,4 +1,4 @@
-import { onUnmounted } from 'vue';
+import { onUnmounted, ref } from 'vue';
 import { api, TAB_ID } from './api';
 
 export interface LiveEvent {
@@ -70,6 +70,24 @@ export function settled(run: () => void, ms = 300): () => void {
       timer = null;
       run();
     }, ms);
+  };
+}
+
+export function useFlash() {
+  const fresh = ref<Set<string>>(new Set());
+  return {
+    fresh,
+    flash(names: string[]): void {
+      if (!names.length) return;
+      const next = new Set(fresh.value);
+      for (const n of names) next.add(n);
+      fresh.value = next;
+      setTimeout(() => {
+        const after = new Set(fresh.value);
+        for (const n of names) after.delete(n);
+        fresh.value = after;
+      }, 2000);
+    },
   };
 }
 

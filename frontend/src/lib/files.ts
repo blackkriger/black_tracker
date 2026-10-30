@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { stored } from './storage';
 
 // Mirrors READABLE in backend issue-routes.ts, which is the real gate; change both together.
 const READS: Record<string, string> = {
@@ -68,20 +69,14 @@ export const langOf = (name: string): string => READS[extOf(name)] ?? 'plaintext
 const WRAP = 'tracker:wrap-lines';
 
 function readWrap(): boolean {
-  try {
-    return localStorage.getItem(WRAP) === '1';
-  } catch {
-    return false;
-  }
+  return stored.get(WRAP) === '1';
 }
 
 export const wrapLines = ref(readWrap());
 
 export function setWrapLines(on: boolean): void {
   wrapLines.value = on;
-  try {
-    localStorage.setItem(WRAP, on ? '1' : '0');
-  } catch {}
+  stored.set(WRAP, on ? '1' : '0');
 }
 
 const PICTURES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif']);

@@ -29,7 +29,7 @@ const { projects } = useProjects();
 const { nameOf, colorOf, genderOf, load: loadPeople } = usePeople();
 void loadPeople();
 const { off, markRead } = useNotices();
-const { errors, fail, clear } = usePanelErrors();
+const { errors, fail, clear, attempt } = usePanelErrors();
 
 const marks = ref<Mark[]>([]);
 const dues = ref<Due[]>([]);
@@ -53,8 +53,7 @@ const projectChoices = computed(() => [
 ]);
 
 async function read(): Promise<void> {
-  clear('day');
-  try {
+  await attempt('day', async () => {
     const [got, notices] = await Promise.all([
       api<{ marks: Mark[]; dues: { day: string; issues: Due[] }[]; activity: Activity[] }>(
         `/calendar?from=${props.day}&to=${props.day}`
@@ -65,9 +64,7 @@ async function read(): Promise<void> {
     marks.value = got.marks;
     dues.value = got.dues.flatMap((d) => d.issues);
     activity.value = got.activity;
-  } catch (err) {
-    fail('day', err, t('calendar.dayFailed'));
-  }
+  }, t('calendar.dayFailed'));
 }
 
 watch(() => props.day, read, { immediate: true });
@@ -121,15 +118,12 @@ async function confirmRemoveMark(): Promise<void> {
 }
 
 async function removeMark(m: Mark): Promise<void> {
-  clear('day');
-  try {
+  await attempt('day', async () => {
     await api(`/key-dates/${m.id}`, { method: 'DELETE' });
     await read();
     emit('changed');
     tellTab('key-date.changed');
-  } catch (err) {
-    fail('day', err);
-  }
+  });
 }
 
 async function openNotice(n: Notice): Promise<void> {

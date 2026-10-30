@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSession } from '../lib/session';
 import { useTitle } from '../lib/title';
+import { messageOf } from '../lib/panelErrors';
 
 const { t } = useI18n();
 useTitle(() => t('auth.signIn'));
@@ -26,7 +27,7 @@ async function onSubmit(): Promise<void> {
       typeof next === 'string' && next.startsWith('/') && !next.startsWith('/login') ? next : '/';
     window.location.assign(target);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t('auth.signInFailed');
+    error.value = messageOf(err, t('auth.signInFailed'));
   } finally {
     busy.value = false;
   }
