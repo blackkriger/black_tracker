@@ -28,6 +28,7 @@ import {
 } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
 import { useI18n } from 'vue-i18n';
+import { INLINE_IMAGE_MAX_BYTES } from '../../../shared/rules';
 
 const { t } = useI18n();
 const body = defineModel<string>({ required: true });
@@ -35,7 +36,6 @@ const props = defineProps<{ placeholder?: string; minHeight?: string; disabled?:
 const emit = defineEmits<{ (e: 'files', list: File[]): void; (e: 'blur'): void }>();
 
 const INLINE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-const INLINE_LIMIT = 20 * 1024 * 1024;
 const picker = ref<HTMLInputElement | null>(null);
 
 const { people, load: loadPeople } = usePeople();
@@ -60,7 +60,7 @@ function onPaste(ev: ClipboardEvent): void {
 }
 
 const inlinable = (file: File): boolean =>
-  !!props.inlineImages && INLINE_TYPES.includes(file.type) && file.size <= INLINE_LIMIT;
+  !!props.inlineImages && INLINE_TYPES.includes(file.type) && file.size <= INLINE_IMAGE_MAX_BYTES;
 
 function readUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

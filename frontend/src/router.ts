@@ -4,6 +4,7 @@ import { findKeys } from './lib/issueKeys';
 import Login from './routes/Login.vue';
 import Home from './routes/Home.vue';
 import AppShell from './components/AppShell.vue';
+import { PROJECT_KEY } from '../../shared/rules';
 
 const Board = () => import('./routes/Board.vue');
 const Profile = () => import('./routes/Profile.vue');
@@ -36,11 +37,11 @@ export const router = createRouter({
       children: [
         { path: '', name: 'home', component: Home },
         { path: '/me', name: 'me', component: Dashboard },
-        { path: '/:short([A-Z][A-Z0-9]*)', name: 'project-board', component: Board },
-        { path: '/:short([A-Z][A-Z0-9]*)/:slug', name: 'board', component: Board },
-        { path: '/:short([A-Z][A-Z0-9]*)/:slug/:key', name: 'issue', component: Board },
+        { path: `/:short(${PROJECT_KEY})`, name: 'project-board', component: Board },
+        { path: `/:short(${PROJECT_KEY})/:slug`, name: 'board', component: Board },
+        { path: `/:short(${PROJECT_KEY})/:slug/:key`, name: 'issue', component: Board },
         {
-          path: '/:key([A-Z][A-Z0-9]*-\\d+)',
+          path: `/:key(${PROJECT_KEY}-\\d+)`,
           name: 'issue-key',
           component: NotFound,
           beforeEnter: async (to) => {
@@ -60,7 +61,7 @@ export const router = createRouter({
         { path: '/settings/preferences', name: 'settings-preferences', component: SettingsPreferences },
         { path: '/settings/api', name: 'settings-api', component: SettingsApi },
         { path: '/settings/new', name: 'settings-new-project', component: SettingsNewProject },
-        { path: '/settings/:short([A-Z][A-Z0-9]*)', name: 'settings-project', component: SettingsProject },
+        { path: `/settings/:short(${PROJECT_KEY})`, name: 'settings-project', component: SettingsProject },
         { path: '/settings/tags', name: 'settings-tags', component: SettingsTags },
         { path: '/settings/users', name: 'settings-users', component: SettingsUsers },
         { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound },

@@ -1,6 +1,7 @@
 import { i18n, locale } from '../i18n';
 import { RU_MONTHS_SHORT, todayKey } from './calendar';
 import { stored } from './storage';
+import { PRIORITIES, REACTIONS, type LinkKind, type Priority } from '../../../shared/rules';
 
 export interface Person {
   id: string;
@@ -20,7 +21,7 @@ export interface IssueTag {
   color: string;
 }
 
-export type Priority = 'Critical' | 'Major' | 'Normal' | 'Minor';
+export type { Priority };
 
 export interface Issue {
   id: string;
@@ -46,18 +47,7 @@ export interface Issue {
   subtasks?: { done: number; total: number } | null;
 }
 
-// Must match REACTIONS in backend issue-routes.ts; the server rejects anything else.
-export const REACTIONS = [
-  '\u{1F44D}',
-  '\u{1F44C}',
-  '\u{1F64F}',
-  '\u{1F440}',
-  '\u{2764}\u{FE0F}',
-  '\u{1F389}',
-  '\u{1F608}',
-  '\u{1F921}',
-  '\u{1F4A9}',
-];
+export { REACTIONS };
 
 export interface Comment {
   id: string;
@@ -91,7 +81,7 @@ export interface Attachment {
   createdAt: string;
 }
 
-export type LinkKind = 'related' | 'parent' | 'child' | 'duplicateOf' | 'duplicatedBy';
+export type { LinkKind };
 
 export interface IssueLink {
   id: string;
@@ -126,7 +116,7 @@ export interface IssueFull extends Issue {
   commits?: IssueCommit[];
 }
 
-export const PRIORITIES: Priority[] = ['Critical', 'Major', 'Normal', 'Minor'];
+export { PRIORITIES };
 
 const ORDER_KEY = 'tracker:comment-order';
 export type CommentOrder = 'oldest' | 'newest';
@@ -202,9 +192,6 @@ export function stampAt(iso: string): string {
     .toUpperCase();
   return `${day} ${d.toLocaleTimeString('en-GB', { hour12: false })}`;
 }
-
-// Mirrors the multipart fileSize limit in backend index.ts; change both together.
-export const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
 export function fileSize(bytes: number): string {
   const ru = locale.value === 'ru';

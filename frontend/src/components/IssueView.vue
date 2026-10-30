@@ -53,7 +53,6 @@ import {
 import {
   PRIORITIES,
   dueLabel,
-  MAX_FILE_BYTES,
   REACTIONS,
   commentOrder,
   fileSize,
@@ -74,6 +73,7 @@ import {
 } from '../lib/issues';
 import { ink } from '../lib/theme';
 import { messageOf } from '../lib/panelErrors';
+import { FILE_MAX_BYTES, type LinkPick } from '../../../shared/rules';
 
 interface State {
   id: string;
@@ -251,7 +251,6 @@ const { results: linkResults, searching } = useIssueSearch(linkQuery, {
 const linking = ref(false);
 const pendingLinks = ref<IssueLink[]>([]);
 
-type LinkPick = 'related' | 'parentOf' | 'subtaskOf' | 'duplicateOf' | 'duplicatedBy';
 const LINK_KINDS: { value: LinkPick; kind: LinkKind }[] = [
   { value: 'related', kind: 'related' },
   { value: 'parentOf', kind: 'child' },
@@ -1359,11 +1358,11 @@ function picked(ev: Event): File[] {
 
 function accept(list: FileList | File[] | null): File[] {
   const chosen = list ? Array.from(list) : [];
-  const tooBig = chosen.filter((f) => f.size > MAX_FILE_BYTES);
+  const tooBig = chosen.filter((f) => f.size > FILE_MAX_BYTES);
   if (tooBig.length) {
     error.value = `${tooBig.map((f) => f.name).join(', ')} — 100mb max for file`;
   }
-  return chosen.filter((f) => f.size <= MAX_FILE_BYTES);
+  return chosen.filter((f) => f.size <= FILE_MAX_BYTES);
 }
 
 async function upload(list: FileList | File[] | null): Promise<void> {

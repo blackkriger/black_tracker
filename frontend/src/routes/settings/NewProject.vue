@@ -6,6 +6,7 @@ import SettingsLayout from '../../components/SettingsLayout.vue';
 import { api } from '../../lib/api';
 import { usePanelErrors } from '../../lib/panelErrors';
 import { useProjects } from '../../lib/projects';
+import { PROJECT_KEY } from '../../../../shared/rules';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -16,7 +17,8 @@ const name = ref('');
 const busy = ref(false);
 const { errors, fail, clear } = usePanelErrors();
 
-const keyLooksRight = computed(() => /^[A-Z][A-Z0-9]*$/.test(shortName.value.trim()));
+const KEY_RE = new RegExp(`^${PROJECT_KEY}$`);
+const keyLooksRight = computed(() => KEY_RE.test(shortName.value.trim()));
 const canCreate = computed(() => keyLooksRight.value && name.value.trim().length > 0 && !busy.value);
 
 async function create(): Promise<void> {

@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { ApiError, api } from '../lib/api';
 import { useTitle } from '../lib/title';
 import { messageOf } from '../lib/panelErrors';
+import { PASSWORD_MIN } from '../../../shared/rules';
 
 const { t } = useI18n();
 useTitle(() => t('auth.createAccount'));
@@ -27,7 +28,7 @@ const mismatch = computed(() => repeat.value.length > 0 && repeat.value !== pass
 const canSubmit = computed(
   () =>
     login.value.trim().length >= 2 &&
-    password.value.length >= 8 &&
+    password.value.length >= PASSWORD_MIN &&
     repeat.value === password.value &&
     !busy.value
 );

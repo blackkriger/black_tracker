@@ -10,9 +10,9 @@ import { denialsOf, mayOpenProject } from './board-service.js';
 import { publish, tabOf } from './events.js';
 import { disposition, fileHeaders, onDisk, storeIn } from './issue-routes.js';
 import { projectByShort } from './project-routes.js';
+import { BUILD_MAX_BYTES, PLATFORMS } from '../../shared/rules.js';
 
-export const BUILD_MAX_BYTES = 1024 * 1024 * 1024;
-const PLATFORM = z.enum(['windows', 'macos']);
+const PLATFORM = z.enum(PLATFORMS);
 type Platform = z.infer<typeof PLATFORM>;
 const PAGE_LIMIT = 5 * 1024 * 1024;
 const CLOSED = { error: 'Open the file to anyone with the link.' };

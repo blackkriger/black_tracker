@@ -4,8 +4,9 @@ import { i18n } from '../i18n';
 import { shortDate } from './calendar';
 import { toggled } from './lists';
 import { useSession, type Me } from './session';
+import type { NoticeKind } from '../../../shared/rules';
 
-export type NoticeKind = 'mention' | 'reaction' | 'assigned' | 'starred' | 'ping';
+export type { NoticeKind };
 
 export interface NoticeChange {
   field: string;

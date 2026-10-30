@@ -13,6 +13,7 @@ import { usePanelErrors } from '../lib/panelErrors';
 import { useSession, type Me } from '../lib/session';
 import { setLanguage } from '../lib/locale';
 import { browserLocale, type LangChoice } from '../i18n';
+import { NOTICE_KINDS } from '../../../shared/rules';
 
 const { t } = useI18n();
 const session = useSession();
@@ -51,7 +52,7 @@ function setOrder(next: CommentOrder): void {
 }
 
 const KINDS = computed<{ kind: NoticeKind; label: string }[]>(() =>
-  (['mention', 'assigned', 'reaction', 'starred', ...(features.pings ? ['ping' as const] : [])] as NoticeKind[]).map(
+  NOTICE_KINDS.filter((kind) => kind !== 'ping' || features.pings).map(
     (kind) => ({ kind, label: t(`notices.kinds.${kind}`) })
   )
 );

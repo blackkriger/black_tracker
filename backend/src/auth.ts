@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { env, telegramReady, vkReady } from './env.js';
 import { publish, tabOf } from './events.js';
+import { NOTICE_KINDS, PASSWORD_MAX, PASSWORD_MIN } from '../../shared/rules.js';
 
 export const SESSION_COOKIE = 'tracker_session';
 const SESSION_DAYS = 30;
@@ -149,7 +150,6 @@ const publicMe = (row: UserRow) => ({
   gender: row.gender,
 });
 
-const NOTICE_KINDS = ['mention', 'assigned', 'reaction', 'starred', 'ping'] as const;
 
 function due(writes: Map<string, number>, key: string): boolean {
   const now = Date.now();
@@ -360,7 +360,7 @@ const githubLoginOf = (typed: string): string =>
     .replace(/^@/, '')
     .replace(/\/+$/, '');
 
-export const newPassword = z.string().min(8).max(200);
+export const newPassword = z.string().min(PASSWORD_MIN).max(PASSWORD_MAX);
 
 const passwordSchema = z.object({
   currentPassword: z.string().min(1).max(200),

@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { stored } from './storage';
+import type { ReadableExtension } from '../../../shared/rules';
 
-// Mirrors READABLE in backend issue-routes.ts, which is the real gate; change both together.
 const READS: Record<string, string> = {
   bat: 'plaintext',
   c: 'c',
@@ -58,7 +58,7 @@ const READS: Record<string, string> = {
   xml: 'xml',
   yaml: 'yaml',
   yml: 'yaml',
-};
+} satisfies Record<ReadableExtension, string>;
 
 const extOf = (name: string): string => name.split('.').pop()?.toLowerCase() ?? '';
 

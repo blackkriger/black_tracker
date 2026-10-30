@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { pool } from './db.js';
+import { BASE_TONE, STATUS_COLORS } from '../../shared/rules.js';
 
-const SAT = 62;
-const LIGHT = 64;
+const [SAT, LIGHT] = BASE_TONE;
 const ROOMY_GAP = 90;
 
 export const hexColor = z
@@ -34,23 +34,18 @@ export function hslToHex(h: number, s: number, l: number): string {
   return `#${channel(0)}${channel(8)}${channel(4)}`;
 }
 
-const KNOWN_COLORS: Record<string, string> = {
-  backlog: '#e0917f',
-  'in progress': '#6cdcff',
-  review: '#c98eff',
-  done: '#8effa9',
-  'wont fix': '#7d8188',
-  'will not fix': '#7d8188',
-  duplicate: '#9aa3ad',
-};
-
-export function knownColor(name: string): string | null {
-  const key = name
+const keyOf = (name: string): string =>
+  name
     .toLowerCase()
     .replace(/['’ʼ`]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return KNOWN_COLORS[key] ?? null;
+
+const KNOWN_COLORS: Record<string, string> = Object.fromEntries(STATUS_COLORS.map((s) => [keyOf(s.name), s.color]));
+KNOWN_COLORS['will not fix'] = KNOWN_COLORS['wont fix'];
+
+export function knownColor(name: string): string | null {
+  return KNOWN_COLORS[keyOf(name)] ?? null;
 }
 
 export function pickColor(taken: string[]): string {

@@ -28,6 +28,7 @@ import { startGeoip } from './geoip.js';
 import { registerMessengerRoutes, startMessengers } from './messenger.js';
 import { registerTelegramRoutes, startTelegram } from './telegram.js';
 import { registerVkRoutes, startVk } from './vk.js';
+import { FILE_MAX_BYTES } from '../../shared/rules.js';
 
 const app = Fastify({
   logger: {
@@ -51,7 +52,7 @@ const app = Fastify({
 
 await app.register(cookie);
 await app.register(cors, { origin: env.corsOrigins, credentials: true });
-await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024, files: 10 } });
+await app.register(multipart, { limits: { fileSize: FILE_MAX_BYTES, files: 10 } });
 
 app.get('/health', async () => ({ data: { ok: true } }));
 

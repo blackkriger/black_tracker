@@ -11,6 +11,7 @@ import { usePanelErrors } from '../lib/panelErrors';
 import { usePeople } from '../lib/people';
 import { useSession, type Me, type Messenger } from '../lib/session';
 import { describeAgent } from '../lib/userAgent';
+import { PASSWORD_MIN } from '../../../shared/rules';
 
 interface Session {
   id: string;
@@ -47,7 +48,7 @@ const mismatch = computed(
 const canChangePassword = computed(
   () =>
     currentPassword.value.length > 0 &&
-    newPassword.value.length >= 8 &&
+    newPassword.value.length >= PASSWORD_MIN &&
     repeatPassword.value === newPassword.value &&
     !passwordBusy.value
 );

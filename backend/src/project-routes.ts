@@ -12,6 +12,7 @@ import {
   type StateRow,
   tagIdsByBoard,
 } from './board-service.js';
+import { PROJECT_KEY } from '../../shared/rules.js';
 
 interface ProjectRow {
   id: string;
@@ -42,7 +43,7 @@ const projectCreate = z.object({
     .trim()
     .min(1)
     .max(20)
-    .regex(/^[A-Z][A-Z0-9]*$/, 'Use upper-case letters and digits, e.g. PROJ'),
+    .regex(new RegExp(`^${PROJECT_KEY}$`), 'Use upper-case letters and digits, e.g. PROJ'),
   name: z.string().trim().min(1).max(200),
   description: z.string().max(4000).optional(),
 });

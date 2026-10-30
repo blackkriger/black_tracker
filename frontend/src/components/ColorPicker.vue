@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ChevronLeft } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
+import { BASE_TONE, STATUS_COLORS } from '../../../shared/rules';
 
 const { t } = useI18n();
 const props = defineProps<{
@@ -10,19 +11,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ pick: [hex: string]; close: [] }>();
 
-const DEFAULT_COLORS: { name: string; color: string }[] = [
-  { name: 'Backlog', color: '#e0917f' },
-  { name: 'In progress', color: '#6cdcff' },
-  { name: 'Review', color: '#c98eff' },
-  { name: 'Done', color: '#8effa9' },
-  { name: "Won't Fix", color: '#7d8188' },
-  { name: 'Duplicate', color: '#9aa3ad' },
-];
-
-const TONES: [number, number][] = [
-  [62, 64],
-  [70, 78],
-];
+const TONES: [number, number][] = [[...BASE_TONE], [70, 78]];
 
 const r = ref(0);
 const g = ref(0);
@@ -283,7 +272,7 @@ onBeforeUnmount(() => {
             <div class="cp__label">{{ t('colors.defaults') }}</div>
             <div class="cp__grid">
               <button
-                v-for="d in DEFAULT_COLORS"
+                v-for="d in STATUS_COLORS"
                 :key="d.name"
                 type="button"
                 class="swatch"

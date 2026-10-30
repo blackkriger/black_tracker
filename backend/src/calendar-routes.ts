@@ -6,6 +6,7 @@ import { denialsOf, mayOpenProject, shutOut } from './board-service.js';
 import { NOTICE_ISSUE } from './notice-routes.js';
 import { projectByShort } from './project-routes.js';
 import { workOf } from './work.js';
+import { MARK_ICONS } from '../../shared/rules.js';
 
 
 const range = z.object({
@@ -22,7 +23,6 @@ const address = z
   .nullable()
   .optional();
 
-const MARK_ICONS = ['flag', 'milestone', 'gem', 'sparkles', 'swords', 'rocket', 'calendar-heart', 'crown'] as const;
 
 const markBody = z.object({
   day: z.string().regex(DAY_RE),

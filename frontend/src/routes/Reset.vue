@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { api } from '../lib/api';
 import { useTitle } from '../lib/title';
 import { messageOf } from '../lib/panelErrors';
+import { PASSWORD_MIN } from '../../../shared/rules';
 
 const { t } = useI18n();
 useTitle(() => t('auth.newPassword'));
@@ -22,7 +23,7 @@ const error = ref<string | null>(null);
 
 const mismatch = computed(() => repeat.value.length > 0 && repeat.value !== password.value);
 const canSubmit = computed(
-  () => password.value.length >= 8 && repeat.value === password.value && !busy.value
+  () => password.value.length >= PASSWORD_MIN && repeat.value === password.value && !busy.value
 );
 
 onMounted(async () => {

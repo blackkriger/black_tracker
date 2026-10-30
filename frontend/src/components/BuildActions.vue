@@ -6,7 +6,6 @@ import Dialog from './Dialog.vue';
 import Segmented from './Segmented.vue';
 import { ApiError, api, latest } from '../lib/api';
 import {
-  MAX_BUILD_BYTES,
   PLATFORMS,
   platformOfFile,
   platformOfName,
@@ -15,6 +14,7 @@ import {
   viewerPlatform,
   type Platform,
 } from '../lib/builds';
+import { BUILD_MAX_BYTES } from '../../../shared/rules';
 
 const props = defineProps<{ project: string }>();
 const emit = defineEmits<{ (e: 'error', message: string | null): void }>();
@@ -33,7 +33,7 @@ async function pick(ev: Event): Promise<void> {
   input.value = '';
   if (!file || sending.value !== null) return;
   emit('error', null);
-  if (file.size > MAX_BUILD_BYTES) {
+  if (file.size > BUILD_MAX_BYTES) {
     emit('error', t('builds.tooLarge'));
     return;
   }

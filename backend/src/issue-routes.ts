@@ -15,8 +15,15 @@ import { denialsOf, mayOpenBoard } from './board-service.js';
 import { commitUrl, firstLine, GITHUB_USER } from './commits.js';
 import { syncMentions } from './notice-routes.js';
 import { publish, tabOf, type LiveEvent } from './events.js';
+import {
+  INLINE_IMAGE_MAX_BYTES,
+  LINK_PICKS,
+  PRIORITIES,
+  READABLE,
+  REACTIONS,
+  type LinkKind,
+} from '../../shared/rules.js';
 
-const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
 
 // Only these types render inline: html, svg, pdf and the like would run script on our origin.
 const INLINE_TYPES = new Set([
@@ -30,18 +37,11 @@ const INLINE_TYPES = new Set([
 ]);
 
 // html and svg are safe here: the text route returns bytes as a JSON string, never as a page.
-const READABLE = new Set([
-  'bat', 'c', 'cfg', 'cmd', 'conf', 'cpp', 'cs', 'css', 'csv', 'dio', 'diff', 'drawio', 'env',
-  'gd', 'go',
-  'godot', 'gradle', 'h', 'hpp', 'htm', 'html', 'import', 'ini', 'java', 'js', 'json',
-  'jsx', 'kt', 'less', 'log', 'lua', 'md', 'patch', 'php', 'pl', 'properties', 'ps1',
-  'py', 'rb', 'rs', 'scss', 'sh', 'sql', 'svg', 'swift', 'toml', 'tres', 'ts', 'tscn',
-  'tsx', 'txt', 'vue', 'xml', 'yaml', 'yml',
-]);
+const READABLE_SET = new Set<string>(READABLE);
 const READ_MAX = 512 * 1024;
 
 const readable = (filename: string): boolean =>
-  READABLE.has(filename.split('.').pop()?.toLowerCase() ?? '');
+  READABLE_SET.has(filename.split('.').pop()?.toLowerCase() ?? '');
 
 export function disposition(kind: 'inline' | 'attachment', name: string): string {
   const plain = name.replace(/[^\x20-\x7e]|["\\]/g, '_');
@@ -177,8 +177,6 @@ interface LinkRow {
   kind?: LinkKind;
   resolved?: boolean;
 }
-
-type LinkKind = 'related' | 'parent' | 'child' | 'duplicateOf' | 'duplicatedBy';
 
 async function linksOf(issueId: string, auth: Auth): Promise<LinkRow[]> {
   const res = await pool.query<LinkRow>(
@@ -561,18 +559,6 @@ const issueCreate = z.object({
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
-export const REACTIONS = [
-  '\u{1F44D}',
-  '\u{1F44C}',
-  '\u{1F64F}',
-  '\u{1F440}',
-  '\u{2764}\u{FE0F}',
-  '\u{1F389}',
-  '\u{1F608}',
-  '\u{1F921}',
-  '\u{1F4A9}',
-] as const;
-
 const issuePatch = z.object({
   summary: issueCreate.shape.summary.optional(),
   boardId: z.string().uuid().optional(),
@@ -757,18 +743,17 @@ const IMAGE_EXT: Record<string, string> = {
   'image/gif': '.gif',
   'image/webp': '.webp',
 };
-const IMAGE_LIMIT = 20 * 1024 * 1024;
 
 async function imageFrom(src: string): Promise<{ mime: string; body: Readable } | null> {
   const inline = /^data:(image\/[a-z]+);base64,(.+)$/i.exec(src);
   if (inline) {
     const bytes = Buffer.from(inline[2], 'base64');
-    return bytes.length && bytes.length <= IMAGE_LIMIT ? { mime: inline[1].toLowerCase(), body: Readable.from(bytes) } : null;
+    return bytes.length && bytes.length <= INLINE_IMAGE_MAX_BYTES ? { mime: inline[1].toLowerCase(), body: Readable.from(bytes) } : null;
   }
   const res = await fetch(src.replace(/&amp;/g, '&'), { signal: AbortSignal.timeout(30_000) });
   const mime = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
   const size = Number(res.headers.get('content-length') ?? 0);
-  if (!res.ok || !res.body || !IMAGE_EXT[mime] || !size || size > IMAGE_LIMIT) return null;
+  if (!res.ok || !res.body || !IMAGE_EXT[mime] || !size || size > INLINE_IMAGE_MAX_BYTES) return null;
   return { mime, body: Readable.fromWeb(res.body as WebStream) };
 }
 
@@ -1552,7 +1537,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       .object({
         key: z.string().trim().min(3).max(30),
         kind: z
-          .enum(['related', 'parentOf', 'subtaskOf', 'duplicateOf', 'duplicatedBy'])
+          .enum(LINK_PICKS)
           .default('related'),
       })
       .safeParse(req.body);

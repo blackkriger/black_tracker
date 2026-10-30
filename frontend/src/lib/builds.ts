@@ -2,13 +2,16 @@ import { ref } from 'vue';
 import { i18n } from '../i18n';
 import { ApiError, TAB_ID, latestRead } from './api';
 import { systemOf } from './userAgent';
+import { PLATFORMS as PLATFORM_NAMES, type Platform } from '../../../shared/rules';
 
-export type Platform = 'windows' | 'macos';
+export type { Platform };
 
-export const PLATFORMS: { value: Platform; label: string }[] = [
-  { value: 'windows', label: 'Windows' },
-  { value: 'macos', label: 'macOS' },
-];
+const PLATFORM_LABELS: Record<Platform, string> = { windows: 'Windows', macos: 'macOS' };
+
+export const PLATFORMS: { value: Platform; label: string }[] = PLATFORM_NAMES.map((value) => ({
+  value,
+  label: PLATFORM_LABELS[value],
+}));
 
 export interface Build {
   id: string;
@@ -21,7 +24,6 @@ export interface Build {
   at: string;
 }
 
-export const MAX_BUILD_BYTES = 1024 * 1024 * 1024;
 
 const builds = ref<Build[]>([]);
 const loaded = ref(false);
