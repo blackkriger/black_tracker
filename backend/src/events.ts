@@ -45,7 +45,18 @@ interface Seat {
   since: number;
 }
 
-async function stillAllowed(client: Client): Promise<Denials | null> {
+type RoleDenials = Map<string, Promise<Denials>>;
+
+function denialsOfRole(roles: RoleDenials, roleId: string | null): Promise<Denials> {
+  let denied = roles.get(roleId ?? '');
+  if (!denied) {
+    denied = deniedFor(roleId);
+    roles.set(roleId ?? '', denied);
+  }
+  return denied;
+}
+
+async function stillAllowed(client: Client, roles: RoleDenials): Promise<Denials | null> {
   const res = await pool.query<{ is_admin: boolean; role_id: string | null }>(
     `select u.is_admin, u.role_id
        from users u
@@ -61,7 +72,7 @@ async function stillAllowed(client: Client): Promise<Denials | null> {
   const row = res.rows[0];
   if (!row) return null;
   client.auth = { ...client.auth, isAdmin: row.is_admin, roleId: row.role_id };
-  return row.is_admin ? DENIES_NOTHING : await deniedFor(row.role_id);
+  return row.is_admin ? DENIES_NOTHING : await denialsOfRole(roles, row.role_id);
 }
 
 const DENIALS_TTL = 30_000;
@@ -123,9 +134,9 @@ setInterval(() => {
   }
 }, SEAT_GRACE_MS).unref();
 
-async function denialsFresh(client: Client): Promise<Denials | null> {
+async function denialsFresh(client: Client, roles: RoleDenials): Promise<Denials | null> {
   if (Date.now() - client.deniedAt <= DENIALS_TTL) return client.denied;
-  const denied = await stillAllowed(client);
+  const denied = await stillAllowed(client, roles);
   if (!denied) return null;
   client.denied = denied;
   client.deniedAt = Date.now();
@@ -205,26 +216,28 @@ export async function publish(event: LiveEvent): Promise<void> {
   }
   const { only, ...told } = event;
   const line = `data: ${JSON.stringify({ ...told, at: new Date().toISOString() })}\n\n`;
-  for (const [id, client] of clients) {
-    if (client.reply.raw.destroyed || client.reply.raw.writableEnded) {
-      clients.delete(id);
-      continue;
-    }
-    if (only && client.auth.userId !== only) continue;
-    let denied: Denials | null;
-    try {
-      denied = await denialsFresh(client);
-    } catch {
-      continue;
-    }
+  const gone = (id: number, client: Client): boolean => {
+    if (!client.reply.raw.destroyed && !client.reply.raw.writableEnded) return false;
+    clients.delete(id);
+    return true;
+  };
+  const listeners = [...clients].filter(
+    ([id, client]) => !gone(id, client) && (!only || client.auth.userId === only)
+  );
+  const roles: RoleDenials = new Map();
+  const checks = await Promise.all(
+    listeners.map(([, client]) => denialsFresh(client, roles).catch(() => undefined))
+  );
+  listeners.forEach(([id, client], i) => {
+    const denied = checks[i];
+    if (denied === undefined || gone(id, client)) return;
     if (!denied) {
       client.reply.raw.end();
       clients.delete(id);
-      continue;
+      return;
     }
-    if (!mayHear(denied, event)) continue;
-    client.reply.raw.write(line);
-  }
+    if (mayHear(denied, event)) client.reply.raw.write(line);
+  });
 }
 
 const TOPICS: [RegExp, string][] = [
