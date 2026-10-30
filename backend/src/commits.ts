@@ -59,34 +59,66 @@ export async function recordCommits(events: CommitEvent[]): Promise<Linked[]> {
       )
     : { rows: [] };
   const byKey = new Map(issues.rows.map((r) => [r.readable_id, r]));
-  const linked = new Map<string, Linked>();
+  const unique = new Map<string, CommitEvent>();
   for (const e of events) {
-    const stored = await pool.query<{ id: string }>(
-      `insert into repo_commits (repo, sha, kind, message, branch, merged_from, author_name, author_login, at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       on conflict (repo, sha) do update set repo = excluded.repo
-       returning id`,
-      [e.repo, e.sha, e.kind, e.message.slice(0, 4000), e.branch, e.mergedFrom, e.authorName, e.authorLogin, e.at]
-    );
-    const commitId = stored.rows[0].id;
-    for (const key of new Set(e.keys)) {
+    const id = `${e.repo}
+${e.sha}`;
+    const seen = unique.get(id);
+    if (seen) unique.set(id, { ...seen, keys: [...seen.keys, ...e.keys] });
+    else unique.set(id, e);
+  }
+  const commits = [...unique.values()];
+  const stored = await pool.query<{ id: string; repo: string; sha: string }>(
+    `insert into repo_commits (repo, sha, kind, message, branch, merged_from, author_name, author_login, at)
+     select * from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::timestamptz[])
+     on conflict (repo, sha) do update set repo = excluded.repo
+     returning id, repo, sha`,
+    [
+      commits.map((e) => e.repo),
+      commits.map((e) => e.sha),
+      commits.map((e) => e.kind),
+      commits.map((e) => e.message.slice(0, 4000)),
+      commits.map((e) => e.branch),
+      commits.map((e) => e.mergedFrom),
+      commits.map((e) => e.authorName),
+      commits.map((e) => e.authorLogin),
+      commits.map((e) => e.at),
+    ]
+  );
+  const commitIds = new Map(stored.rows.map((r) => [`${r.repo}
+${r.sha}`, r.id]));
+  const pairs = new Map<string, { issueId: string; commitId: string }>();
+  for (const e of commits) {
+    const commitId = commitIds.get(`${e.repo}
+${e.sha}`);
+    if (!commitId) continue;
+    for (const key of e.keys) {
       const issue = byKey.get(key);
-      if (!issue) continue;
-      const res = await pool.query(
-        `insert into issue_commits (issue_id, commit_id)
-         select $1, $2
-          where not exists (select 1 from commit_unlinks where issue_id = $1 and commit_id = $2)
-         on conflict (issue_id, commit_id) do nothing`,
-        [issue.id, commitId]
-      );
-      if (res.rowCount) {
-        linked.set(issue.id, {
-          issueId: issue.id,
-          issueKey: issue.readable_id,
-          boardId: issue.board_id,
-          projectId: issue.project_id,
-        });
-      }
+      if (issue) pairs.set(`${issue.id}:${commitId}`, { issueId: issue.id, commitId });
+    }
+  }
+  if (!pairs.size) return [];
+  const made = await pool.query<{ issue_id: string }>(
+    `insert into issue_commits (issue_id, commit_id)
+     select v.issue_id, v.commit_id from unnest($1::uuid[], $2::uuid[]) as v(issue_id, commit_id)
+      where not exists (
+              select 1 from commit_unlinks u where u.issue_id = v.issue_id and u.commit_id = v.commit_id
+            )
+     on conflict (issue_id, commit_id) do nothing
+     returning issue_id`,
+    [[...pairs.values()].map((p) => p.issueId), [...pairs.values()].map((p) => p.commitId)]
+  );
+  const linked = new Map<string, Linked>();
+  const byId = new Map(issues.rows.map((r) => [r.id, r]));
+  for (const { issue_id: issueId } of made.rows) {
+    const issue = byId.get(issueId);
+    if (issue) {
+      linked.set(issueId, {
+        issueId,
+        issueKey: issue.readable_id,
+        boardId: issue.board_id,
+        projectId: issue.project_id,
+      });
     }
   }
   return [...linked.values()];
