@@ -318,9 +318,9 @@ async function visibleHistory(auth: Auth, projectId: string, rows: HistoryRow[])
   });
 }
 
-async function mayReachIssue(auth: Auth, issueId: string): Promise<boolean> {
+async function reachableIssue(auth: Auth, issueId: string): Promise<IssueRow | null> {
   const host = await issueById(issueId);
-  return !!host && (await mayOpenBoard(auth, host.board_id, host.project_id));
+  return host && (await mayOpenBoard(auth, host.board_id, host.project_id)) ? host : null;
 }
 
 async function loadIssueFor(
@@ -1806,9 +1806,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
     const { author_id: authorId, issue_id: issueId } = owner.rows[0];
-    if (!(await mayReachIssue(session, issueId))) {
-      return reply.code(403).send({ error: 'This issue is not open to you.' });
-    }
+    const host = await reachableIssue(session, issueId);
+    if (!host) return reply.code(403).send({ error: 'This issue is not open to you.' });
 
     const emoji = parsed.data.emoji;
     const on = await inTransaction(async (client) => {
@@ -1839,13 +1838,12 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return true;
     });
 
-    const host = await issueById(issueId);
     void publish({
       type: 'comment.reacted',
-      boardId: host?.board_id,
-      projectId: host?.project_id,
+      boardId: host.board_id,
+      projectId: host.project_id,
       issueId,
-      issueKey: host?.readable_id,
+      issueKey: host.readable_id,
       commentId: id,
       by: session.login,
       origin: tabOf(req),
@@ -1914,9 +1912,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id]
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
-    if (!(await mayReachIssue(auth, owner.rows[0].issue_id))) {
-      return reply.code(403).send({ error: 'This issue is not open to you.' });
-    }
+    const host = await reachableIssue(auth, owner.rows[0].issue_id);
+    if (!host) return reply.code(403).send({ error: 'This issue is not open to you.' });
     if (owner.rows[0].author_id !== auth.userId) {
       return reply.code(403).send({ error: 'Only the author can edit a comment.' });
     }
@@ -1928,15 +1925,14 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       await syncMentions(client, id, parsed.data.text, auth.userId);
       return updated;
     });
-    const host = await issueById(owner.rows[0].issue_id);
-    const text = host ? await adoptCommentImages(id, parsed.data.text, host, auth, tabOf(req)) : parsed.data.text;
+    const text = await adoptCommentImages(id, parsed.data.text, host, auth, tabOf(req));
     await writeHistory(pool, owner.rows[0].issue_id, auth, 'comment edited', null, null);
     void publish({
       type: 'comment.edited',
-      boardId: host?.board_id,
-      projectId: host?.project_id,
+      boardId: host.board_id,
+      projectId: host.project_id,
       issueId: owner.rows[0].issue_id,
-      issueKey: host?.readable_id,
+      issueKey: host.readable_id,
       commentId: id,
       by: auth.login,
       origin: tabOf(req),
@@ -1955,9 +1951,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [id]
     );
     if (!owner.rowCount) return reply.code(404).send({ error: 'No such comment.' });
-    if (!(await mayReachIssue(auth, owner.rows[0].issue_id))) {
-      return reply.code(403).send({ error: 'This issue is not open to you.' });
-    }
+    const host = await reachableIssue(auth, owner.rows[0].issue_id);
+    if (!host) return reply.code(403).send({ error: 'This issue is not open to you.' });
     const mine = owner.rows[0].author_id === auth.userId;
     if (!mine && !(await requireDeleter(req, reply))) return;
     const files = await pool.query<{ storage_path: string }>(
@@ -1966,14 +1961,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     );
     await pool.query('delete from issue_comments where id = $1', [id]);
     await Promise.all(files.rows.map((f) => unlink(onDisk(f.storage_path)).catch(() => {})));
-    const host = await issueById(owner.rows[0].issue_id);
     await writeHistory(pool, owner.rows[0].issue_id, auth, 'comment deleted', null, null);
     void publish({
       type: 'comment.deleted',
-      boardId: host?.board_id,
-      projectId: host?.project_id,
+      boardId: host.board_id,
+      projectId: host.project_id,
       issueId: owner.rows[0].issue_id,
-      issueKey: host?.readable_id,
+      issueKey: host.readable_id,
       commentId: id,
       by: auth.login,
       origin: tabOf(req),
@@ -2125,7 +2119,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     );
     const host = owner.rows[0];
     if (!host) return reply.code(404).send({ error: 'No such comment.' });
-    if (!(await mayReachIssue(auth, host.issue_id))) {
+    if (!(await reachableIssue(auth, host.issue_id))) {
       return reply.code(403).send({ error: 'This comment is not open to you.' });
     }
     const res = await pool.query<{ filename: string; storage_path: string }>(
@@ -2186,9 +2180,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     );
     const row = res.rows[0];
     if (!row) return reply.code(404).send({ error: 'No such file.' });
-    if (!(await mayReachIssue(auth, row.issue_id))) {
-      return reply.code(403).send({ error: 'This file is not open to you.' });
-    }
+    const host = await reachableIssue(auth, row.issue_id);
+    if (!host) return reply.code(403).send({ error: 'This file is not open to you.' });
     if (row.comment_id) {
       const owner = await pool.query<{ author_id: string }>(
         'select author_id from issue_comments where id = $1',
@@ -2208,14 +2201,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       ]);
     }
     await unlink(onDisk(row.storage_path)).catch(() => {});
-    const host = await issueById(row.issue_id);
     await writeHistory(pool, row.issue_id, auth, 'file removed', null, row.filename);
     void publish({
       type: 'attachment.deleted',
-      boardId: host?.board_id,
-      projectId: host?.project_id,
+      boardId: host.board_id,
+      projectId: host.project_id,
       issueId: row.issue_id,
-      issueKey: host?.readable_id,
+      issueKey: host.readable_id,
       by: auth.login,
       origin: tabOf(req),
     });
