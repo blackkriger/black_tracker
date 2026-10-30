@@ -8,7 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebStream } from 'node:stream/web';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { DAY_RE, inTransaction, listOf, onDays, pool } from './db.js';
+import { DAY_RE, inTransaction, listOf, onDays, pool, ZONE } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { denialsOf, mayOpenBoard } from './board-service.js';
@@ -2121,7 +2121,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const owner = await pool.query<{ issue_id: string; readable_id: string; said_at: string }>(
       // Dashes, not colons, in the time: a colon is not allowed in a Windows filename.
       `select c.issue_id, i.readable_id,
-              to_char(c.created_at at time zone 'Europe/Moscow', 'YYYY-MM-DD-HH24-MI') as said_at
+              to_char(c.created_at at time zone '${ZONE}', 'YYYY-MM-DD-HH24-MI') as said_at
          from issue_comments c join issues i on i.id = c.issue_id where c.id = $1`,
       [id]
     );
