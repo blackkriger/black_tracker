@@ -226,6 +226,11 @@ async function issueById(id: string): Promise<IssueRow | null> {
   return res.rows[0] ?? null;
 }
 
+async function issueByKey(key: string): Promise<IssueRow | null> {
+  const res = await pool.query<IssueRow>(`${ISSUE_SELECT} where lower(i.readable_id) = lower($1)`, [key]);
+  return res.rows[0] ?? null;
+}
+
 async function parentOf(issueId: string): Promise<IssueRow | null> {
   const res = await pool.query<IssueRow>(
     `${ISSUE_SELECT} join issue_links l on l.a = i.id and l.kind = 'subtask' where l.b = $1`,
@@ -952,10 +957,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const { key } = req.params as { key: string };
-    const res = await pool.query<IssueRow>(`${ISSUE_SELECT} where lower(i.readable_id) = lower($1)`, [
-      key,
-    ]);
-    const issue = res.rows[0];
+    const issue = await issueByKey(key);
     if (!issue) return reply.code(404).send({ error: 'No such issue.' });
     if (!(await mayOpenBoard(auth, issue.board_id, issue.project_id))) {
       return reply.code(403).send({ error: 'This issue is not open to you.' });
@@ -1319,10 +1321,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!found) return;
     const parsed = commitPick.extend({ key: z.string().trim().min(3).max(30) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Which commits, and to which issue?' });
-    const other = await pool.query<IssueRow>(`${ISSUE_SELECT} where lower(i.readable_id) = lower($1)`, [
-      parsed.data.key,
-    ]);
-    const target = other.rows[0];
+    const target = await issueByKey(parsed.data.key);
     if (!target) return reply.code(404).send({ error: 'No issue with that key.' });
     if (target.id === id) return reply.code(400).send({ error: 'These commits are already on this issue.' });
     if (!(await mayOpenBoard(found.auth, target.board_id, target.project_id))) {
@@ -1560,11 +1559,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (!parsed.success) return reply.code(400).send({ error: 'Which issue? Give its key.' });
     const { kind } = parsed.data;
 
-    const other = await pool.query<IssueRow>(
-      `${ISSUE_SELECT} where lower(i.readable_id) = lower($1)`,
-      [parsed.data.key]
-    );
-    const target = other.rows[0];
+    const target = await issueByKey(parsed.data.key);
     if (!target) return reply.code(404).send({ error: 'No issue with that key.' });
     if (target.id === id) return reply.code(400).send({ error: 'An issue cannot link to itself.' });
     if (!(await mayOpenBoard(found.auth, target.board_id, target.project_id))) {
