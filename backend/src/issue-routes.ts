@@ -383,32 +383,46 @@ async function noteStarred(
       where f.issue_id = $1 and f.user_id <> $2`,
     [issueId, actorId]
   );
-  for (const w of watchers.rows) {
-    if ((change.field === 'assignee' || change.field === 'watcher') && change.to === w.login) continue;
-    const open = await client.query<{ id: string; detail: string | null }>(
-      `select id, detail from notices
-        where user_id = $1 and issue_id = $2 and by_id = $3 and kind = 'starred'
-          and comment_id is null and read_at is null and created_at > now() - interval '10 minutes'
-        order by created_at desc
-        limit 1
-        for update`,
-      [w.user_id, issueId, actorId]
-    );
-    const kept = open.rows[0];
+  const due = watchers.rows.filter(
+    (w) => !((change.field === 'assignee' || change.field === 'watcher') && change.to === w.login)
+  );
+  if (!due.length) return;
+  const open = await client.query<{ id: string; user_id: string; detail: string | null }>(
+    `select id, user_id, detail from notices
+      where user_id = any($1::uuid[]) and issue_id = $2 and by_id = $3 and kind = 'starred'
+        and comment_id is null and read_at is null and created_at > now() - interval '10 minutes'
+      order by user_id, created_at desc
+      for update`,
+    [due.map((w) => w.user_id), issueId, actorId]
+  );
+  const latest = new Map<string, { id: string; detail: string | null }>();
+  for (const row of open.rows) if (!latest.has(row.user_id)) latest.set(row.user_id, row);
+  const updated: { id: string; detail: string }[] = [];
+  const dropped: string[] = [];
+  const added: { userId: string; detail: string }[] = [];
+  for (const w of due) {
+    const kept = latest.get(w.user_id);
     const changes = mergeChange(kept ? (JSON.parse(kept.detail ?? '[]') as StarChange[]) : [], change);
-    if (kept && changes.length) {
-      await client.query('update notices set detail = $2, created_at = now() where id = $1', [
-        kept.id,
-        JSON.stringify(changes),
-      ]);
-    } else if (kept) {
-      await client.query('delete from notices where id = $1', [kept.id]);
-    } else if (changes.length) {
-      await client.query(
-        `insert into notices (user_id, kind, issue_id, by_id, detail) values ($1, 'starred', $2, $3, $4)`,
-        [w.user_id, issueId, actorId, JSON.stringify(changes)]
-      );
-    }
+    if (kept && changes.length) updated.push({ id: kept.id, detail: JSON.stringify(changes) });
+    else if (kept) dropped.push(kept.id);
+    else if (changes.length) added.push({ userId: w.user_id, detail: JSON.stringify(changes) });
+  }
+  if (updated.length) {
+    await client.query(
+      `update notices n set detail = v.detail, created_at = now()
+         from unnest($1::uuid[], $2::text[]) as v(id, detail)
+        where n.id = v.id`,
+      [updated.map((u) => u.id), updated.map((u) => u.detail)]
+    );
+  }
+  if (dropped.length) await client.query('delete from notices where id = any($1::uuid[])', [dropped]);
+  if (added.length) {
+    await client.query(
+      `insert into notices (user_id, kind, issue_id, by_id, detail)
+       select v.user_id, 'starred', $3::uuid, $4::uuid, v.detail
+         from unnest($1::uuid[], $2::text[]) as v(user_id, detail)`,
+      [added.map((a) => a.userId), added.map((a) => a.detail), issueId, actorId]
+    );
   }
 }
 
