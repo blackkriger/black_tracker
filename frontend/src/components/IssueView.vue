@@ -143,6 +143,13 @@ interface Pushed {
 }
 type Entry = { key: string; at: string; comment?: Comment; event?: Pushed };
 
+const descriptionHtml = computed(() => asHtml(issue.value?.description ?? '', true));
+const expectedHtml = computed(() => asHtml(issue.value?.expected ?? '', true, true));
+const commentHtml = computed(() => {
+  const mine = session.me.value?.id;
+  return new Map((issue.value?.comments ?? []).map((c) => [c.id, asHtml(c.text, c.author.id === mine)]));
+});
+
 const thread = computed<Entry[]>(() => {
   const comments = issue.value?.comments ?? [];
   const pinned = comments.filter((c) => c.pinnedAt).map((c) => ({ key: c.id, at: c.createdAt, comment: c }));
@@ -1711,7 +1718,7 @@ async function removeIssue(): Promise<void> {
                 class="md iv__body"
                 :class="{ 'is-fresh': fresh.has('description') }"
                 @click="onTextClick($event, 'description')"
-                v-html="asHtml(issue?.description ?? '', true)"
+                v-html="descriptionHtml"
               ></div>
               <div v-else class="iv__body hint faint">{{ t('issue.nothingWritten') }}</div>
             </div>
@@ -1728,7 +1735,7 @@ async function removeIssue(): Promise<void> {
             </div>
             <div v-else-if="hasExpected" :class="{ 'is-fresh': fresh.has('expected') }">
               <div v-if="hasDescription" class="sec-h">{{ t('issue.expected') }}</div>
-              <div class="md iv__body" @click="onTextClick($event, 'expected')" v-html="asHtml(issue?.expected ?? '', true, true)"></div>
+              <div class="md iv__body" @click="onTextClick($event, 'expected')" v-html="expectedHtml"></div>
             </div>
 
             <div :class="{ 'is-fresh': fresh.has('links') }">
@@ -2007,7 +2014,7 @@ async function removeIssue(): Promise<void> {
                       v-else
                       class="md cm__body"
                       @click="onTextClick($event, c)"
-                      v-html="asHtml(c.text, c.author.id === session.me.value?.id)"
+                      v-html="commentHtml.get(c.id)"
                     ></div>
 
                     <div v-if="filesOf(c.id).length" class="cm__files">
