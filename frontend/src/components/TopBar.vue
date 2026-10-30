@@ -7,7 +7,7 @@ import { usePeople } from '../lib/people';
 import { useFocus } from '../lib/focus';
 import { useNotices, type NoticeKind } from '../lib/notices';
 import { useRoles } from '../lib/roles';
-import { useLive } from '../lib/live';
+import { settled, useLive } from '../lib/live';
 import { useSession } from '../lib/session';
 import DayWindow from './DayWindow.vue';
 import DatePanel from './DatePanel.vue';
@@ -163,6 +163,8 @@ function onKeydown(ev: KeyboardEvent): void {
   drawer.value = false;
 }
 
+const rereadNotices = settled(() => void readNotices());
+
 useLive((ev) => {
   if (['project.changed', 'board.changed'].includes(ev.type)) {
     void load(true);
@@ -176,7 +178,7 @@ useLive((ev) => {
     void load(true);
     void readNotices();
   }
-  if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void readNotices();
+  if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) rereadNotices();
   if (ev.type === 'session.changed') void api('/me').catch(() => {});
 }, () => {
   void load(true);

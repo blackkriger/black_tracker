@@ -256,6 +256,7 @@ watch(
 );
 watch([year, wide], () => void load());
 const reloadDays = settled(() => void load());
+const reloadFeed = settled(() => void loadFeed());
 const reloadLists = settled(() => {
   void loadMine();
   void loadStarred();
@@ -273,7 +274,7 @@ useLive((ev) => {
   if (ev.type.startsWith('issue.') || ev.type === 'favourite.changed' || RELOAD_ON.includes(ev.type)) {
     reloadLists();
   }
-  if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) void loadFeed();
+  if (ev.type.startsWith('comment.') || ev.type.startsWith('notice.')) reloadFeed();
 }, () => {
   reloadDays();
   reloadLists();

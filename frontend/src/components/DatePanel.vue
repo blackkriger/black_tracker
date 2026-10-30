@@ -102,7 +102,7 @@ onMounted(() => {
   window.addEventListener('resize', fill);
 });
 onBeforeUnmount(() => window.removeEventListener('resize', fill));
-watch(() => route.fullPath, () => void readMonth());
+watch(() => route.path, () => void readMonth());
 
 const rereadMonth = settled(() => void readMonth());
 useLive(
