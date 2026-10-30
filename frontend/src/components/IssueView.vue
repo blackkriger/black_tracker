@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import Dialog from './Dialog.vue';
 import ImageViewer from './ImageViewer.vue';
 import RichText from './RichText.vue';
-import { ApiError, TAB_ID, api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
 import { asHtml, flipCheck, flipStrike, isBlank, trimBlank } from '../lib/richtext';
 import { fromGoogleDoc } from '../lib/googleDoc';
 import { forgetKeys, keyInfo, refreshKey } from '../lib/issueKeys';
@@ -1414,18 +1414,9 @@ async function sendFiles(issueId: string, list: File[], commentId?: string): Pro
     const form = new FormData();
     form.append('file', file);
     const where = commentId ? `?comment=${commentId}` : '';
-    const res = await fetch(`/api/issues/${issueId}/attachments${where}`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'X-Tab-Id': TAB_ID },
-      body: form,
-    });
-    const payload = (await res.json().catch(() => null)) as
-      | { data?: Attachment; error?: string }
-      | null;
-    if (!res.ok || !payload?.data) throw new Error(payload?.error ?? t('issue.uploadFailed'));
+    const made = await api<Attachment>(`/issues/${issueId}/attachments${where}`, { method: 'POST', body: form });
     if (issue.value) {
-      issue.value = { ...issue.value, attachments: [...issue.value.attachments, payload.data] };
+      issue.value = { ...issue.value, attachments: [...issue.value.attachments, made] };
     }
   }
 }

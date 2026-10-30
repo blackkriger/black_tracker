@@ -26,15 +26,16 @@ export async function api<T>(
   init: Omit<RequestInit, 'body'> & { body?: unknown } = {}
 ): Promise<T> {
   const { body, headers, ...rest } = init;
+  const form = body instanceof FormData;
   const res = await fetch(`/api${path}`, {
     ...rest,
     credentials: 'include',
     headers: {
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(body !== undefined && !form ? { 'Content-Type': 'application/json' } : {}),
       'X-Tab-Id': TAB_ID,
       ...headers,
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: form ? body : body !== undefined ? JSON.stringify(body) : undefined,
   });
   const payload = (await res.json().catch(() => null)) as
     | { data?: T; error?: string }
