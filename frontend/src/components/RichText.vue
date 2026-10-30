@@ -5,7 +5,7 @@ import { useRoles } from '../lib/roles';
 import { useProjects } from '../lib/projects';
 import { api } from '../lib/api';
 import type { IssueLink } from '../lib/issues';
-import Quill from 'quill';
+import Quill from '../lib/quill';
 import 'quill/dist/quill.core.css';
 import { clean } from '../lib/richtext';
 import '../lib/mention-blot';

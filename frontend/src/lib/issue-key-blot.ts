@@ -1,4 +1,4 @@
-import Quill from 'quill';
+import Quill from './quill';
 import { keyInfo } from './issueKeys';
 import { ink } from './theme';
 
