@@ -20,7 +20,7 @@ import {
   type Issue,
 } from '../lib/issues';
 import { lastBoard, lastProject } from '../lib/lastProject';
-import { useLive } from '../lib/live';
+import { settled, useLive } from '../lib/live';
 import { Plus, Search, Star } from 'lucide-vue-next';
 import { ink } from '../lib/theme';
 import { vSplitLine as splitLine } from '../lib/splitLine';
@@ -159,11 +159,19 @@ function flash(issueId: string): void {
   }, 2000);
 }
 
+const changed = new Set<string>();
+const reloadIssues = settled(() => {
+  const board = current.value;
+  const ids = [...changed];
+  changed.clear();
+  if (board) void loadIssues(board.id, true).then(() => ids.forEach((id) => flash(id)));
+});
+
 useLive((ev) => {
   const board = current.value;
   if (!board) return;
   if (ev.type === 'favourite.changed') {
-    void loadIssues(board.id, true);
+    reloadIssues();
     return;
   }
   if (['state.changed', 'board.changed', 'project.changed', 'tag.changed'].includes(ev.type)) {
@@ -176,9 +184,8 @@ useLive((ev) => {
     issues.value = issues.value.filter((i) => i.id !== ev.issueId);
     return;
   }
-  void loadIssues(board.id, true).then(() => {
-    if (ev.issueId) flash(ev.issueId);
-  });
+  if (ev.issueId) changed.add(ev.issueId);
+  reloadIssues();
 }, () => {
   void load(String(route.params.short), true);
   if (current.value) void loadIssues(current.value.id, true);
@@ -242,8 +249,17 @@ function byOrder(a: Issue, b: Issue): number {
   return a.position - b.position || a.createdAt.localeCompare(b.createdAt);
 }
 
-const issuesOf = (stateId: string): Issue[] =>
-  filtered.value.filter((i) => i.stateId === stateId).sort(byOrder);
+const columns = computed(() => {
+  const by = new Map<string, Issue[]>();
+  for (const issue of filtered.value) {
+    const list = by.get(issue.stateId);
+    if (list) list.push(issue);
+    else by.set(issue.stateId, [issue]);
+  }
+  for (const list of by.values()) list.sort(byOrder);
+  return by;
+});
+const issuesOf = (stateId: string): Issue[] => columns.value.get(stateId) ?? [];
 
 async function loadIssues(boardId: string, quiet = false): Promise<void> {
   const mine = ++issuesRead;
