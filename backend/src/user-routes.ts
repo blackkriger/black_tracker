@@ -5,6 +5,7 @@ import {
   USER_SELECT,
   hashPassword,
   mayManageRoles,
+  newPassword,
   publicUser,
   requireAdmin,
   requireAuth,
@@ -19,7 +20,7 @@ export const accountCredentials = z.object({
     .min(2)
     .max(32)
     .regex(/^[a-zA-Z0-9_.-]+$/, 'Login can hold letters, digits, dot, dash and underscore'),
-  password: z.string().min(8).max(200),
+  password: newPassword,
   fullName: z.string().trim().max(120).optional(),
 });
 
@@ -133,7 +134,7 @@ export function registerUserRoutes(app: FastifyInstance): void {
   app.post('/users/:id/password', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const { id } = req.params as { id: string };
-    const parsed = z.object({ password: z.string().min(8).max(200) }).safeParse(req.body);
+    const parsed = z.object({ password: newPassword }).safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'The password must be at least 8 characters.' });
     }

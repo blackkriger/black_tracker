@@ -39,6 +39,9 @@ export const onDays = (column: string, from: string, to: string): string =>
   `(${column} >= coalesce(${from}::date::timestamp at time zone '${ZONE}', '-infinity')
     and ${column} < coalesce((${to}::date + 1)::timestamp at time zone '${ZONE}', 'infinity'))`;
 export const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+export const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+export const SET_RESOLVED = 'resolved_at = case when $2 then coalesce(resolved_at, now()) else null end';
 
 export const listOf = (value: string | undefined): string[] | null => {
   const items = (value ?? '')

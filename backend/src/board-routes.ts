@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { inTransaction, pool } from './db.js';
-import { filesOfIssues, sweepFiles } from './issue-routes.js';
+import { inTransaction, pool, SET_RESOLVED } from './db.js';
+import { removeWithFiles } from './issue-routes.js';
 import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
 import { boardsOfProject, projectByShort } from './project-routes.js';
 import {
@@ -17,7 +17,7 @@ import {
   type StateRow,
   tagIdsByBoard,
 } from './board-service.js';
-import { knownColor, pickColor } from './colors.js';
+import { freshColor, hexColor, knownColor } from './colors.js';
 
 const boardCreate = z.object({ name: z.string().trim().min(1).max(60) });
 
@@ -36,11 +36,7 @@ const stateCreate = z.object({
 
 const statePatch = z.object({
   name: z.string().trim().min(1).max(60).optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9a-f]{6}$/i)
-    .transform((c) => c.toLowerCase())
-    .optional(),
+  color: hexColor.optional(),
   isOpen: z.boolean().optional(),
   isResolved: z.boolean().optional(),
   position: z.number().int().min(0).optional(),
@@ -229,14 +225,8 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         return reply.code(403).send({ error: 'This board is not open to you.' });
       }
     }
-    const doomed = await pool.query<{ id: string }>('select id from issues where board_id = $1', [
-      id,
-    ]);
-    const ids = doomed.rows.map((r) => r.id);
-    const paths = await filesOfIssues(ids);
-    await pool.query('delete from boards where id = $1', [id]);
-    await sweepFiles(ids, paths);
-    return reply.send({ data: { ok: true, issues: doomed.rowCount ?? 0 } });
+    const issues = await removeWithFiles('board', id);
+    return reply.send({ data: { ok: true, issues } });
   });
 
   app.post('/boards/:id/states', async (req, reply) => {
@@ -254,10 +244,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const p = parsed.data;
     const flags = settleFlags(p, { is_open: true, is_resolved: false });
     try {
-      const taken = await pool.query<{ color: string }>(
-        'select color from states where board_id = $1',
-        [id]
-      );
+      const picked = await freshColor('select color from states where board_id = $1', [id]);
       const res = await pool.query<StateRow>(
         `insert into states (board_id, name, position, is_open, is_resolved, color)
          values ($1, $2, (select coalesce(max(position), -1) + 1 from states where board_id = $1), $3, $4, $5)
@@ -267,7 +254,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
           p.name,
           flags.isOpen,
           flags.isResolved,
-          knownColor(p.name) ?? pickColor(taken.rows.map((r) => r.color)),
+          knownColor(p.name) ?? picked,
         ]
       );
       return reply.code(201).send({ data: publicState(res.rows[0]) });
@@ -315,7 +302,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
         if (flags.isResolved !== before.rows[0].is_resolved) {
           await client.query(
             `update issues
-                set resolved_at = case when $2 then coalesce(resolved_at, now()) else null end
+                set ${SET_RESOLVED}
               where state_id = $1`,
             [id, flags.isResolved]
           );

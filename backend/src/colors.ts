@@ -1,6 +1,14 @@
+import { z } from 'zod';
+import { pool } from './db.js';
+
 const SAT = 62;
 const LIGHT = 64;
 const ROOMY_GAP = 90;
+
+export const hexColor = z
+  .string()
+  .regex(/^#[0-9a-f]{6}$/i)
+  .transform((c) => c.toLowerCase());
 
 export function hexToHue(hex: string): number | null {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
@@ -62,4 +70,9 @@ export function pickColor(taken: string[]): string {
   }
   const pos = size > ROOMY_GAP ? 0.25 + Math.random() * 0.5 : 0.5;
   return hslToHex(Math.round((start + size * pos) % 360), SAT, LIGHT);
+}
+
+export async function freshColor(takenSql: string, params: unknown[] = []): Promise<string> {
+  const taken = await pool.query<{ color: string }>(takenSql, params);
+  return pickColor(taken.rows.map((r) => r.color));
 }

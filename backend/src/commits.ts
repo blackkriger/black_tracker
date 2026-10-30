@@ -28,6 +28,14 @@ export function loginOf(email: string | null | undefined, username?: string | nu
   return hit ? hit[1] : null;
 }
 
+export const GITHUB_USER = `
+  left join users u on u.github_login is not null
+   and lower(u.github_login) = lower(coalesce(c.author_login, c.author_name))`;
+
+export const firstLine = (message: string): string => message.split('\n')[0];
+
+export const commitUrl = (repo: string, sha: string): string => `https://github.com/${repo}/commit/${sha}`;
+
 export async function projectKeys(): Promise<string[]> {
   const res = await pool.query<{ short_name: string }>('select short_name from projects');
   return res.rows.map((r) => r.short_name);

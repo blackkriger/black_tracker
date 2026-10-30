@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from './db.js';
 import { requireAuth, requireDeleter, type Auth } from './auth.js';
 import { denialsOf, mayOpenBoard } from './board-service.js';
-import { pickColor } from './colors.js';
+import { freshColor, hexColor } from './colors.js';
 
 interface TagRow {
   id: string;
@@ -27,11 +27,7 @@ const tagCreate = z.object({
 
 const tagPatch = z.object({
   name: z.string().trim().min(1).max(40).optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9a-f]{6}$/i)
-    .transform((c) => c.toLowerCase())
-    .optional(),
+  color: hexColor.optional(),
 });
 
 const TAG_COLUMNS = `id, name, color,
@@ -105,10 +101,9 @@ export function registerTagRoutes(app: FastifyInstance): void {
       return reply.code(409).send({ error: 'A tag with that name already exists.' });
     }
     if (!tag) {
-      const taken = await pool.query<{ color: string }>('select color from tags');
       const made = await pool.query<TagRow>(
         `insert into tags (name, color) values ($1, $2) returning id, name, color, 0 as used`,
-        [name, pickColor(taken.rows.map((r) => r.color))]
+        [name, await freshColor('select color from tags')]
       );
       tag = made.rows[0];
     }

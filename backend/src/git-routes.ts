@@ -1,5 +1,6 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { sameSecret } from './auth.js';
 import { keysIn, loginOf, mergeOf, projectKeys, recordCommits, type CommitEvent } from './commits.js';
 import { env } from './env.js';
 import { publish } from './events.js';
@@ -22,9 +23,7 @@ type RawRequest = FastifyRequest & { rawBody?: string };
 
 function signedRight(raw: string, header: unknown): boolean {
   if (!env.githubWebhookSecret || typeof header !== 'string' || !header.startsWith('sha256=')) return false;
-  const want = Buffer.from(createHmac('sha256', env.githubWebhookSecret).update(raw).digest('hex'));
-  const got = Buffer.from(header.slice(7));
-  return want.length === got.length && timingSafeEqual(want, got);
+  return sameSecret(createHmac('sha256', env.githubWebhookSecret).update(raw).digest('hex'), header.slice(7));
 }
 
 export async function eventsOfPush(payload: PushPayload): Promise<CommitEvent[]> {

@@ -1,7 +1,7 @@
-import { timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { ReadableStream as WebStream } from 'node:stream/web';
 import type { FastifyInstance } from 'fastify';
+import { sameSecret } from './auth.js';
 import { env, vkReady } from './env.js';
 import {
   FILE_LIMIT,
@@ -184,9 +184,7 @@ registerAdapter(vkAdapter);
 
 function secretRight(given: unknown): boolean {
   if (typeof given !== 'string') return false;
-  const want = Buffer.from(env.vkSecret);
-  const got = Buffer.from(given);
-  return want.length === got.length && timingSafeEqual(want, got);
+  return sameSecret(env.vkSecret, given);
 }
 
 const MIME: Record<string, string> = {

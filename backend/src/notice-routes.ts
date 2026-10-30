@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
-import { DAY_RE, onDays, pool } from './db.js';
+import { DAY_RE, onDays, pool, UUID_RE } from './db.js';
 import { requireAuth } from './auth.js';
 import { denialsOf } from './board-service.js';
 
@@ -18,6 +18,10 @@ export const plain = (html: string): string =>
     .trim();
 
 const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export const NOTICE_ISSUE = `
+  left join issue_comments c on c.id = n.comment_id
+  join issues i on i.id = coalesce(c.issue_id, n.issue_id)`;
 
 export async function syncMentions(
   client: PoolClient,
@@ -89,7 +93,7 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
     const from = q.from?.trim() || null;
     const to = q.to?.trim() || null;
     const size = Math.min(200, Math.max(1, Number(q.limit) || 10));
-    const after = q.after && /^[0-9a-f-]{36}$/i.test(q.after) ? q.after : null;
+    const after = q.after && UUID_RE.test(q.after) ? q.after : null;
     if ((from && !DAY_RE.test(from)) || (to && !DAY_RE.test(to))) {
       return reply.code(400).send({ error: 'Dates go as YYYY-MM-DD.' });
     }
@@ -101,9 +105,8 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
       `select n.id, n.kind, n.detail, n.comment_id, c.text, i.summary, n.created_at, n.read_at,
               u.login as by_login, i.readable_id, p.short_name, b.slug, st.color as state_color
          from notices n
-         left join issue_comments c on c.id = n.comment_id
+         ${NOTICE_ISSUE}
          left join users u on u.id = n.by_id
-         join issues i on i.id = coalesce(c.issue_id, n.issue_id)
          join projects p on p.id = i.project_id
          join boards b on b.id = i.board_id
          join states st on st.id = i.state_id
@@ -134,8 +137,7 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
     const res = await pool.query<{ kind: string; n: number }>(
       `select n.kind, count(*)::int as n
          from notices n
-         left join issue_comments c on c.id = n.comment_id
-         join issues i on i.id = coalesce(c.issue_id, n.issue_id)
+         ${NOTICE_ISSUE}
         where n.user_id = $1 and n.read_at is null
           and i.project_id <> all($2::uuid[])
           and i.board_id <> all($3::uuid[])

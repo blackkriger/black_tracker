@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { DAY_RE, listOf, onDays, pool, ZONE } from './db.js';
+import { DAY_RE, listOf, onDays, pool, UUID_RE, ZONE } from './db.js';
 import { requireAuth } from './auth.js';
 import { shutOut } from './board-service.js';
 import { stretchesOf, workTrail, type HandRow } from './work.js';
@@ -188,7 +188,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance): void {
     const q = req.query as Record<string, string | undefined>;
     const only = listOf(q.projects);
     const inState = listOf(q.states);
-    const tagged = listOf(q.tags)?.filter((t) => /^[0-9a-f-]{36}$/i.test(t)) ?? null;
+    const tagged = listOf(q.tags)?.filter((t) => UUID_RE.test(t)) ?? null;
     const holders = listOf(q.assignees);
     const writers = listOf(q.authors);
     const watchers = listOf(q.watchers);

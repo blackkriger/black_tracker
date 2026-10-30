@@ -2,12 +2,12 @@ import type { Readable } from 'node:stream';
 import type { FastifyInstance } from 'fastify';
 import { hashToken, newRawToken, requireSession } from './auth.js';
 import { DENIES_NOTHING, deniedFor } from './board-service.js';
-import { inTransaction, pool } from './db.js';
+import { inTransaction, pool, UUID_RE } from './db.js';
 import { deed, langOf, shortDay, WORDS, type Deed, type Gender, type Lang } from './words.js';
 import { env } from './env.js';
 import { publish, tabOf } from './events.js';
 import { boardDefaults, createIssue, recordFile, storeFile } from './issue-routes.js';
-import { plain } from './notice-routes.js';
+import { NOTICE_ISSUE, plain } from './notice-routes.js';
 
 export type Channel = 'telegram' | 'vk';
 export const CHANNELS: Channel[] = ['telegram', 'vk'];
@@ -195,8 +195,7 @@ const SEND_SELECT = `
     join users u on u.id = n.user_id
     left join messenger_links l on l.user_id = n.user_id and l.channel = s.channel
     left join users bu on bu.id = n.by_id
-    left join issue_comments c on c.id = n.comment_id
-    join issues i on i.id = coalesce(c.issue_id, n.issue_id)
+    ${NOTICE_ISSUE}
     join projects p on p.id = i.project_id
     join boards b on b.id = i.board_id`;
 
@@ -359,7 +358,7 @@ const tellerOf = async (channel: Channel, peer: number): Promise<Teller | null> 
     )
   ).rows[0] ?? null;
 
-const escapeHtml = (s: string): string =>
+export const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const paragraphs = (text: string): string =>
@@ -479,7 +478,7 @@ export async function issueCommand(adapter: Adapter, args: string, m: Incoming):
 
 export async function pick(adapter: Adapter, from: number, data: string): Promise<void> {
   const [kind, draftId, index] = data.split(':');
-  if (!/^[0-9a-f-]{36}$/i.test(draftId ?? '')) return;
+  if (!UUID_RE.test(draftId ?? '')) return;
   const user = await tellerOf(adapter.channel, from);
   if (!user) return;
   const res = await pool.query<DraftRow>(

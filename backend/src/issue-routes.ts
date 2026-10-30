@@ -8,12 +8,13 @@ import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebStream } from 'node:stream/web';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { DAY_RE, inTransaction, listOf, onDays, pool, ZONE } from './db.js';
+import { DAY_RE, inTransaction, listOf, onDays, pool, SET_RESOLVED, UUID_RE, ZONE } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
 import { denialsOf, mayOpenBoard } from './board-service.js';
+import { commitUrl, firstLine, GITHUB_USER } from './commits.js';
 import { syncMentions } from './notice-routes.js';
-import { publish, tabOf } from './events.js';
+import { publish, tabOf, type LiveEvent } from './events.js';
 
 const PRIORITIES = ['Critical', 'Major', 'Normal', 'Minor'] as const;
 
@@ -50,6 +51,12 @@ export function disposition(kind: 'inline' | 'attachment', name: string): string
     (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
   );
   return `${kind}; filename="${plain}"; filename*=UTF-8''${encoded}`;
+}
+
+export function fileHeaders(reply: FastifyReply, type: string, kind: 'inline' | 'attachment', name: string): void {
+  reply.header('Content-Type', type);
+  reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('Content-Disposition', disposition(kind, name));
 }
 
 interface IssueRow {
@@ -239,17 +246,28 @@ async function parentOf(issueId: string): Promise<IssueRow | null> {
   return res.rows[0] ?? null;
 }
 
+function announce(
+  type: string,
+  issue: Pick<IssueRow, 'id' | 'board_id' | 'project_id' | 'readable_id'>,
+  by: string,
+  origin?: string,
+  extra: Partial<LiveEvent> = {}
+): void {
+  void publish({
+    type,
+    boardId: issue.board_id,
+    projectId: issue.project_id,
+    issueId: issue.id,
+    issueKey: issue.readable_id,
+    ...extra,
+    by,
+    origin,
+  });
+}
+
 function announceParent(parent: IssueRow | null, by: string): void {
   if (!parent) return;
-  void publish({
-    type: 'issue.linked',
-    boardId: parent.board_id,
-    projectId: parent.project_id,
-    issueId: parent.id,
-    issueKey: parent.readable_id,
-    fields: ['links'],
-    by,
-  });
+  announce('issue.linked', parent, by, undefined, { fields: ['links'] });
 }
 
 async function subtaskCounts(
@@ -512,7 +530,7 @@ async function changeState(
     byId(toStateId)?.name ?? null
   );
   await client.query(
-    `update issues set resolved_at = case when $2 then coalesce(resolved_at, now()) else null end
+    `update issues set ${SET_RESOLVED}
       where id = $1`,
     [issueId, byId(toStateId)?.is_resolved === true]
   );
@@ -539,7 +557,7 @@ const issueCreate = z.object({
   priority: z.enum(PRIORITIES).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   watcherId: z.string().uuid().nullable().optional(),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  dueDate: z.string().regex(DAY_RE).nullable().optional(),
   tagIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
@@ -556,16 +574,9 @@ export const REACTIONS = [
 ] as const;
 
 const issuePatch = z.object({
-  summary: z.string().trim().min(1).max(300).optional(),
+  summary: issueCreate.shape.summary.optional(),
   boardId: z.string().uuid().optional(),
-  description: description.optional(),
-  expected: description.optional(),
-  stateId: z.string().uuid().optional(),
-  priority: z.enum(PRIORITIES).optional(),
-  assigneeId: z.string().uuid().nullable().optional(),
-  watcherId: z.string().uuid().nullable().optional(),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  tagIds: z.array(z.string().uuid()).max(50).optional(),
+  ...issueCreate.omit({ summary: true }).shape,
 });
 
 export const onDisk = (stored: string): string => path.join(env.uploadDir, stored);
@@ -587,6 +598,15 @@ export async function sweepFiles(issueIds: string[], paths: string[]): Promise<v
       rm(path.join(env.uploadDir, id.toLowerCase()), { recursive: true, force: true }).catch(() => {})
     )
   );
+}
+
+export async function removeWithFiles(owner: 'board' | 'project', id: string): Promise<number> {
+  const doomed = await pool.query<{ id: string }>(`select id from issues where ${owner}_id = $1`, [id]);
+  const ids = doomed.rows.map((r) => r.id);
+  const paths = await filesOfIssues(ids);
+  await pool.query(`delete from ${owner}s where id = $1`, [id]);
+  await sweepFiles(ids, paths);
+  return doomed.rowCount ?? 0;
 }
 
 interface BoardDefaults {
@@ -712,7 +732,10 @@ export async function createIssue(
 }
 
 export async function storeFile(issueId: string, source: NodeJS.ReadableStream, filename: string): Promise<string> {
-  const folder = issueId.toLowerCase();
+  return storeIn(issueId.toLowerCase(), source, filename);
+}
+
+export async function storeIn(folder: string, source: NodeJS.ReadableStream, filename: string): Promise<string> {
   await mkdir(onDisk(folder), { recursive: true });
   // Stored under our own name: the uploaded one may collide or carry a path out of the folder.
   const ext = path.extname(filename).slice(0, 12).replace(/[^a-zA-Z0-9.]/g, '');
@@ -828,15 +851,7 @@ export async function recordFile(
     await pool.query('update issue_comments set edited_at = now() where id = $1', [file.commentId]);
   }
   await writeHistory(pool, issue.id, by, 'file added', null, filename);
-  void publish({
-    type: 'attachment.added',
-    boardId: issue.board_id,
-    projectId: issue.project_id,
-    issueId: issue.id,
-    issueKey: issue.readable_id,
-    by: by.login,
-    origin,
-  });
+  announce('attachment.added', issue, by.login, origin);
   return { id: res.rows[0].id, filename, size, createdAt: res.rows[0].created_at };
 }
 
@@ -943,22 +958,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           state.rows[0].name
         );
         await client.query(
-          `update issues set resolved_at = case when $2 then coalesce(resolved_at, now()) else null end
+          `update issues set ${SET_RESOLVED}
             where id = $1`,
           [issueId, state.rows[0].is_resolved]
         );
       }
     });
 
-    void publish({
-      type: 'issue.moved',
-      boardId: id,
-      projectId: moved.project_id,
+    announce('issue.moved', moved, auth.login, tabOf(req), {
       issueId,
-      issueKey: moved.readable_id,
       fields: moved.state_id === stateId ? [] : ['status'],
-      by: auth.login,
-      origin: tabOf(req),
     });
     if (moved.state_id !== stateId) {
       announceParent(await parentOf(issueId), auth.login);
@@ -1018,8 +1027,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
                 c.author_login, c.at, u.login as by_login
            from issue_commits l
            join repo_commits c on c.id = l.commit_id
-           left join users u on u.github_login is not null
-            and lower(u.github_login) = lower(coalesce(c.author_login, c.author_name))
+           ${GITHUB_USER}
           where l.issue_id = $1
           order by c.at`,
         [issue.id]
@@ -1054,13 +1062,13 @@ export function registerIssueRoutes(app: FastifyInstance): void {
           id: c.id,
           kind: c.kind,
           sha: c.sha,
-          message: c.message.split('\n')[0],
+          message: firstLine(c.message),
           branch: c.branch,
           mergedFrom: c.merged_from,
           author: c.author_login ?? c.author_name,
           by: c.by_login,
           at: c.at.toISOString(),
-          url: `https://github.com/${c.repo}/commit/${c.sha}`,
+          url: commitUrl(c.repo, c.sha),
         })),
         attachments: attachments.rows.map((a) => ({
           id: a.id,
@@ -1275,30 +1283,16 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       void tellWatchers(row as IssueRow, auth.userId);
     }
     const [tags, stars] = await Promise.all([tagsFor([id]), starredBy(auth.userId, [id])]);
-    void publish({
-      type: 'issue.updated',
+    announce('issue.updated', issue, auth.login, tabOf(req), {
       boardId: home,
-      projectId: issue.project_id,
       issueId: id,
-      issueKey: issue.readable_id,
       fields: Object.keys(p),
-      by: auth.login,
-      origin: tabOf(req),
     });
     if (nextState !== undefined && nextState !== issue.state_id) {
       announceParent(await parentOf(id), auth.login);
     }
     if (landing) {
-      void publish({
-        type: 'issue.moved',
-        boardId: issue.board_id,
-        projectId: issue.project_id,
-        issueId: id,
-        issueKey: issue.readable_id,
-        fields: ['board'],
-        by: auth.login,
-        origin: tabOf(req),
-      });
+      announce('issue.moved', issue, auth.login, tabOf(req), { issueId: id, fields: ['board'] });
     }
     return reply.send({ data: publicIssue(row as IssueRow, tags.get(id) ?? [], stars.has(id)) });
   });
@@ -1404,15 +1398,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     await pool.query('delete from issues where id = $1', [id]);
     await sweepFiles([id], doomed);
     announceParent(parent, auth.login);
-    void publish({
-      type: 'issue.deleted',
-      boardId: issue.board_id,
-      projectId: issue.project_id,
-      issueId: id,
-      issueKey: issue.readable_id,
-      by: auth.login,
-      origin: tabOf(req),
-    });
+    announce('issue.deleted', issue, auth.login, tabOf(req), { issueId: id });
     return reply.send({ data: { ok: true } });
   });
 
@@ -1424,7 +1410,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (denied.everything) return reply.send({ data: [] });
     const from = q.from && DAY_RE.test(q.from) ? q.from : null;
     const to = q.to && DAY_RE.test(q.to) ? q.to : null;
-    const tags = listOf(q.tags)?.filter((t) => /^[0-9a-f-]{36}$/i.test(t)) ?? null;
+    const tags = listOf(q.tags)?.filter((t) => UUID_RE.test(t)) ?? null;
     const term = (q.q ?? '').trim().slice(0, 100) || null;
     const res = await pool.query<ListedRow>(
       `select i.*, a.login as assignee_login, v.login as watcher_login, w.login as author_login,
@@ -1525,7 +1511,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const { q, exclude } = req.query as { q?: string; exclude?: string };
     const term = (q ?? '').trim().slice(0, 100);
     if (!term) return reply.send({ data: [] });
-    const skip = exclude && /^[0-9a-fA-F-]{36}$/.test(exclude) ? exclude : null;
+    const skip = exclude && UUID_RE.test(exclude) ? exclude : null;
     const number = /^\d+$/.test(term) ? term : null;
     const res = await pool.query<LinkRow>(
       `select i.id, i.readable_id, i.summary, i.board_id, i.project_id,
@@ -1683,15 +1669,8 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     });
     if (!linked) return reply.code(409).send({ error: 'These two are already linked.' });
     for (const side of [self, target]) {
-      void publish({
-        type: 'issue.linked',
-        boardId: side.board_id,
-        projectId: side.project_id,
-        issueId: side.id,
-        issueKey: side.readable_id,
+      announce('issue.linked', side, found.auth.login, tabOf(req), {
         fields: duplicateState && side.id === from?.id ? ['links', 'stateId'] : ['links'],
-        by: found.auth.login,
-        origin: tabOf(req),
       });
     }
     if (from && duplicateState) announceParent(await parentOf(from.id), found.auth.login);
@@ -1730,16 +1709,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (other) {
       for (const side of [found.issue, other]) void tellWatchers(side, found.auth.userId);
       for (const side of [found.issue, other]) {
-        void publish({
-          type: 'issue.linked',
-          boardId: side.board_id,
-          projectId: side.project_id,
-          issueId: side.id,
-          issueKey: side.readable_id,
-          fields: ['links'],
-          by: found.auth.login,
-          origin: tabOf(req),
-        });
+        announce('issue.linked', side, found.auth.login, tabOf(req), { fields: ['links'] });
       }
     }
     return reply.send({ data: { ok: true } });
@@ -1778,16 +1748,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     if (starredNow) tellStarred(auth.userId, found.issue);
     row.text = await adoptCommentImages(row.id, row.text, found.issue, auth, tabOf(req));
     await writeHistory(pool, id, auth, 'comment added', null, null);
-    void publish({
-      type: 'comment.added',
-      boardId: found.issue.board_id,
-      projectId: found.issue.project_id,
-      issueId: id,
-      issueKey: found.issue.readable_id,
-      commentId: row.id,
-      by: auth.login,
-      origin: tabOf(req),
-    });
+    announce('comment.added', found.issue, auth.login, tabOf(req), { issueId: id, commentId: row.id });
     return reply.code(201).send({
       data: {
         id: row.id,
@@ -1846,16 +1807,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return true;
     });
 
-    void publish({
-      type: 'comment.reacted',
-      boardId: host.board_id,
-      projectId: host.project_id,
-      issueId,
-      issueKey: host.readable_id,
-      commentId: id,
-      by: session.login,
-      origin: tabOf(req),
-    });
+    announce('comment.reacted', host, session.login, tabOf(req), { commentId: id });
     return reply.send({ data: { on } });
   });
 
@@ -1890,16 +1842,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       null,
       null
     );
-    void publish({
-      type: 'comment.pinned',
-      boardId: host.board_id,
-      projectId: host.project_id,
-      issueId: host.id,
-      issueKey: host.readable_id,
-      commentId: id,
-      by: auth.login,
-      origin: tabOf(req),
-    });
+    announce('comment.pinned', host, auth.login, tabOf(req), { commentId: id });
     return reply.send({
       data: {
         id,
@@ -1935,16 +1878,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     });
     const text = await adoptCommentImages(id, parsed.data.text, host, auth, tabOf(req));
     await writeHistory(pool, owner.rows[0].issue_id, auth, 'comment edited', null, null);
-    void publish({
-      type: 'comment.edited',
-      boardId: host.board_id,
-      projectId: host.project_id,
-      issueId: owner.rows[0].issue_id,
-      issueKey: host.readable_id,
-      commentId: id,
-      by: auth.login,
-      origin: tabOf(req),
-    });
+    announce('comment.edited', host, auth.login, tabOf(req), { commentId: id });
     return reply.send({
       data: { id, text, editedAt: res.rows[0].edited_at.toISOString() },
     });
@@ -1970,16 +1904,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     await pool.query('delete from issue_comments where id = $1', [id]);
     await Promise.all(files.rows.map((f) => unlink(onDisk(f.storage_path)).catch(() => {})));
     await writeHistory(pool, owner.rows[0].issue_id, auth, 'comment deleted', null, null);
-    void publish({
-      type: 'comment.deleted',
-      boardId: host.board_id,
-      projectId: host.project_id,
-      issueId: owner.rows[0].issue_id,
-      issueKey: host.readable_id,
-      commentId: id,
-      by: auth.login,
-      origin: tabOf(req),
-    });
+    announce('comment.deleted', host, auth.login, tabOf(req), { commentId: id });
     return reply.send({ data: { ok: true } });
   });
 
@@ -2065,9 +1990,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       return reply.code(403).send({ error: 'This file is not open to you.' });
     }
     const inline = INLINE_TYPES.has(row.mime);
-    reply.header('Content-Type', inline ? row.mime : 'application/octet-stream');
-    reply.header('X-Content-Type-Options', 'nosniff');
-    reply.header('Content-Disposition', disposition(inline ? 'inline' : 'attachment', row.filename));
+    fileHeaders(reply, inline ? row.mime : 'application/octet-stream', inline ? 'inline' : 'attachment', row.filename);
     return reply.send(createReadStream(onDisk(row.storage_path)));
   });
 
@@ -2081,9 +2004,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       if (await stat(onDisk(file.storage_path)).then(() => true, () => false)) present.push(file);
     }
     if (!present.length) return reply.code(404).send({ error: 'Nothing is attached here.' });
-    reply.header('Content-Type', 'application/zip');
-    reply.header('X-Content-Type-Options', 'nosniff');
-    reply.header('Content-Disposition', disposition('attachment', name));
+    fileHeaders(reply, 'application/zip', 'attachment', name);
     const zip = new ZipArchive();
     const taken = new Set<string>();
     for (const file of present) {
@@ -2210,15 +2131,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     }
     await unlink(onDisk(row.storage_path)).catch(() => {});
     await writeHistory(pool, row.issue_id, auth, 'file removed', null, row.filename);
-    void publish({
-      type: 'attachment.deleted',
-      boardId: host.board_id,
-      projectId: host.project_id,
-      issueId: row.issue_id,
-      issueKey: host.readable_id,
-      by: auth.login,
-      origin: tabOf(req),
-    });
+    announce('attachment.deleted', host, auth.login, tabOf(req));
     return reply.send({ data: { ok: true } });
   });
 }

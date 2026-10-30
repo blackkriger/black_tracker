@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { requireAdmin, requireAuth } from './auth.js';
 import { deniedFor } from './board-service.js';
-import { pickColor } from './colors.js';
+import { freshColor } from './colors.js';
 
 interface RoleRow {
   id: string;
@@ -33,11 +33,6 @@ const rolePatch = z.object({
   canManageRoles: z.boolean().optional(),
 });
 
-async function takenColors(): Promise<string[]> {
-  const res = await pool.query<{ color: string }>('select color from roles');
-  return res.rows.map((r) => r.color);
-}
-
 export function registerRoleRoutes(app: FastifyInstance): void {
   app.get('/roles', async (req, reply) => {
     if (!(await requireAuth(req, reply))) return;
@@ -59,7 +54,7 @@ export function registerRoleRoutes(app: FastifyInstance): void {
        returning id, name, color, can_delete, can_manage_roles`,
       [
         name,
-        pickColor(await takenColors()),
+        await freshColor('select color from roles'),
         parsed.data.canDelete ?? false,
         parsed.data.canManageRoles ?? false,
       ]

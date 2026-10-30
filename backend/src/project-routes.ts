@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { pool } from './db.js';
 import { sweepBuilds } from './build-routes.js';
-import { filesOfIssues, sweepFiles } from './issue-routes.js';
+import { removeWithFiles } from './issue-routes.js';
 import { requireAuth, requireDeleter } from './auth.js';
 import {
   type BoardRow,
@@ -182,15 +182,9 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     ) {
       return reply.code(400).send({ error: 'Type name of the project to confirm.' });
     }
-    const doomed = await pool.query<{ id: string }>('select id from issues where project_id = $1', [
-      project.id,
-    ]);
-    const ids = doomed.rows.map((r) => r.id);
-    const paths = await filesOfIssues(ids);
-    await pool.query('delete from projects where id = $1', [project.id]);
-    await sweepFiles(ids, paths);
+    const issues = await removeWithFiles('project', project.id);
     await sweepBuilds(project.id);
-    return reply.send({ data: { ok: true, issues: doomed.rowCount ?? 0 } });
+    return reply.send({ data: { ok: true, issues } });
   });
 
   app.patch('/projects/:short', async (req, reply) => {

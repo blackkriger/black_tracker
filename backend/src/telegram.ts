@@ -1,9 +1,10 @@
-import { timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { ReadableStream as WebStream } from 'node:stream/web';
 import type { FastifyInstance } from 'fastify';
+import { sameSecret } from './auth.js';
 import { env, telegramReady } from './env.js';
 import {
+  escapeHtml,
   FILE_LIMIT,
   issueCommand,
   linkByCode,
@@ -69,11 +70,10 @@ async function bot<T>(method: string, body: object): Promise<BotReply<T>> {
   return (await res.json()) as BotReply<T>;
 }
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
 const segments = (line: Segment[]): string =>
-  line.map((s) => (typeof s === 'string' ? esc(s) : `<a href="${esc(s.url)}">${esc(s.text)}</a>`)).join('');
+  line
+    .map((s) => (typeof s === 'string' ? escapeHtml(s) : `<a href="${escapeHtml(s.url)}">${escapeHtml(s.text)}</a>`))
+    .join('');
 
 const format = (n: Note): string =>
   [...(n.head ? [`<b>${segments(n.head)}</b>`] : []), ...n.lines.map(segments)].join('\n');
@@ -142,9 +142,7 @@ registerAdapter(telegram);
 
 function secretRight(header: unknown): boolean {
   if (typeof header !== 'string') return false;
-  const want = Buffer.from(env.telegramWebhookSecret);
-  const got = Buffer.from(header);
-  return want.length === got.length && timingSafeEqual(want, got);
+  return sameSecret(env.telegramWebhookSecret, header);
 }
 
 const nameOf = (from: TelegramUser | undefined): string | null =>

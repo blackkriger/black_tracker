@@ -1,15 +1,16 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { onDays, pool, ZONE } from './db.js';
+import { DAY_RE, onDays, pool, ZONE } from './db.js';
 import { requireAuth, requireDeleter, type Auth } from './auth.js';
 import { denialsOf, mayOpenProject, shutOut } from './board-service.js';
+import { NOTICE_ISSUE } from './notice-routes.js';
 import { projectByShort } from './project-routes.js';
 import { workOf } from './work.js';
 
 
 const range = z.object({
-  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  from: z.string().regex(DAY_RE),
+  to: z.string().regex(DAY_RE),
 });
 
 // Only http(s) links are stored: a javascript: URL in an href would run script.
@@ -24,7 +25,7 @@ const address = z
 const MARK_ICONS = ['flag', 'milestone', 'gem', 'sparkles', 'swords', 'rocket', 'calendar-heart', 'crown'] as const;
 
 const markBody = z.object({
-  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  day: z.string().regex(DAY_RE),
   title: z.string().trim().min(1).max(120),
   project: z.string().trim().max(20).nullable().optional(),
   url: address,
@@ -45,6 +46,13 @@ interface MarkRow {
   project_name: string | null;
   by_login: string | null;
 }
+
+const MARK_SELECT = `
+  select k.id, k.day, k.title, k.url, k.banner, k.icon,
+         p.short_name, p.name as project_name, u.login as by_login
+    from key_dates k
+    left join projects p on p.id = k.project_id
+    left join users u on u.id = k.created_by`;
 
 const publicMark = (r: MarkRow) => ({
   id: r.id,
@@ -80,11 +88,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
 
     const [marks, dues, activity, mentions, worked, days] = await Promise.all([
       pool.query<MarkRow>(
-        `select k.id, k.day, k.title, k.url, k.banner, k.icon,
-                p.short_name, p.name as project_name, u.login as by_login
-           from key_dates k
-           left join projects p on p.id = k.project_id
-           left join users u on u.id = k.created_by
+        `${MARK_SELECT}
           where k.day between $1 and $2
             and (k.project_id is null or k.project_id <> all($3::uuid[]))
           order by k.day, lower(k.title)`,
@@ -140,8 +144,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
                 count(*)::int as said,
                 count(*) filter (where n.read_at is null)::int as unread
            from notices n
-           left join issue_comments c on c.id = n.comment_id
-           join issues i on i.id = coalesce(c.issue_id, n.issue_id)
+           ${NOTICE_ISSUE}
           where n.user_id = $1
             and ${onDays('n.created_at', '$2', '$3')}
             and i.project_id <> all($4::uuid[])
@@ -227,11 +230,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
     const denied = await shutOut(auth);
     if (denied.all) return reply.send({ data: null });
     const res = await pool.query<MarkRow>(
-      `select k.id, k.day, k.title, k.url, k.banner, k.icon,
-              p.short_name, p.name as project_name, u.login as by_login
-         from key_dates k
-         left join projects p on p.id = k.project_id
-         left join users u on u.id = k.created_by
+      `${MARK_SELECT}
         where k.day >= (now() at time zone '${ZONE}')::date
           and (k.project_id is null or k.project_id <> all($1::uuid[]))
         order by k.day, lower(k.title)
@@ -330,15 +329,7 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
 }
 
 async function markById(id: string) {
-  const res = await pool.query<MarkRow>(
-    `select k.id, k.day, k.title, k.url, k.banner, k.icon,
-            p.short_name, p.name as project_name, u.login as by_login
-       from key_dates k
-       left join projects p on p.id = k.project_id
-       left join users u on u.id = k.created_by
-      where k.id = $1`,
-    [id]
-  );
+  const res = await pool.query<MarkRow>(`${MARK_SELECT} where k.id = $1`, [id]);
   return publicMark(res.rows[0]);
 }
 

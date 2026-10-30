@@ -1,8 +1,6 @@
-import { randomUUID } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, rm, stat, unlink } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
@@ -10,7 +8,7 @@ import { env } from './env.js';
 import { requireAuth, type Auth } from './auth.js';
 import { denialsOf, mayOpenProject } from './board-service.js';
 import { publish, tabOf } from './events.js';
-import { disposition, onDisk } from './issue-routes.js';
+import { disposition, fileHeaders, onDisk, storeIn } from './issue-routes.js';
 import { projectByShort } from './project-routes.js';
 
 export const BUILD_MAX_BYTES = 1024 * 1024 * 1024;
@@ -219,14 +217,10 @@ export function registerBuildRoutes(app: FastifyInstance): void {
     const file = await req.file({ limits: { fileSize: BUILD_MAX_BYTES, files: 1 } });
     if (!file) return reply.code(400).send({ error: 'Send a file.' });
 
-    const folder = buildFolder(project.id);
-    await mkdir(onDisk(folder), { recursive: true });
-    const ext = path.extname(file.filename).slice(0, 12).replace(/[^a-zA-Z0-9.]/g, '');
-    const stored = `${folder}/${randomUUID()}${ext}`;
+    let stored: string;
     try {
-      await pipeline(file.file, createWriteStream(onDisk(stored)));
+      stored = await storeIn(buildFolder(project.id), file.file, file.filename);
     } catch (err) {
-      await unlink(onDisk(stored)).catch(() => {});
       if (file.file.truncated) return reply.code(413).send(TOO_LARGE);
       throw err;
     }
@@ -297,9 +291,7 @@ export function registerBuildRoutes(app: FastifyInstance): void {
     if (!row || !(await mayOpenProject(auth, row.project_id))) {
       return reply.code(404).send({ error: 'No such build.' });
     }
-    reply.header('Content-Type', 'application/octet-stream');
-    reply.header('X-Content-Type-Options', 'nosniff');
-    reply.header('Content-Disposition', disposition('attachment', row.name));
+    fileHeaders(reply, 'application/octet-stream', 'attachment', row.name);
     reply.header('Content-Length', row.size);
     return reply.send(createReadStream(onDisk(row.storage_path)));
   });

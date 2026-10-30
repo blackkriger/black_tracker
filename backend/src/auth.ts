@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -29,6 +29,12 @@ export function hashToken(raw: string): string {
 }
 
 export const newRawToken = () => randomBytes(32).toString('base64url');
+
+export function sameSecret(expected: string, given: string): boolean {
+  const want = Buffer.from(expected);
+  const got = Buffer.from(given);
+  return want.length === got.length && timingSafeEqual(want, got);
+}
 
 export const hashPassword = (plain: string) => bcrypt.hash(plain, 10);
 const DUMMY_HASH = bcrypt.hashSync('not anyone', 10);
@@ -145,11 +151,16 @@ const publicMe = (row: UserRow) => ({
 
 const NOTICE_KINDS = ['mention', 'assigned', 'reaction', 'starred', 'ping'] as const;
 
+function due(writes: Map<string, number>, key: string): boolean {
+  const now = Date.now();
+  if (now - (writes.get(key) ?? 0) < LAST_SEEN_THROTTLE_MS) return false;
+  writes.set(key, now);
+  return true;
+}
+
 const lastSeenWrites = new Map<string, number>();
 function touchLastSeen(userId: string): void {
-  const now = Date.now();
-  if (now - (lastSeenWrites.get(userId) ?? 0) < LAST_SEEN_THROTTLE_MS) return;
-  lastSeenWrites.set(userId, now);
+  if (!due(lastSeenWrites, userId)) return;
   pool
     .query('update users set last_seen_at = now() where id = $1', [userId])
     .catch((err) => console.error('[auth] last-seen write failed', err));
@@ -157,9 +168,7 @@ function touchLastSeen(userId: string): void {
 
 const sessionWrites = new Map<string, number>();
 function touchSession(token: string, userId: string, userAgent: string | null): void {
-  const now = Date.now();
-  if (now - (sessionWrites.get(token) ?? 0) < LAST_SEEN_THROTTLE_MS) return;
-  sessionWrites.set(token, now);
+  if (!due(sessionWrites, token)) return;
   pool
     .query(
       'update sessions set last_seen_at = now(), user_agent = coalesce(user_agent, $2) where token = $1',
@@ -171,9 +180,7 @@ function touchSession(token: string, userId: string, userAgent: string | null): 
 
 const tokenUseWrites = new Map<string, number>();
 function touchTokenUse(userId: string): void {
-  const now = Date.now();
-  if (now - (tokenUseWrites.get(userId) ?? 0) < LAST_SEEN_THROTTLE_MS) return;
-  tokenUseWrites.set(userId, now);
+  if (!due(tokenUseWrites, userId)) return;
   pool
     .query('update users set api_token_last_used_at = now() where id = $1', [userId])
     .catch((err) => console.error('[auth] token-use write failed', err));
@@ -353,9 +360,11 @@ const githubLoginOf = (typed: string): string =>
     .replace(/^@/, '')
     .replace(/\/+$/, '');
 
+export const newPassword = z.string().min(8).max(200);
+
 const passwordSchema = z.object({
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(8).max(200),
+  newPassword,
 });
 
 const TRIES_BEFORE_LOCK = 8;
@@ -602,15 +611,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       await client.query('update users set password_hash = $1 where id = $2', [hash, auth.userId]);
       await client.query('delete from sessions where user_id = $1', [auth.userId]);
     });
-    const raw = await createSession(auth.userId, agentOf(req));
-    reply.setCookie(SESSION_COOKIE, raw, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: env.secureCookies,
-      path: '/',
-      maxAge: SESSION_DAYS * 24 * 60 * 60,
-    });
-    void publish({ type: 'session.changed', only: auth.userId });
+    await startSession(req, reply, auth.userId);
     return reply.send({ data: { ok: true } });
   });
 }

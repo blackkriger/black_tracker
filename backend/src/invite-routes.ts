@@ -4,6 +4,7 @@ import { inTransaction, pool } from './db.js';
 import {
   hashPassword,
   hashToken,
+  newPassword,
   newRawToken,
   publicUser,
   requireRoleManager,
@@ -177,7 +178,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
       [hashToken(token)]
     );
     if (kind.rows[0]?.for_user) {
-      const chosen = z.object({ password: z.string().min(8).max(200) }).safeParse(req.body);
+      const chosen = z.object({ password: newPassword }).safeParse(req.body);
       if (!chosen.success) {
         return reply.code(400).send({ error: 'The password must be at least 8 characters.' });
       }

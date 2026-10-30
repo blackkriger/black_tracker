@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { DAY_RE, inTransaction, onDays, pool } from './db.js';
+import { DAY_RE, inTransaction, onDays, pool, UUID_RE } from './db.js';
 import { requireAuth, type Auth } from './auth.js';
 import { mayOpenBoard, shutOut } from './board-service.js';
+import { commitUrl, firstLine, GITHUB_USER } from './commits.js';
 import { writeHistory } from './issue-routes.js';
 
 const PAGE = 100;
@@ -45,8 +46,7 @@ const listOf = (raw: string | undefined): string[] =>
 const VISIBLE = `
   from repo_commits c
   left join projects rp on rp.repo = c.repo
-  left join users u on u.github_login is not null
-   and lower(u.github_login) = lower(coalesce(c.author_login, c.author_name))
+  ${GITHUB_USER}
  where (rp.id is null or not (rp.id = any($1::uuid[])))`;
 
 const AUTHOR = 'coalesce(u.login, c.author_login, c.author_name)';
@@ -71,7 +71,7 @@ export function registerCommitRoutes(app: FastifyInstance): void {
     const authors = listOf(p.authors);
     const branches = listOf(p.branches);
     const projects = listOf(p.projects);
-    const tags = listOf(p.tags).filter((v) => /^[0-9a-f-]{36}$/i.test(v));
+    const tags = listOf(p.tags).filter((v) => UUID_RE.test(v));
     const res = await pool.query<ListedRow>(
       `select c.id, c.repo, c.sha, c.kind, c.message, c.branch, c.merged_from, ${AUTHOR} as author,
               c.author_name, u.login as by_login, c.at, rp.short_name as project,
@@ -125,13 +125,13 @@ export function registerCommitRoutes(app: FastifyInstance): void {
           id: r.id,
           sha: r.sha,
           kind: r.kind,
-          message: r.message.split('\n')[0],
+          message: firstLine(r.message),
           branch: r.branch,
           mergedFrom: r.merged_from,
           author: r.author,
           by: r.by_login,
           at: r.at.toISOString(),
-          url: `https://github.com/${r.repo}/commit/${r.sha}`,
+          url: commitUrl(r.repo, r.sha),
           project: r.project,
           issues: r.issues,
         })),
