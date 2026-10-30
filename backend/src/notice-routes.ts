@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { DAY_RE, pool, ZONE } from './db.js';
 import { requireAuth } from './auth.js';
-import { DENIES_NOTHING, deniedFor } from './board-service.js';
+import { denialsOf } from './board-service.js';
 
 const NAME = /(?:^|\s)@([a-zA-Z0-9_.-]{2,32})/g;
 
@@ -93,7 +93,7 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
     if ((from && !DAY_RE.test(from)) || (to && !DAY_RE.test(to))) {
       return reply.code(400).send({ error: 'Dates go as YYYY-MM-DD.' });
     }
-    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     if (denied.everything) return reply.send({ data: [] });
 
     const within = from || to;
@@ -130,7 +130,7 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
   app.get('/notices/unread', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     if (denied.everything) return reply.send({ data: {} });
     const res = await pool.query<{ kind: string; n: number }>(
       `select n.kind, count(*)::int as n

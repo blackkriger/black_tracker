@@ -5,18 +5,17 @@ import { filesOfIssues, sweepFiles } from './issue-routes.js';
 import { requireAdmin, requireAuth, requireDeleter } from './auth.js';
 import { boardsOfProject, projectByShort } from './project-routes.js';
 import {
-  DENIES_NOTHING,
+  type BoardRow,
   createBoardWithDefaults,
-  deniedFor,
   denialsFor,
+  denialsOf,
   freeSlug,
   mayOpenBoard,
   mayOpenProject,
   publicBoard,
   publicState,
-  tagIdsByBoard,
-  type BoardRow,
   type StateRow,
+  tagIdsByBoard,
 } from './board-service.js';
 import { knownColor, pickColor } from './colors.js';
 
@@ -88,7 +87,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
 
-    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     if (denied.everything || denied.projects.has(project.id)) {
       return reply.code(404).send({ error: 'No such project.' });
     }
@@ -115,7 +114,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     if (!board) return reply.code(404).send({ error: 'No such board.' });
     const denials = await denialsFor([id]);
     if (!auth.isAdmin) {
-      const denied = await deniedFor(auth.roleId);
+      const denied = await denialsOf(auth);
       if (denied.everything || denied.boards.has(id) || denied.projects.has(board.project_id)) {
         return reply.code(403).send({ error: 'This board is not open to you.' });
       }
@@ -207,7 +206,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     if (!project || !(await mayOpenProject(auth, project.id))) {
       return reply.code(404).send({ error: 'No such project.' });
     }
-    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     await pool.query(
       `update boards b
           set position = o.pos
@@ -230,7 +229,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const board = await boardById(id);
     if (!board) return reply.code(404).send({ error: 'No such board.' });
     if (!auth.isAdmin) {
-      const denied = await deniedFor(auth.roleId);
+      const denied = await denialsOf(auth);
       if (denied.everything || denied.boards.has(id) || denied.projects.has(board.project_id)) {
         return reply.code(403).send({ error: 'This board is not open to you.' });
       }
@@ -369,7 +368,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     );
     if (!onBoard.rowCount) return reply.code(404).send({ error: 'No such status.' });
     if (!auth.isAdmin) {
-      const denied = await deniedFor(auth.roleId);
+      const denied = await denialsOf(auth);
       const { board_id: boardId, project_id: projectId } = onBoard.rows[0];
       if (denied.everything || denied.boards.has(boardId) || denied.projects.has(projectId)) {
         return reply.code(403).send({ error: 'This board is not open to you.' });

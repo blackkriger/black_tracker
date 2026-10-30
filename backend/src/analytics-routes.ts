@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { DAY_RE, listOf, pool, ZONE } from './db.js';
-import { requireAuth, type Auth } from './auth.js';
-import { DENIES_NOTHING, deniedFor } from './board-service.js';
+import { requireAuth } from './auth.js';
+import { shutOut } from './board-service.js';
 import { stretchesOf, workOf, type HandRow } from './work.js';
 
 const ISSUE_PICKS = `
@@ -12,11 +12,6 @@ const ISSUE_PICKS = `
                  or ('-' = any($8) and i.assignee_id is null))
             and ($9::text[] is null or i.author_id in (select id from users where login = any($9)))
             and ($10::text[] is null or i.watcher_id in (select id from users where login = any($10)))`;
-
-async function shutOut(auth: Auth): Promise<{ all: boolean; projects: string[]; boards: string[] }> {
-  const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
-  return { all: denied.everything, projects: [...denied.projects], boards: [...denied.boards] };
-}
 
 interface Cell {
   board_id: string;

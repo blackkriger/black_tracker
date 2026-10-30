@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { DAY_RE, inTransaction, listOf, pool, ZONE } from './db.js';
 import { env } from './env.js';
 import { requireAuth, requireDeleter, requireSession, type Auth } from './auth.js';
-import { DENIES_NOTHING, deniedFor, mayOpenBoard } from './board-service.js';
+import { denialsOf, mayOpenBoard } from './board-service.js';
 import { syncMentions } from './notice-routes.js';
 import { publish, tabOf } from './events.js';
 
@@ -193,7 +193,7 @@ async function linksOf(issueId: string, auth: Auth): Promise<LinkRow[]> {
     [issueId]
   );
   if (auth.isAdmin) return res.rows;
-  const denied = await deniedFor(auth.roleId);
+  const denied = await denialsOf(auth);
   if (denied.everything) return [];
   return res.rows.filter(
     (r) => !denied.boards.has(r.board_id) && !denied.projects.has(r.project_id)
@@ -253,7 +253,7 @@ async function subtaskCounts(
 ): Promise<Map<string, { done: number; total: number }>> {
   const out = new Map<string, { done: number; total: number }>();
   if (!parentIds.length) return out;
-  const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+  const denied = await denialsOf(auth);
   const res = await pool.query<{ parent: string; done: number; total: number }>(
     `select l.a as parent, count(*)::int as total, count(*) filter (where s.is_resolved)::int as done
        from issue_links l
@@ -279,7 +279,7 @@ interface HistoryRow {
 
 async function visibleHistory(auth: Auth, projectId: string, rows: HistoryRow[]): Promise<HistoryRow[]> {
   if (auth.isAdmin) return rows;
-  const denied = await deniedFor(auth.roleId);
+  const denied = await denialsOf(auth);
   if (!denied.boards.size && !denied.projects.size) return rows;
   const keys = rows
     .filter((h) => h.field === 'link added' || h.field === 'link removed')
@@ -1407,7 +1407,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const q = req.query as Record<string, string | undefined>;
-    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     if (denied.everything) return reply.send({ data: [] });
     const from = q.from && DAY_RE.test(q.from) ? q.from : null;
     const to = q.to && DAY_RE.test(q.to) ? q.to : null;
@@ -1498,7 +1498,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [wanted]
     );
     if (auth.isAdmin) return reply.send({ data: res.rows.map(publicLink) });
-    const denied = await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     if (denied.everything) return reply.send({ data: [] });
     return reply.send({
       data: res.rows
@@ -1536,7 +1536,7 @@ export function registerIssueRoutes(app: FastifyInstance): void {
       [term, skip, number]
     );
     if (auth.isAdmin) return reply.send({ data: res.rows.slice(0, 20).map(publicLink) });
-    const denied = await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     if (denied.everything) return reply.send({ data: [] });
     return reply.send({
       data: res.rows

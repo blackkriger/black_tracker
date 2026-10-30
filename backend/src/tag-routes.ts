@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { pool } from './db.js';
 import { requireAuth, requireDeleter, type Auth } from './auth.js';
-import { DENIES_NOTHING, deniedFor, mayOpenBoard } from './board-service.js';
+import { denialsOf, mayOpenBoard } from './board-service.js';
 import { pickColor } from './colors.js';
 
 interface TagRow {
@@ -38,7 +38,7 @@ const TAG_COLUMNS = `id, name, color,
   (select count(*)::int from issue_tags it where it.tag_id = tags.id) as used`;
 
 async function reachesTags(auth: Auth): Promise<boolean> {
-  return auth.isAdmin || !(await deniedFor(auth.roleId)).everything;
+  return auth.isAdmin || !(await denialsOf(auth)).everything;
 }
 
 async function boardFor(auth: Auth, boardId: string): Promise<boolean> {
@@ -51,7 +51,7 @@ async function boardFor(auth: Auth, boardId: string): Promise<boolean> {
 async function boardsOfTags(auth: Auth, tagIds: string[]): Promise<Map<string, string[]>> {
   const byTag = new Map<string, string[]>();
   if (!tagIds.length) return byTag;
-  const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+  const denied = await denialsOf(auth);
   const res = await pool.query<{ tag_id: string; board_id: string; project_id: string }>(
     `select bt.tag_id, bt.board_id, b.project_id
        from board_tags bt join boards b on b.id = bt.board_id

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { DAY_RE, inTransaction, pool, ZONE } from './db.js';
 import { requireAuth, type Auth } from './auth.js';
-import { deniedFor, mayOpenBoard } from './board-service.js';
+import { mayOpenBoard, shutOut } from './board-service.js';
 import { writeHistory } from './issue-routes.js';
 
 const PAGE = 100;
@@ -42,12 +42,6 @@ const listOf = (raw: string | undefined): string[] =>
     .map((v) => v.trim())
     .filter(Boolean);
 
-async function hiddenFor(auth: Auth): Promise<{ projects: string[]; boards: string[] }> {
-  if (auth.isAdmin) return { projects: [], boards: [] };
-  const denied = await deniedFor(auth.roleId);
-  return { projects: [...denied.projects], boards: [...denied.boards] };
-}
-
 const VISIBLE = `
   from repo_commits c
   left join projects rp on rp.repo = c.repo
@@ -58,7 +52,7 @@ const VISIBLE = `
 const AUTHOR = 'coalesce(u.login, c.author_login, c.author_name)';
 
 async function visibleCommit(auth: Auth, id: string): Promise<{ id: string; sha: string } | null> {
-  const hidden = await hiddenFor(auth);
+  const hidden = await shutOut(auth);
   const res = await pool.query<{ id: string; sha: string }>(`select c.id, c.sha ${VISIBLE} and c.id = $2`, [
     hidden.projects,
     id,
@@ -73,7 +67,7 @@ export function registerCommitRoutes(app: FastifyInstance): void {
     const parsed = listQuery.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send({ error: 'Bad filter.' });
     const p = parsed.data;
-    const hidden = await hiddenFor(auth);
+    const hidden = await shutOut(auth);
     const authors = listOf(p.authors);
     const branches = listOf(p.branches);
     const projects = listOf(p.projects);
@@ -149,7 +143,7 @@ export function registerCommitRoutes(app: FastifyInstance): void {
   app.get('/commits/facets', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const hidden = await hiddenFor(auth);
+    const hidden = await shutOut(auth);
     const [authors, branches] = await Promise.all([
       pool.query<{ value: string; login: string | null; n: number }>(
         `select ${AUTHOR} as value, max(u.login) as login, count(*)::int as n ${VISIBLE}

@@ -5,13 +5,12 @@ import { sweepBuilds } from './build-routes.js';
 import { filesOfIssues, sweepFiles } from './issue-routes.js';
 import { requireAuth, requireDeleter } from './auth.js';
 import {
-  DENIES_NOTHING,
-  deniedFor,
+  type BoardRow,
+  denialsOf,
   mayOpenProject,
   publicBoard,
-  tagIdsByBoard,
-  type BoardRow,
   type StateRow,
+  tagIdsByBoard,
 } from './board-service.js';
 
 interface ProjectRow {
@@ -104,7 +103,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
         'select id, project_id, name, slug, default_state_id, position from boards order by position, name'
       ),
     ]);
-    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     if (denied.everything) return reply.send({ data: [] });
     const byProject = new Map<string, { id: string; name: string; slug: string }[]>();
     for (const b of boards.rows) {
@@ -126,7 +125,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const { short } = req.params as { short: string };
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
-    const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
+    const denied = await denialsOf(auth);
     if (denied.everything || denied.projects.has(project.id)) {
       return reply.code(404).send({ error: 'No such project.' });
     }
@@ -144,7 +143,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
   app.post('/projects', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    if (!auth.isAdmin && (await deniedFor(auth.roleId)).everything) {
+    if (!auth.isAdmin && (await denialsOf(auth)).everything) {
       return reply.code(403).send({ error: 'Making a project is not open to your role.' });
     }
     const parsed = projectCreate.safeParse(req.body);
@@ -172,7 +171,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const project = await projectByShort(short);
     if (!project) return reply.code(404).send({ error: 'No such project.' });
     if (!auth.isAdmin) {
-      const denied = await deniedFor(auth.roleId);
+      const denied = await denialsOf(auth);
       if (denied.everything || denied.projects.has(project.id)) {
         return reply.code(404).send({ error: 'No such project.' });
       }

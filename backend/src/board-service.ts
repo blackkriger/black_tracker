@@ -124,19 +124,36 @@ export async function deniedFor(roleId: string | null): Promise<Denials> {
   };
 }
 
+const perRequest = new WeakMap<Auth, Promise<Denials>>();
+
+export function denialsOf(auth: Auth): Promise<Denials> {
+  if (auth.isAdmin) return Promise.resolve(DENIES_NOTHING);
+  let denied = perRequest.get(auth);
+  if (!denied) {
+    denied = deniedFor(auth.roleId);
+    perRequest.set(auth, denied);
+  }
+  return denied;
+}
+
+export async function shutOut(auth: Auth): Promise<{ all: boolean; projects: string[]; boards: string[] }> {
+  const denied = await denialsOf(auth);
+  return { all: denied.everything, projects: [...denied.projects], boards: [...denied.boards] };
+}
+
 export async function mayOpenBoard(
   auth: Auth,
   boardId: string,
   projectId: string
 ): Promise<boolean> {
   if (auth.isAdmin) return true;
-  const denied = await deniedFor(auth.roleId);
+  const denied = await denialsOf(auth);
   return !denied.everything && !denied.boards.has(boardId) && !denied.projects.has(projectId);
 }
 
 export async function mayOpenProject(auth: Auth, projectId: string): Promise<boolean> {
   if (auth.isAdmin) return true;
-  const denied = await deniedFor(auth.roleId);
+  const denied = await denialsOf(auth);
   return !denied.everything && !denied.projects.has(projectId);
 }
 

@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { inTransaction, pool } from './db.js';
 import { env } from './env.js';
 import { requireAuth, type Auth } from './auth.js';
-import { deniedFor, mayOpenProject } from './board-service.js';
+import { denialsOf, mayOpenProject } from './board-service.js';
 import { publish, tabOf } from './events.js';
 import { disposition, onDisk } from './issue-routes.js';
 import { projectByShort } from './project-routes.js';
@@ -199,7 +199,7 @@ export function registerBuildRoutes(app: FastifyInstance): void {
   app.get('/builds', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const denied = auth.isAdmin ? [] : [...(await deniedFor(auth.roleId)).projects];
+    const denied = [...(await denialsOf(auth)).projects];
     const res = await pool.query<BuildRow>(
       `${SELECT} where not p.archived and not (p.id = any($1::uuid[]))
         order by p.short_name, b.platform = 'macos', b.created_at desc`,

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { pool, ZONE } from './db.js';
 import { requireAuth, requireDeleter, type Auth } from './auth.js';
-import { DENIES_NOTHING, deniedFor, mayOpenProject } from './board-service.js';
+import { denialsOf, mayOpenProject, shutOut } from './board-service.js';
 import { projectByShort } from './project-routes.js';
 import { workOf } from './work.js';
 
@@ -62,11 +62,6 @@ function iso(d: Date | string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
     d.getDate()
   ).padStart(2, '0')}`;
-}
-
-async function shutOut(auth: Auth): Promise<{ all: boolean; projects: string[]; boards: string[] }> {
-  const denied = auth.isAdmin ? DENIES_NOTHING : await deniedFor(auth.roleId);
-  return { all: denied.everything, projects: [...denied.projects], boards: [...denied.boards] };
 }
 
 export function registerCalendarRoutes(app: FastifyInstance): void {
@@ -350,7 +345,7 @@ async function markById(id: string) {
 async function mayReachMark(auth: Auth, projectId: string | null): Promise<boolean> {
   if (auth.isAdmin) return true;
   if (projectId) return mayOpenProject(auth, projectId);
-  return !(await deniedFor(auth.roleId)).everything;
+  return !(await denialsOf(auth)).everything;
 }
 
 async function scopeOf(
@@ -359,7 +354,7 @@ async function scopeOf(
   project?: string | null
 ): Promise<string | null | undefined> {
   if (!project) {
-    if (!auth.isAdmin && (await deniedFor(auth.roleId)).everything) {
+    if (!auth.isAdmin && (await denialsOf(auth)).everything) {
       reply.code(403).send({ error: 'Marking a day is not open to your role.' });
       return undefined;
     }
