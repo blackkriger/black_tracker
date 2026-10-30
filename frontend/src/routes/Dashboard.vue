@@ -17,7 +17,7 @@ import { IssueView } from '../lib/issueView';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import StickyNotes from '../components/StickyNotes.vue';
-import { api } from '../lib/api';
+import { api, latestRead } from '../lib/api';
 import {
   byDay,
   dayAndMonth,
@@ -89,10 +89,12 @@ function refresh(): void {
   void loadStarred();
 }
 
+const readStarred = latestRead<Starred[]>('/my-favourites', (rows) => (starred.value = rows));
+
 async function loadStarred(): Promise<void> {
   clear('starred');
   try {
-    starred.value = await api<Starred[]>('/my-favourites');
+    await readStarred(true);
   } catch (err) {
     fail('starred', err, t('me.starredFailed'));
   } finally {
@@ -150,10 +152,12 @@ function onPickUp(): void {
 }
 watch(feedDays, () => void loadFeed());
 
+const readMine = latestRead<Mine[]>('/my-issues', (rows) => (mine.value = rows));
+
 async function loadMine(): Promise<void> {
   clear('mine');
   try {
-    mine.value = await api<Mine[]>('/my-issues');
+    await readMine(true);
   } catch (err) {
     fail('mine', err, t('me.mineFailed'));
   } finally {
