@@ -92,7 +92,7 @@ export function registerBoardRoutes(app: FastifyInstance): void {
       return reply.code(404).send({ error: 'No such project.' });
     }
     const { rows, statesByBoard, tagsByBoard } = await boardsOfProject(project.id);
-    const denials = await denialsFor(rows.map((r) => r.id));
+    const denials = auth.isAdmin ? await denialsFor(rows.map((r) => r.id)) : new Map<string, string[]>();
     const visible = auth.isAdmin ? rows : rows.filter((r) => !denied.boards.has(r.id));
     return reply.send({
       data: visible.map((r) =>
@@ -112,21 +112,16 @@ export function registerBoardRoutes(app: FastifyInstance): void {
     const { id } = req.params as { id: string };
     const board = await boardById(id);
     if (!board) return reply.code(404).send({ error: 'No such board.' });
-    const denials = await denialsFor([id]);
-    if (!auth.isAdmin) {
-      const denied = await denialsOf(auth);
-      if (denied.everything || denied.boards.has(id) || denied.projects.has(board.project_id)) {
-        return reply.code(403).send({ error: 'This board is not open to you.' });
-      }
+    if (!(await mayOpenBoard(auth, id, board.project_id))) {
+      return reply.code(403).send({ error: 'This board is not open to you.' });
     }
-    const tags = await tagIdsByBoard([id]);
+    const [states, denials, tags] = await Promise.all([
+      statesOf(id),
+      auth.isAdmin ? denialsFor([id]) : new Map<string, string[]>(),
+      tagIdsByBoard([id]),
+    ]);
     return reply.send({
-      data: publicBoard(
-        board,
-        await statesOf(id),
-        auth.isAdmin ? denials.get(id) ?? [] : [],
-        tags.get(id) ?? []
-      ),
+      data: publicBoard(board, states, denials.get(id) ?? [], tags.get(id) ?? []),
     });
   });
 
