@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-vue-next';
 import BuildsPanel from '../components/BuildsPanel.vue';
 import FilterBar from '../components/FilterBar.vue';
-import IssueView from '../components/IssueView.vue';
+import { IssueView } from '../lib/issueView';
 import { api } from '../lib/api';
 import { useBoards, type BoardFull } from '../lib/boards';
 import { filtersOf, filtersQuery, noFilters, remember, sameQuery, type Filters } from '../lib/filters';

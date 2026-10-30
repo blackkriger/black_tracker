@@ -7,7 +7,7 @@ import BuildsPanel from '../components/BuildsPanel.vue';
 import Dialog from '../components/Dialog.vue';
 import FilterBar from '../components/FilterBar.vue';
 import FilterMenu from '../components/FilterMenu.vue';
-import IssueView from '../components/IssueView.vue';
+import { IssueView } from '../lib/issueView';
 import { api } from '../lib/api';
 import { useBoards, type BoardFull } from '../lib/boards';
 import {

@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-vue-next';
-import IssueView from '../components/IssueView.vue';
+import { IssueView } from '../lib/issueView';
 import RidgeRows, { type RidgeRow } from '../components/RidgeRows.vue';
 import FilterBar from '../components/FilterBar.vue';
 import { api } from '../lib/api';

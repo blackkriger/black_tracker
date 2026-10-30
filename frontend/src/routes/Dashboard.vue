@@ -13,7 +13,7 @@ import {
   Smile,
   Star,
 } from 'lucide-vue-next';
-import IssueView from '../components/IssueView.vue';
+import { IssueView } from '../lib/issueView';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import StickyNotes from '../components/StickyNotes.vue';

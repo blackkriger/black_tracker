@@ -6,7 +6,7 @@ import { features } from '../lib/features';
 import { boardViewers, here } from '../lib/presence';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import IssueView from '../components/IssueView.vue';
+import { IssueView, preloadIssueView } from '../lib/issueView';
 import Select from '../components/Select.vue';
 import { usePeople } from '../lib/people';
 import { api } from '../lib/api';
@@ -453,6 +453,7 @@ onMounted(() => {
   void load(String(route.params.short));
   void loadPeople();
   window.addEventListener('keydown', onKeydown);
+  preloadIssueView();
 });
 onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
