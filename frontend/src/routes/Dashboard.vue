@@ -608,6 +608,7 @@ function closeIssue(): void {
                 <span class="kind__hold">
                   <button
                     class="btn btn--sm btn--icon btn--ghost"
+                    :class="{ 'is-read': n.read }"
                     type="button"
                     :aria-label="t(n.read ? 'notices.markUnread' : 'notices.markRead')"
                     @click="toggleRead(n)"
@@ -800,6 +801,12 @@ function closeIssue(): void {
 }
 .note__row .day:hover {
   background: none;
+}
+.note__row .is-read {
+  color: var(--text-faint);
+}
+.note__row .is-read:hover {
+  color: var(--text);
 }
 .note__row:hover .day {
   color: var(--text);
