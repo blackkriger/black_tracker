@@ -1,10 +1,5 @@
-<script setup lang="ts">
-import mark from '../../../docs/icon.png';
-</script>
-
 <template>
   <footer class="authfoot stamp">
-    <img :src="mark" alt="" width="20" height="20" />
     <i18n-t keypath="settings.by" tag="span">
       <template #name>
         <a href="https://github.com/blackkriger" target="_blank" rel="noopener noreferrer">blackkriger</a>
@@ -15,9 +10,6 @@ import mark from '../../../docs/icon.png';
 
 <style scoped>
 .authfoot {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
   margin-top: auto;
 }
 .authfoot a {
