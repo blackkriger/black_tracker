@@ -1,4 +1,4 @@
-param([string]$OutDir = "frontend/public", [string]$PreviewDir = "")
+param([string]$OutDir = "docs", [string]$PreviewDir = "")
 Add-Type -AssemblyName System.Drawing
 
 function New-Image([string]$text, [int]$size) {
@@ -35,28 +35,9 @@ function New-Frame([int]$size) {
   return , (New-Image 'bt' $size)
 }
 
-function Save-Ico([string]$path) {
-  $sizes = 16, 24, 32, 48
-  $frames = @{}
-  foreach ($s in $sizes) { $frames[$s] = (New-Frame $s) }
-  $out = New-Object System.IO.MemoryStream
-  $bw = New-Object System.IO.BinaryWriter($out)
-  $bw.Write([uint16]0); $bw.Write([uint16]1); $bw.Write([uint16]$sizes.Count)
-  $offset = 6 + 16 * $sizes.Count
-  foreach ($s in $sizes) {
-    $len = $frames[$s].Length
-    $bw.Write([byte]($s % 256)); $bw.Write([byte]($s % 256)); $bw.Write([byte]0); $bw.Write([byte]0)
-    $bw.Write([uint16]1); $bw.Write([uint16]32); $bw.Write([uint32]$len); $bw.Write([uint32]$offset)
-    $offset += $len
-  }
-  foreach ($s in $sizes) { $bw.Write($frames[$s]) }
-  $bw.Flush()
-  [System.IO.File]::WriteAllBytes($path, $out.ToArray())
-  $bw.Dispose()
-  Write-Output ("{0}: {1} bytes" -f (Split-Path $path -Leaf), (Get-Item $path).Length)
-}
-
-Save-Ico (Join-Path $OutDir 'favicon.ico')
+New-Item -ItemType Directory -Force $OutDir | Out-Null
+[System.IO.File]::WriteAllBytes((Join-Path $OutDir 'icon.png'), (New-Frame 512))
+Write-Output "icon.png written"
 
 if ($PreviewDir) {
   foreach ($s in 16, 32, 72) {

@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="64" align="right" alt="black_tracker icon">
+
 # black_tracker
 
 A self-hosted issue tracker with boards, built for a small team, with GitHub and Telegram integrations. An admin sends an invite link, whoever opens it picks a login and password. 
