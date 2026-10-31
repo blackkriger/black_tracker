@@ -783,10 +783,21 @@ function closeIssue(): void {
   display: flex;
   align-items: center;
   gap: 4px;
+  padding-right: 4px;
+  border-radius: var(--radius-sm);
+}
+.note__row:hover {
+  background: var(--card-hover);
 }
 .note__row .day {
   flex: 1 1 auto;
   min-width: 0;
+}
+.note__row .day:hover {
+  background: none;
+}
+.note__row:hover .day {
+  color: var(--text);
 }
 .kind.is-off {
   opacity: 0.35;
