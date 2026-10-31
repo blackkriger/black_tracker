@@ -564,16 +564,19 @@ function closeIssue(): void {
                 ><Bell class="ic" /></button>
                 <span class="selbar kind__what">{{ t('notices.kinds.ping') }}</span>
               </span>
-              <span class="panel__end">{{ spanLabel(pickedDays.from, pickedDays.to, false) }}</span>
-              <span v-if="anyUnread" class="kind__hold">
-                <button
-                  class="btn btn--sm btn--icon btn--ghost"
-                  type="button"
-                  :aria-label="t('notices.markAllRead')"
-                  @click="readAll()"
-                ><CircleCheck class="ic" /></button>
-                <span class="selbar kind__what">{{ t('notices.markAllRead') }}</span>
-              </span>
+              <template v-if="anyUnread">
+                <span class="vsep" aria-hidden="true"></span>
+                <span class="kind__hold">
+                  <button
+                    class="btn btn--sm btn--icon btn--ghost"
+                    type="button"
+                    :aria-label="t('notices.markAllRead')"
+                    @click="readAll()"
+                  ><CircleCheck class="ic" /></button>
+                  <span class="selbar kind__what">{{ t('notices.markAllRead') }}</span>
+                </span>
+              </template>
+              <span class="panel__end feed__span">{{ spanLabel(pickedDays.from, pickedDays.to, false) }}</span>
             </header>
             <div class="panel__b days">
               <template v-if="!feedLoaded">
@@ -778,6 +781,9 @@ function closeIssue(): void {
 }
 .note.is-new {
   color: var(--text);
+}
+.feed__span {
+  white-space: nowrap;
 }
 .note__row {
   display: flex;
