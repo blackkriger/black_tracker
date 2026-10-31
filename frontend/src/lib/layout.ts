@@ -6,7 +6,7 @@ export type Layout = 'top' | 'side';
 const KEY = 'tracker:layout';
 
 function readLayout(): Layout {
-  return stored.get(KEY) === 'side' ? 'side' : 'top';
+  return stored.get(KEY) === 'top' ? 'top' : 'side';
 }
 
 export const layout = ref<Layout>(readLayout());
