@@ -9,11 +9,15 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Circle,
+  CircleCheck,
+  CircleDot,
   ContactRound,
   Smile,
   Star,
 } from 'lucide-vue-next';
 import { IssueView, useIssueOverlay } from '../lib/issueView';
+import { NOTICE_KINDS } from '../../../shared/rules';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import StickyNotes from '../components/StickyNotes.vue';
@@ -53,7 +57,7 @@ const { nameOf, colorOf, genderOf, load: loadPeople } = usePeople();
 const { load: loadProjects } = useProjects();
 const { errors, fail, clear, attempt } = usePanelErrors();
 const { ask } = useFocus();
-const { off, markRead, toggleKind } = useNotices();
+const { off, markRead, markUnread, toggleKind, unreadOf } = useNotices();
 
 const now = new Date();
 const year = ref(now.getFullYear());
@@ -109,6 +113,20 @@ const dragging = ref<{ start: string; end: string } | null>(null);
 const feed = ref<Notice[]>([]);
 const feedLoaded = ref(false);
 const shownFeed = computed(() => feed.value.filter((n) => !off.value.includes(n.kind)));
+const anyUnread = computed(
+  () => NOTICE_KINDS.some((kind) => unreadOf.value(kind) > 0) || shownFeed.value.some((n) => !n.read)
+);
+
+async function toggleRead(n: Notice): Promise<void> {
+  if (n.read) await markUnread(n.id);
+  else await markRead(n.id);
+  feed.value = feed.value.map((f) => (f.id === n.id ? { ...f, read: !n.read } : f));
+}
+
+async function readAll(): Promise<void> {
+  await markRead();
+  feed.value = feed.value.map((f) => ({ ...f, read: true }));
+}
 
 function ordered(a: string, b: string): { from: string; to: string } {
   return a <= b ? { from: a, to: b } : { from: b, to: a };
@@ -547,6 +565,15 @@ function closeIssue(): void {
                 <span class="selbar kind__what">{{ t('notices.kinds.ping') }}</span>
               </span>
               <span class="panel__end">{{ spanLabel(pickedDays.from, pickedDays.to, false) }}</span>
+              <span v-if="anyUnread" class="kind__hold">
+                <button
+                  class="btn btn--sm btn--icon btn--ghost"
+                  type="button"
+                  :aria-label="t('notices.markAllRead')"
+                  @click="readAll()"
+                ><CircleCheck class="ic" /></button>
+                <span class="selbar kind__what">{{ t('notices.markAllRead') }}</span>
+              </span>
             </header>
             <div class="panel__b days">
               <template v-if="!feedLoaded">
@@ -555,28 +582,37 @@ function closeIssue(): void {
                   <span class="sk sk--line" :style="{ width: `${w}%` }"></span>
                 </div>
               </template>
-              <button
-                v-for="n in shownFeed"
-                :key="n.id"
-                class="day note"
-                :class="{ 'is-new': !n.read }"
-                type="button"
-                @click="openNotice(n)"
-              >
-                <span class="stamp">{{ stampAt(n.at) }}</span>
-                <span class="day__what">
-                  <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
-                  <span v-if="n.emoji">{{ n.emoji }}</span>
-                  <span
-                    v-if="showsAuthor(n, session.me.value?.login)"
-                    class="note__by"
-                    :style="{ color: ink(colorOf(n.by)) }"
-                  >{{ nameOf(n.by) }}</span>
-                  <span class="note__said">
-                    {{ noticeLine(n, nameOf, genderOf) }}
+              <div v-for="n in shownFeed" :key="n.id" class="note__row">
+                <button
+                  class="day note"
+                  :class="{ 'is-new': !n.read }"
+                  type="button"
+                  @click="openNotice(n)"
+                >
+                  <span class="stamp">{{ stampAt(n.at) }}</span>
+                  <span class="day__what">
+                    <span class="key" :style="{ color: ink(n.color) }">{{ n.key }}</span>
+                    <span v-if="n.emoji">{{ n.emoji }}</span>
+                    <span
+                      v-if="showsAuthor(n, session.me.value?.login)"
+                      class="note__by"
+                      :style="{ color: ink(colorOf(n.by)) }"
+                    >{{ nameOf(n.by) }}</span>
+                    <span class="note__said">
+                      {{ noticeLine(n, nameOf, genderOf) }}
+                    </span>
                   </span>
+                </button>
+                <span class="kind__hold">
+                  <button
+                    class="btn btn--sm btn--icon btn--ghost"
+                    type="button"
+                    :aria-label="t(n.read ? 'notices.markUnread' : 'notices.markRead')"
+                    @click="toggleRead(n)"
+                  ><CircleDot v-if="!n.read" class="ic" /><Circle v-else class="ic" /></button>
+                  <span class="selbar kind__what">{{ t(n.read ? 'notices.markUnread' : 'notices.markRead') }}</span>
                 </span>
-              </button>
+              </div>
               <div v-if="feedLoaded && !shownFeed.length" class="empty empty--sm">
                 <span class="empty__g">◇</span>{{ t('me.nothingForYou') }}
               </div>
@@ -742,6 +778,15 @@ function closeIssue(): void {
 }
 .note.is-new {
   color: var(--text);
+}
+.note__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.note__row .day {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .kind.is-off {
   opacity: 0.35;

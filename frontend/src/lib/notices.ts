@@ -182,5 +182,12 @@ export function useNotices() {
         .sort((a, b) => Number(a.read) - Number(b.read) || Date.parse(b.at) - Date.parse(a.at));
       await readCounts();
     },
+    async markUnread(id: string): Promise<void> {
+      await api('/notices/read', { method: 'POST', body: { id, read: false } }).catch(() => {});
+      notices.value = notices.value
+        .map((n) => (n.id === id ? { ...n, read: false } : n))
+        .sort((a, b) => Number(a.read) - Number(b.read) || Date.parse(b.at) - Date.parse(a.at));
+      await readCounts();
+    },
   };
 }

@@ -126,7 +126,8 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
       [auth.userId, [...denied.projects], [...denied.boards], from, to, within ? null : after]
     );
 
-    return reply.send({ data: res.rows.map((r) => publicNotice(r, auth.login)) });
+    const mentioned = await mentionPattern();
+    return reply.send({ data: res.rows.map((r) => publicNotice(r, mentioned)) });
   });
 
   app.get('/notices/unread', async (req, reply) => {
@@ -150,20 +151,36 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
   app.post('/notices/read', async (req, reply) => {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
-    const parsed = z.object({ id: z.string().uuid().optional() }).safeParse(req.body ?? {});
+    const parsed = z
+      .object({ id: z.string().uuid().optional(), read: z.boolean().default(true) })
+      .refine((p) => p.read || p.id)
+      .safeParse(req.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: 'Bad notice.' });
-    await pool.query(
-      `update notices set read_at = now()
-        where user_id = $1 and read_at is null and ($2::uuid is null or id = $2)`,
-      [auth.userId, parsed.data.id ?? null]
-    );
+    if (parsed.data.read) {
+      await pool.query(
+        `update notices set read_at = now()
+          where user_id = $1 and read_at is null and ($2::uuid is null or id = $2)`,
+        [auth.userId, parsed.data.id ?? null]
+      );
+    } else {
+      await pool.query('update notices set read_at = null where user_id = $1 and id = $2', [
+        auth.userId,
+        parsed.data.id,
+      ]);
+    }
     return reply.send({ data: { ok: true } });
   });
 }
 
 type Change = { field: string; from: string | null; to: string | null };
 
-function publicNotice(r: NoticeRow, mine: string) {
+async function mentionPattern(): Promise<RegExp | null> {
+  const res = await pool.query<{ name: string }>('select login as name from users union select name from roles');
+  const names = res.rows.map((r) => r.name).sort((a, b) => b.length - a.length);
+  return names.length ? new RegExp(`(^|\\s)@(?:${names.map(escape).join('|')})(?![a-zA-Z0-9_.-])`, 'gi') : null;
+}
+
+function publicNotice(r: NoticeRow, mentioned: RegExp | null) {
   if (!r.comment_id) {
     const starred = r.kind === 'starred';
     const review = r.kind === 'assigned' && r.detail === 'watcher';
@@ -184,8 +201,7 @@ function publicNotice(r: NoticeRow, mine: string) {
       read: r.read_at !== null,
     };
   }
-  const said = plain(r.text ?? '')
-    .replace(new RegExp(`(^|\\s)@${escape(mine)}(?![a-zA-Z0-9_.-])`, 'gi'), '$1')
+  const said = (mentioned ? plain(r.text ?? '').replace(mentioned, '$1') : plain(r.text ?? ''))
     .replace(/\s+/g, ' ')
     .trim();
   return {

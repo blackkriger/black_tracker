@@ -2,6 +2,9 @@ import type en from '../en/notices';
 import type { Shape } from '../shape';
 
 const notices: Shape<typeof en> = {
+  markRead: 'Отметить прочитанным',
+  markUnread: 'Отметить непрочитанным',
+  markAllRead: 'Прочитать все',
   kinds: {
     mention: 'Упоминания',
     assigned: 'Назначенные тебе',

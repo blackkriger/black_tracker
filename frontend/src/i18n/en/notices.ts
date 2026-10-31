@@ -1,4 +1,7 @@
 export default {
+  markRead: 'Mark as read',
+  markUnread: 'Mark as unread',
+  markAllRead: 'Mark all as read',
   kinds: {
     mention: 'Mentions',
     assigned: 'Assigned to you',
