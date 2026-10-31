@@ -212,6 +212,7 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-5);
+  container-type: inline-size;
 }
 .prefs__layout {
   flex: none;
@@ -226,6 +227,19 @@ async function setAutoStar(body: string, on: boolean): Promise<void> {
 }
 .layouts .layout {
   width: 282px;
+}
+@container (width < 707px) {
+  .prefs__layout {
+    flex: 1 1 100%;
+  }
+  .layouts {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .layouts .layout {
+    flex: 1 1 200px;
+    width: auto;
+  }
 }
 .langs {
   display: grid;
