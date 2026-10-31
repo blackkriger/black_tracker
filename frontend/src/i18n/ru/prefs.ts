@@ -15,7 +15,7 @@ const prefs: Shape<typeof en> = {
   commentsRead: 'Порядок комментариев',
   oldestFirst: 'Сначала старые',
   newestFirst: 'Сначала новые',
-  noticesShown: 'Показывать уведомления',
+  noticesShown: 'Показывать и присылать в мессенджеры',
   files: 'Файлы',
   wrapLines: 'Переносить длинные строки',
   starAuto: 'Добавлять в избранное',

@@ -12,7 +12,7 @@ export default {
   commentsRead: 'Comments read',
   oldestFirst: 'Oldest first',
   newestFirst: 'Newest first',
-  noticesShown: 'Notices shown',
+  noticesShown: 'Notices shown and sent to messengers',
   files: 'Files',
   wrapLines: 'Wrap long lines',
   starAuto: 'Star automatically',
