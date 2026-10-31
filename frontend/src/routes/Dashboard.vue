@@ -17,7 +17,6 @@ import {
   Star,
 } from 'lucide-vue-next';
 import { IssueView, useIssueOverlay } from '../lib/issueView';
-import { NOTICE_KINDS } from '../../../shared/rules';
 import DayWindow from '../components/DayWindow.vue';
 import MonthGrid from '../components/MonthGrid.vue';
 import StickyNotes from '../components/StickyNotes.vue';
@@ -57,7 +56,7 @@ const { nameOf, colorOf, genderOf, load: loadPeople } = usePeople();
 const { load: loadProjects } = useProjects();
 const { errors, fail, clear, attempt } = usePanelErrors();
 const { ask } = useFocus();
-const { off, markRead, markUnread, toggleKind, unreadOf } = useNotices();
+const { off, markRead, markEachRead, markUnread, toggleKind } = useNotices();
 
 const now = new Date();
 const year = ref(now.getFullYear());
@@ -113,9 +112,7 @@ const dragging = ref<{ start: string; end: string } | null>(null);
 const feed = ref<Notice[]>([]);
 const feedLoaded = ref(false);
 const shownFeed = computed(() => feed.value.filter((n) => !off.value.includes(n.kind)));
-const anyUnread = computed(
-  () => NOTICE_KINDS.some((kind) => unreadOf.value(kind) > 0) || shownFeed.value.some((n) => !n.read)
-);
+const unreadShown = computed(() => shownFeed.value.filter((n) => !n.read).map((n) => n.id));
 
 async function toggleRead(n: Notice): Promise<void> {
   if (n.read) await markUnread(n.id);
@@ -124,8 +121,9 @@ async function toggleRead(n: Notice): Promise<void> {
 }
 
 async function readAll(): Promise<void> {
-  await markRead();
-  feed.value = feed.value.map((f) => ({ ...f, read: true }));
+  const ids = unreadShown.value;
+  await markEachRead(ids);
+  feed.value = feed.value.map((f) => (ids.includes(f.id) ? { ...f, read: true } : f));
 }
 
 function ordered(a: string, b: string): { from: string; to: string } {
@@ -565,7 +563,7 @@ function closeIssue(): void {
                 ><Bell class="ic" /></button>
                 <span class="selbar kind__what">{{ t('notices.kinds.ping') }}</span>
               </span>
-              <template v-if="anyUnread">
+              <template v-if="unreadShown.length">
                 <span class="vsep" aria-hidden="true"></span>
                 <span class="kind__hold">
                   <button

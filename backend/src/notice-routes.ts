@@ -152,11 +152,20 @@ export function registerNoticeRoutes(app: FastifyInstance): void {
     const auth = await requireAuth(req, reply);
     if (!auth) return;
     const parsed = z
-      .object({ id: z.string().uuid().optional(), read: z.boolean().default(true) })
-      .refine((p) => p.read || p.id)
+      .object({
+        id: z.string().uuid().optional(),
+        ids: z.array(z.string().uuid()).min(1).max(500).optional(),
+        read: z.boolean().default(true),
+      })
+      .refine((p) => !(p.id && p.ids) && (p.read || p.id))
       .safeParse(req.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: 'Bad notice.' });
-    if (parsed.data.read) {
+    if (parsed.data.ids) {
+      await pool.query(
+        'update notices set read_at = now() where user_id = $1 and read_at is null and id = any($2::uuid[])',
+        [auth.userId, parsed.data.ids]
+      );
+    } else if (parsed.data.read) {
       await pool.query(
         `update notices set read_at = now()
           where user_id = $1 and read_at is null and ($2::uuid is null or id = $2)`,

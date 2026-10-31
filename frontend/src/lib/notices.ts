@@ -184,6 +184,15 @@ export function useNotices() {
       tellTab('notice.changed');
       await readCounts();
     },
+    async markEachRead(ids: string[]): Promise<void> {
+      if (!ids.length) return;
+      await api('/notices/read', { method: 'POST', body: { ids } }).catch(() => {});
+      notices.value = notices.value
+        .map((n) => (ids.includes(n.id) ? { ...n, read: true } : n))
+        .sort((a, b) => Number(a.read) - Number(b.read) || Date.parse(b.at) - Date.parse(a.at));
+      tellTab('notice.changed');
+      await readCounts();
+    },
     async markUnread(id: string): Promise<void> {
       await api('/notices/read', { method: 'POST', body: { id, read: false } }).catch(() => {});
       notices.value = notices.value
