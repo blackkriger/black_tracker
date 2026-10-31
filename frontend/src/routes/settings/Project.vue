@@ -29,6 +29,7 @@ interface Board {
   name: string;
   defaultStateId: string | null;
   defaultAssigneeId: string | null;
+  defaultWatcherId: string | null;
   position: number;
   states: State[];
 }
@@ -299,6 +300,10 @@ async function onDrop(b: Board, target: State): Promise<void> {
             <span class="label">{{ t('project.defaultAssignee') }}</span>
             <span class="sk default-pick-sk"></span>
           </div>
+          <div class="field">
+            <span class="label">{{ t('project.defaultWatcher') }}</span>
+            <span class="sk default-pick-sk"></span>
+          </div>
         </div>
         <div class="panel__table">
           <table class="tbl">
@@ -430,6 +435,16 @@ async function onDrop(b: Board, target: State): Promise<void> {
               :model-value="b.defaultAssigneeId ?? ''"
               :options="assigneeChoices"
               @update:model-value="patchBoard(b, { defaultAssigneeId: $event || null })"
+            />
+          </div>
+          <div class="field">
+            <label class="label" :for="`watcher-${b.id}`">{{ t('project.defaultWatcher') }}</label>
+            <Select
+              :id="`watcher-${b.id}`"
+              class="default-pick"
+              :model-value="b.defaultWatcherId ?? ''"
+              :options="assigneeChoices"
+              @update:model-value="patchBoard(b, { defaultWatcherId: $event || null })"
             />
           </div>
         </div>
@@ -660,6 +675,7 @@ async function onDrop(b: Board, target: State): Promise<void> {
 }
 @media (max-width: 760px) {
   .board-prefs {
+    flex-direction: column;
     gap: 12px;
     padding: 12px 16px 14px;
   }

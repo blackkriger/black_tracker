@@ -72,7 +72,7 @@ export async function projectByShort(shortName: string): Promise<ProjectRow | nu
 export async function boardsOfProject(projectId: string) {
   const [boards, states] = await Promise.all([
     pool.query<BoardRow>(
-      `select id, project_id, name, slug, default_state_id, default_assignee_id, position
+      `select id, project_id, name, slug, default_state_id, default_assignee_id, default_watcher_id, position
          from boards where project_id = $1 order by position, name`,
       [projectId]
     ),

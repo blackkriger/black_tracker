@@ -3,6 +3,7 @@ export default {
   loadFailed: 'Could not load the project.',
   defaultStatus: 'Default status',
   defaultAssignee: 'Default assignee',
+  defaultWatcher: 'Default watcher',
   order: 'Order',
   open: 'Open',
   resolved: 'Resolved',

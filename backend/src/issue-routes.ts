@@ -599,11 +599,12 @@ interface BoardDefaults {
   project_id: string;
   default_state_id: string | null;
   default_assignee_id: string | null;
+  default_watcher_id: string | null;
 }
 
 export async function boardDefaults(boardId: string): Promise<BoardDefaults | null> {
   const res = await pool.query<BoardDefaults>(
-    'select project_id, default_state_id, default_assignee_id from boards where id = $1',
+    'select project_id, default_state_id, default_assignee_id, default_watcher_id from boards where id = $1',
     [boardId]
   );
   return res.rows[0] ?? null;
@@ -620,7 +621,7 @@ export async function createIssue(
 ): Promise<{ issue: IssueRow; tags: TagRow[] } | { error: string }> {
   const projectId = board.project_id;
   const assigneeId = p.assigneeId !== undefined ? p.assigneeId : board.default_assignee_id;
-  const watcherId = p.watcherId ?? null;
+  const watcherId = p.watcherId !== undefined ? p.watcherId : board.default_watcher_id;
   const stateId = p.stateId ?? board.default_state_id;
   if (!stateId) return { error: 'This board has no statuses yet.' };
   const state = await pool.query('select 1 from states where id = $1 and board_id = $2', [

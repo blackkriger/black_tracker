@@ -84,7 +84,7 @@ interface State {
 const props = defineProps<{
   issueKey?: string;
   createIn?: string | null;
-  board: { id: string; name: string; states: State[]; defaultAssigneeId?: string | null };
+  board: { id: string; name: string; states: State[]; defaultAssigneeId?: string | null; defaultWatcherId?: string | null };
   boards: { id: string; name: string; slug: string }[];
   tags: IssueTag[];
   project: string;
@@ -884,7 +884,7 @@ async function load(): Promise<void> {
       stateId: props.createIn ?? props.board.states[0]?.id ?? '',
       priority: 'Normal',
       assigneeId: props.board.defaultAssigneeId ?? null,
-      watcherId: null,
+      watcherId: props.board.defaultWatcherId ?? null,
       dueDate: null,
       tagIds: [],
     };

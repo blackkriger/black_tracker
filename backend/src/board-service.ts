@@ -37,6 +37,7 @@ export interface BoardRow {
   slug: string;
   default_state_id: string | null;
   default_assignee_id: string | null;
+  default_watcher_id: string | null;
   position: number;
 }
 
@@ -65,7 +66,7 @@ export async function createBoardWithDefaults(
   const board = await client.query<BoardRow>(
     `insert into boards (project_id, name, slug, position)
      values ($1, $2, $3, (select coalesce(max(position), -1) + 1 from boards where project_id = $1))
-     returning id, project_id, name, slug, default_state_id, default_assignee_id, position`,
+     returning id, project_id, name, slug, default_state_id, default_assignee_id, default_watcher_id, position`,
     [projectId, name, await freeSlug(client, projectId, name)]
   );
   const row = board.rows[0];
@@ -89,7 +90,7 @@ export async function createBoardWithDefaults(
   const first = [...states.rows].sort((a, b) => a.position - b.position)[0];
   const withDefault = await client.query<BoardRow>(
     `update boards set default_state_id = $1 where id = $2
-     returning id, project_id, name, slug, default_state_id, default_assignee_id, position`,
+     returning id, project_id, name, slug, default_state_id, default_assignee_id, default_watcher_id, position`,
     [first?.id ?? null, row.id]
   );
   return withDefault.rows[0];
@@ -194,6 +195,7 @@ export const publicBoard = (
   slug: r.slug,
   defaultStateId: r.default_state_id,
   defaultAssigneeId: r.default_assignee_id,
+  defaultWatcherId: r.default_watcher_id,
   position: r.position,
   states: states.map(publicState),
   deniedRoles,

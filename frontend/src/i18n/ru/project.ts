@@ -6,6 +6,7 @@ const project: Shape<typeof en> = {
   loadFailed: 'Не получилось загрузить проект.',
   defaultStatus: 'Статус по умолчанию',
   defaultAssignee: 'Исполнитель по умолчанию',
+  defaultWatcher: 'Наблюдатель по умолчанию',
   order: 'Порядок',
   open: 'Открытый',
   resolved: 'Закрытый',

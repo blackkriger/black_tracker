@@ -9,6 +9,7 @@ export interface BoardFull {
   tagIds: string[];
   defaultStateId?: string | null;
   defaultAssigneeId?: string | null;
+  defaultWatcherId?: string | null;
 }
 
 const cache = ref(new Map<string, BoardFull>());
