@@ -284,6 +284,7 @@ useLive((ev) => {
   if (
     ev.type.startsWith('issue.') ||
     ev.type.startsWith('comment.') ||
+    ev.type.startsWith('notice.') ||
     ev.type === 'key-date.changed' ||
     RELOAD_ON.includes(ev.type)
   ) {

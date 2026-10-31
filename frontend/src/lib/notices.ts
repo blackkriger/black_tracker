@@ -3,6 +3,7 @@ import { api } from './api';
 import { i18n } from '../i18n';
 import { shortDate } from './calendar';
 import { toggled } from './lists';
+import { tellTab } from './live';
 import { useSession, type Me } from './session';
 import type { NoticeKind } from '../../../shared/rules';
 
@@ -180,6 +181,7 @@ export function useNotices() {
       notices.value = notices.value
         .map((n) => (!id || n.id === id ? { ...n, read: true } : n))
         .sort((a, b) => Number(a.read) - Number(b.read) || Date.parse(b.at) - Date.parse(a.at));
+      tellTab('notice.changed');
       await readCounts();
     },
     async markUnread(id: string): Promise<void> {
@@ -187,6 +189,7 @@ export function useNotices() {
       notices.value = notices.value
         .map((n) => (n.id === id ? { ...n, read: false } : n))
         .sort((a, b) => Number(a.read) - Number(b.read) || Date.parse(b.at) - Date.parse(a.at));
+      tellTab('notice.changed');
       await readCounts();
     },
   };

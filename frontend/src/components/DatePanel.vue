@@ -105,6 +105,7 @@ useLive(
     if (
       ev.type.startsWith('issue.') ||
       ev.type.startsWith('comment.') ||
+      ev.type.startsWith('notice.') ||
       ['history.added', 'state.changed', 'board.changed', 'project.changed'].includes(ev.type)
     ) {
       rereadMonth();
