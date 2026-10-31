@@ -200,7 +200,15 @@ onBeforeUnmount(() => {
           :disabled="adding"
           @click="add"
         ><Plus class="ic" /></button>
-        <span class="sp"></span>
+        <button
+          class="btn btn--sm btn--icon btn--ghost"
+          :class="{ 'is-on': coloring === n.id }"
+          type="button"
+          :title="t('me.noteColor')"
+          :aria-label="t('me.noteColor')"
+          :aria-expanded="coloring === n.id"
+          @click="coloring = coloring === n.id ? null : n.id"
+        ><Palette class="ic" /></button>
         <div v-if="coloring === n.id" class="sticky__colors" role="radiogroup" :aria-label="t('me.noteColor')">
           <button
             v-for="c in COLORS"
@@ -215,15 +223,7 @@ onBeforeUnmount(() => {
             @click="recolor(n, c)"
           ></button>
         </div>
-        <button
-          class="btn btn--sm btn--icon btn--ghost"
-          :class="{ 'is-on': coloring === n.id }"
-          type="button"
-          :title="t('me.noteColor')"
-          :aria-label="t('me.noteColor')"
-          :aria-expanded="coloring === n.id"
-          @click="coloring = coloring === n.id ? null : n.id"
-        ><Palette class="ic" /></button>
+        <span class="sp"></span>
         <button
           class="btn btn--sm btn--icon btn--ghost"
           type="button"
@@ -321,7 +321,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding-right: 4px;
+  padding-left: 4px;
 }
 .sticky__swatch {
   background: var(--h);
