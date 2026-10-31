@@ -6,7 +6,7 @@ import { api } from '../lib/api';
 import { useTitle } from '../lib/title';
 import { messageOf } from '../lib/panelErrors';
 import { PASSWORD_MIN } from '../../../shared/rules';
-import mark from '../../../docs/icon.png';
+import AuthFoot from '../components/AuthFoot.vue';
 
 const { t } = useI18n();
 useTitle(() => t('auth.newPassword'));
@@ -62,7 +62,6 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <div class="signin">
-    <img class="signin__mark" :src="mark" alt="" width="64" height="64" />
     <section class="panel signin__panel" aria-labelledby="reset-title">
       <header id="reset-title" class="panel__h">{{ t('auth.newPassword') }}</header>
 
@@ -110,5 +109,6 @@ async function onSubmit(): Promise<void> {
         </button>
       </form>
     </section>
+    <AuthFoot />
   </div>
 </template>

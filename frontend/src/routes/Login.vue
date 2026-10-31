@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useSession } from '../lib/session';
 import { useTitle } from '../lib/title';
 import { messageOf } from '../lib/panelErrors';
-import mark from '../../../docs/icon.png';
+import AuthFoot from '../components/AuthFoot.vue';
 
 const { t } = useI18n();
 useTitle(() => t('auth.signIn'));
@@ -37,7 +37,6 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <div class="signin">
-    <img class="signin__mark" :src="mark" alt="" width="64" height="64" />
     <section class="panel signin__panel" aria-labelledby="signin-title">
       <header class="panel__h" id="signin-title">{{ t('auth.signIn') }}</header>
       <form class="panel__b signin__form" @submit.prevent="onSubmit">
@@ -62,5 +61,6 @@ async function onSubmit(): Promise<void> {
       </form>
     </section>
 
+    <AuthFoot />
   </div>
 </template>
